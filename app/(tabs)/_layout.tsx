@@ -1,33 +1,65 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Platform, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';//  Tenho que meter o Ionicons do MaterialIcons da Google
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: '#4A665E', 
+        tabBarInactiveTintColor: '#9BA3A1',
         headerShown: false,
-        tabBarButton: HapticTab,
+        tabBarStyle: {
+          backgroundColor: '#F1F4E9', 
+          borderTopWidth: 0,
+          height: Platform.OS === 'ios' ? 90 : 70,
+          paddingBottom: Platform.OS === 'ios' ? 30 : 10,
+          elevation: 0, 
+        },
+        tabBarLabelStyle: {
+          fontFamily: 'Nunito-SemiBold',
+          fontSize: 12,
+        },
       }}>
+      
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
+          ),
         }}
       />
+
       <Tabs.Screen
-        name="explore"
+        name="Activities"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Activities',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "leaf" : "leaf-outline"} size={24} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="Routines"
+        options={{
+          title: 'Routines',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "sunny" : "sunny-outline"} size={24} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="Rooms"
+        options={{
+          title: 'Rooms',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "grid" : "grid-outline"} size={24} color={color} />
+          ),
         }}
       />
     </Tabs>
