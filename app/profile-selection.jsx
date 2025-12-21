@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, View, Text, Image, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons'; // Tenho que importar o Ionicons do MaterialIcons da Google
+import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
@@ -44,7 +44,7 @@ export default function ProfileSelection() {
 
           <TouchableOpacity activeOpacity={0.7} style={styles.profileItem}>
             <View style={[styles.avatarContainer, styles.addButton]}>
-              <Ionicons name="add" size={50} color="#3A5A54" />
+              <Ionicons name="add" size={70} color="#354F52" />{/* Tenho que meter o Ionicons do MaterialIcons da Google */}
             </View>
             <Text style={styles.profileName}>Add Profile</Text>
           </TouchableOpacity>
@@ -67,7 +67,7 @@ export default function ProfileSelection() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F1F4E9', 
+    backgroundColor: '#F0F2EB', 
   },
   scrollContent: {
     alignItems: 'center',
@@ -77,9 +77,10 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: 'Nunito-Bold',
-    fontSize: 26,
+    fontSize: 32, 
     color: '#3A5A54', 
-    marginBottom: 40,
+    marginBottom: 50,
+    textAlign: 'center',
   },
   grid: {
     flexDirection: 'row',
@@ -87,20 +88,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: '100%',
     paddingHorizontal: 20,
-    gap: 10,
+    gap: 15,
   },
   profileItem: {
     alignItems: 'center',
     width: '45%', 
-    marginBottom: 30,
+    marginBottom: 40,
   },
   avatarContainer: {
-    width: 120, 
-    height: 120,
-    borderRadius: 60, 
+    width: 110, 
+    height: 110,
+    borderRadius: 75, 
     backgroundColor: '#FFFFFF',
     overflow: 'hidden',
-    marginBottom: 10,
+    marginBottom: 15,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 3,
@@ -120,17 +121,17 @@ const styles = StyleSheet.create({
   },
   profileName: {
     fontFamily: 'Nunito-SemiBold',
-    fontSize: 16,
+    fontSize: 18, 
     color: '#3A5A54',
     textAlign: 'center',
   },
   manageButton: {
-    marginTop: 20,
+    marginTop: 10,
   },
   manageText: {
     fontFamily: 'Nunito-Bold',
-    fontSize: 16,
-    color: '#6B967E',
+    fontSize: 18,
+    color: '#548F53',
     textDecorationLine: 'underline',
   },
   waveImage: {
