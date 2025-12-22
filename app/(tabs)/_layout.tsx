@@ -1,33 +1,81 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-
-import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Platform, Image } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        tabBarActiveTintColor: '#4A665E',
+        tabBarInactiveTintColor: '#9BA3A1',
         headerShown: false,
-        tabBarButton: HapticTab,
-      }}>
+        tabBarStyle: {
+          backgroundColor: '#F1F4E9',
+          borderTopWidth: 0,
+          height: Platform.OS === 'ios' ? 90 : 70,
+          paddingBottom: Platform.OS === 'ios' ? 30 : 10,
+          elevation: 0,
+        },
+        tabBarLabelStyle: {
+          fontFamily: 'Nunito-SemiBold',
+          fontSize: 12,
+        },
+      }}
+    >
+      {/* Home alterar para o logo da Nidush*/}
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons name="home-outline" size={26} color={color} />
+          ),
         }}
       />
+
+      {/* Activities */}
       <Tabs.Screen
-        name="explore"
+        name="Activities"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Activities',
+          tabBarIcon: ({ color }) => (
+            <Image
+              source={require('../../assets/navbar/spa.png')} 
+              style={{ width: 26, height: 26, tintColor: color }}
+              resizeMode="contain"
+            />
+          ),
+        }}
+      />
+
+      {/* Routines*/}
+      <Tabs.Screen
+        name="Routines"
+        options={{
+          title: 'Routines',
+          tabBarIcon: ({ color }) => (
+            <Image
+              source={require('../../assets/navbar/routine.png')} 
+              style={{ width: 26, height: 26, tintColor: color }}
+              resizeMode="contain"
+            />
+          ),
+        }}
+      />
+
+      {/* Rooms*/}
+      <Tabs.Screen
+        name="Rooms"
+        options={{
+          title: 'Rooms',
+          tabBarIcon: ({ color }) => (
+            <Image
+              source={require('../../assets/navbar/auto_awesome_mosaic.png')} 
+              style={{ width: 26, height: 26, tintColor: color }}
+              resizeMode="contain"
+            />
+          ),
         }}
       />
     </Tabs>
