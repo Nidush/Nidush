@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  ImageBackground, 
-  TouchableOpacity, 
-  FlatList, 
-  Dimensions, 
+import {
+  View,
+  Text,
+  ImageBackground,
+  TouchableOpacity,
+  FlatList,
+  Dimensions,
   StyleSheet,
   Image,
   Animated
@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
-const SLIDE_DURATION = 511000; 
+const SLIDE_DURATION = 5000;
 
 const SLIDES = [
   { id: '1', title: 'Your home, your safe space', description: "Stress and anxiety shouldn't follow you home. Nidush is here to help you disconnect, reconnect with yourself and turn your home into a space that adapts to you.", image: require('../assets/gif/Inico.png') },
@@ -66,7 +66,7 @@ export default function Onboarding() {
   const finishOnboarding = async () => {
     try {
       await AsyncStorage.setItem('@viewedOnboarding', 'true');
-      router.replace('/signup'); 
+      router.replace('/signup');
     } catch (e) {
       router.replace('/signup');
     }
@@ -128,10 +128,10 @@ export default function Onboarding() {
         <SafeAreaView style={styles.container} pointerEvents="box-none">
           <View style={styles.header} pointerEvents="box-none">
 
-            <Image 
-              source={require('../assets/images/Logo.png')} 
-              style={styles.topLogo} 
-              resizeMode="contain" 
+            <Image
+              source={require('../assets/images/Logo.png')}
+              style={styles.topLogo}
+              resizeMode="contain"
             />
             {!item.isLast && (
               <TouchableOpacity onPress={finishOnboarding} style={styles.skipButton}>
@@ -174,15 +174,15 @@ export default function Onboarding() {
         }}
         getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
       />
-      
+
       <View style={styles.indicatorContainer}>
         {SLIDES.map((_, index) => (
-          <AnimatedIndicator 
-            key={index} 
-            index={index} 
-            currentIndex={currentIndex} 
-            duration={SLIDE_DURATION} 
-            isPlaying={!showWelcome} 
+          <AnimatedIndicator
+            key={index}
+            index={index}
+            currentIndex={currentIndex}
+            duration={SLIDE_DURATION}
+            isPlaying={!showWelcome}
           />
         ))}
       </View>
@@ -208,43 +208,43 @@ const styles = StyleSheet.create({
   leftTapArea: { position: 'absolute', left: 0, top: 0, bottom: 0, width: width * 0.25, zIndex: 1 },
   rightTapArea: { position: 'absolute', right: 0, top: 0, bottom: 0, width: width * 0.75, zIndex: 1 },
   container: { flex: 1, justifyContent: 'space-between', paddingHorizontal: 25, zIndex: 5 },
-  
+
   // Header com Logo Maior
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, zIndex: 10, height: 50 },
   topLogo: { width: 40, height: 42, tintColor: '#FFFFFF' },
-  skipButton: { padding: 10, zIndex: 20 }, 
+  skipButton: { padding: 10, zIndex: 20 },
   skipText: { color: '#fff', fontSize: 16, fontWeight: '600', textDecorationLine: 'underline', fontFamily: 'Nunito' },
-  
+
   // Conteúdo posicionado mais abaixo
   contentBox: { marginTop: 'auto', marginBottom: '-20%' },
 
   titleText: { color: '#fff', fontSize: 36, fontWeight: '800', lineHeight: 42, marginBottom: 15, fontFamily: 'Nunito' },
   descriptionText: { color: '#fff', fontSize: 17, lineHeight: 24, opacity: 0.9, fontFamily: 'Nunito' },
-  
+
   // Botão Final
   footer: { height: 140, justifyContent: 'center', zIndex: 20 },
   beginButton: { backgroundColor: '#589158', paddingVertical: 18, borderRadius: 40, alignItems: 'center', zIndex: 30 },
   beginButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 18, fontFamily: 'Nunito' },
 
   // Indicadores estilo Stories 
-  indicatorContainer: { 
-    flexDirection: 'row', 
-    position: 'absolute', 
-    bottom: '10%', 
-    width: '100%', 
+  indicatorContainer: {
+    flexDirection: 'row',
+    position: 'absolute',
+    bottom: '10%',
+    width: '100%',
     paddingHorizontal: 20,
     zIndex: 100
   },
-  indicatorBase: { 
-    height: 4, 
-    flex: 1, 
-    marginHorizontal: 3, 
-    borderRadius: 2, 
-    backgroundColor: 'rgba(255,255,255,0.3)', 
-    overflow: 'hidden' 
+  indicatorBase: {
+    height: 4,
+    flex: 1,
+    marginHorizontal: 3,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    overflow: 'hidden'
   },
-  indicatorFill: { 
-    height: '100%', 
-    backgroundColor: '#589158' 
+  indicatorFill: {
+    height: '100%',
+    backgroundColor: '#589158'
   },
 });
