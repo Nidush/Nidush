@@ -1,196 +1,310 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, TouchableOpacity, SafeAreaView, Platform, ScrollView, TextInput, ImageBackground } from 'react-native';
-import { Ionicons, MaterialCommunityIcons, FontAwesome5, MaterialIcons } from '@expo/vector-icons';
+import React, { useState, ComponentProps } from 'react';
+import { StyleSheet, View, TouchableOpacity, ScrollView, TextInput, Dimensions, ImageBackground, Image } from 'react-native';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { useFonts, Nunito_700Bold, Nunito_600SemiBold, Nunito_400Regular } from '@expo-google-fonts/nunito';
 import { ThemedText } from '@/components/themed-text';
 
+const { width } = Dimensions.get('window');
+
+type MaterialIconName = ComponentProps<typeof MaterialIcons>['name'];
+type IonIconName = ComponentProps<typeof Ionicons>['name'];
+
+const FlowHeader = ({ title, step, totalSteps, onBack }: any) => (
+  <View>
+    <View style={styles.header}>
+      <TouchableOpacity onPress={onBack}>
+        <Ionicons name="chevron-back" size={28} color="#2F4F4F" />
+      </TouchableOpacity>
+      <ThemedText style={styles.headerTitle}>{title}</ThemedText>
+      <TouchableOpacity onPress={() => router.back()}>
+        <ThemedText style={styles.cancelButton}>Cancel</ThemedText>
+      </TouchableOpacity>
+    </View>
+    <View style={styles.progressRow}>
+      {[...Array(totalSteps)].map((_, i) => (
+        <View 
+          key={i} 
+          style={[
+            styles.progressStep, 
+            i + 1 <= step ? styles.stepActive : styles.stepInactive
+          ]} 
+        />
+      ))}
+    </View>
+  </View>
+);
+
+const ContentCard = ({ item, isSelected, onSelect, type = 'small' }: any) => (
+  <TouchableOpacity 
+    onPress={() => onSelect(item.title)}
+    activeOpacity={0.9}
+    style={[
+      type === 'large' ? styles.largeCard : styles.smallCard,
+      isSelected && styles.contentSelected 
+    ]}
+  >
+    <ImageBackground 
+      source={{ uri: item.image }} 
+      style={styles.cardImage} 
+      imageStyle={{ borderRadius: 20 }}
+    >
+      <TouchableOpacity style={styles.moreIcon}>
+        <MaterialIcons name="more-vert" size={24} color="white" />
+      </TouchableOpacity>
+
+      <View style={styles.cardOverlay}>
+        {item.recommended && <ThemedText style={styles.recommendedTag}>Recommended</ThemedText>}
+        <View>
+          <ThemedText style={type === 'large' ? styles.largeCardTitle : styles.smallCardTitle} numberOfLines={1}>
+            {item.title}
+          </ThemedText>
+          <View style={styles.cardInfoRow}>
+            <Ionicons 
+              name={(item.type === 'Video' ? "play-circle" : "headset") as IonIconName} 
+              size={14} 
+              color="white" 
+            />
+            <ThemedText style={styles.cardInfoText}>{item.type} • {item.duration}</ThemedText>
+          </View>
+        </View>
+      </View>
+    </ImageBackground>
+  </TouchableOpacity>
+);
+
+const StepWrapper = ({ title, subtitle, children }: any) => (
+  <View style={{ marginTop: 10 }}>
+    <ThemedText style={styles.mainTitle}>{title}</ThemedText>
+    {subtitle && <ThemedText style={styles.subtitle}>{subtitle}</ThemedText>}
+    {children}
+  </View>
+);
+
+const ReviewItem = ({ label, value }: any) => (
+  <View style={styles.reviewSection}>
+    <View style={styles.rowBetween}>
+      <ThemedText style={styles.reviewLabelSmall}>{label}</ThemedText>
+      <TouchableOpacity><ThemedText style={styles.editText}>Edit</ThemedText></TouchableOpacity>
+    </View>
+    <View style={styles.reviewValueBox}>
+       <ThemedText style={styles.reviewValueText}>{value || 'Not selected'}</ThemedText>
+    </View>
+  </View>
+);
+
 export default function NewActivityFlow() {
+  let [fontsLoaded] = useFonts({
+    Nunito_700Bold,
+    Nunito_600SemiBold,
+    Nunito_400Regular,
+  });
+
   const [step, setStep] = useState(1);
   const totalSteps = 6;
 
-  // aida em desenvolvimento
-
-  // Estados para salvar as escolhas
-  const [activityType, setActivityType] = useState('Meditation');
-  const [content, setContent] = useState('Rise and Shine');
-  const [room, setRoom] = useState('Bedroom');
+  const [activityType, setActivityType] = useState(''); 
+  const [selectedContent, setSelectedContent] = useState(''); 
+  const [room, setRoom] = useState(''); 
   const [environment, setEnvironment] = useState('Moonlight Bay');
+  const [activityName, setActivityName] = useState('');
+  const [description, setDescription] = useState('');
 
-  const nextStep = () => {
-    if (step < totalSteps) setStep(step + 1);
-    else router.back(); 
-  };
+  if (!fontsLoaded) return null;
 
-  const prevStep = () => {
-    if (step > 1) setStep(step - 1);
-    else router.back();
+  const nextStep = () => { if (step < totalSteps) setStep(step + 1); };
+  const prevStep = () => { if (step > 1) setStep(step - 1); else router.back(); };
+
+  const isNextDisabled = () => {
+    if (step === 1 && !activityType) return true;
+    if (step === 2 && !selectedContent) return true;
+    if (step === 3 && !room) return true;
+    return false;
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* HEADER FIXO */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={prevStep}>
-          <Ionicons name="chevron-back" size={30} color="#354F52" />
-        </TouchableOpacity>
-        <ThemedText style={styles.headerTitle}>New activity</ThemedText>
-        <TouchableOpacity onPress={() => router.back()}>
-          <ThemedText style={styles.cancelButton}>Cancel</ThemedText>
-        </TouchableOpacity>
-      </View>
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.container}>
+        <FlowHeader title="New activity" step={step} totalSteps={totalSteps} onBack={prevStep} />
 
-      {/* BARRA DE PROGRESSO DINÂMICA */}
-      <View style={styles.progressRow}>
-        {[...Array(totalSteps)].map((_, i) => (
-          <View 
-            key={i} 
-            style={[styles.progressStep, i + 1 <= step && styles.stepActive]} 
-          />
-        ))}
-      </View>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 140 }}>
+          
+          {step === 1 && (
+            <StepWrapper title="What do you want to do?" subtitle="Select the activity type you want to do.">
+              <View style={styles.grid}>
+                {['Cooking', 'Audiobook', 'Meditation', 'Workout'].map((id) => (
+                  <TouchableOpacity 
+                    key={id} 
+                    style={[styles.typeCard, activityType === id && styles.typeCardSelected]} 
+                    onPress={() => setActivityType(id)}
+                  >
+                    <MaterialIcons 
+                      name={(id === 'Cooking' ? 'restaurant' : id === 'Audiobook' ? 'menu-book' : id === 'Meditation' ? 'self-improvement' : 'fitness-center') as MaterialIconName} 
+                      size={50} color="#354F52" 
+                    />
+                    <ThemedText style={styles.cardLabel}>{id}</ThemedText>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </StepWrapper>
+          )}
 
-      {/* CONTEÚDO QUE MUDA DE ACORDO COM O STEP */}
-      <ScrollView showsVerticalScrollIndicator={false} style={styles.body}>
-        {step === 1 && <StepActivityType selected={activityType} onSelect={setActivityType} />}
-        {step === 2 && <StepContent selected={content} onSelect={setContent} />}
-        {step === 3 && <StepRoom selected={room} onSelect={setRoom} />}
-        {step === 4 && <StepEnvironment selected={environment} onSelect={setEnvironment} />}
-        {step === 5 && <StepDetails />}
-        {step === 6 && <StepReview activity={{activityType, content, room, environment}} />}
-      </ScrollView>
+          {step === 2 && (
+            <StepWrapper title="How do you want to practice?" subtitle="Select the type of content you want to have access.">
+              <ContentCard 
+                type="large"
+                item={{ title: 'Stress Buster', duration: '8min', type: 'Video', recommended: true, image: 'https://picsum.photos/400/300' }}
+                isSelected={selectedContent === 'Stress Buster'}
+                onSelect={setSelectedContent}
+              />
+              <ThemedText style={styles.sectionTitle}>Video sessions</ThemedText>
+              <View style={styles.row}>
+                <ContentCard 
+                  item={{ title: 'Rise and Shine', duration: '10min', type: 'Video', image: 'https://picsum.photos/200/200' }}
+                  isSelected={selectedContent === 'Rise and Shine'}
+                  onSelect={setSelectedContent}
+                />
+                <ContentCard 
+                  item={{ title: 'Panic Reset', duration: '15min', type: 'Video', image: 'https://picsum.photos/201/200' }}
+                  isSelected={selectedContent === 'Panic Reset'}
+                  onSelect={setSelectedContent}
+                />
+              </View>
+              <ThemedText style={styles.sectionTitle}>Audio sessions</ThemedText>
+              <View style={styles.row}>
+                <ContentCard 
+                  item={{ title: 'Brain Boost', duration: '5min', type: 'Audio', image: 'https://picsum.photos/202/200' }}
+                  isSelected={selectedContent === 'Brain Boost'}
+                  onSelect={setSelectedContent}
+                />
+                <ContentCard 
+                  item={{ title: 'Self Love', duration: '12min', type: 'Audio', image: 'https://picsum.photos/203/200' }}
+                  isSelected={selectedContent === 'Self Love'}
+                  onSelect={setSelectedContent}
+                />
+              </View>
+            </StepWrapper>
+          )}
 
-      {/* BOTÃO CONTINUE FIXO EMBAIXO */}
-      <TouchableOpacity style={styles.continueButton} onPress={nextStep}>
-        <ThemedText style={styles.continueText}>
-          {step === 6 ? "Save" : "Continue"}
-        </ThemedText>
-      </TouchableOpacity>
-    </SafeAreaView>
+          {step === 3 && (
+            <StepWrapper title="Where will it happen?" subtitle="Select the room.">
+              <View style={styles.grid}>
+                {[
+                  { id: 'Bedroom', icon: 'bed' as MaterialIconName },
+                  { id: 'Kitchen', icon: 'restaurant' as MaterialIconName },
+                  { id: 'Living Room', icon: 'weekend' as MaterialIconName }, 
+                  { id: 'Bathroom', icon: 'bathtub' as MaterialIconName },
+                  { id: 'Office', icon: 'computer' as MaterialIconName },
+                  { id: 'Garden', icon: 'local-florist' as MaterialIconName },
+                ].map((r) => (
+                  <TouchableOpacity 
+                    key={r.id} 
+                    style={[styles.typeCard, room === r.id && styles.typeCardSelected]} 
+                    onPress={() => setRoom(r.id)}
+                  >
+                    <MaterialIcons name={r.icon} size={50} color="#354F52" />
+                    <ThemedText style={styles.cardLabel}>{r.id}</ThemedText>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </StepWrapper>
+          )}
+
+          {step === 4 && (
+            <StepWrapper title="Environment" subtitle="Select a scenario.">
+              <View style={styles.grid}>
+                {['Moonlight Bay', 'Rose Garden', 'Deep Focus'].map((env) => (
+                  <TouchableOpacity key={env} style={[styles.envCard, environment === env && styles.envSelected]} onPress={() => setEnvironment(env)}>
+                    <ImageBackground source={{ uri: 'https://picsum.photos/150' }} style={{flex:1}} imageStyle={{borderRadius: 15}}>
+                      <View style={styles.envOverlay}>
+                        <ThemedText style={styles.envText}>{env}</ThemedText>
+                      </View>
+                    </ImageBackground>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </StepWrapper>
+          )}
+
+          {step === 5 && (
+            <StepWrapper title="Last details" subtitle="Activity info.">
+              <TextInput placeholder="Activity Name" style={styles.input} value={activityName} onChangeText={setActivityName} />
+              <TextInput placeholder="Description" style={[styles.input, { height: 120 }]} multiline value={description} onChangeText={setDescription} />
+            </StepWrapper>
+          )}
+
+          {step === 6 && (
+            <StepWrapper title="Review and save">
+              <ReviewItem label="Activity Type" value={activityType} />
+              <ReviewItem label="Contents" value={selectedContent} />
+              <ReviewItem label="Room" value={room} />
+              <ReviewItem label="Environment" value={environment} />
+            </StepWrapper>
+          )}
+        </ScrollView>
+
+        <View style={styles.footer}>
+          <TouchableOpacity 
+            style={[styles.continueButton, isNextDisabled() && { opacity: 0.5 }]} 
+            onPress={nextStep}
+            disabled={isNextDisabled()}
+          >
+            <ThemedText style={styles.continueText}>{step === 6 ? "Save" : "Continue"}</ThemedText>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
-const StepActivityType = ({selected, onSelect}: any) => (
-  <View>
-    <ThemedText style={styles.mainTitle}>What do you want to do?</ThemedText>
-    <ThemedText style={styles.subtitle}>Select the activity type you want to do.</ThemedText>
-    <View style={styles.grid}>
-      {[
-        { id: 'Cooking', icon: 'chef-hat', lib: 'Material' },
-        { id: 'Audiobook', icon: 'book-open', lib: 'Font5' },
-        { id: 'Meditation', icon: 'self-improvement', lib: 'MatIcons' },
-        { id: 'Workout', icon: 'dumbbell', lib: 'Font5' },
-      ].map((item) => (
-        <TouchableOpacity 
-          key={item.id}
-          style={[styles.card, selected === item.id && styles.cardSelected]} 
-          onPress={() => onSelect(item.id)}
-        >
-          <MaterialCommunityIcons name={item.icon as any} size={40} color="#354F52" />
-          <ThemedText style={styles.cardText}>{item.id}</ThemedText>
-        </TouchableOpacity>
-      ))}
-    </View>
-  </View>
-);
-
-const StepContent = ({selected, onSelect}: any) => (
-  <View>
-    <ThemedText style={styles.mainTitle}>How do you want to practice?</ThemedText>
-    <ThemedText style={styles.subtitle}>Select the type of content you want to access.</ThemedText>
-    
-    <ThemedText style={styles.sectionLabel}>Video sessions</ThemedText>
-    <View style={styles.grid}>
-      <TouchableOpacity style={styles.imageCard} onPress={() => onSelect('Rise and Shine')}>
-        <ImageBackground source={{uri: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773'}} style={styles.imgBg} imageStyle={{borderRadius: 15}}>
-           <ThemedText style={styles.imgCardText}>Rise and Shine</ThemedText>
-        </ImageBackground>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.imageCard} onPress={() => onSelect('Panic Reset')}>
-        <ImageBackground source={{uri: 'https://images.unsplash.com/photo-1499209974431-9dac3adaf471'}} style={styles.imgBg} imageStyle={{borderRadius: 15}}>
-           <ThemedText style={styles.imgCardText}>Panic Reset</ThemedText>
-        </ImageBackground>
-      </TouchableOpacity>
-    </View>
-  </View>
-);
-
-const StepRoom = ({selected, onSelect}: any) => (
-  <View>
-    <ThemedText style={styles.mainTitle}>Where will it happen?</ThemedText>
-    <ThemedText style={styles.subtitle}>Select the room where the activity will take place.</ThemedText>
-    <View style={styles.grid}>
-      {['Bedroom', 'Kitchen', 'Living Room', 'Bathroom'].map((r) => (
-        <TouchableOpacity 
-          key={r}
-          style={[styles.card, selected === r && styles.cardSelected]} 
-          onPress={() => onSelect(r)}
-        >
-          <MaterialCommunityIcons name="bed-outline" size={35} color="#354F52" />
-          <ThemedText style={styles.cardText}>{r}</ThemedText>
-        </TouchableOpacity>
-      ))}
-    </View>
-  </View>
-);
-
-const StepEnvironment = ({selected, onSelect}: any) => (
-  <View>
-    <ThemedText style={styles.mainTitle}>What kind of environment?</ThemedText>
-    <View style={styles.grid}>
-       <ThemedText>Environment list...</ThemedText>
-    </View>
-  </View>
-);
-
-const StepDetails = () => (
-  <View>
-    <ThemedText style={styles.mainTitle}>Last details</ThemedText>
-    <View style={styles.uploadBox}>
-       <Ionicons name="add-circle-outline" size={50} color="#354F52" />
-    </View>
-    <ThemedText style={styles.inputLabel}>Activity Name</ThemedText>
-    <TextInput style={styles.input} placeholder="Ex: Morning Yoga" />
-    <ThemedText style={styles.inputLabel}>Description</ThemedText>
-    <TextInput style={[styles.input, {height: 100}]} multiline placeholder="Describe it..." />
-  </View>
-);
-
-const StepReview = ({activity}: any) => (
-  <View>
-    <ThemedText style={styles.mainTitle}>Review and save</ThemedText>
-    <View style={styles.reviewItem}>
-       <ThemedText style={styles.reviewLabel}>Activity Type</ThemedText>
-       <View style={styles.reviewCard}><ThemedText>{activity.activityType}</ThemedText></View>
-    </View>
-  </View>
-);
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F0F2EB', paddingHorizontal: 20 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 15, marginBottom: 10 },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: '#354F52' },
-  cancelButton: { color: '#548F53', fontWeight: '600' },
-  progressRow: { flexDirection: 'row', gap: 8, marginVertical: 20 },
-  progressStep: { flex: 1, height: 6, borderRadius: 3, backgroundColor: '#D9DFD0' },
-  stepActive: { backgroundColor: '#548F53' },
-  body: { flex: 1 },
-  mainTitle: { fontSize: 24, fontWeight: '800', color: '#354F52', marginBottom: 5 },
-  subtitle: { fontSize: 14, color: '#6A7D5B', marginBottom: 25 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  card: { width: '47%', aspectRatio: 1, backgroundColor: '#C4D4B5', borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
-  cardSelected: { borderWidth: 2, borderColor: '#4A6741' },
-  cardText: { marginTop: 8, fontSize: 16, fontWeight: '600' },
-  imageCard: { width: '47%', height: 120, marginBottom: 15 },
-  imgBg: { flex: 1, justifyContent: 'flex-end', padding: 10 },
-  imgCardText: { color: 'white', fontWeight: 'bold', fontSize: 12 },
-  sectionLabel: { fontSize: 18, fontWeight: '700', color: '#354F52', marginVertical: 15 },
-  input: { backgroundColor: 'white', borderRadius: 10, padding: 15, marginBottom: 20, borderColor: '#D9DFD0' },
-  inputLabel: { fontWeight: '600', marginBottom: 8, color: '#354F52' },
-  uploadBox: { width: '100%', height: 150, backgroundColor: '#C4D4B5', borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
-  continueButton: { backgroundColor: '#4A6741', height: 55, borderRadius: 28, justifyContent: 'center', alignItems: 'center', marginBottom: 30 },
-  continueText: { color: 'white', fontSize: 18, fontWeight: '700' },
-  reviewItem: { marginBottom: 15 },
-  reviewLabel: { fontWeight: 'bold', color: '#354F52', marginBottom: 5 },
-  reviewCard: { backgroundColor: 'white', padding: 15, borderRadius: 12 }
+  container: { flex: 1, backgroundColor: '#F9FAF7', paddingHorizontal: 20 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 60, marginTop: 10 },
+  headerTitle: { fontSize: 20, color: '#2F4F4F', fontFamily: 'Nunito_700Bold' },
+  cancelButton: { color: '#548F53', fontSize: 16, fontFamily: 'Nunito_600SemiBold' },
+  progressRow: { flexDirection: 'row', gap: 6, marginVertical: 15 },
+  progressStep: { flex: 1, height: 6, borderRadius: 50 },
+  stepActive: { backgroundColor: '#519A4E' },
+  stepInactive: { backgroundColor: '#DDE5D7' },
+  mainTitle: { fontSize: 26, color: '#2F4F4F', marginBottom: 8, fontFamily: 'Nunito_700Bold' },
+  subtitle: { fontSize: 15, color: '#6A7D5B', marginBottom: 25, fontFamily: 'Nunito_600SemiBold' },
+  sectionTitle: { fontSize: 18, color: '#2F4F4F', fontFamily: 'Nunito_700Bold', marginVertical: 12 },
+  
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' },
+  row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
+  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+
+  typeCard: { width: '48%', height: 150, backgroundColor: '#BBDABA', borderRadius: 24, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: 'transparent' },
+  typeCardSelected: { borderColor: '#548F53' },
+  cardLabel: { marginTop: 10, fontSize: 16, color: '#2F4F4F', fontFamily: 'Nunito_600SemiBold' },
+  
+  largeCard: { width: '100%', height: 148, borderRadius: 24, overflow: 'hidden', marginBottom: 12, borderWidth: 3, borderColor: 'transparent' },
+  smallCard: { width: '48%', height: 148, borderRadius: 24, overflow: 'hidden', borderWidth: 3, borderColor: 'transparent' },
+  contentSelected: { borderColor: '#548F53' }, 
+  
+  cardImage: { flex: 1 },
+  moreIcon: { position: 'absolute', top: 10, right: 4, zIndex: 10 }, 
+  cardOverlay: { padding: 12, backgroundColor: 'rgba(0,0,0,0.15)', flex: 1, justifyContent: 'flex-end' },
+  largeCardTitle: { color: 'white', fontSize: 20, fontFamily: 'Nunito_700Bold' },
+  smallCardTitle: { color: 'white', fontSize: 15, fontFamily: 'Nunito_700Bold' },
+  recommendedTag: { color: 'white', fontSize: 11, fontFamily: 'Nunito_400Regular', marginBottom: 2 },
+  cardInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+  cardInfoText: { color: 'white', fontSize: 11, fontFamily: 'Nunito_400Regular' },
+
+  envCard: { width: '48%', height: 148, borderRadius: 24, overflow: 'hidden', borderWidth: 3, borderColor: 'transparent' },
+  envSelected: { borderColor: '#548F53' },
+  envOverlay: { flex: 1, padding: 12, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.2)' },
+  envText: { color: 'white', fontFamily: 'Nunito_700Bold', fontSize: 14 },
+
+  input: { backgroundColor: 'white', borderRadius: 15, padding: 18, fontSize: 16, marginBottom: 15, fontFamily: 'Nunito_400Regular' },
+  reviewSection: { marginBottom: 15 },
+  reviewLabelSmall: { fontSize: 16, color: '#2F4F4F', fontFamily: 'Nunito_700Bold' },
+  reviewValueBox: { backgroundColor: 'white', padding: 15, borderRadius: 15, marginTop: 8 },
+  reviewValueText: { fontSize: 15, color: '#4A6741', fontFamily: 'Nunito_600SemiBold' },
+  editText: { color: '#548F53', fontFamily: 'Nunito_600SemiBold' },
+
+  footer: { position: 'absolute', bottom: 40, left: 0, right: 0, alignItems: 'center' },
+  continueButton: { backgroundColor: '#548F53', height: 54, width: 210, borderRadius: 28, justifyContent: 'center', alignItems: 'center' },
+  continueText: { color: 'white', fontSize: 18, fontFamily: 'Nunito_700Bold' },
 });
