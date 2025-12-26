@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
-const SLIDE_DURATION = 511000; 
+const SLIDE_DURATION = 5000; 
 
 const SLIDES = [
   { id: '1', title: 'Your home, your safe space', description: "Stress and anxiety shouldn't follow you home. Nidush is here to help you disconnect, reconnect with yourself and turn your home into a space that adapts to you.", image: require('../assets/gif/Inico.png') },
