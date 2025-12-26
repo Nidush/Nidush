@@ -20,7 +20,7 @@ export default function Profile() {
         <ThemedText style={styles.headerTitle}>Profile</ThemedText>
         <View style={{ width: 28 }} /> 
       </View>
-
+ 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Foto e Nome */}
         <View style={styles.profileSection}>

@@ -11,7 +11,7 @@ export default function RootLayout() {
     const checkOnboarding = async () => {
       try {
         // Remova a linha abaixo após testar, para que ele lembre da escolha:
-        await AsyncStorage.removeItem('@viewedOnboarding'); 
+        // await AsyncStorage.removeItem('@viewedOnboarding'); 
 
         const viewed = await AsyncStorage.getItem('@viewedOnboarding');
         
