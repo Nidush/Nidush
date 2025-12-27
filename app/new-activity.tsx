@@ -212,17 +212,43 @@ export default function NewActivityFlow() {
           )}
 
           {step === 4 && (
-            <StepWrapper title="Environment" subtitle="Select a scenario.">
+            <StepWrapper 
+              title="What kind of environment are you looking for?" 
+              subtitle="Select a scenario or create a personalized scene."
+            >
+              <ThemedText style={styles.sectionTitle}>Scenarios</ThemedText>
               <View style={styles.grid}>
-                {['Moonlight Bay', 'Rose Garden', 'Deep Focus'].map((env) => (
-                  <TouchableOpacity key={env} style={[styles.envCard, environment === env && styles.envSelected]} onPress={() => setEnvironment(env)}>
-                    <ImageBackground source={{ uri: 'https://picsum.photos/150' }} style={{flex:1}} imageStyle={{borderRadius: 15}}>
+                {[
+                  { id: 'Moonlight Bay', img: 'https://picsum.photos/id/10/400/400' },
+                  { id: 'Rose Garden', img: 'https://picsum.photos/id/306/400/400' },
+                  { id: 'Deep Focus', img: 'https://picsum.photos/id/445/400/400' },
+                  { id: 'Lavender Dream', img: 'https://picsum.photos/id/529/400/400' },
+                  { id: 'Forest Bathing', img: 'https://picsum.photos/id/28/400/400' },
+                ].map((env) => (
+                  <TouchableOpacity 
+                    key={env.id} 
+                    style={[styles.envCard, environment === env.id && styles.envSelected]} 
+                    onPress={() => setEnvironment(env.id)}
+                  >
+                    <ImageBackground source={{ uri: env.img }} style={{flex:1}} imageStyle={{borderRadius: 20}}>
+                      <TouchableOpacity style={styles.moreIcon}>
+                        <MaterialIcons name="more-vert" size={24} color="white" />
+                      </TouchableOpacity>
                       <View style={styles.envOverlay}>
-                        <ThemedText style={styles.envText}>{env}</ThemedText>
+                        <ThemedText style={styles.envText}>{env.id}</ThemedText>
+                        <View style={styles.roomIndicator}>
+                          <MaterialIcons name="door-front" size={16} color="white" />
+                          <ThemedText style={styles.roomText}>{room || 'Bedroom'}</ThemedText>
+                        </View>
                       </View>
                     </ImageBackground>
                   </TouchableOpacity>
                 ))}
+                
+                <TouchableOpacity style={styles.createSceneCard}>
+                  <Ionicons name="add" size={40} color="#354F52" />
+                  <ThemedText style={styles.createSceneText}>Create Scene</ThemedText>
+                </TouchableOpacity>
               </View>
             </StepWrapper>
           )}
@@ -307,4 +333,30 @@ const styles = StyleSheet.create({
   footer: { position: 'absolute', bottom: 40, left: 0, right: 0, alignItems: 'center' },
   continueButton: { backgroundColor: '#548F53', height: 54, width: 210, borderRadius: 28, justifyContent: 'center', alignItems: 'center' },
   continueText: { color: 'white', fontSize: 18, fontFamily: 'Nunito_700Bold' },
+
+  // Create new Scene
+  roomIndicator: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 4 
+  },
+  roomText: { 
+    color: 'white', 
+    fontFamily: 'Nunito_400Regular', 
+    fontSize: 14 
+  },
+  createSceneCard: {
+    width: '48%',
+    height: 148,
+    backgroundColor: '#D1E4D1', 
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  createSceneText: {
+    color: '#354F52',
+    fontFamily: 'Nunito_600SemiBold',
+    fontSize: 16,
+    marginTop: 8
+  },
 });
