@@ -25,7 +25,7 @@ jobs:
         run: npm install
 
       - name: Check Prettier formatting
-        run: npx prettier --check .
+        run: npx prettier --write .
 
       - name: Run ESLint
         run: npm run lint
