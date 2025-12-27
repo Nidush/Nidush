@@ -1,7 +1,6 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform, Image } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function TabLayout() {
   return (
@@ -11,7 +10,7 @@ export default function TabLayout() {
         tabBarInactiveTintColor: '#9BA3A1',
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#F1F4E9',
+          backgroundColor: '#F0F2EB',
           borderTopWidth: 0,
           height: Platform.OS === 'ios' ? 90 : 70,
           paddingBottom: Platform.OS === 'ios' ? 30 : 10,
@@ -23,13 +22,17 @@ export default function TabLayout() {
         },
       }}
     >
-      {/* Home alterar para o logo da Nidush*/}
+      {/* Home com o logo da Nidush */}
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
           tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="home-outline" size={26} color={color} />
+            <Image
+              source={require('../../assets/images/Logo.png')} // Coloque aqui o seu logo
+              style={{ width: 26, height: 26, tintColor: color }}
+              resizeMode="contain"
+            />
           ),
         }}
       />
@@ -41,7 +44,7 @@ export default function TabLayout() {
           title: 'Activities',
           tabBarIcon: ({ color }) => (
             <Image
-              source={require('../../assets/navbar/spa.png')} 
+              source={require('../../assets/navbar/spa.png')}
               style={{ width: 26, height: 26, tintColor: color }}
               resizeMode="contain"
             />
@@ -49,14 +52,14 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Routines*/}
+      {/* Routines */}
       <Tabs.Screen
         name="Routines"
         options={{
           title: 'Routines',
           tabBarIcon: ({ color }) => (
             <Image
-              source={require('../../assets/navbar/routine.png')} 
+              source={require('../../assets/navbar/routine.png')}
               style={{ width: 26, height: 26, tintColor: color }}
               resizeMode="contain"
             />
@@ -64,14 +67,14 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Rooms*/}
+      {/* Rooms */}
       <Tabs.Screen
         name="Rooms"
         options={{
           title: 'Rooms',
           tabBarIcon: ({ color }) => (
             <Image
-              source={require('../../assets/navbar/auto_awesome_mosaic.png')} 
+              source={require('../../assets/navbar/auto_awesome_mosaic.png')}
               style={{ width: 26, height: 26, tintColor: color }}
               resizeMode="contain"
             />
