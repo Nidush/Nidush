@@ -1,9 +1,23 @@
 import React, { useState, ComponentProps } from 'react';
-import { StyleSheet, View, TouchableOpacity, ScrollView, TextInput, Dimensions, ImageBackground, Image } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  TouchableOpacity,
+  ScrollView,
+  TextInput,
+  Dimensions,
+  ImageBackground,
+  Image,
+} from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { useFonts, Nunito_700Bold, Nunito_600SemiBold, Nunito_400Regular } from '@expo-google-fonts/nunito';
+import {
+  useFonts,
+  Nunito_700Bold,
+  Nunito_600SemiBold,
+  Nunito_400Regular,
+} from '@expo-google-fonts/nunito';
 import { ThemedText } from '@/components/themed-text';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -57,9 +71,16 @@ const ContentCard = ({ item, isSelected, onSelect, type = 'small' }: any) => (
       </TouchableOpacity>
 
       <View style={styles.cardOverlay}>
-        {item.recommended && <ThemedText style={styles.recommendedTag}>Recommended</ThemedText>}
+        {item.recommended && (
+          <ThemedText style={styles.recommendedTag}>Recommended</ThemedText>
+        )}
         <View>
-          <ThemedText style={type === 'large' ? styles.largeCardTitle : styles.smallCardTitle} numberOfLines={1}>
+          <ThemedText
+            style={
+              type === 'large' ? styles.largeCardTitle : styles.smallCardTitle
+            }
+            numberOfLines={1}
+          >
             {item.title}
           </ThemedText>
           <View style={styles.cardInfoRow}>
@@ -68,7 +89,9 @@ const ContentCard = ({ item, isSelected, onSelect, type = 'small' }: any) => (
               size={14}
               color="white"
             />
-            <ThemedText style={styles.cardInfoText}>{item.type} • {item.duration}</ThemedText>
+            <ThemedText style={styles.cardInfoText}>
+              {item.type} • {item.duration}
+            </ThemedText>
           </View>
         </View>
       </View>
@@ -88,7 +111,9 @@ const ReviewItem = ({ label, value }: any) => (
   <View style={styles.reviewSection}>
     <View style={styles.rowBetween}>
       <ThemedText style={styles.reviewLabelSmall}>{label}</ThemedText>
-      <TouchableOpacity><ThemedText style={styles.editText}>Edit</ThemedText></TouchableOpacity>
+      <TouchableOpacity>
+        <ThemedText style={styles.editText}>Edit</ThemedText>
+      </TouchableOpacity>
     </View>
     <View style={styles.reviewValueBox}>
       <ThemedText style={styles.reviewValueText}>{value || 'Not selected'}</ThemedText>
@@ -117,8 +142,13 @@ export default function NewActivityFlow() {
 
   if (!fontsLoaded) return null;
 
-  const nextStep = () => { if (step < totalSteps) setStep(step + 1); };
-  const prevStep = () => { if (step > 1) setStep(step - 1); else router.back(); };
+  const nextStep = () => {
+    if (step < totalSteps) setStep(step + 1);
+  };
+  const prevStep = () => {
+    if (step > 1) setStep(step - 1);
+    else router.back();
+  };
 
   const isNextDisabled = () => {
     if (step === 1 && !activityType) return true;
@@ -167,12 +197,20 @@ export default function NewActivityFlow() {
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.container}>
-        <FlowHeader title="New activity" step={step} totalSteps={totalSteps} onBack={prevStep} />
+        <FlowHeader
+          title="New activity"
+          step={step}
+          totalSteps={totalSteps}
+          onBack={prevStep}
+        />
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 140 }}>
 
           {step === 1 && (
-            <StepWrapper title="What do you want to do?" subtitle="Select the activity type you want to do.">
+            <StepWrapper
+              title="What do you want to do?"
+              subtitle="Select the activity type you want to do."
+            >
               <View style={styles.grid}>
                 {['Cooking', 'Audiobook', 'Meditation', 'Workout'].map((id) => (
                   <TouchableOpacity
@@ -195,11 +233,19 @@ export default function NewActivityFlow() {
             <StepWrapper title="How do you want to practice?" subtitle="Select the type of content you want to have access.">
               <ContentCard
                 type="large"
-                item={{ title: 'Stress Buster', duration: '8min', type: 'Video', recommended: true, image: 'https://picsum.photos/400/300' }}
+                item={{
+                  title: 'Stress Buster',
+                  duration: '8min',
+                  type: 'Video',
+                  recommended: true,
+                  image: 'https://picsum.photos/400/300',
+                }}
                 isSelected={selectedContent === 'Stress Buster'}
                 onSelect={setSelectedContent}
               />
-              <ThemedText style={styles.sectionTitle}>Video sessions</ThemedText>
+              <ThemedText style={styles.sectionTitle}>
+                Video sessions
+              </ThemedText>
               <View style={styles.row}>
                 <ContentCard
                   item={{ title: 'Rise and Shine', duration: '10min', type: 'Video', image: 'https://picsum.photos/200/200' }}
@@ -212,7 +258,9 @@ export default function NewActivityFlow() {
                   onSelect={setSelectedContent}
                 />
               </View>
-              <ThemedText style={styles.sectionTitle}>Audio sessions</ThemedText>
+              <ThemedText style={styles.sectionTitle}>
+                Audio sessions
+              </ThemedText>
               <View style={styles.row}>
                 <ContentCard
                   item={{ title: 'Brain Boost', duration: '5min', type: 'Audio', image: 'https://picsum.photos/202/200' }}
@@ -229,7 +277,10 @@ export default function NewActivityFlow() {
           )}
 
           {step === 3 && (
-            <StepWrapper title="Where will it happen?" subtitle="Select the room.">
+            <StepWrapper
+              title="Where will it happen?"
+              subtitle="Select the room."
+            >
               <View style={styles.grid}>
                 {[
                   { id: 'Bedroom', icon: 'bed' as MaterialIconName },
@@ -412,7 +463,9 @@ export default function NewActivityFlow() {
             onPress={nextStep}
             disabled={isNextDisabled()}
           >
-            <ThemedText style={styles.continueText}>{step === 6 ? "Save" : "Continue"}</ThemedText>
+            <ThemedText style={styles.continueText}>
+              {step === 6 ? 'Save' : 'Continue'}
+            </ThemedText>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -422,9 +475,19 @@ export default function NewActivityFlow() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAF7', paddingHorizontal: 20 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', height: 60, marginTop: 10 },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    height: 60,
+    marginTop: 10,
+  },
   headerTitle: { fontSize: 20, color: '#2F4F4F', fontFamily: 'Nunito_700Bold' },
-  cancelButton: { color: '#548F53', fontSize: 16, fontFamily: 'Nunito_600SemiBold' },
+  cancelButton: {
+    color: '#548F53',
+    fontSize: 16,
+    fontFamily: 'Nunito_600SemiBold',
+  },
   progressRow: { flexDirection: 'row', gap: 6, marginVertical: 15 },
   progressStep: { flex: 1, height: 6, borderRadius: 50 },
   stepActive: { backgroundColor: '#519A4E' },
@@ -437,7 +500,16 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 
-  typeCard: { width: '48%', height: 150, backgroundColor: '#BBDABA', borderRadius: 24, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: 'transparent' },
+  typeCard: {
+    width: '48%',
+    height: 150,
+    backgroundColor: '#BBDABA',
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: 'transparent',
+  },
   typeCardSelected: { borderColor: '#548F53' },
   cardLabel: { marginTop: 10, fontSize: 16, color: '#2F4F4F', fontFamily: 'Nunito_600SemiBold' },
 
@@ -454,9 +526,21 @@ const styles = StyleSheet.create({
   cardInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
   cardInfoText: { color: 'white', fontSize: 11, fontFamily: 'Nunito_400Regular' },
 
-  envCard: { width: '48%', height: 148, borderRadius: 24, overflow: 'hidden', borderWidth: 3, borderColor: 'transparent' },
+  envCard: {
+    width: '48%',
+    height: 148,
+    borderRadius: 24,
+    overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: 'transparent',
+  },
   envSelected: { borderColor: '#548F53' },
-  envOverlay: { flex: 1, padding: 12, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.2)' },
+  envOverlay: {
+    flex: 1,
+    padding: 12,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
   envText: { color: 'white', fontFamily: 'Nunito_700Bold', fontSize: 14 },
 
   reviewSection: { marginBottom: 15 },
@@ -464,8 +548,21 @@ const styles = StyleSheet.create({
   reviewValueBox: { backgroundColor: 'white', padding: 15, borderRadius: 15, marginTop: 8 },
   editText: { color: '#548F53', fontFamily: 'Nunito_600SemiBold' },
 
-  footer: { position: 'absolute', bottom: 40, left: 0, right: 0, alignItems: 'center' },
-  continueButton: { backgroundColor: '#548F53', height: 54, width: 210, borderRadius: 28, justifyContent: 'center', alignItems: 'center' },
+  footer: {
+    position: 'absolute',
+    bottom: 40,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  continueButton: {
+    backgroundColor: '#548F53',
+    height: 54,
+    width: 210,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   continueText: { color: 'white', fontSize: 18, fontFamily: 'Nunito_700Bold' },
 
   // Create new Scene

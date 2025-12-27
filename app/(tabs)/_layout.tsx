@@ -44,7 +44,7 @@ export default function TabLayout() {
           title: 'Activities',
           tabBarIcon: ({ color }) => (
             <Image
-              source={require('../../assets/navbar/spa.png')} 
+              source={require('../../assets/navbar/spa.png')}
               style={{ width: 26, height: 26, tintColor: color }}
               resizeMode="contain"
             />
@@ -59,7 +59,7 @@ export default function TabLayout() {
           title: 'Routines',
           tabBarIcon: ({ color }) => (
             <Image
-              source={require('../../assets/navbar/routine.png')} 
+              source={require('../../assets/navbar/routine.png')}
               style={{ width: 26, height: 26, tintColor: color }}
               resizeMode="contain"
             />
@@ -74,7 +74,7 @@ export default function TabLayout() {
           title: 'Rooms',
           tabBarIcon: ({ color }) => (
             <Image
-              source={require('../../assets/navbar/auto_awesome_mosaic.png')} 
+              source={require('../../assets/navbar/auto_awesome_mosaic.png')}
               style={{ width: 26, height: 26, tintColor: color }}
               resizeMode="contain"
             />
