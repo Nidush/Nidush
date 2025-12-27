@@ -7,8 +7,4 @@ module.exports = {
     extend: {},
   },
   plugins: [],
-<<<<<<< HEAD
 };
-=======
-};
->>>>>>> feature/activities
