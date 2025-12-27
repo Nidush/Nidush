@@ -21,7 +21,8 @@
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/Logo.png"
+      "favicon": "./assets/images/Logo.png",
+      "bundler": "metro"
     },
     "plugins": [
       "expo-router",
