@@ -8,6 +8,6 @@ export default function Routines() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'transparent', 
+    backgroundColor: 'transparent',
   },
 });
