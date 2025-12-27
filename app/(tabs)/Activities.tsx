@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  StyleSheet,
   ScrollView,
   View,
   TextInput,
@@ -8,7 +7,9 @@ import {
   ImageBackground,
   Platform,
   Pressable,
+  Text,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -18,396 +19,232 @@ import {
   Nunito_600SemiBold,
   Nunito_400Regular,
 } from '@expo-google-fonts/nunito';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 
-// Dados
 const ALL_ACTIVITIES = [
   {
     id: '1',
-    title: 'Desert Heat',
-    room: 'Living Room',
+    title: 'Italian Night',
+    room: 'Kitchen',
     time: '45 min',
-    image:
-      'https://images.unsplash.com/photo-1509316785289-025f5b846b35?q=80&w=400',
-    category: 'My Creations',
+    image: require('@/assets/cooking_activities/my_creations_cooking/italian_night.png'),
+    category: 'My creations', 
   },
   {
     id: '2',
-    title: 'Deep Focus',
-    room: 'Bedroom',
-    time: '20 min',
-    image:
-      'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?q=80&w=400',
-    category: 'My Creations',
+    title: 'Romantic Dinner',
+    room: 'Kitchen',
+    time: '50 min',
+    image: require('@/assets/cooking_activities/my_creations_cooking/romantic_dinner.png'),
+    category: 'My creations',
   },
   {
     id: '3',
-    title: 'Forest Bathing',
-    room: 'Bedroom',
+    title: 'Brownies',
+    room: 'Kitchen',
     time: '15 min',
-    image:
-      'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?q=80&w=400',
+    image: require('@/assets/cooking_activities/recommended/brownies.png'),
     category: 'Recommended',
   },
   {
     id: '4',
-    title: 'Slow Cooking',
+    title: 'Pikelets',
     room: 'Kitchen',
-    time: '60 min',
-    image:
-      'https://images.unsplash.com/photo-1556910103-1c02745aae4d?q=80&w=400',
+    time: '50 min',
+    image: require('@/assets/cooking_activities/recommended/eggs_benedict.png'),
     category: 'Recommended',
   },
 ];
 
 export default function ActivitiesScreen() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [activeFilter, setActiveFilter] = useState('All'); // Estado do filtro
-  const [searchQuery, setSearchQuery] = useState(''); // Estado da busca
+  const [activeFilter, setActiveFilter] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
 
   let [fontsLoaded] = useFonts({
     Nunito_700Bold,
     Nunito_600SemiBold,
     Nunito_400Regular,
   });
+
   if (!fontsLoaded) return null;
 
-  // Lógica de Filtragem combinada (Filtro + Busca)
   const filteredData = ALL_ACTIVITIES.filter((item) => {
     const matchesFilter = activeFilter === 'All' || item.room === activeFilter;
-    const matchesSearch = item.title
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
+    const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 
-  const myCreations = filteredData.filter(
-    (item) => item.category === 'My Creations',
-  );
-  const recommended = filteredData.filter(
-    (item) => item.category === 'Recommended',
-  );
+  const myCreations = filteredData.filter((item) => item.category === 'My creations');
+  const recommended = filteredData.filter((item) => item.category === 'Recommended');
 
   return (
-    <ThemedView style={styles.container}>
+    <SafeAreaView className="flex-1 bg-[#F0F2EB]" edges={['top']}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={{ 
+          paddingHorizontal: 16, 
+          paddingTop: Platform.OS === 'ios' ? 20 : 10,
+          paddingBottom: 120 
+        }}
         showsVerticalScrollIndicator={false}
       >
-        {/* TABS SELETOR */}
-        <View style={styles.tabSelector}>
-          <TouchableOpacity style={[styles.tabButton, styles.tabButtonActive]}>
-            <ThemedText style={[styles.tabText, styles.tabTextActive]}>
+        {/* TABS SELETOR  */}
+        <View className="flex-row bg-[#F0F2EB] rounded-[30px] p-1 border border-[#354F52] mb-[15px] h-[50px] mt-4">
+          <TouchableOpacity className="flex-1 justify-center items-center rounded-[25px] bg-[#548F53]">
+            <Text className="text-white text-[14px]" style={{ fontFamily: 'Nunito_600SemiBold' }}>
               Activities
-            </ThemedText>
+            </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.tabButton}>
-            <ThemedText style={styles.tabText}>Scenarios</ThemedText>
+          <TouchableOpacity className="flex-1 justify-center items-center rounded-[25px]">
+            <Text className="text-[#2D3E27] text-[14px]" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+              Scenarios
+            </Text>
           </TouchableOpacity>
         </View>
 
-        {/* BARRA DE PESQUISA */}
-        <View style={styles.searchContainer}>
-          <Ionicons
-            name="search"
-            size={18}
-            color="#8E8E93"
-            style={styles.searchIcon}
-          />
+        {/* BARRA DE PESQUISA  */}
+        <View className="flex-row items-center bg-[#F0F2EB] rounded-[12px] px-3 h-[42px] border border-[#354F52] mb-4">
+          <Ionicons name="search" size={18} color="#8E8E93" />
           <TextInput
             placeholder="Search..."
             placeholderTextColor="#8E8E93"
-            style={styles.searchInput}
+            className="flex-1 text-[14px] ml-2 h-full"
+            style={{ fontFamily: 'Nunito_400Regular' }}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
         </View>
 
-        {/* FILTROS HORIZONTAIS FUNCIONAIS */}
-        <View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.filterScroll}
-          >
-            {['All', 'Bedroom', 'Living Room', 'Kitchen'].map((filter) => (
-              <TouchableOpacity
-                key={filter}
-                onPress={() => setActiveFilter(filter)}
-                style={[
-                  styles.filterChip,
-                  activeFilter === filter && styles.filterChipActive,
-                ]}
+        {/* FILTROS HORIZONTAIS */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-6">
+          {['All', 'Bedroom', 'Living Room', 'Kitchen'].map((filter) => (
+            <TouchableOpacity
+              key={filter}
+              onPress={() => setActiveFilter(filter)}
+              className={`px-4 h-9 rounded-[18px] border mr-2 justify-center items-center ${
+                activeFilter === filter ? 'bg-[#BBE6BA] border-[#354F52]' : 'bg-[#F0F2EB] border-[#354F52]'
+              }`}
+            >
+              <Text 
+                className={`text-[13px] ${activeFilter === filter ? 'text-[#2D3E27]' : 'text-[#354F52]'}`}
+                style={{ fontFamily: 'Nunito_600SemiBold' }}
               >
-                <ThemedText
-                  style={[
-                    styles.filterText,
-                    activeFilter === filter && styles.filterTextActive,
-                  ]}
-                >
-                  {filter}
-                </ThemedText>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+                {filter}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
         {/* SEÇÃO: MY CREATIONS */}
         {myCreations.length > 0 && (
-          <>
-            <View style={styles.sectionHeader}>
-              <ThemedText style={styles.sectionTitle}>My creations</ThemedText>
+          <View className="mb-6">
+            <View className="flex-row items-center mb-4">
+              <Text className="text-[20px] text-[#354F52] mr-1" style={{ fontFamily: 'Nunito_700Bold' }}>
+                My creations
+              </Text>
               <Ionicons name="chevron-forward" size={20} color="#548F53" />
             </View>
-            <View style={styles.grid}>
+            <View className="flex-row flex-wrap justify-between">
               {myCreations.map((item) => (
                 <ScenarioCard key={item.id} {...item} />
               ))}
             </View>
-          </>
+          </View>
         )}
 
         {/* SEÇÃO: RECOMMENDED */}
         {recommended.length > 0 && (
-          <>
-            <View style={styles.sectionHeader}>
-              <ThemedText style={styles.sectionTitle}>Recommended</ThemedText>
+          <View className="mb-6">
+            <View className="flex-row items-center mb-4">
+              <Text className="text-[20px] text-[#354F52] mr-1" style={{ fontFamily: 'Nunito_700Bold' }}>
+                Recommended
+              </Text>
               <Ionicons name="chevron-forward" size={20} color="#548F53" />
             </View>
-            <View style={styles.grid}>
+            <View className="flex-row flex-wrap justify-between">
               {recommended.map((item) => (
                 <ScenarioCard key={item.id} {...item} />
               ))}
             </View>
-          </>
+          </View>
         )}
 
-        {/* Mensagem se nada for encontrado */}
+        {/* Mensagem de vazio do comentário */}
         {filteredData.length === 0 && (
-          <ThemedText style={styles.emptyText}>No activities found.</ThemedText>
+          <Text className="text-center mt-[50%] text-[#8E8E93]" style={{ fontFamily: 'Nunito_400Regular' }}>
+            No activities found.
+          </Text>
         )}
       </ScrollView>
 
-      {/* FAB MENU */}
+      {/* FAB MENU - Logica do comentário */}
       {isMenuOpen && (
         <>
-          <Pressable
-            style={styles.overlay}
-            onPress={() => setIsMenuOpen(false)}
+          <Pressable 
+            className="absolute inset-0 bg-black/20 z-[5]" 
+            onPress={() => setIsMenuOpen(false)} 
           />
-          <View style={styles.fabMenu}>
-            <TouchableOpacity
-              style={styles.menuOption}
+          <View className="absolute bottom-[110px] right-[25px] items-end z-[11]">
+            <TouchableOpacity 
+              className="mb-4" 
               onPress={() => {
                 setIsMenuOpen(false);
                 router.push('/new-activity');
               }}
             >
-              <ThemedText style={styles.menuLabel}>Activity</ThemedText>
+              <Text className="bg-[#548F53] px-5 py-2 rounded-xl text-white overflow-hidden shadow-md" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                Activity
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.menuOption}
-              onPress={() => setIsMenuOpen(false)}
-            >
-              <ThemedText style={styles.menuLabel}>Scenario</ThemedText>
+            <TouchableOpacity onPress={() => setIsMenuOpen(false)}>
+              <Text className="bg-[#548F53] px-5 py-2 rounded-xl text-white overflow-hidden shadow-md" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                Scenario
+              </Text>
             </TouchableOpacity>
           </View>
         </>
       )}
 
+      {/* FAB PRINCIPAL */}
       <TouchableOpacity
-        style={[styles.fab, isMenuOpen && styles.fabActive]}
+        activeOpacity={0.9}
+        className="absolute bottom-8 right-6 bg-[#548F53] w-[65px] h-[65px] rounded-full justify-center items-center z-[10] shadow-lg shadow-black/40"
         onPress={() => setIsMenuOpen(!isMenuOpen)}
       >
-        <Ionicons name={isMenuOpen ? 'close' : 'add'} size={35} color="white" />
+        <Ionicons name={isMenuOpen ? 'close' : 'add'} size={36} color="white" />
       </TouchableOpacity>
-    </ThemedView>
+    </SafeAreaView>
   );
 }
 
 function ScenarioCard({ title, room, image, time }: any) {
   return (
-    <View style={styles.cardContainer}>
+    <View className="w-[48%] aspect-square mb-4">
       <ImageBackground
-        source={{ uri: image }}
-        style={styles.cardBg}
+        source={image}
+        className="flex-1 justify-end overflow-hidden"
         imageStyle={{ borderRadius: 20 }}
-        resizeMode="cover"
       >
         <LinearGradient
           colors={['transparent', 'rgba(0,0,0,0.85)']}
-          style={styles.cardOverlay}
+          className="p-3 h-full justify-end rounded-[20px]"
         >
-          <ThemedText style={styles.cardTitle}>{title}</ThemedText>
-          <View style={styles.cardInfoRow}>
+          <Text className="text-white text-[16px] mb-1" style={{ fontFamily: 'Nunito_700Bold' }} numberOfLines={1}>
+            {title}
+          </Text>
+          <View className="flex-row items-center mt-1">
             <Ionicons name="time-outline" size={14} color="white" />
-            <ThemedText style={styles.cardSubText}>{time}</ThemedText>
+            <Text className="text-white text-[12px] ml-1" style={{ fontFamily: 'Nunito_400Regular' }}>
+              {time}
+            </Text>
           </View>
-          <View style={styles.cardInfoRow}>
+          <View className="flex-row items-center mt-1">
             <MaterialCommunityIcons name="door-open" size={14} color="white" />
-            <ThemedText style={styles.cardSubText}>{room}</ThemedText>
+            <Text className="text-white text-[12px] ml-1" style={{ fontFamily: 'Nunito_400Regular' }}>
+              {room}
+            </Text>
           </View>
         </LinearGradient>
       </ImageBackground>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F0F2EB' },
-  scrollContent: {
-    padding: 16,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    paddingBottom: 100,
-  },
-  tabSelector: {
-    flexDirection: 'row',
-    backgroundColor: '#F0F2EB',
-    borderRadius: 30,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: '#354F52',
-    marginBottom: 15,
-    height: 50,
-  },
-  tabButton: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 25,
-  },
-  tabButtonActive: { backgroundColor: '#548F53' },
-  tabText: { color: '#2D3E27', fontSize: 14, fontFamily: 'Nunito_600SemiBold' },
-  tabTextActive: { color: 'white' },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F0F2EB',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    height: 38,
-    borderWidth: 1,
-    borderColor: '#354F52',
-    marginBottom: 12,
-  },
-  searchIcon: { marginRight: 8 },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    fontFamily: 'Nunito_400Regular',
-    paddingVertical: 0,
-  },
-  filterScroll: { marginBottom: 20 },
-  filterChip: {
-    paddingHorizontal: 16,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#354F52',
-    marginRight: 8,
-    backgroundColor: '#F0F2EB',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  filterChipActive: { backgroundColor: '#BBE6BA', borderColor: '#354F52' },
-  filterText: {
-    color: '#354F52',
-    fontSize: 13,
-    fontFamily: 'Nunito_600SemiBold',
-  },
-  filterTextActive: { color: '#2D3E27' },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    color: '#354F52',
-    marginRight: 4,
-    fontFamily: 'Nunito_700Bold',
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  cardContainer: { width: '48%', aspectRatio: 1, marginBottom: 16 },
-  cardBg: { flex: 1, justifyContent: 'flex-end', overflow: 'hidden' },
-  cardOverlay: {
-    flex: 1,
-    padding: 12,
-    justifyContent: 'flex-end',
-    borderRadius: 20,
-  },
-  cardTitle: {
-    color: 'white',
-    fontSize: 16,
-    fontFamily: 'Nunito_700Bold',
-    marginBottom: 4,
-  },
-  cardInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
-  },
-  cardSubText: {
-    color: 'white',
-    fontSize: 12,
-    fontFamily: 'Nunito_400Regular',
-  },
-  emptyText: {
-    textAlign: 'center',
-    marginTop: '50%',
-    fontFamily: 'Nunito_400Regular',
-    color: '#8E8E93',
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    zIndex: 5,
-  },
-  fab: {
-    position: 'absolute',
-    bottom: 30,
-    right: 20,
-    backgroundColor: '#548F53',
-    width: 65,
-    height: 65,
-    borderRadius: 32.5,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 8,
-    zIndex: 10,
-  },
-  fabActive: { backgroundColor: '#548F53' },
-  fabMenu: {
-    position: 'absolute',
-    bottom: 110,
-    right: 25,
-    alignItems: 'flex-end',
-    gap: 15,
-    zIndex: 11,
-  },
-  menuOption: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  menuLabel: {
-    backgroundColor: '#548F53',
-    paddingHorizontal: 15,
-    paddingVertical: 6,
-    borderRadius: 10,
-    color: '#FFFFFF',
-    fontFamily: 'Nunito_600SemiBold',
-    elevation: 3,
-  },
-  miniFab: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#548F53',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
