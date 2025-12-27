@@ -20,7 +20,7 @@ import {
 } from '@expo-google-fonts/nunito';
 import { ThemedText } from '@/components/themed-text';
 import * as ImagePicker from 'expo-image-picker';
-
+  
 
 const { width } = Dimensions.get('window');
 
