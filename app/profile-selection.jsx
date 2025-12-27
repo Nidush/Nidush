@@ -1,5 +1,13 @@
 import React from 'react';
-import { StyleSheet, View, Text, Image, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
+import {
+  StyleSheet,
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  ScrollView,
+  Dimensions,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,9 +15,21 @@ import { Ionicons } from '@expo/vector-icons';
 const { width } = Dimensions.get('window');
 
 const profiles = [
-  { id: 1, name: 'Laura Rossi', avatar: require('./../assets/avatars/profile.png') },
-  { id: 2, name: 'Miguel Soares', avatar: require('./../assets/avatars/profile1.png') },
-  { id: 3, name: 'Inês Silva', avatar: require('./../assets/avatars/profile3.png') },
+  {
+    id: 1,
+    name: 'Laura Rossi',
+    avatar: require('./../assets/avatars/profile.png'),
+  },
+  {
+    id: 2,
+    name: 'Miguel Soares',
+    avatar: require('./../assets/avatars/profile1.png'),
+  },
+  {
+    id: 3,
+    name: 'Inês Silva',
+    avatar: require('./../assets/avatars/profile3.png'),
+  },
 ];
 
 export default function ProfileSelection() {
@@ -17,7 +37,7 @@ export default function ProfileSelection() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
@@ -32,10 +52,10 @@ export default function ProfileSelection() {
               style={styles.profileItem}
             >
               <View style={styles.avatarContainer}>
-                <Image 
-                  source={profile.avatar} 
-                  style={styles.avatarImage} 
-                  resizeMode="cover" 
+                <Image
+                  source={profile.avatar}
+                  style={styles.avatarImage}
+                  resizeMode="cover"
                 />
               </View>
               <Text style={styles.profileName}>{profile.name}</Text>
@@ -44,7 +64,8 @@ export default function ProfileSelection() {
 
           <TouchableOpacity activeOpacity={0.7} style={styles.profileItem}>
             <View style={[styles.avatarContainer, styles.addButton]}>
-              <Ionicons name="add" size={70} color="#354F52" />{/* Tenho que meter o Ionicons do MaterialIcons da Google */}
+              <Ionicons name="add" size={70} color="#354F52" />
+              {/* Tenho que meter o Ionicons do MaterialIcons da Google */}
             </View>
             <Text style={styles.profileName}>Add Profile</Text>
           </TouchableOpacity>
@@ -55,8 +76,8 @@ export default function ProfileSelection() {
         </TouchableOpacity>
       </ScrollView>
 
-      <Image 
-        source={require('./../assets/images/Wave2.png')} 
+      <Image
+        source={require('./../assets/images/Wave2.png')}
         style={styles.waveImage}
         resizeMode="stretch"
       />
@@ -67,18 +88,18 @@ export default function ProfileSelection() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F2EB', 
+    backgroundColor: '#F0F2EB',
   },
   scrollContent: {
     alignItems: 'center',
     paddingTop: 60,
-    paddingBottom: 120, 
+    paddingBottom: 120,
     zIndex: 2,
   },
   title: {
     fontFamily: 'Nunito-Bold',
-    fontSize: 32, 
-    color: '#3A5A54', 
+    fontSize: 32,
+    color: '#3A5A54',
     marginBottom: 50,
     textAlign: 'center',
   },
@@ -92,13 +113,13 @@ const styles = StyleSheet.create({
   },
   profileItem: {
     alignItems: 'center',
-    width: '45%', 
+    width: '45%',
     marginBottom: 40,
   },
   avatarContainer: {
-    width: 110, 
+    width: 110,
     height: 110,
-    borderRadius: 75, 
+    borderRadius: 75,
     backgroundColor: '#FFFFFF',
     overflow: 'hidden',
     marginBottom: 15,
@@ -115,13 +136,13 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   addButton: {
-    backgroundColor: '#C2DBC5', 
+    backgroundColor: '#C2DBC5',
     borderWidth: 1,
-    borderColor: 'rgba(58, 90, 84, 0.2)', 
+    borderColor: 'rgba(58, 90, 84, 0.2)',
   },
   profileName: {
     fontFamily: 'Nunito-SemiBold',
-    fontSize: 18, 
+    fontSize: 18,
     color: '#3A5A54',
     textAlign: 'center',
   },
@@ -138,7 +159,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     width: width,
-    height: 380, 
+    height: 380,
     zIndex: 1,
   },
 });
