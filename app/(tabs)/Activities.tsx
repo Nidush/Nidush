@@ -107,6 +107,7 @@ export default function ActivitiesScreen() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  
 
   let [fontsLoaded] = useFonts({
     Nunito_700Bold,
