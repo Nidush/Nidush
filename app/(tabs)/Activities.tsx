@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+
 import {
   ScrollView,
   View,
@@ -19,6 +20,10 @@ import {
   Nunito_600SemiBold,
   Nunito_400Regular,
 } from '@expo-google-fonts/nunito';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
+
 
 const ALL_ACTIVITIES = [
   {
@@ -107,7 +112,23 @@ export default function ActivitiesScreen() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  
+  const [myActivities, setMyActivities] = useState<any[]>([]);
+ useFocusEffect(
+  useCallback(() => {
+    const loadActivities = async () => {
+      const stored = await AsyncStorage.getItem('@myActivities');
+      if (stored) {
+        setMyActivities(JSON.parse(stored));
+      } else {
+        setMyActivities([]);
+      }
+    };
+
+    loadActivities();
+  }, [])
+);
+
+
 
   let [fontsLoaded] = useFonts({
     Nunito_700Bold,
@@ -116,8 +137,12 @@ export default function ActivitiesScreen() {
   });
 
   if (!fontsLoaded) return null;
+  const allActivitiesCombined = [
+      ...myActivities,
+      ...ALL_ACTIVITIES,
+    ];
 
-  const filteredData = ALL_ACTIVITIES.filter((item) => {
+  const filteredData = allActivitiesCombined.filter((item) => {
     const matchesFilter = activeFilter === 'All' || item.room === activeFilter;
     const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesFilter && matchesSearch;
@@ -126,7 +151,9 @@ export default function ActivitiesScreen() {
   const myCreations = filteredData.filter((item) => item.category === 'My creations');
   const recommended = filteredData.filter((item) => item.category === 'Recommended');
   const simpleRecipes = filteredData.filter((item) => item.category === 'Simple recipes');
-
+ 
+  
+ 
   return (
     <SafeAreaView className="flex-1 bg-[#F0F2EB]" edges={['top']}>
       <ScrollView
@@ -230,7 +257,16 @@ function CarouselSection({ title, data }: { title: string, data: any[] }) {
 function ScenarioCard({ title, room, image, time }: any) {
   return (
     <View className="w-[165px] aspect-square mr-4">
-      <ImageBackground source={image} className="flex-1 justify-end overflow-hidden" imageStyle={{ borderRadius: 20 }}>
+
+      <ImageBackground
+        source={
+          typeof image === 'string'
+            ? { uri: image }
+            : image
+        }
+        className="flex-1 justify-end overflow-hidden"
+        imageStyle={{ borderRadius: 20 }}
+      >
         <LinearGradient colors={['transparent', 'rgba(0,0,0,0.85)']} className="p-3 h-full justify-end rounded-[20px]">
           <Text className="text-white text-[15px] mb-0.5" style={{ fontFamily: 'Nunito_700Bold' }} numberOfLines={1}>{title}</Text>
           <View className="flex-row items-center mt-1">
@@ -243,6 +279,7 @@ function ScenarioCard({ title, room, image, time }: any) {
           </View>
         </LinearGradient>
       </ImageBackground>
+
     </View>
   );
 }

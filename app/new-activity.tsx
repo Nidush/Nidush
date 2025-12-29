@@ -20,6 +20,7 @@ import {
 } from '@expo-google-fonts/nunito';
 import { ThemedText } from '@/components/themed-text';
 import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 const { width } = Dimensions.get('window');
@@ -129,21 +130,43 @@ export default function NewActivityFlow() {
     Nunito_400Regular,
   });
   
-  // Dentro do componente NewActivityFlow
-const handleSave = () => {
-  router.push({
-    pathname: '/activity-details', // Certifique-se que o nome do arquivo na pasta app é activity-details.tsx
-    params: {
-      title: activityName || 'Untitled Activity',
-      type: activityType || 'Activity',
-      room: room || 'Any Room',
-      description: description || 'No description provided.',
-      image: activityImage || 'https://picsum.photos/400/600',
-      content: selectedContent,
-      environment: environment
-    }
-  });
+const handleSave = async () => {
+  const newActivity = {
+    id: Date.now().toString(),
+    title: activityName || 'Untitled Activity',
+    room: room || 'Any Room',
+    time: '15 min',
+    image: activityImage || 'https://picsum.photos/400/600',
+    category: 'My creations',
+    description,
+    environment,
+  };
+
+  try {
+    const storedActivities = await AsyncStorage.getItem('@myActivities');
+    const parsedActivities = storedActivities
+      ? JSON.parse(storedActivities)
+      : [];
+
+    const updatedActivities = [newActivity, ...parsedActivities];
+
+    await AsyncStorage.setItem(
+      '@myActivities',
+      JSON.stringify(updatedActivities)
+    );
+
+    router.push({
+      pathname: '/activity-details',
+      params: {
+        id: newActivity.id,
+      },
+    });
+  } catch (e) {
+    console.log('Erro ao salvar atividade', e);
+  }
 };
+
+
 
   const [step, setStep] = useState(1);
   const totalSteps = 6;
@@ -188,7 +211,6 @@ const handleSave = () => {
     </View>
   );
 
-
   const pickImage = async () => {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
@@ -208,8 +230,6 @@ const handleSave = () => {
       setActivityImage(result.assets[0].uri);
     }
   };
-
-
 
   return (
     <SafeAreaProvider>
