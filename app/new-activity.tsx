@@ -129,16 +129,18 @@ export default function NewActivityFlow() {
     Nunito_400Regular,
   });
   
-  const handleSave = () => {
+  // Dentro do componente NewActivityFlow
+const handleSave = () => {
   router.push({
-    pathname: '/activity-details',
+    pathname: '/activity-details', // Certifique-se que o nome do arquivo na pasta app é activity-details.tsx
     params: {
-      title: activityName || 'After Work Detox',
-      type: activityType || 'Meditation',
-      room: room || 'Bedroom',
-      description: description,
-      image: activityImage, 
-      content: selectedContent
+      title: activityName || 'Untitled Activity',
+      type: activityType || 'Activity',
+      room: room || 'Any Room',
+      description: description || 'No description provided.',
+      image: activityImage || 'https://picsum.photos/400/600',
+      content: selectedContent,
+      environment: environment
     }
   });
 };
