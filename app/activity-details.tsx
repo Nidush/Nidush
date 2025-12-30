@@ -113,7 +113,7 @@ export default function ActivityDetails() {
             className="flex-1"
           >
             <SafeAreaView edges={['top']} className="flex-row justify-between px-5 pt-2">
-              <TouchableOpacity onPress={() => router.back()}>
+              <TouchableOpacity onPress={() => router.replace('/Activities')}>
                 <Ionicons name="chevron-back" size={28} color="white" />
               </TouchableOpacity>
               <TouchableOpacity>
