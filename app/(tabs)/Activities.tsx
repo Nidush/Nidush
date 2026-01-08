@@ -197,7 +197,14 @@ function CarouselSection({ title, data, showTime }: { title: string, data: any[]
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 16, paddingRight: 8 }}>
         {data.map((item) => (
-          <View key={item.id} className="w-[165px] aspect-square mr-4">
+          <TouchableOpacity 
+            key={item.id} 
+            className="w-[165px] aspect-square mr-4"
+            onPress={() => router.push({
+              pathname: "/activity-details", 
+              params: { id: item.id }
+            })}
+          >
             <ImageBackground
               source={typeof item.image === 'string' ? { uri: item.image } : item.image}
               className="flex-1 justify-end overflow-hidden"
@@ -217,7 +224,7 @@ function CarouselSection({ title, data, showTime }: { title: string, data: any[]
                 </View>
               </LinearGradient>
             </ImageBackground>
-          </View>
+          </TouchableOpacity>
         ))}
       </ScrollView>
     </View>
