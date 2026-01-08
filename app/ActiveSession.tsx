@@ -1,40 +1,114 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Image, Dimensions } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { View, Text, TouchableOpacity, Image, Dimensions, Modal, ActivityIndicator } from 'react-native';
+import { Ionicons, MaterialCommunityIcons, FontAwesome5, Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import * as Audio from 'expo-audio'; 
+import { router, useLocalSearchParams } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+// Removi o import do expo-audio para não causar conflitos agora
 import Svg, { Path } from 'react-native-svg';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence } from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
-const TOTAL_TIME = 8 * 60; 
+
+const ICON_MAP = [
+  <MaterialCommunityIcons name="meditation" size={80} color="#354F52" />,
+  <FontAwesome5 name="hands-helping" size={70} color="#354F52" />,
+  <Feather name="smile" size={80} color="#354F52" />,
+  <MaterialCommunityIcons name="weather-windy" size={80} color="#354F52" />,
+];
 
 export default function ActiveSession() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  
+  const [loading, setLoading] = useState(true);
+  const [activity, setActivity] = useState<any>(null);
   const [isActive, setIsActive] = useState(true);
-  const [secondsLeft, setSecondsLeft] = useState(TOTAL_TIME);
+  const [secondsLeft, setSecondsLeft] = useState(60);
+  const [totalSessionTime, setTotalSessionTime] = useState(60);
+  const [showExitModal, setShowExitModal] = useState(false);
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  
   const progress = useSharedValue(0);
+  const contentOpacity = useSharedValue(1);
 
-  const player = Audio.useAudioPlayer('https://github.com/anars/blank-audio/raw/master/10-minutes-of-silence.mp3');
-
+  // 1. CARREGAR DADOS DA ATIVIDADE SELECIONADA
   useEffect(() => {
-    Audio.setAudioModeAsync({
-      shouldPlayInBackground: true,
-      interruptionMode: 'doNotMix',
-    });
-    player.loop = true;
-    player.volume = 0;
-    if (isActive) player.play();
-  }, [player]);
+    const loadData = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('@myActivities');
+        let foundActivity = null;
 
+        if (stored) {
+          const activities = JSON.parse(stored);
+          foundActivity = activities.find((a: any) => a.id === id);
+        }
+
+        if (foundActivity) {
+          setActivity(foundActivity);
+          // Converte tempo "5 min" para segundos
+          const timeStr = foundActivity.time.split(' ')[0];
+          const secs = timeStr.includes(':') 
+            ? parseInt(timeStr.split(':')[0]) * 60 + parseInt(timeStr.split(':')[1])
+            : parseInt(timeStr) * 60;
+          
+          setSecondsLeft(secs);
+          setTotalSessionTime(secs);
+        } else {
+          // Atividade padrão caso o ID falhe
+          setActivity({
+            title: "Gratitude Flow",
+            instructions: ["Sit and put your hand on your heart", "Find 3 things you have", "Think of one person", "Take 3 deep breaths"],
+            room: "Living Room",
+            content: "Nature Sounds"
+          });
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [id]);
+
+  // 2. FUNÇÕES DE CONTROLE
+  const handleOpenExitModal = () => {
+    setIsActive(false);
+    setShowExitModal(true);
+  };
+
+  const toggleSession = () => {
+    setIsActive(!isActive);
+  };
+
+  // 3. CRONÔMETRO
   useEffect(() => {
     let interval: any = null;
     if (isActive && secondsLeft > 0) {
       interval = setInterval(() => setSecondsLeft((p) => p - 1), 1000);
     }
-    progress.value = withTiming(((TOTAL_TIME - secondsLeft) / TOTAL_TIME) * 100, { duration: 1000 });
+    progress.value = withTiming(((totalSessionTime - secondsLeft) / totalSessionTime) * 100, { duration: 1000 });
+    
+    if (secondsLeft === 0 && !loading) {
+        router.replace('/Activities'); 
+    }
     return () => clearInterval(interval);
   }, [isActive, secondsLeft]);
+
+  // 4. MUDANÇA AUTOMÁTICA DE INSTRUÇÕES
+  useEffect(() => {
+    if (!activity?.instructions) return;
+    const stepDuration = totalSessionTime / activity.instructions.length;
+    const nextIndex = Math.min(
+      Math.floor((totalSessionTime - secondsLeft) / stepDuration),
+      activity.instructions.length - 1
+    );
+
+    if (nextIndex !== currentStepIndex) {
+      contentOpacity.value = withSequence(withTiming(0, { duration: 500 }), withTiming(1, { duration: 500 }));
+      setTimeout(() => setCurrentStepIndex(nextIndex), 500);
+    }
+  }, [secondsLeft]);
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
@@ -42,99 +116,97 @@ export default function ActiveSession() {
     return `${m}:${sec < 10 ? '0' : ''}${sec}`;
   };
 
-  const animatedProgressStyle = useAnimatedStyle(() => ({
-    width: `${progress.value}%`,
-  }));
+  const animatedProgressStyle = useAnimatedStyle(() => ({ width: `${progress.value}%` }));
+  const animatedContentStyle = useAnimatedStyle(() => ({ opacity: contentOpacity.value }));
 
-  const toggleSession = () => {
-    isActive ? player.pause() : player.play();
-    setIsActive(!isActive);
-  };
+  if (loading) {
+    return (
+      <View className="flex-1 justify-center items-center bg-[#F1F4EE]">
+        <ActivityIndicator size="large" color="#5E8C5D" />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-[#F1F4EE]">
-      {/* Header */}
+      
+      {/* MODAL DE SAÍDA */}
+      <Modal animationType="fade" transparent visible={showExitModal}>
+        <View className="flex-1 bg-black/40 justify-center items-center px-8">
+          <View className="bg-[#F1F4EE] w-full rounded-[40px] p-8 items-center shadow-2xl">
+            <View className="w-16 h-16 rounded-full border-4 border-[#5E8C5D] items-center justify-center mb-6">
+               <View className="w-6 h-6 bg-[#5E8C5D] rounded-sm" />
+            </View>
+            <Text className="text-[#354F52] text-3xl font-bold mb-4">End the activity?</Text>
+            <TouchableOpacity 
+              onPress={() => { setShowExitModal(false); setIsActive(true); }}
+              className="bg-[#5E8C5D] w-full py-4 rounded-full mb-4"
+            >
+              <Text className="text-white text-center text-xl font-bold">Resume</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.replace('/Activities')} className="py-2">
+              <Text className="text-[#5E8C5D] text-xl font-medium">End activity</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* HEADER */}
       <View className="flex-row justify-between items-center px-6 py-2">
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={30} color="#354F52" />
         </TouchableOpacity>
-        <Text className="text-[#354F52] text-xl font-semibold">Gratitude Flow</Text>
-        <TouchableOpacity onPress={() => router.replace('/')}>
+        <Text className="text-[#354F52] text-xl font-semibold">{activity?.title}</Text>
+        <TouchableOpacity onPress={handleOpenExitModal}>
           <Text className="text-[#7DA87B] text-lg font-medium">Cancel</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Ilustração Central */}
-      <View className="flex-1 items-center justify-end pb-6">
-        <MaterialCommunityIcons name="meditation" size={80} color="#354F52" />
-        <Text className="text-[#354F52] text-3xl font-bold text-center mt-8 px-10">
-          Sit and put your hand on your heart
+      {/* ÁREA CENTRAL DINÂMICA */}
+      <Animated.View style={[animatedContentStyle]} className="flex-1 items-center justify-center px-10">
+        <View className="mb-10">
+          {ICON_MAP[currentStepIndex % ICON_MAP.length]}
+        </View>
+        <Text className="text-[#354F52] text-3xl font-bold text-center leading-10">
+          {activity?.instructions[currentStepIndex]}
         </Text>
-      </View>
+      </Animated.View>
 
-      {/* Efeito de 3 Ondas Sobrepostas */}
-      <View className="h-32 w-full justify-end overflow-hidden">
-        <Svg height="160" width={width} viewBox="0 0 1440 320" style={{ marginBottom: -5 }}>
-          {/* Onda de Trás (Mais Clara) */}
-          <Path
-            fill="#D7E8D6"
-            fillOpacity="0.3"
-            d="M0,160L48,176C96,192,192,224,288,224C384,224,480,192,576,165.3C672,139,768,117,864,138.7C960,160,1056,224,1152,245.3C1248,267,1344,245,1392,234.7L1440,224L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"
-          />
-          {/* Onda do Meio */}
-          <Path
-            fill="#D7E8D6"
-            fillOpacity="0.5"
-            d="M0,224L60,213.3C120,203,240,181,360,181.3C480,181,600,203,720,224C840,245,960,267,1080,245.3C1200,224,1320,160,1380,128L1440,96L1440,320L1380,320C1320,320,1200,320,1080,320C960,320,840,320,720,320C600,320,480,320,360,320C240,320,120,320,60,320L0,320Z"
-          />
-          {/* Onda da Frente (Mais Escura/Visível) */}
-          <Path
-            fill="#D7E8D6"
-            fillOpacity="0.8"
-            d="M0,256L80,240C160,224,320,192,480,197.3C640,203,800,245,960,250.7C1120,256,1280,224,1360,208L1440,192L1440,320L1360,320C1280,320,1120,320,960,320C800,320,640,320,480,320C320,320,160,320,80,320L0,320Z"
-          />
+      {/* ONDAS */}
+      <View className="h-24 w-full justify-end overflow-hidden">
+        <Svg height="120" width={width} viewBox="0 0 1440 320">
+          <Path fill="#D7E8D6" d="M0,256L80,240C160,224,320,192,480,197.3C640,203,800,245,960,250.7C1120,256,1280,224,1360,208L1440,192L1440,320L1360,320C1280,320,1120,320,960,320C800,320,640,320,480,320C320,320,160,320,80,320L0,320Z" />
         </Svg>
       </View>
 
-      {/* Painel Inferior */}
+      {/* PAINEL INFERIOR */}
       <View className="bg-[#F1F4EE] px-10 pb-8">
         <View className="items-center mb-6">
           <Text className="text-[#354F52] text-6xl font-bold tabular-nums">
-            {formatTime(secondsLeft)} <Text className="text-2xl font-normal">min</Text>
+            {formatTime(secondsLeft)}
           </Text>
-          <Text className="text-[#354F52]/50 text-lg font-medium">remaining</Text>
-          
           <View className="w-full h-1.5 bg-[#DDE5D7] mt-6 rounded-full overflow-hidden">
             <Animated.View style={[animatedProgressStyle]} className="h-full bg-[#7DA87B]" />
           </View>
         </View>
 
-        {/* Mini Player */}
+        {/* MINI PLAYER (APENAS VISUAL) */}
         <View className="flex-row items-center bg-white/40 border border-[#7DA87B]/20 p-4 rounded-3xl mb-8">
-          <Image 
-            source={{ uri: 'https://i.scdn.co/image/ab67616d0000b2738b52c6b9bc3c43d008c0ad22' }} 
-            className="w-12 h-12 rounded-lg"
-          />
+          <Image source={{ uri: 'https://i.scdn.co/image/ab67616d0000b2738b52c6b9bc3c43d008c0ad22' }} className="w-12 h-12 rounded-lg" />
           <View className="flex-1 ml-4">
-            <Text className="text-[#354F52] font-bold">Anchor</Text>
-            <Text className="text-[#354F52]/60 text-xs">Novo Amor</Text>
+            <Text className="text-[#354F52] font-bold">{activity?.content || 'Silent Session'}</Text>
+            <Text className="text-[#354F52]/60 text-xs">Environment: {activity?.room}</Text>
           </View>
-          <View className="flex-row items-center space-x-4">
-            <Ionicons name="play-skip-back" size={22} color="#7DA87B" />
-            <TouchableOpacity onPress={toggleSession}>
-              <Ionicons name={isActive ? "pause-circle" : "play-circle"} size={44} color="#7DA87B" />
-            </TouchableOpacity>
-            <Ionicons name="play-skip-forward" size={22} color="#7DA87B" />
-          </View>
+          <TouchableOpacity onPress={toggleSession}>
+            <Ionicons name={isActive ? "pause-circle" : "play-circle"} size={44} color="#7DA87B" />
+          </TouchableOpacity>
         </View>
 
-        {/* Botão Pause */}
         <TouchableOpacity 
           onPress={toggleSession}
-          className="bg-[#5E8C5D] py-4 rounded-full flex-row justify-center items-center"
+          className="bg-[#5E8C5D] py-4 rounded-full items-center"
         >
-          <Text className="text-white text-xl font-bold mr-2">Pause</Text>
-          <Ionicons name="pause" size={20} color="white" />
+          <Text className="text-white text-xl font-bold">{isActive ? 'Pause' : 'Resume'}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
