@@ -4,17 +4,17 @@ import { Ionicons, MaterialCommunityIcons, FontAwesome5, Feather } from '@expo/v
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-// Removi o import do expo-audio para não causar conflitos agora
 import Svg, { Path } from 'react-native-svg';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSequence } from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
 
+// 1. CORREÇÃO: Adicionadas chaves (keys) únicas para cada elemento do array
 const ICON_MAP = [
-  <MaterialCommunityIcons name="meditation" size={80} color="#354F52" />,
-  <FontAwesome5 name="hands-helping" size={70} color="#354F52" />,
-  <Feather name="smile" size={80} color="#354F52" />,
-  <MaterialCommunityIcons name="weather-windy" size={80} color="#354F52" />,
+  <MaterialCommunityIcons key="meditation" name="meditation" size={80} color="#354F52" />,
+  <FontAwesome5 key="helping" name="hands-helping" size={70} color="#354F52" />,
+  <Feather key="smile" name="smile" size={80} color="#354F52" />,
+  <MaterialCommunityIcons key="windy" name="weather-windy" size={80} color="#354F52" />,
 ];
 
 export default function ActiveSession() {
@@ -31,7 +31,6 @@ export default function ActiveSession() {
   const progress = useSharedValue(0);
   const contentOpacity = useSharedValue(1);
 
-  // 1. CARREGAR DADOS DA ATIVIDADE SELECIONADA
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -45,7 +44,6 @@ export default function ActiveSession() {
 
         if (foundActivity) {
           setActivity(foundActivity);
-          // Converte tempo "5 min" para segundos
           const timeStr = foundActivity.time.split(' ')[0];
           const secs = timeStr.includes(':') 
             ? parseInt(timeStr.split(':')[0]) * 60 + parseInt(timeStr.split(':')[1])
@@ -54,7 +52,6 @@ export default function ActiveSession() {
           setSecondsLeft(secs);
           setTotalSessionTime(secs);
         } else {
-          // Atividade padrão caso o ID falhe
           setActivity({
             title: "Gratitude Flow",
             instructions: ["Sit and put your hand on your heart", "Find 3 things you have", "Think of one person", "Take 3 deep breaths"],
@@ -71,7 +68,6 @@ export default function ActiveSession() {
     loadData();
   }, [id]);
 
-  // 2. FUNÇÕES DE CONTROLE
   const handleOpenExitModal = () => {
     setIsActive(false);
     setShowExitModal(true);
@@ -81,21 +77,22 @@ export default function ActiveSession() {
     setIsActive(!isActive);
   };
 
-  // 3. CRONÔMETRO
+  // 2. CORREÇÃO: Adicionadas dependências 'loading', 'progress' e 'totalSessionTime'
   useEffect(() => {
     let interval: any = null;
     if (isActive && secondsLeft > 0) {
       interval = setInterval(() => setSecondsLeft((p) => p - 1), 1000);
     }
+    
     progress.value = withTiming(((totalSessionTime - secondsLeft) / totalSessionTime) * 100, { duration: 1000 });
     
     if (secondsLeft === 0 && !loading) {
         router.replace('/Activities'); 
     }
     return () => clearInterval(interval);
-  }, [isActive, secondsLeft]);
+  }, [isActive, secondsLeft, loading, progress, totalSessionTime]);
 
-  // 4. MUDANÇA AUTOMÁTICA DE INSTRUÇÕES
+  // 3. CORREÇÃO: Adicionadas dependências 'activity.instructions', 'contentOpacity', 'currentStepIndex' e 'totalSessionTime'
   useEffect(() => {
     if (!activity?.instructions) return;
     const stepDuration = totalSessionTime / activity.instructions.length;
@@ -108,7 +105,7 @@ export default function ActiveSession() {
       contentOpacity.value = withSequence(withTiming(0, { duration: 500 }), withTiming(1, { duration: 500 }));
       setTimeout(() => setCurrentStepIndex(nextIndex), 500);
     }
-  }, [secondsLeft]);
+  }, [secondsLeft, activity?.instructions, contentOpacity, currentStepIndex, totalSessionTime]);
 
   const formatTime = (s: number) => {
     const m = Math.floor(s / 60);
@@ -129,8 +126,6 @@ export default function ActiveSession() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#F1F4EE]">
-      
-      {/* MODAL DE SAÍDA */}
       <Modal animationType="fade" transparent visible={showExitModal}>
         <View className="flex-1 bg-black/40 justify-center items-center px-8">
           <View className="bg-[#F1F4EE] w-full rounded-[40px] p-8 items-center shadow-2xl">
@@ -151,7 +146,6 @@ export default function ActiveSession() {
         </View>
       </Modal>
 
-      {/* HEADER */}
       <View className="flex-row justify-between items-center px-6 py-2">
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={30} color="#354F52" />
@@ -162,7 +156,6 @@ export default function ActiveSession() {
         </TouchableOpacity>
       </View>
 
-      {/* ÁREA CENTRAL DINÂMICA */}
       <Animated.View style={[animatedContentStyle]} className="flex-1 items-center justify-center px-10">
         <View className="mb-10">
           {ICON_MAP[currentStepIndex % ICON_MAP.length]}
@@ -172,14 +165,12 @@ export default function ActiveSession() {
         </Text>
       </Animated.View>
 
-      {/* ONDAS */}
       <View className="h-24 w-full justify-end overflow-hidden">
         <Svg height="120" width={width} viewBox="0 0 1440 320">
           <Path fill="#D7E8D6" d="M0,256L80,240C160,224,320,192,480,197.3C640,203,800,245,960,250.7C1120,256,1280,224,1360,208L1440,192L1440,320L1360,320C1280,320,1120,320,960,320C800,320,640,320,480,320C320,320,160,320,80,320L0,320Z" />
         </Svg>
       </View>
 
-      {/* PAINEL INFERIOR */}
       <View className="bg-[#F1F4EE] px-10 pb-8">
         <View className="items-center mb-6">
           <Text className="text-[#354F52] text-6xl font-bold tabular-nums">
@@ -190,7 +181,6 @@ export default function ActiveSession() {
           </View>
         </View>
 
-        {/* MINI PLAYER (APENAS VISUAL) */}
         <View className="flex-row items-center bg-white/40 border border-[#7DA87B]/20 p-4 rounded-3xl mb-8">
           <Image source={{ uri: 'https://i.scdn.co/image/ab67616d0000b2738b52c6b9bc3c43d008c0ad22' }} className="w-12 h-12 rounded-lg" />
           <View className="flex-1 ml-4">
