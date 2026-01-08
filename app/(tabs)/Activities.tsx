@@ -165,7 +165,7 @@ export default function UnifiedActivitiesScreen() {
         <>
           <Pressable className="absolute inset-0 bg-black/20 z-[5]" onPress={() => setIsMenuOpen(false)} />
           <View className="absolute bottom-[110px] right-[25px] items-end z-[11]">
-            <TouchableOpacity onPress={() => { setIsMenuOpen(false); router.push('/new-scenario'); }}> {/* para desenvolvimento */}
+            <TouchableOpacity onPress={() => { setIsMenuOpen(false); router.push('/new-scenario'); }}> 
               <Text className="bg-[#548F53] px-8 py-3 rounded-xl text-[14px] text-white shadow-md mb-4" style={{ fontFamily: 'Nunito_600SemiBold' }}>Scenario</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => { setIsMenuOpen(false); router.push('/new-activity'); }}>
@@ -197,7 +197,14 @@ function CarouselSection({ title, data, showTime }: { title: string, data: any[]
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 16, paddingRight: 8 }}>
         {data.map((item) => (
-          <View key={item.id} className="w-[165px] aspect-square mr-4">
+          <TouchableOpacity 
+            key={item.id} 
+            className="w-[165px] aspect-square mr-4"
+            onPress={() => router.push({
+              pathname: "/activity-details", 
+              params: { id: item.id }
+            })}
+          >
             <ImageBackground
               source={typeof item.image === 'string' ? { uri: item.image } : item.image}
               className="flex-1 justify-end overflow-hidden"
@@ -217,7 +224,7 @@ function CarouselSection({ title, data, showTime }: { title: string, data: any[]
                 </View>
               </LinearGradient>
             </ImageBackground>
-          </View>
+          </TouchableOpacity>
         ))}
       </ScrollView>
     </View>

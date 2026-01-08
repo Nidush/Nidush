@@ -113,7 +113,7 @@ export default function ActivityDetails() {
             className="flex-1"
           >
             <SafeAreaView edges={['top']} className="flex-row justify-between px-5 pt-2">
-              <TouchableOpacity onPress={() => router.back()}>
+              <TouchableOpacity onPress={() => router.replace('/Activities')}>
                 <Ionicons name="chevron-back" size={28} color="white" />
               </TouchableOpacity>
               <TouchableOpacity>
@@ -205,8 +205,11 @@ export default function ActivityDetails() {
           activeOpacity={0.9}
           className="bg-[#548F53] py-4 rounded-full flex-row items-center justify-center shadow-lg shadow-[#548F53]/40"
           style={{ width: width * 0.65 }}
-          onPress={() => alert('Starting Session...')}
-        >
+          onPress={() => router.push({
+            pathname: "/LoadingActivity",
+            params: { title: activity.title }
+                })}
+              >
           <Text className="text-white text-2xl mr-2">Start</Text>
           <Ionicons name="play" size={24} color="white" />
         </TouchableOpacity>
