@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AddRoomDevice from '../../components/rooms/AddRoomDevice';
 import CategoryPill from '../../components/rooms/CategoryPill';
 import DeviceCard from '../../components/rooms/device-card';
-// Mantenha os dados iniciais aqui
+
 const ROOMS_DATA = [
   { id: 1, name: 'Bedroom' },
   { id: 2, name: 'Living Room' },
@@ -68,7 +68,6 @@ export default function Rooms() {
   const [activeRoom, setActiveRoom] = useState(1);
   const [devices, setDevices] = useState(INITIAL_DEVICES);
 
-  // Função para ligar/desligar
   const toggleDevice = (id) => {
     setDevices((current) =>
       current.map((d) =>
@@ -77,7 +76,6 @@ export default function Rooms() {
     );
   };
 
-  // 2. NOVA FUNÇÃO: Atualizar o nível de intensidade nos dados principais
   const updateDeviceLevel = (id, newLevel) => {
     setDevices((current) =>
       current.map((d) => (d.id === id ? { ...d, level: newLevel } : d)),
@@ -110,7 +108,6 @@ export default function Rooms() {
         </Text>
       </View>
 
-      {/* Barra de Pesquisa */}
       <View className="px-5 mb-6">
         <View className="flex-row items-center justify-center border border-[#BDC7C2] rounded-full px-4 h-12 bg-transparent">
           <MaterialIcons
@@ -122,20 +119,15 @@ export default function Rooms() {
           <TextInput
             placeholder="Search..."
             placeholderTextColor="#7A8C85"
-            // 1. Adicionei 'h-full' para ocupar a altura toda
             className="flex-1 h-full text-base text-[#2C3A35]"
             style={{
               fontFamily: 'Nunito_600SemiBold',
-              // 2. IMPORTANTE: Remove o espaçamento interno padrão do Android
               paddingVertical: 0,
             }}
-            // 3. Garante o centro no Android
             textAlignVertical="center"
           />
         </View>
       </View>
-
-      {/* Filtro de Cômodos */}
       <View className="h-10 mb-9 flex justify-center items-center">
         <ScrollView
           horizontal
@@ -153,7 +145,6 @@ export default function Rooms() {
         </ScrollView>
       </View>
 
-      {/* Grid de Dispositivos */}
       <FlatList
         data={filteredDevices}
         keyExtractor={(item) => item.id.toString()}
@@ -161,7 +152,6 @@ export default function Rooms() {
           <DeviceCard
             item={item}
             onToggle={() => toggleDevice(item.id)}
-            // 3. Passamos a função de atualizar nível para o filho
             onUpdateLevel={(newLevel) => updateDeviceLevel(item.id, newLevel)}
           />
         )}

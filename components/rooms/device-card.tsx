@@ -83,27 +83,22 @@ const DeviceCard = ({ item, onToggle, onUpdateLevel }: DeviceCardProps) => {
     }),
   ).current;
 
-  // --- LÓGICA DE CORES ---
-  let containerBg = 'bg-[#F1F3EA]'; // Padrão (Off)
+  let containerBg = 'bg-[#F1F3EA]';
 
   if (isOn) {
     if (item.type === 'light') {
-      containerBg = 'bg-[#E9D58F]'; // Amarelo (Luzes)
+      containerBg = 'bg-[#E9D58F]';
     } else {
-      containerBg = 'bg-[#BBE6BA]'; // Verde Claro (Outros)
+      containerBg = 'bg-[#BBE6BA]';
     }
   }
 
-  // --- LÓGICA DA BORDA (NOVA) ---
-  // Se estiver ligado: sem borda (border-0)
-  // Se estiver desligado: borda verde/cinza
   const borderStyle = isOn ? 'border-0' : 'border border-[#548f537f]';
 
   const sliderFillColor = 'bg-[#FFE57C]';
 
   return (
     <View
-      // Adicionei ${borderStyle} e removi as classes de borda hardcoded
       className={`w-[48%] ${containerBg} ${borderStyle} rounded-2xl h-44 mb-4 overflow-hidden relative`}
       {...panResponder.panHandlers}
     >

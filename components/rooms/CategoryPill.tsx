@@ -1,17 +1,14 @@
 import React from 'react';
 import { Text, TouchableOpacity } from 'react-native';
 
-// Interface do objeto de dados
 export interface Room {
   id: number;
   name: string;
 }
 
-// Props do componente
 interface CategoryPillProps {
   item: Room;
   isActive: boolean;
-  // Define que a função onPress recebe um ID numérico e não retorna nada
   onPress: (id: number) => void;
 }
 
