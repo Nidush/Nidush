@@ -1,3 +1,4 @@
+import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import {
   Dimensions,
@@ -7,8 +8,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-// Adicionado MaterialIcons aqui para resolver o erro
-import { MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
@@ -46,7 +45,7 @@ export default function ProfileSelection() {
           className="text-[32px] text-[#3A5A54] mb-12 text-center px-10"
           style={{ fontFamily: 'Nunito_700Bold' }}
         >
-          Who is at {hostName}'s home?
+          {`Who is at ${hostName}'s home?`}
         </Text>
 
         <View className="flex-row flex-wrap justify-center w-full px-5 gap-y-10">
@@ -73,7 +72,7 @@ export default function ProfileSelection() {
             </TouchableOpacity>
           ))}
 
-          {/* Botão Add Profile - Agora com MaterialIcons funcionando */}
+          {/* Botão Add Profile  */}
           <TouchableOpacity activeOpacity={0.7} className="items-center w-[45%]">
             <View className="w-[130px] h-[130px] rounded-full bg-[#C8E0C4] items-center justify-center mb-3">
               <MaterialIcons name="add" size={90} color="#354F52" />
