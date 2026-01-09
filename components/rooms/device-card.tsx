@@ -83,22 +83,28 @@ const DeviceCard = ({ item, onToggle, onUpdateLevel }: DeviceCardProps) => {
     }),
   ).current;
 
-  // --- LÓGICA DE CORES ALTERADA AQUI ---
+  // --- LÓGICA DE CORES ---
   let containerBg = 'bg-[#F1F3EA]'; // Padrão (Off)
 
   if (isOn) {
     if (item.type === 'light') {
-      containerBg = 'bg-[#E9D58F]'; // Amarelo (Apenas Luzes)
+      containerBg = 'bg-[#E9D58F]'; // Amarelo (Luzes)
     } else {
-      containerBg = 'bg-[#BBE6BA]'; // Verde Claro (Outros Dispositivos)
+      containerBg = 'bg-[#BBE6BA]'; // Verde Claro (Outros)
     }
   }
+
+  // --- LÓGICA DA BORDA (NOVA) ---
+  // Se estiver ligado: sem borda (border-0)
+  // Se estiver desligado: borda verde/cinza
+  const borderStyle = isOn ? 'border-0' : 'border border-[#548f537f]';
 
   const sliderFillColor = 'bg-[#FFE57C]';
 
   return (
     <View
-      className={`w-[48%] ${containerBg} rounded-2xl border border-[#548f537f] h-44 mb-4 overflow-hidden relative`}
+      // Adicionei ${borderStyle} e removi as classes de borda hardcoded
+      className={`w-[48%] ${containerBg} ${borderStyle} rounded-2xl h-44 mb-4 overflow-hidden relative`}
       {...panResponder.panHandlers}
     >
       {isOn && isDimmable && (

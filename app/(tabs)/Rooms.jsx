@@ -10,9 +10,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import AddRoomDevice from '../../components/rooms/AddRoomDevice';
 import CategoryPill from '../../components/rooms/CategoryPill';
 import DeviceCard from '../../components/rooms/device-card';
-
 // Mantenha os dados iniciais aqui
 const ROOMS_DATA = [
   { id: 1, name: 'Bedroom' },
@@ -88,6 +88,14 @@ export default function Rooms() {
     (device) => device.roomId === activeRoom,
   );
 
+  const menuActions = [
+    {
+      label: 'Device',
+    },
+    {
+      label: 'Room',
+    },
+  ];
   return (
     <SafeAreaView className="flex-1 bg-[#F1F3EA]" edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#F2F5F0" />
@@ -95,7 +103,7 @@ export default function Rooms() {
       {/* Header */}
       <View className="items-center mt-2 mb-6">
         <Text
-          className="text-2xl font-semibold text-[#354F52]"
+          className="text-3xl font-semibold text-[#354F52]"
           style={{ fontFamily: 'Nunito_600SemiBold' }}
         >
           Rooms
@@ -177,6 +185,7 @@ export default function Rooms() {
           </View>
         }
       />
+      <AddRoomDevice actions={menuActions} />
     </SafeAreaView>
   );
 }
