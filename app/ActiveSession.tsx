@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, Dimensions, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, Image, Dimensions, Modal, ActivityIndicator } from 'react-native';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5, Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Audio from 'expo-audio'; 
 import Svg, { Path } from 'react-native-svg';
 import Animated, { 
   useSharedValue, 
@@ -16,6 +17,7 @@ import Animated, {
 
 const { width } = Dimensions.get('window');
 
+// Ícones para as instruções
 const ICON_MAP = [
   <MaterialCommunityIcons key="1" name="meditation" size={80} color="#354F52" />,
   <FontAwesome5 key="2" name="hands-helping" size={70} color="#354F52" />,
@@ -24,15 +26,16 @@ const ICON_MAP = [
 ];
 
 const ALL_ACTIVITIES = [
-  { id: '1', title: 'Italian Night', room: 'Kitchen', time: '45 min', instructions: ["Prepare ingredients", "Boil pasta", "Mix sauce", "Serve"] },
-  { id: '2', title: 'Sunrise Flow', room: 'Living Room', time: '15 min', instructions: ["Breathe", "Stretch", "Flow", "Relax"] },
-  { id: '3', title: 'Gratitude Flow', room: 'Living Room', time: '10 min', instructions: ["Focus", "Identify 3 things", "Feel thanks", "Smile"] },
-  { id: '4', title: 'Forest Bathing', room: 'Living Room', time: '20 min', instructions: ["Listen", "Visualize trees", "Deep breath", "Peace"] },
+  { id: '1', title: 'Italian Night', room: 'Kitchen', time: '45 min', instructions: ["Prepare ingredients", "Boil pasta", "Mix sauce", "Serve"], content: 'Italian Jazz' },
+  { id: '2', title: 'Sunrise Flow', room: 'Living Room', time: '15 min', instructions: ["Breathe", "Stretch", "Flow", "Relax"], content: 'Morning Birds' },
+  { id: '3', title: 'Gratitude Flow', room: 'Living Room', time: '10 min', instructions: ["Focus", "Identify 3 things", "Feel thanks", "Smile"], content: 'Soft Piano' },
+  { id: '4', title: 'Forest Bathing', room: 'Living Room', time: '20 min', instructions: ["Listen", "Visualize trees", "Deep breath", "Peace"], content: 'Nature Sounds' },
 ];
 
 export default function ActiveSession() {
   const { id } = useLocalSearchParams<{ id: string }>();
   
+  // Estados principais
   const [loading, setLoading] = useState(true);
   const [activity, setActivity] = useState<any>(null);
   const [isActive, setIsActive] = useState(true);
@@ -41,11 +44,31 @@ export default function ActiveSession() {
   const [showExitModal, setShowExitModal] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   
+  // Valores Animados
   const progress = useSharedValue(0);
   const contentOpacity = useSharedValue(1);
   const pulseScale = useSharedValue(1);
 
-  // 1. CARREGAMENTO DE DADOS
+  // 1. PLAYER SILENCIOSO (Para manter a App ativa em Background/Lock Screen)
+  const player = Audio.useAudioPlayer('https://github.com/anars/blank-audio/raw/master/10-minutes-of-silence.mp3');
+
+  useEffect(() => {
+    async function setupAudio() {
+      try {
+        await Audio.setAudioModeAsync({
+          shouldPlayInBackground: true, 
+          interruptionMode: 'doNotMix',
+          shouldRouteThroughEarpiece: false,
+        });
+        player.loop = true;
+        player.volume = 0; 
+        if (isActive) player.play();
+      } catch (e) { console.log("Audio Error:", e); }
+    }
+    setupAudio();
+  }, [player]);
+
+  // 2. CARREGAMENTO DE DADOS (API READY)
   const loadData = useCallback(async () => {
     try {
       let found = ALL_ACTIVITIES.find((a) => String(a.id) === String(id));
@@ -75,7 +98,7 @@ export default function ActiveSession() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // 2. ANIMAÇÃO DE PULSAÇÃO (Visual)
+  // 3. ANIMAÇÃO DE PULSAÇÃO
   useEffect(() => {
     if (isActive) {
       pulseScale.value = withRepeat(
@@ -85,7 +108,7 @@ export default function ActiveSession() {
     } else { pulseScale.value = withTiming(1); }
   }, [isActive]);
 
-  // 3. CRONÓMETRO E PROGRESSO
+  // 4. CRONÓMETRO E PROGRESSO
   useEffect(() => {
     let interval: any = null;
     if (isActive && secondsLeft > 0) {
@@ -98,7 +121,7 @@ export default function ActiveSession() {
     return () => clearInterval(interval);
   }, [isActive, secondsLeft, loading, totalSessionTime]);
 
-  // 4. TROCA DE INSTRUÇÕES
+  // 5. TROCA DE INSTRUÇÕES
   useEffect(() => {
     const steps = activity?.instructions;
     if (!steps || totalSessionTime === 0) return;
@@ -135,7 +158,7 @@ export default function ActiveSession() {
           <View className="bg-[#F1F4EE] w-full rounded-[40px] p-8 items-center shadow-2xl">
             <Text className="text-[#354F52] text-3xl font-bold mb-4">End activity?</Text>
             <TouchableOpacity 
-              onPress={() => { setShowExitModal(false); setIsActive(true); }}
+              onPress={() => { setShowExitModal(false); setIsActive(true); player.play(); }}
               className="bg-[#5E8C5D] w-full py-4 rounded-full mb-4"
             >
               <Text className="text-white text-center text-xl font-bold">Resume</Text>
@@ -153,7 +176,7 @@ export default function ActiveSession() {
           <Ionicons name="chevron-back" size={30} color="#354F52" />
         </TouchableOpacity>
         <Text className="text-[#354F52] text-xl font-semibold">{activity.title}</Text>
-        <TouchableOpacity onPress={() => { setIsActive(false); setShowExitModal(true); }}>
+        <TouchableOpacity onPress={() => { setIsActive(false); player.pause(); setShowExitModal(true); }}>
           <Text className="text-[#7DA87B] text-lg font-medium">Cancel</Text>
         </TouchableOpacity>
       </View>
@@ -179,7 +202,7 @@ export default function ActiveSession() {
 
       {/* Painel de Controle */}
       <View className="bg-[#F1F4EE] px-10 pb-8">
-        <View className="items-center mb-10">
+        <View className="items-center mb-6">
           <Text className="text-[#354F52] text-6xl font-bold tabular-nums">
             {Math.floor(secondsLeft / 60)}:{(secondsLeft % 60).toString().padStart(2, '0')}
           </Text>
@@ -188,13 +211,22 @@ export default function ActiveSession() {
           </View>
         </View>
 
+        <View className="flex-row items-center bg-white/40 border border-[#7DA87B]/20 p-4 rounded-3xl mb-8">
+         <Image source={{ uri: 'https://picsum.photos/seed/6/100/100' }} className="w-12 h-12 rounded-lg" /> 
+          <View className="flex-1 ml-4">
+            <Text className="text-[#354F52] font-bold">{activity.content || "Session"}</Text>
+            <Text className="text-[#354F52]/60 text-xs">Playing in {activity.room}</Text>
+          </View>
+          <TouchableOpacity onPress={() => { isActive ? player.pause() : player.play(); setIsActive(!isActive); }}>
+            <Ionicons name={isActive ? "pause-circle" : "play-circle"} size={44} color="#7DA87B" />
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity 
-          onPress={() => setIsActive(!isActive)} 
-          className="bg-[#5E8C5D] py-5 rounded-full items-center shadow-lg active:opacity-90"
+          onPress={() => { isActive ? player.pause() : player.play(); setIsActive(!isActive); }} 
+          className="bg-[#5E8C5D] py-4 rounded-full items-center"
         >
-          <Text className="text-white text-2xl font-bold">
-            {isActive ? 'Pause Session' : 'Resume Session'}
-          </Text>
+          <Text className="text-white text-xl font-bold">{isActive ? 'Pause' : 'Resume'}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
