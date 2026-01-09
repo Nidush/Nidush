@@ -213,7 +213,10 @@ export default function ActivityDetails() {
           style={{ width: width * 0.65 }}
           onPress={() => router.push({
             pathname: "/LoadingActivity",
-            params: { title: activity.title }
+            params: { 
+              id: activity.id,   
+              title: activity.title 
+            }
           })}
         >
           <Text className="text-white text-2xl mr-2">Start</Text>
