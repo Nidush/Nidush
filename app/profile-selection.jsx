@@ -32,16 +32,20 @@ const profiles = [
 
 export default function ProfileSelection() {
   const router = useRouter();
-  const hostName = "Laura"; 
+  const hostName = 'Laura';
 
   return (
     <SafeAreaView className="flex-1 bg-[#F5F7F0]" edges={['top']}>
       <ScrollView
-        contentContainerStyle={{ alignItems: 'center', paddingTop: 60, paddingBottom: 120 }}
+        contentContainerStyle={{
+          alignItems: 'center',
+          paddingTop: 60,
+          paddingBottom: 120,
+        }}
         className="z-20"
         showsVerticalScrollIndicator={false}
       >
-        <Text 
+        <Text
           className="text-[32px] text-[#3A5A54] mb-12 text-center px-10"
           style={{ fontFamily: 'Nunito_700Bold' }}
         >
@@ -63,7 +67,7 @@ export default function ProfileSelection() {
                   resizeMode="cover"
                 />
               </View>
-              <Text 
+              <Text
                 className="text-xl text-[#3A5A54] text-center"
                 style={{ fontFamily: 'Nunito_600SemiBold' }}
               >
@@ -73,11 +77,14 @@ export default function ProfileSelection() {
           ))}
 
           {/* Botão Add Profile  */}
-          <TouchableOpacity activeOpacity={0.7} className="items-center w-[45%]">
+          <TouchableOpacity
+            activeOpacity={0.7}
+            className="items-center w-[45%]"
+          >
             <View className="w-[130px] h-[130px] rounded-full bg-[#C8E0C4] items-center justify-center mb-3">
               <MaterialIcons name="add" size={90} color="#354F52" />
             </View>
-            <Text 
+            <Text
               className="text-xl text-[#3A5A54] text-center"
               style={{ fontFamily: 'Nunito_600SemiBold' }}
             >
@@ -87,7 +94,7 @@ export default function ProfileSelection() {
         </View>
 
         <TouchableOpacity className="mt-12">
-          <Text 
+          <Text
             className="text-lg text-[#548F53] underline"
             style={{ fontFamily: 'Nunito_700Bold' }}
           >
