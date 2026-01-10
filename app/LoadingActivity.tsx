@@ -1,143 +1,143 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+const tips = [
+  'Deep breathing activates the parasympathetic nervous system, calming your body instantly.',
+  'Meditation reduces stress and anxiety levels significantly with regular practice.',
+  'Regular mindfulness improves focus, concentration, and cognitive flexibility.',
+  'Hydration is key for optimal brain function; drink water before you start.',
+  'Short breaks can boost productivity and prevent mental fatigue.',
+  'Listening to nature sounds can help lower blood pressure and muscle tension.',
+  'Gratitude journaling before bed is proven to improve sleep quality.',
+  'Reducing blue light exposure one hour before sleep helps you rest better.',
+  'Gentle stretching releases physical tension and prepares the mind for stillness.',
+  'Consistent sleep schedules aid mental clarity and emotional stability.',
+  'Smiling, even intentionally, can trigger dopamine and lift your mood.',
+  'A decluttered physical space often leads to a more decluttered mind.',
+  'Writing down your worries before meditation helps clear your head.',
+  'A short walk can boost creative thinking and problem-solving skills.',
+  'Focusing on the present moment reduces regrets about the past and fears of the future.',
+  'Aromatherapy with lavender or eucalyptus can promote deeper relaxation.',
+  'Visualization techniques can prime your brain for success and confidence.',
+  'Mindful eating improves digestion and your relationship with food.',
+  'Disconnecting from screens for 30 minutes daily reduces mental overload.',
+  'Practicing kindness towards others actually boosts your own happiness levels.',
+];
+
+const messages = [
+  'Preparing your environment',
+  'Preparing your activity',
+  'Activating Focus Mode',
+];
+
 export default function LoadingActivity() {
   const { title } = useLocalSearchParams();
+  const [messageIndex, setMessageIndex] = useState(0);
+  const [randomTip] = useState(
+    () => tips[Math.floor(Math.random() * tips.length)],
+  );
 
-  // Refs de animação existentes
-  const scaleCenter = useRef(new Animated.Value(1)).current;
-  const scaleWave1 = useRef(new Animated.Value(1)).current;
-  const scaleWave2 = useRef(new Animated.Value(1)).current;
+  const breathAnim = useRef(new Animated.Value(0)).current;
+
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const rotateAnimReverse = useRef(new Animated.Value(0)).current;
-
-  // === NOVA REF PARA O EFEITO LÍQUIDO (Squash & Stretch) ===
-  const liquidWiggleAnim = useRef(new Animated.Value(0)).current;
+  const textOpacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    // Função de respiração (Mantida do anterior, fluida)
-    const breathe = (
-      anim: Animated.Value,
-      toValue: number,
-      duration: number,
-      initialDelay: number = 0,
-    ) => {
-      const breathingCycle = Animated.loop(
-        Animated.sequence([
-          Animated.timing(anim, {
-            toValue,
-            duration: duration,
-            useNativeDriver: true,
-            easing: Easing.inOut(Easing.sin),
-          }),
-          Animated.timing(anim, {
-            toValue: 1,
-            duration: duration,
-            useNativeDriver: true,
-            easing: Easing.inOut(Easing.sin),
-          }),
-        ]),
-      );
+    const textInterval = setInterval(() => {
+      Animated.timing(textOpacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        setMessageIndex((prev) => (prev + 1) % messages.length);
+        Animated.timing(textOpacity, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }).start();
+      });
+    }, 5000);
+    return () => clearInterval(textInterval);
+  }, [textOpacity]);
 
-      if (initialDelay > 0) {
-        Animated.sequence([
-          Animated.delay(initialDelay),
-          breathingCycle,
-        ]).start();
-      } else {
-        breathingCycle.start();
-      }
-    };
-
-    // === NOVA FUNÇÃO: MOVIMENTO LÍQUIDO (Amassar e Esticar) ===
-    const startLiquidMotion = () => {
+  useEffect(() => {
+    const startBreathing = () => {
       Animated.loop(
         Animated.sequence([
-          Animated.timing(liquidWiggleAnim, {
+          Animated.timing(breathAnim, {
             toValue: 1,
-            // Duração diferente da respiração e rotação para criar "caos orgânico"
-            duration: 2500,
+            duration: 4000,
             useNativeDriver: true,
-            // Easing.quad dá uma sensação mais elástica/gelatinosa
-            easing: Easing.inOut(Easing.quad),
+            easing: Easing.bezier(0.42, 0, 0.58, 1),
           }),
-          Animated.timing(liquidWiggleAnim, {
+          Animated.timing(breathAnim, {
             toValue: 0,
-            duration: 2500,
+            duration: 4000,
             useNativeDriver: true,
-            easing: Easing.inOut(Easing.quad),
+            easing: Easing.bezier(0.42, 0, 0.58, 1),
           }),
         ]),
       ).start();
     };
 
-    // --- INICIALIZANDO AS ANIMAÇÕES ---
+    const startRotation = () => {
+      Animated.loop(
+        Animated.timing(rotateAnim, {
+          toValue: 1,
+          duration: 12000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+      ).start();
 
-    // 1. Inicia o novo movimento líquido
-    startLiquidMotion();
+      Animated.loop(
+        Animated.timing(rotateAnimReverse, {
+          toValue: 1,
+          duration: 15000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        }),
+      ).start();
+    };
 
-    // 2. Respirações (Mantidas)
-    breathe(scaleCenter, 0.85, 3000); // Núcleo contrai
-    breathe(scaleWave1, 1.28, 4000, 0); // Onda média expande muito
-    breathe(scaleWave2, 1.15, 3500, 1000); // Onda externa expande
+    startBreathing();
+    startRotation();
 
-    // 3. Rotações (Acelerei *levemente* para o efeito líquido ficar mais dinâmico)
-    Animated.loop(
-      Animated.timing(rotateAnim, {
-        toValue: 1,
-        duration: 10000, // De 12s para 10s
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-    ).start();
-
-    Animated.loop(
-      Animated.timing(rotateAnimReverse, {
-        toValue: 1,
-        duration: 13000, // De 15s para 13s
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }),
-    ).start();
-
-    const timer = setTimeout(() => {
-      // router.replace('/ActiveSession');
-    }, 7000);
+    const timer = setTimeout(() => {}, 16000);
 
     return () => clearTimeout(timer);
-  }, [
-    scaleCenter,
-    scaleWave1,
-    scaleWave2,
-    rotateAnim,
-    rotateAnimReverse,
-    liquidWiggleAnim,
-  ]);
-
-  // --- INTERPOLAÇÕES ---
+  }, [breathAnim, rotateAnim, rotateAnimReverse]);
 
   const spin = rotateAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
   });
-
   const spinReverse = rotateAnimReverse.interpolate({
     inputRange: [0, 1],
     outputRange: ['360deg', '0deg'],
   });
 
-  // === NOVAS INTERPOLAÇÕES LÍQUIDAS PARA A CAMADA DO MEIO ===
-  // Quando wiggle vai para 1, estica em X e achata em Y.
-  const fluidScaleX = liquidWiggleAnim.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [1, 1.05, 0.95], // Estica um pouco, depois comprime
+  const coreScale = breathAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.9, 1.0],
   });
 
-  const fluidScaleY = liquidWiggleAnim.interpolate({
-    inputRange: [0, 0.5, 1],
-    outputRange: [1, 0.92, 1.08], // Comprime, depois estica (oposto de X)
+  const midScale = breathAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.95, 1.25],
+  });
+
+  const outerScale = breathAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1.0, 1.3],
+  });
+  const breathingOpacity = breathAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.15, 0.1],
   });
 
   return (
@@ -149,73 +149,74 @@ export default function LoadingActivity() {
         Initializing “{title || 'Gratitude Flow'}”...
       </Text>
 
-      {/* ÁREA CENTRAL ANIMADA */}
       <View className="items-center justify-center w-full h-[450px] relative">
-        {/* === CAMADA 1: DISFORME EXTERNA === */}
         <Animated.View
           style={{
-            transform: [{ rotate: spinReverse }, { scale: scaleWave2 }],
+            transform: [{ rotate: spinReverse }, { scale: outerScale }],
             position: 'absolute',
-            width: 350,
-            height: 340,
-            backgroundColor: '#DDE5D7',
-            opacity: 0.5,
-            borderTopLeftRadius: 120,
-            borderTopRightRadius: 210,
-            borderBottomLeftRadius: 190,
-            borderBottomRightRadius: 130,
+            width: 320,
+            height: 310,
+            backgroundColor: '#4ADE80',
+            opacity: breathingOpacity,
+            borderRadius: 160,
+            borderTopLeftRadius: 140,
+            borderTopRightRadius: 200,
+            borderBottomLeftRadius: 200,
+            borderBottomRightRadius: 150,
           }}
         />
 
-        {/* === CAMADA 2: DISFORME INTERNA (ALVO DO EFEITO LÍQUIDO) === */}
         <Animated.View
           style={{
-            // ADICIONAMOS scaleX e scaleY NO TRANSFORM
-            // A ordem importa: primeiro gira, depois aplica a escala uniforme (respiração),
-            // e por último aplica a distorção líquida (X e Y independentes).
-            transform: [
-              { rotate: spin },
-              { scale: scaleWave1 },
-              { scaleX: fluidScaleX },
-              { scaleY: fluidScaleY },
-            ],
+            transform: [{ rotate: spin }, { scale: midScale }],
             position: 'absolute',
-            width: 245,
-            height: 250,
-            backgroundColor: '#BFD6BA',
-            opacity: 0.6,
-            borderTopLeftRadius: 130,
-            borderTopRightRadius: 80,
-            borderBottomLeftRadius: 90,
-            borderBottomRightRadius: 140,
+            width: 260,
+            height: 260,
+            backgroundColor: '#4ADE80',
+            opacity: 0.2,
+            borderRadius: 130,
+            borderTopLeftRadius: 150,
+            borderTopRightRadius: 110,
+            borderBottomLeftRadius: 120,
+            borderBottomRightRadius: 160,
           }}
         />
 
-        {/* === CAMADA 3: NÚCLEO === */}
         <Animated.View
           style={{
-            transform: [{ scale: scaleCenter }],
+            transform: [{ scale: coreScale }],
             width: 230,
             height: 230,
             borderRadius: 115,
-            backgroundColor: '#6A9969',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 24,
             zIndex: 10,
-            shadowColor: '#548F53',
+            shadowColor: '#000000',
             shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.2,
+            shadowOpacity: 0.15,
             shadowRadius: 10,
-            elevation: 5,
+            elevation: 3,
           }}
         >
-          <Text
-            className="text-white text-center text-xl font-semibold leading-7"
-            style={{ fontFamily: 'Nunito_600SemiBold' }}
+          <LinearGradient
+            colors={['#7ECA7C', '#548F53']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              flex: 1,
+              width: '100%',
+              height: '100%',
+              borderRadius: 115,
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 24,
+            }}
           >
-            Preparing your environment
-          </Text>
+            <Animated.Text
+              className="text-white text-center text-2xl font-semibold leading-7"
+              style={{ fontFamily: 'Nunito_600SemiBold', opacity: textOpacity }}
+            >
+              {messages[messageIndex]}
+            </Animated.Text>
+          </LinearGradient>
         </Animated.View>
       </View>
 
@@ -230,8 +231,7 @@ export default function LoadingActivity() {
           className="text-[#354F52] text-center text-lg leading-6"
           style={{ fontFamily: 'Nunito_600SemiBold' }}
         >
-          Using warm, dim lighting before meditation helps boost melatonin
-          production.
+          {randomTip}
         </Text>
       </View>
 
