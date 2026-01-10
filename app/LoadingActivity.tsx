@@ -7,7 +7,7 @@ import TipDisplay from '../components/loading/TipDisplay';
 import { TIPS } from '../constants/loadingData';
 
 const LoadingActivity = () => {
-  const { title } = useLocalSearchParams();
+  const { title, id } = useLocalSearchParams();
   const randomTip = useMemo(() => {
     return TIPS[Math.floor(Math.random() * TIPS.length)];
   }, []);
