@@ -18,7 +18,7 @@ const LoadingActivity = () => {
     }, 15000);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [id]);
 
   const handleCancel = () => {
     router.back();

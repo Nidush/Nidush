@@ -8,7 +8,7 @@
 // }
 
 // export const FilterChip = ({ label, active = false }: FilterChipProps) => (
-//   <TouchableOpacity 
+//   <TouchableOpacity
 //     className={`px-6 py-1.5 rounded-full mr-2 border ${
 //       active ? 'bg-[#C8E6C9] border-[#548F53]' : 'bg-transparent border-[#A8B5AA]'
 //     }`}
@@ -22,10 +22,10 @@
 // export const SearchBar = () => (
 //   <View className="flex-row items-center bg-[#F1F3EA] border border-[#A8B5AA] rounded-full px-4 py-2.5 mb-6">
 //     <Feather name="search" size={18} color="#A8B5AA" />
-//     <TextInput 
-//       placeholder="Search..." 
-//       className="flex-1 ml-2 text-[16px] text-[#354F52] font-[Nunito_400Regular]" 
-//       placeholderTextColor="#A8B5AA" 
+//     <TextInput
+//       placeholder="Search..."
+//       className="flex-1 ml-2 text-[16px] text-[#354F52] font-[Nunito_400Regular]"
+//       placeholderTextColor="#A8B5AA"
 //     />
 //   </View>
 // );
