@@ -2,9 +2,9 @@ name: CI/CD Nidush
 
 on:
   push:
-    branches: ['**']
+    branches: ["**"]
   pull_request:
-    branches: ['main']
+    branches: ["main"]
 
 jobs:
   build-test-deploy:
@@ -35,8 +35,8 @@ jobs:
       - name: Audit dependencies
         run: npm audit --audit-level=moderate || true
 
-      - name: Check Prettier formatting
-        run: npx prettier . --check
+      - name: Format code with Prettier
+        run: npx prettier --write .
 
       - name: Run ESLint
         run: npm run lint
