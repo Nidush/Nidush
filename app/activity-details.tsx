@@ -5,16 +5,17 @@ import {
   MaterialIcons,
 } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import MaskedView from '@react-native-masked-view/masked-view'; // <--- IMPORTANTE
+import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Image, // <--- Adicionado
+  Image,
   Platform,
   ScrollView,
-  StyleSheet, // <--- Adicionado
+  StyleSheet,
+  // Switch, <--- REMOVIDO, JÁ NÃO É NECESSÁRIO
   Text,
   TouchableOpacity,
   View,
@@ -67,6 +68,7 @@ export default function ActivityDetails() {
   const [mainItem, setMainItem] = useState<Activity | Scenario | null>(null);
   const [relatedScenario, setRelatedScenario] = useState<Scenario | null>(null);
   const [relatedContent, setRelatedContent] = useState<Content | null>(null);
+  const [focusEnabled, setFocusEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const isActivity = mainItem ? 'type' in mainItem : false;
@@ -89,6 +91,7 @@ export default function ActivityDetails() {
         if (foundActivity.scenarioId) {
           const scen = SCENARIOS.find((s) => s.id === foundActivity.scenarioId);
           setRelatedScenario(scen || null);
+          if (scen) setFocusEnabled(scen.focusMode);
         }
         if (foundActivity.contentId) {
           const cont = CONTENTS[foundActivity.contentId];
@@ -99,6 +102,7 @@ export default function ActivityDetails() {
         if (foundScenario) {
           setMainItem(foundScenario);
           setRelatedScenario(foundScenario);
+          setFocusEnabled(foundScenario.focusMode);
         }
       }
       setLoading(false);
@@ -130,16 +134,13 @@ export default function ActivityDetails() {
   const devicesToShow: ScenarioDeviceState[] =
     relatedScenario?.devices || (mainItem as Scenario).devices || [];
 
-  // --- NOVA LÓGICA DE ÁUDIO ---
-  // 1. Procura se há algum speaker na lista de dispositivos deste cenário
   const activeSpeakerConfig = devicesToShow.find((config) => {
     const device = SMART_HOME_DEVICES[config.deviceId];
     return device?.type === 'speaker';
   });
 
-  // 2. Define o texto a mostrar
   const audioStatusText = activeSpeakerConfig
-    ? `Playlist will be played on ${SMART_HOME_DEVICES[activeSpeakerConfig.deviceId].name}` // Caso tenha speaker
+    ? `Playlist will be played on ${SMART_HOME_DEVICES[activeSpeakerConfig.deviceId].name}`
     : 'Playlist will be played';
 
   const instructions = relatedContent?.instructions || [];
@@ -155,12 +156,11 @@ export default function ActivityDetails() {
         contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* --- HEADER COM EFEITO BLUR FADE --- */}
+        {/* --- HEADER --- */}
         <View className="w-full h-[450px] relative ">
           <View style={StyleSheet.absoluteFill}>
             <Image
               source={imageSource}
-              // Forçamos a largura e altura totais
               style={{ width: '100%', height: '100%' }}
               resizeMode="cover"
               blurRadius={Platform.OS === 'ios' ? 70 : 50}
@@ -168,7 +168,6 @@ export default function ActivityDetails() {
             <View className="absolute inset-0" />
           </View>
 
-          {/* CAMADA 2: Imagem Nítida com Máscara */}
           <MaskedView
             style={StyleSheet.absoluteFill}
             maskElement={
@@ -181,29 +180,23 @@ export default function ActivityDetails() {
           >
             <Image
               source={imageSource}
-              // Forçamos a largura e altura totais aqui também
               style={{ width: '100%', height: '100%' }}
-              resizeMode="cover" // Crucial para não ficar pequena
+              resizeMode="cover"
             />
           </MaskedView>
 
-          {/* CAMADA 3: Gradiente de Leitura (Overlay) */}
           <LinearGradient
             colors={['rgba(0,0,0,0.1)', 'transparent', 'rgba(0,0,0,0.8)']}
             style={StyleSheet.absoluteFill}
             pointerEvents="none"
           />
 
-          {/* CAMADA 4: Texto e Botões */}
           <SafeAreaView style={StyleSheet.absoluteFill} edges={['top']}>
-            {/* Top Bar */}
             <View className="flex-row justify-between items-center px-5 pt-2">
-              {/* Botão Voltar (Esquerda) */}
               <TouchableOpacity onPress={() => router.back()}>
                 <Ionicons name="chevron-back" size={28} color="white" />
               </TouchableOpacity>
 
-              {/* Botão 3 Pontos (Direita) */}
               <TouchableOpacity onPress={() => console.log('Opções clicadas')}>
                 <MaterialIcons name="more-vert" size={28} color="white" />
               </TouchableOpacity>
@@ -250,10 +243,9 @@ export default function ActivityDetails() {
           </SafeAreaView>
         </View>
 
-        {/* --- RESTO DO CONTEÚDO DA PÁGINA --- */}
+        {/* --- CONTEÚDO --- */}
         <View className="px-6 pt-8">
-          {/* SECÇÃO: DISPOSITIVOS */}
-          {/* SECÇÃO: DISPOSITIVOS */}
+          {/* DISPOSITIVOS */}
           {devicesToShow.length > 0 && (
             <View className="mb-8">
               <Text
@@ -263,7 +255,6 @@ export default function ActivityDetails() {
                 Selected Devices
               </Text>
 
-              {/* PAI: Define o layout flexível e o espaçamento (gap) */}
               <View className="flex-row flex-wrap gap-3">
                 {devicesToShow.map((config, i) => {
                   const realDevice = SMART_HOME_DEVICES[config.deviceId];
@@ -278,9 +269,6 @@ export default function ActivityDetails() {
                   return (
                     <View
                       key={i}
-                      // AQUI ESTÁ O SEGREDO:
-                      // w-[48%]: 48% + 48% + gap = ~100% (Cabe numa linha)
-                      // grow: Se o card ficar sozinho na linha, estica para 100%
                       className="w-[48%] grow flex-row items-center px-3 py-3 rounded-xl border border-[#548f537f]"
                     >
                       {getDeviceIcon(realDevice.type, '#548F53')}
@@ -353,7 +341,50 @@ export default function ActivityDetails() {
             </Text>
           </View>
 
-          {/* MEDIA */}
+          {/* --- FOCUS MODE (COM O NOVO TOGGLE) --- */}
+          <View className="mb-8">
+            <Text
+              className="text-[#354F52] text-xl mb-3"
+              style={{ fontFamily: 'Nunito_700Bold' }}
+            >
+              Focus Mode
+            </Text>
+            <View className="flex-row items-center justify-between bg-[#F0F2EB] border border-[#548f537f] p-4 rounded-2xl">
+              <View className="flex-1 pr-4">
+                <Text
+                  className="text-[#354F52] text-lg"
+                  style={{ fontFamily: 'Nunito_700Bold' }}
+                >
+                  Do Not Disturb
+                </Text>
+                <Text
+                  className="text-[#548F53] text-xs mt-1"
+                  style={{ fontFamily: 'Nunito_600SemiBold' }}
+                >
+                  {focusEnabled
+                    ? 'Notifications silenced for deep work'
+                    : 'Notifications enabled'}
+                </Text>
+              </View>
+
+              {/* TEU TOGGLE PERSONALIZADO */}
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setFocusEnabled(!focusEnabled)}
+                className={`w-14 h-7 rounded-full px-1 justify-center ${
+                  focusEnabled ? 'bg-[#548F53]' : 'bg-gray-400/60'
+                }`}
+              >
+                <View
+                  className={`w-5 h-5 bg-white rounded-full shadow-sm ${
+                    focusEnabled ? 'self-end' : 'self-start'
+                  }`}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* MEDIA (Playlist) */}
           {(relatedScenario?.playlist || relatedContent?.videoUrl) && (
             <View className="mb-8">
               <Text
@@ -374,13 +405,13 @@ export default function ActivityDetails() {
                       'Relaxing Sounds'}
                   </Text>
                   <Text
-                    className="text-[#6A7D5B] text-xs mt-1"
-                    style={{ fontFamily: 'Nunito_700Bold' }}
+                    className="text-[#548F53] text-xs mt-1"
+                    style={{ fontFamily: 'Nunito_600SemiBold' }}
                   >
                     {audioStatusText}
                   </Text>
                 </View>
-                <View className="bg-[#548F53] p-2 rounded-full">
+                <View className="bg-[#548F53] p-5 rounded-xl">
                   <Ionicons name="musical-notes" size={24} color="white" />
                 </View>
               </View>
@@ -421,7 +452,6 @@ export default function ActivityDetails() {
           )}
 
           {/* INSTRUÇÕES */}
-          {/* INSTRUÇÕES */}
           {instructions.length > 0 && (
             <View className="mb-4">
               <Text
@@ -432,8 +462,6 @@ export default function ActivityDetails() {
               </Text>
               {instructions.map((step, i) => (
                 <View key={i} className="flex-row mb-4">
-                  {/* BOLINHA NUMERADA */}
-                  {/* Removi o 'mt-0.5' daqui para simplificar o cálculo */}
                   <View className="bg-[#BBE6BA] w-8 h-8 rounded-full items-center justify-center mr-3">
                     <Text
                       className="text-[#354F52]"
@@ -443,8 +471,6 @@ export default function ActivityDetails() {
                     </Text>
                   </View>
 
-                  {/* TEXTO DA INSTRUÇÃO */}
-                  {/* Adicionei 'mt-1' (4px) para centrar perfeitamente a linha de 24px com a bola de 32px */}
                   <Text
                     className="text-[#354F52] text-[16px] flex-1 leading-6 mt-1"
                     style={{ fontFamily: 'Nunito_400Regular' }}
@@ -459,10 +485,10 @@ export default function ActivityDetails() {
       </ScrollView>
 
       {/* START BTN */}
-      <View className="absolute bottom-10 left-0 right-0 items-center px-4">
+      <View className="absolute bottom-10 left-0 right-0 items-center px-5">
         <TouchableOpacity
           activeOpacity={0.9}
-          className="bg-[#548F53] w-52 py-4 rounded-full flex-row items-center justify-center shadow-lg shadow-[#548F53]/40"
+          className="bg-[#548F53] w-72 py-4 rounded-full flex-row items-center justify-center shadow-lg shadow-[#548F53]/40"
           onPress={() =>
             router.push({
               pathname: '/LoadingActivity',
@@ -470,6 +496,7 @@ export default function ActivityDetails() {
                 id: mainItem.id,
                 title: mainItem.title,
                 type: isActivity ? 'activity' : 'scenario',
+                focusMode: focusEnabled.toString(),
               },
             })
           }
