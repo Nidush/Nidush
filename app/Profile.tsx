@@ -1,127 +1,171 @@
-import React from 'react';
-import {
-  StyleSheet,
-  View,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-} from 'react-native';
-import {
-  Ionicons,
-  MaterialCommunityIcons,
-  FontAwesome5,
-} from '@expo/vector-icons';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ThemedText } from '@/components/themed-text';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import React from 'react';
+import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function Profile() {
   const router = useRouter();
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header com Botão Voltar */}
-      <View style={styles.header}>
+    <SafeAreaView className="flex-1 bg-[#F5F7F0]" edges={['top']}>
+      {/* Header */}
+      <View className="flex-row justify-between items-center px-6 py-4">
         <TouchableOpacity onPress={() => router.replace('/(tabs)')}>
-          <Ionicons name="chevron-back" size={28} color="#2D3E27" />
+          <MaterialIcons name="chevron-left" size={32} color="#4A5D4E" />
         </TouchableOpacity>
-        <ThemedText style={styles.headerTitle}>Profile</ThemedText>
-        <View style={{ width: 28 }} />
+        <Text
+          className="text-2xl text-[#4A5D4E]"
+          style={{ fontFamily: 'Nunito_600SemiBold' }}
+        >
+          Profile
+        </Text>
+        <View className="w-8" />
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Foto e Nome */}
-        <View style={styles.profileSection}>
+        <View className="items-center my-6">
           <Image
             source={require('@/assets/avatars/profile.png')}
-            style={styles.mainAvatar}
+            className="w-32 h-32 rounded-full"
           />
-          <ThemedText style={styles.userName}>Laura Rossi</ThemedText>
+          <Text
+            className="text-3xl text-[#3A4D3F] mt-4"
+            style={{ fontFamily: 'Nunito_700Bold' }}
+          >
+            Laura Rossi
+          </Text>
         </View>
 
-        {/* Hobby Preferences */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <ThemedText style={styles.cardTitle}>Hobby Preferences</ThemedText>
+        {/* Hobbies */}
+        <View className="bg-[#F5F7F0] rounded-[24px] p-5 mb-4 border border-[#D1D9C5]">
+          <View className="flex-row justify-between items-center mb-4">
+            <Text
+              className="text-lg text-[#4A5D4E]"
+              style={{ fontFamily: 'Nunito_600SemiBold' }}
+            >
+              Hobby Preferences
+            </Text>
             <TouchableOpacity>
-              <ThemedText style={styles.editLink}>Edit</ThemedText>
+              <Text
+                className="text-[#5B8C51] underline"
+                style={{ fontFamily: 'Nunito_700Bold' }}
+              >
+                Edit
+              </Text>
             </TouchableOpacity>
           </View>
-          <View style={styles.tagContainer}>
+          <View className="flex-row flex-wrap gap-2">
             {['Cooking', 'Workout', 'Meditation', 'Audiobooks'].map((hobby) => (
-              <View key={hobby} style={styles.tag}>
-                <ThemedText style={styles.tagText}>{hobby}</ThemedText>
+              <View
+                key={hobby}
+                className="bg-[#C8E0C4] px-4 py-1.5 rounded-full"
+              >
+                <Text
+                  className="text-[#4A5D4E] text-sm"
+                  style={{ fontFamily: 'Nunito_600SemiBold' }}
+                >
+                  {hobby}
+                </Text>
               </View>
             ))}
           </View>
         </View>
 
-        {/* Associated Wearables */}
-        <View style={styles.card}>
-          <ThemedText style={styles.cardTitle}>Associated Wearables</ThemedText>
+        {/* Wearables */}
+        <View className="bg-[#F5F7F0] rounded-[24px] p-5 mb-4 border border-[#D1D9C5]">
+          <Text
+            className="text-lg text-[#4A5D4E] mb-4"
+            style={{ fontFamily: 'Nunito_600SemiBold' }}
+          >
+            Associated Wearables
+          </Text>
+
+          {/* Ícones de relógio do MaterialIcons */}
           <DeviceItem
             name="Apple Watch"
             status="Connected"
             connected
-            icon="watch-variant"
+            icon="watch"
           />
           <DeviceItem
             name="Mi Band"
             status="Disconnected"
             connected={false}
-            icon="watch-variant"
+            icon="watch"
           />
 
-          <TouchableOpacity style={styles.addButton}>
-            <ThemedText style={styles.addButtonText}>Add New Device</ThemedText>
+          <TouchableOpacity className="bg-[#5B8C51] py-3.5 rounded-full items-center mt-4 shadow-sm">
+            <Text
+              className="text-white text-xl"
+              style={{ fontFamily: 'Nunito_700Bold' }}
+            >
+              Add New Device
+            </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Menu de Opções */}
-        <View style={styles.menuCard}>
-          <MenuItem icon="person-circle-outline" label="Account Information" />
-          <MenuItem icon="notifications-outline" label="Notifications" />
+        {/* Menu Principal com MaterialIcons do Design */}
+        <View className="bg-[#F5F7F0] rounded-[24px] px-2 mb-4 border border-[#D1D9C5]">
+          <MenuItem icon="account-circle" label="Account Information" />
+          <MenuItem icon="notifications-none" label="Notifications" />
           <MenuItem
-            icon="shield-checkmark-outline"
+            icon="admin-panel-settings"
             label="Privacy & Data"
             border={false}
           />
         </View>
 
-        <View style={styles.menuCard}>
-          <MenuItem icon="people-outline" label="Residents" border={false} />
+        {/* Menu Secundário */}
+        <View className="bg-[#F5F7F0] rounded-[24px] px-2 mb-6 border border-[#D1D9C5]">
+          <MenuItem icon="group" label="Residents" border={false} />
         </View>
 
-        {/* Logout */}
-        <TouchableOpacity
-          style={styles.logoutButton}
-          onPress={() => router.replace('/profile-selection')}
-        >
-          <ThemedText style={styles.logoutText}>Logout</ThemedText>
-        </TouchableOpacity>
+        {/* Botão Logout */}
+        <View className="items-center">
+          <TouchableOpacity
+            className="bg-[#5B8C51] px-12 py-3.5 rounded-full shadow-sm"
+            onPress={() => router.replace('/profile-selection')}
+          >
+            <Text
+              className="text-white text-xl"
+              style={{ fontFamily: 'Nunito_700Bold' }}
+            >
+              Logout
+            </Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-// Componentes Auxiliares
 function DeviceItem({ name, status, connected, icon }: any) {
   return (
-    <View style={styles.deviceRow}>
-      <MaterialCommunityIcons name={icon} size={32} color="#4A6741" />
-      <View style={{ marginLeft: 12 }}>
-        <ThemedText style={styles.deviceName}>{name}</ThemedText>
-        <View style={styles.statusRow}>
+    <View className="flex-row items-center mb-4">
+      <View className="bg-[#E8EDDF] p-2 rounded-xl">
+        <MaterialIcons name={icon} size={28} color="#4A5D4E" />
+      </View>
+      <View className="ml-4">
+        <Text
+          className="text-base text-[#4A5D4E]"
+          style={{ fontFamily: 'Nunito_600SemiBold' }}
+        >
+          {name}
+        </Text>
+        <View className="flex-row items-center mt-0.5">
           <View
-            style={[
-              styles.statusDot,
-              { backgroundColor: connected ? '#4A6741' : '#A8A8A8' },
-            ]}
+            className={`w-2.5 h-2.5 rounded-full ${connected ? 'bg-[#5B8C51]' : 'bg-gray-400'}`}
           />
-          <ThemedText style={styles.statusText}>{status}</ThemedText>
+          <Text
+            className="text-xs text-gray-500 ml-1.5"
+            style={{ fontFamily: 'Nunito_400Regular' }}
+          >
+            {status}
+          </Text>
         </View>
       </View>
     </View>
@@ -130,99 +174,19 @@ function DeviceItem({ name, status, connected, icon }: any) {
 
 function MenuItem({ icon, label, border = true }: any) {
   return (
-    <TouchableOpacity style={[styles.menuItem, border && styles.menuBorder]}>
-      <View style={styles.menuLeft}>
-        <Ionicons name={icon} size={24} color="#2D3E27" />
-        <ThemedText style={styles.menuLabel}>{label}</ThemedText>
+    <TouchableOpacity
+      className={`flex-row justify-between items-center py-5 px-4 ${border ? 'border-b border-[#D1D9C5]' : ''}`}
+    >
+      <View className="flex-row items-center">
+        <MaterialIcons name={icon} size={28} color="#4A5D4E" />
+        <Text
+          className="text-lg text-[#4A5D4E] ml-4"
+          style={{ fontFamily: 'Nunito_600SemiBold' }}
+        >
+          {label}
+        </Text>
       </View>
-      <Ionicons name="chevron-forward" size={20} color="#2D3E27" />
+      <MaterialIcons name="chevron-right" size={28} color="#4A5D4E" />
     </TouchableOpacity>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F0F2EB' },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontFamily: 'Nunito_600SemiBold',
-    color: '#2D3E27',
-  },
-  scrollContent: { padding: 20 },
-  profileSection: { alignItems: 'center', marginBottom: 25 },
-  mainAvatar: { width: 150, height: 150, borderRadius: 75, marginBottom: 15 },
-  userName: { fontSize: 24, fontFamily: 'Nunito_700Bold', color: '#2D3E27' },
-  card: {
-    backgroundColor: '#F0F2EB',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: '#548F53',
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontFamily: 'Nunito_600SemiBold',
-    color: '#354F52',
-  },
-  editLink: { color: '#548F53', fontSize: 14 },
-  tagContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tag: {
-    backgroundColor: '#BBE6BA',
-    paddingHorizontal: 15,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  tagText: { color: '#548F53', fontSize: 14 },
-  deviceRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
-  deviceName: { fontSize: 16, color: '#2D3E27' },
-  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
-  statusText: { fontSize: 12, color: '#A8A8A8' },
-  addButton: {
-    backgroundColor: '#548F53',
-    padding: 15,
-    borderRadius: 30,
-    alignItems: 'center',
-    marginTop: 8,
-    marginInline: 24,
-  },
-  addButtonText: { color: 'white', fontFamily: 'Nunito_700Bold', fontSize: 18 },
-  menuCard: {
-    backgroundColor: '#F0F2EB',
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: '#548F53',
-  },
-  menuItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 15,
-  },
-  menuBorder: { borderBottomWidth: 1, borderBottomColor: '#548F53' },
-  menuLeft: { flexDirection: 'row', alignItems: 'center', gap: 15 },
-  menuLabel: { fontSize: 16, color: '#2D3E27' },
-  logoutButton: {
-    backgroundColor: '#5B8C51',
-    padding: 15,
-    borderRadius: 30,
-    alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 30,
-  },
-  logoutText: { color: 'white', fontFamily: 'Nunito_700Bold', fontSize: 18 },
-});
