@@ -180,11 +180,13 @@ export default function Onboarding() {
       <View style={styles.overlay}>
         <TouchableOpacity
           style={styles.leftTapArea}
+          testID="left-tap-area"
           onPress={goToPrev}
           activeOpacity={1}
         />
         <TouchableOpacity
           style={styles.rightTapArea}
+          testID="right-tap-area"
           onPress={goToNext}
           activeOpacity={1}
         />
@@ -231,6 +233,7 @@ export default function Onboarding() {
       <StatusBar style="light" />
       <FlatList
         ref={scrollRef}
+        testID="onboarding-flatlist"
         data={SLIDES}
         renderItem={renderItem}
         horizontal
