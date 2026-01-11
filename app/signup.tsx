@@ -4,7 +4,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
   Image,
   Dimensions,
   ScrollView,
@@ -21,73 +20,109 @@ export default function SignUp() {
   const router = useRouter();
 
   return (
-    <View style={styles.mainContainer}>
+    <View className="flex-1 bg-[#F3F5EE]">
       <StatusBar style="dark" />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
+        className="flex-1"
       >
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} bounces={false}>
-          <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
+          <SafeAreaView className="flex-1 px-[28px]">
+            {/* Header */}
+            <View className="items-center mt-[15px] h-[60px] justify-center">
               <Image
                 source={require('../assets/images/Logo.png')}
-                style={styles.logo}
+                className="w-[130px] h-[45px]"
                 resizeMode="contain"
               />
             </View>
 
-            <View style={styles.content}>
-              <Text style={styles.welcomeTitle}>Welcome Home</Text>
-              <Text style={styles.welcomeSubtitle}>
+            {/* Content */}
+            <View className="mt-[25px]">
+              <Text 
+                className="text-[40px] font-bold text-[#3E545C] tracking-[-0.5px]"
+                style={{ fontFamily: 'Nunito' }}
+              >
+                Welcome Home
+              </Text>
+              <Text 
+                className="text-[16px] text-[#3E545C] mt-[8px] mb-[30px] leading-[22px] opacity-90"
+                style={{ fontFamily: 'Nunito' }}
+              >
                 Join Nidush and let your home be your safe space.
               </Text>
 
-              <View style={styles.row}>
-                <View style={styles.inputWrapperSmall}>
-                  <Text style={styles.label}>First Name</Text>
+              {/* Name Row */}
+              <View className="flex-row justify-between mb-[15px]">
+                <View className="w-[48%]">
+                  <Text className="text-[14px] text-[#3E545C] mb-[6px] font-semibold" style={{ fontFamily: 'Nunito' }}>
+                    First Name
+                  </Text>
                   <TextInput
-                    style={styles.input}
+                    className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB] text-[15px] text-[#3E545C]"
                     placeholderTextColor="#A0A0A0"
                   />
                 </View>
-                <View style={styles.inputWrapperSmall}>
-                  <Text style={styles.label}>Last Name</Text>
+                <View className="w-[48%]">
+                  <Text className="text-[14px] text-[#3E545C] mb-[6px] font-semibold" style={{ fontFamily: 'Nunito' }}>
+                    Last Name
+                  </Text>
                   <TextInput
-                    style={styles.input}
+                    className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB] text-[15px] text-[#3E545C]"
                     placeholderTextColor="#A0A0A0"
                   />
                 </View>
               </View>
 
-              <View style={styles.inputWrapperFull}>
-                <Text style={styles.label}>Email</Text>
+              {/* Email */}
+              <View className="w-full mb-[15px]">
+                <Text className="text-[14px] text-[#3E545C] mb-[6px] font-semibold" style={{ fontFamily: 'Nunito' }}>
+                  Email
+                </Text>
                 <TextInput
-                  style={styles.input}
+                  className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB] text-[15px] text-[#3E545C]"
                   keyboardType="email-address"
                   autoCapitalize="none"
                 />
               </View>
 
-              <View style={styles.inputWrapperFull}>
-                <Text style={styles.label}>Password</Text>
-                <TextInput style={styles.input} secureTextEntry={true} />
+              {/* Password */}
+              <View className="w-full mb-[15px]">
+                <Text className="text-[14px] text-[#3E545C] mb-[6px] font-semibold" style={{ fontFamily: 'Nunito' }}>
+                  Password
+                </Text>
+                <TextInput 
+                  className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB] text-[15px] text-[#3E545C]"
+                  secureTextEntry={true} 
+                />
               </View>
 
-              {/* AGORA O BOTÃO NAVEGA PARA AS TABS */}
+              {/* Button */}
               <TouchableOpacity
-                style={styles.joinButton}
+                className="bg-[#5C8D58] w-[230px] h-[54px] rounded-full justify-center items-center self-center mt-[15px] shadow-sm"
+                style={{ 
+                  elevation: 2,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 4,
+                }}
                 onPress={() => router.replace('/(tabs)')}
               >
-                <Text style={styles.joinButtonText}>Join Nidush</Text>
+                <Text className="text-white text-[20px] font-bold" style={{ fontFamily: 'Nunito' }}>
+                  Join Nidush
+                </Text>
               </TouchableOpacity>
 
-              <View style={styles.loginRow}>
-                <Text style={styles.alreadyText}>
+              {/* Login Link */}
+              <View className="flex-row justify-center mt-[20px]">
+                <Text className="text-[#3E545C] text-[15px]" style={{ fontFamily: 'Nunito' }}>
                   Already have an account?{' '}
                 </Text>
                 <TouchableOpacity onPress={() => router.push('/(tabs)')}>
-                  <Text style={styles.loginLink}>Login</Text>
+                  <Text className="text-[#5C8D58] text-[15px] font-bold" style={{ fontFamily: 'Nunito' }}>
+                    Login
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -95,108 +130,18 @@ export default function SignUp() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <View style={styles.waveContainer}>
+      {/* Wave Background */}
+      <View 
+        className="absolute bottom-0 overflow-hidden" 
+        style={{ width: width, height: height * 0.18 }}
+      >
         <Image
           source={require('../assets/images/Wave2.png')}
-          style={styles.waves}
+          className="w-full absolute bottom-0"
+          style={{ height: height * 0.45 }}
           resizeMode="stretch"
         />
       </View>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  mainContainer: { flex: 1, backgroundColor: '#F3F5EE' },
-  container: { flex: 1, paddingHorizontal: 28 },
-  header: {
-    alignItems: 'center',
-    marginTop: 15,
-    height: 60,
-    justifyContent: 'center',
-  },
-  logo: { width: 130, height: 45 },
-  content: { marginTop: 25 },
-  welcomeTitle: {
-    fontSize: 40,
-    fontWeight: '700',
-    color: '#3E545C',
-    fontFamily: 'Nunito',
-    letterSpacing: -0.5,
-  },
-  welcomeSubtitle: {
-    fontSize: 16,
-    color: '#3E545C',
-    marginTop: 8,
-    marginBottom: 30,
-    fontFamily: 'Nunito',
-    lineHeight: 22,
-    opacity: 0.9,
-  },
-  label: {
-    fontSize: 14,
-    color: '#3E545C',
-    marginBottom: 6,
-    fontWeight: '600',
-    fontFamily: 'Nunito',
-  },
-  input: {
-    height: 44,
-    borderWidth: 1.2,
-    borderColor: '#C8D2C8',
-    borderRadius: 15,
-    paddingHorizontal: 15,
-    backgroundColor: '#FBFDFB',
-    fontSize: 15,
-    color: '#3E545C',
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
-  inputWrapperSmall: { width: '48%' },
-  inputWrapperFull: { width: '100%', marginBottom: 15 },
-  joinButton: {
-    backgroundColor: '#5C8D58',
-    width: 230,
-    height: 54,
-    borderRadius: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'center',
-    marginTop: 15,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  joinButtonText: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '700',
-    fontFamily: 'Nunito',
-  },
-  loginRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
-  alreadyText: { color: '#3E545C', fontSize: 15, fontFamily: 'Nunito' },
-  loginLink: {
-    color: '#5C8D58',
-    fontSize: 15,
-    fontWeight: '700',
-    fontFamily: 'Nunito',
-  },
-  waveContainer: {
-    position: 'absolute',
-    bottom: 0,
-    width: width,
-    height: height * 0.18,
-    overflow: 'hidden',
-  },
-  waves: {
-    width: '100%',
-    height: height * 0.45,
-    position: 'absolute',
-    bottom: 0,
-  },
-});

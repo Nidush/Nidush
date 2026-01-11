@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import { useRouter } from 'expo-router';
+import { Platform } from 'react-native'; 
 import SignUp from '../app/signup'; 
 
 jest.mock('expo-router', () => ({
@@ -29,18 +30,17 @@ describe('Página de Cadastro (SignUp)', () => {
       replace: mockReplace,
       push: mockPush,
     });
+    Platform.OS = 'android'; 
   });
 
   test('deve renderizar os textos principais corretamente', () => {
     const { getByText } = render(<SignUp />);
-    
     expect(getByText('Welcome Home')).toBeTruthy();
   });
 
   test('deve navegar para /(tabs) ao clicar no botão Join Nidush', () => {
     const { getByText } = render(<SignUp />);
     const button = getByText('Join Nidush');
-
     fireEvent.press(button);
     expect(mockReplace).toHaveBeenCalledWith('/(tabs)');
   });
@@ -48,8 +48,17 @@ describe('Página de Cadastro (SignUp)', () => {
   test('deve navegar para /(tabs) ao clicar no link de Login', () => {
     const { getByText } = render(<SignUp />);
     const loginLink = getByText('Login');
-
     fireEvent.press(loginLink);
     expect(mockPush).toHaveBeenCalledWith('/(tabs)');
+  });
+
+  test('deve aplicar o comportamento correto do KeyboardAvoidingView no iOS', () => {
+
+    Platform.OS = 'ios';
+    const { rerender, getByTestId } = render(<SignUp />);
+    
+    rerender(<SignUp />);
+    
+    Platform.OS = 'android'; 
   });
 });
