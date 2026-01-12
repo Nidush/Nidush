@@ -29,7 +29,7 @@ export default function TabLayout() {
           title: 'Home',
           tabBarIcon: ({ color }) => (
             <Image
-              source={require('../../assets/images/Logo.png')} // Coloque aqui o seu logo
+              source={require('../../assets/images/Logo.png')}
               style={{ width: 26, height: 26, tintColor: color }}
               resizeMode="contain"
             />

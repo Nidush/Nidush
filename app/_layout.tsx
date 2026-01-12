@@ -2,7 +2,8 @@ import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import "./../global.css"
+import { ActivityProvider } from '../context/ActivityContext';
+import './../global.css';
 export default function RootLayout() {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
@@ -11,7 +12,7 @@ export default function RootLayout() {
     const checkOnboarding = async () => {
       try {
         // Remova a linha abaixo após testar, para que ele lembre da escolha:
-        // await AsyncStorage.removeItem('@viewedOnboarding');
+        await AsyncStorage.removeItem('@viewedOnboarding');
 
         const viewed = await AsyncStorage.getItem('@viewedOnboarding');
 
@@ -34,6 +35,7 @@ export default function RootLayout() {
       <Stack.Screen name="onboarding" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="profile-selection" />
+      <Stack.Screen name="activity-details" />
     </Stack>
   );
 }
