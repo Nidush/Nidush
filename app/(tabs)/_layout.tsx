@@ -10,8 +10,8 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#4A665E',
-        tabBarInactiveTintColor: '#9BA3A1',
+        tabBarActiveTintColor: '#548F53',
+        tabBarInactiveTintColor: '#354F52',
         tabBarStyle: {
           backgroundColor: '#F0F2EB',
           borderTopWidth: 0,
@@ -20,7 +20,7 @@ export default function TabLayout() {
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          fontFamily: 'Nunito-SemiBold',
+          fontFamily: 'Nunito',
         },
       }}
     >
