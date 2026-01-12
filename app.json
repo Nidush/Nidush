@@ -8,7 +8,9 @@
     "scheme": "nidush",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "ios": { "supportsTablet": true },
+    "ios": {
+      "supportsTablet": true
+    },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -31,12 +33,18 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#F0F2EB",
-          "dark": { "backgroundColor": "#000000" }
+          "dark": {
+            "backgroundColor": "#000000"
+          }
         }
       ],
       "expo-font",
-      "expo-audio"
+      "expo-audio",
+      "expo-video"
     ],
-    "experiments": { "typedRoutes": true, "reactCompiler": true }
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
   }
 }
