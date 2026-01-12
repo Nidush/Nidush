@@ -6,6 +6,7 @@ export const CONTENTS: Record<string, Content> = {
     id: 'c1',
     title: 'Italian Pasta Tutorial',
     type: 'recipe',
+    category: 'cooking',
     duration: '45 min',
     image: require('@/assets/cooking_activities/my_creations_cooking/italian_night.png'),
     ingredients: [
@@ -18,6 +19,7 @@ export const CONTENTS: Record<string, Content> = {
     id: 'c3',
     title: 'Fudgy Brownies',
     type: 'recipe',
+    category: 'cooking',
     duration: '50 min',
     image: require('@/assets/cooking_activities/simple_recipes/chocolate_cake.png'),
     ingredients: [
@@ -39,6 +41,7 @@ export const CONTENTS: Record<string, Content> = {
   c10: {
     id: 'c10',
     title: 'Classic Eggs Benedict',
+    category: 'cooking',
     type: 'recipe',
     duration: '30 min',
     image: require('@/assets/cooking_activities/recommended/eggs_benedict.png'),
@@ -67,6 +70,7 @@ export const CONTENTS: Record<string, Content> = {
     id: 'c2',
     title: 'Morning Zen Guide',
     type: 'video',
+    category: 'meditation',
     duration: '12 min',
     image: require('@/assets/meditation_content/video_sessions/morning_zen.png'),
     instructions: [
@@ -80,6 +84,7 @@ export const CONTENTS: Record<string, Content> = {
     id: 'c4',
     title: 'Deep Sleep Frequency',
     type: 'audio',
+    category: 'meditation',
     duration: '60 min',
     image: require('@/assets/meditation_activities/my_creations/gratitude_flow.png'),
   },
@@ -87,6 +92,7 @@ export const CONTENTS: Record<string, Content> = {
     id: 'c9',
     title: 'Sunrise Flow Meditation',
     type: 'video',
+    category: 'meditation',
     duration: '15 min',
     image: require('@/assets/activities_for_you/sunrise_flow.png'),
     instructions: [
@@ -104,6 +110,7 @@ export const CONTENTS: Record<string, Content> = {
     id: 'c5',
     title: 'HIIT Cardio Blast',
     type: 'video',
+    category: 'workout',
     duration: '20 min',
     image: require('@/assets/activities_for_you/sunrise_flow.png'),
     instructions: ['Warm up 5 min', 'Sprint 30s', 'Rest 30s', 'Repeat 10x'],
@@ -112,6 +119,7 @@ export const CONTENTS: Record<string, Content> = {
     id: 'c6',
     title: 'Yoga for Back Pain',
     type: 'video',
+    category: 'workout',
     duration: '30 min',
     image: require('@/assets/activities_for_you/sunrise_flow.png'),
     instructions: ['Child pose', 'Cat-Cow', 'Downward Dog', 'Cobra Pose'],
@@ -120,6 +128,7 @@ export const CONTENTS: Record<string, Content> = {
     id: 'c11',
     title: 'Daily Full Body Stretch',
     type: 'video',
+    category: 'workout',
     duration: '15 min',
     image: require('@/assets/activities_for_you/stretching.png'),
     instructions: [
@@ -137,6 +146,7 @@ export const CONTENTS: Record<string, Content> = {
     id: 'c7',
     title: 'The Power of Habit',
     type: 'audio',
+    category: 'audiobook',
     duration: '15 min',
     image: require('@/assets/Scenarios/deep_focus.png'),
     author: 'Charles Duhigg',
@@ -145,6 +155,7 @@ export const CONTENTS: Record<string, Content> = {
     id: 'c8',
     title: 'Atomic Habits',
     type: 'audio',
+    category: 'audiobook',
     duration: '20 min',
     image: require('@/assets/Scenarios/deep_focus.png'),
     author: 'James Clear',

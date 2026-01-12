@@ -1,3 +1,7 @@
+import { CarouselSection } from '@/components/activitiesScenarios/CarouselSection';
+import { FabMenu } from '@/components/activitiesScenarios/FabMenu';
+import { FilterBar } from '@/components/activitiesScenarios/FilterBar';
+import { HeaderSection } from '@/components/activitiesScenarios/HeaderSection';
 import {
   Nunito_400Regular,
   Nunito_600SemiBold,
@@ -10,12 +14,6 @@ import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useMemo, useState } from 'react';
 import { Platform, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-// --- IMPORTS DOS COMPONENTES ---
-import { CarouselSection } from '@/components/activitiesScenarios/CarouselSection';
-import { FabMenu } from '@/components/activitiesScenarios/FabMenu';
-import { FilterBar } from '@/components/activitiesScenarios/FilterBar';
-import { HeaderSection } from '@/components/activitiesScenarios/HeaderSection';
 
 // --- DADOS ---
 import {

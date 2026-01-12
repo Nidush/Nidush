@@ -11,6 +11,7 @@ export interface Content {
   id: string;
   title: string;
   type: 'video' | 'recipe' | 'audio' | 'workout';
+  category: 'meditation' | 'audiobook' | 'cooking' | 'workout' | string;
   duration: string;
   image: ImageSourcePropType;
   instructions?: string[];
