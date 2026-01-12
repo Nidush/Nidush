@@ -1,5 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import React from 'react';
 import { StatusBar, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -11,12 +12,12 @@ export default function NewScenarioScreen() {
       <StatusBar barStyle="dark-content" />
       
       <View className="flex-1 justify-center items-center px-10">
-        {/* icone */}
+        {/* Icon */}
         <View className="bg-[#BDC7C2]/30 p-8 rounded-full mb-8">
           <MaterialIcons name="construction" size={80} color="#354F52" />
         </View>
 
-        {/* mensagem */}
+        {/* Mensagem principal */}
         <Text 
           style={{ fontFamily: 'Nunito_700Bold' }}
           className="text-[#354F52] text-3xl text-center mb-3"
@@ -24,6 +25,7 @@ export default function NewScenarioScreen() {
           Work in Progress
         </Text>
 
+        {/* Descrição */}
         <Text 
           style={{ fontFamily: 'Nunito_600SemiBold' }}
           className="text-[#7A8C85] text-lg text-center mb-12"
@@ -31,7 +33,7 @@ export default function NewScenarioScreen() {
           This feature is still in development. We are building something special for you!
         </Text>
 
-        {/* Botão Back to Home */}
+        {/* Back to Home*/}
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={() => router.replace('/(tabs)')}
