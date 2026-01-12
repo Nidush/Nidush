@@ -19,25 +19,49 @@ export const HeaderSection = ({
     <View className="px-4">
       {/* TOGGLE BUTTONS */}
       <View className="flex-row bg-[#F0F2EB] p-1 border border-[#BDC7C2] rounded-full mb-[15px] h-[50px] mt-4">
+        {/* BOTÃO ACTIVITIES */}
         <TouchableOpacity
           onPress={() => setViewMode('activities')}
-          className={`flex-1 justify-center items-center rounded-[25px] ${viewMode === 'activities' ? 'bg-[#548F53]' : ''}`}
+          className={`flex-1 justify-center items-center rounded-[25px] ${
+            viewMode === 'activities' ? 'bg-[#548F53]' : ''
+          }`}
         >
           <Text
-            className={`${viewMode === 'activities' ? 'text-white' : 'text-[#2D3E27]'} text-xl`}
-            style={{ fontFamily: 'Nunito_600SemiBold' }}
+            className={`${
+              viewMode === 'activities' ? 'text-white' : 'text-[#2D3E27]'
+            } text-xl`}
+            // AQUI ESTÁ A ALTERAÇÃO:
+            // Se estiver selecionado usa Bold, se não usa SemiBold
+            style={{
+              fontFamily:
+                viewMode === 'activities'
+                  ? 'Nunito_700Bold'
+                  : 'Nunito_600SemiBold',
+            }}
           >
             Activities
           </Text>
         </TouchableOpacity>
 
+        {/* BOTÃO SCENARIOS */}
         <TouchableOpacity
           onPress={() => setViewMode('scenarios')}
-          className={`flex-1 justify-center items-center rounded-[25px] ${viewMode === 'scenarios' ? 'bg-[#548F53]' : ''}`}
+          className={`flex-1 justify-center items-center rounded-[25px] ${
+            viewMode === 'scenarios' ? 'bg-[#548F53]' : ''
+          }`}
         >
           <Text
-            className={`${viewMode === 'scenarios' ? 'text-white' : 'text-[#2D3E27]'} text-xl`}
-            style={{ fontFamily: 'Nunito_600SemiBold' }}
+            className={`${
+              viewMode === 'scenarios' ? 'text-white' : 'text-[#2D3E27]'
+            } text-xl`}
+            // AQUI ESTÁ A ALTERAÇÃO:
+            // Se estiver selecionado usa Bold, se não usa SemiBold
+            style={{
+              fontFamily:
+                viewMode === 'scenarios'
+                  ? 'Nunito_700Bold'
+                  : 'Nunito_600SemiBold',
+            }}
           >
             Scenarios
           </Text>

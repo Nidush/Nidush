@@ -7,18 +7,28 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Platform, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// --- IMPORTS ---
+// --- IMPORTS DOS COMPONENTES ---
 import { CarouselSection } from '@/components/activitiesScenarios/CarouselSection';
 import { FabMenu } from '@/components/activitiesScenarios/FabMenu';
 import { FilterBar } from '@/components/activitiesScenarios/FilterBar';
 import { HeaderSection } from '@/components/activitiesScenarios/HeaderSection';
 
 // --- DADOS ---
-import { ACTIVITIES, Activity, CONTENTS, SCENARIOS } from '@/constants/data';
+import {
+  ACTIVITIES,
+  Activity,
+  CONTENTS,
+  Scenario,
+  SCENARIOS,
+} from '@/constants/data';
+import {
+  getDynamicRecommendations,
+  getRecommendationTitle,
+} from '@/utils/recommendationEngine';
 
 const UnifiedActivitiesScreen = () => {
   // --- STATE ---
@@ -47,58 +57,17 @@ const UnifiedActivitiesScreen = () => {
     Nunito_400Regular,
   });
 
-  if (!fontsLoaded) return null;
-
-  // --- LÓGICA DE NEGÓCIO ---
+  // --- LÓGICA ---
 
   const filterOptions =
     viewMode === 'activities'
       ? ['All', 'Cooking', 'Audiobooks', 'Meditation', 'Workout']
       : ['All', 'Bedroom', 'Living Room', 'Kitchen'];
 
-  const handleViewModeChange = (mode: 'activities' | 'scenarios') => {
-    setViewMode(mode);
-    setActiveFilter('All');
-    setSearchQuery('');
+  const isActivity = (item: Activity | Scenario): item is Activity => {
+    return 'type' in item;
   };
 
-  // Filtragem
-  const currentBaseData =
-    viewMode === 'activities' ? [...myActivities, ...ACTIVITIES] : SCENARIOS;
-
-  const filteredData = currentBaseData.filter((item: any) => {
-    const matchesSearch = item.title
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    if (activeFilter === 'All') return matchesSearch;
-
-    let matchesFilter = false;
-    if (viewMode === 'activities') {
-      const itemType = item.type ? item.type.toLowerCase() : '';
-      const filterName = activeFilter.toLowerCase();
-      matchesFilter = itemType === filterName;
-    } else {
-      matchesFilter = item.room === activeFilter;
-    }
-    return matchesFilter && matchesSearch;
-  });
-
-  // Categorização
-  const myCreations = filteredData.filter(
-    (item) => item.category === 'My creations',
-  );
-  const recommended = filteredData.filter(
-    (item) => item.category === 'Recommended',
-  );
-  const simpleRecipes = filteredData.filter(
-    (item) => item.category === 'Simple recipes',
-  );
-
-  // Lógica de visualização limitada para 'Recommended' quando filtro é All
-  const displayedRecommended =
-    activeFilter === 'All' ? recommended.slice(0, 10) : recommended;
-
-  // --- HELPER PARA OBTER O TEMPO DO CONTEÚDO ---
   const getActivityTime = (activity: Activity) => {
     if (activity.contentId && CONTENTS[activity.contentId]) {
       return CONTENTS[activity.contentId].duration;
@@ -106,11 +75,65 @@ const UnifiedActivitiesScreen = () => {
     return undefined;
   };
 
-  const isActivity = (item: Activity | any): item is Activity => {
-    return 'type' in item;
+  // --- PROCESSAMENTO DE DADOS (useMemo) ---
+  const processedData = useMemo(() => {
+    // 1. Seleciona Base
+    const baseData =
+      viewMode === 'activities' ? [...myActivities, ...ACTIVITIES] : SCENARIOS;
+
+    // 2. Filtra (Pesquisa + Pill selecionada)
+    const filteredBase = baseData.filter((item) => {
+      const matchesSearch = item.title
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase());
+
+      if (activeFilter === 'All') return matchesSearch;
+
+      let matchesFilter = false;
+      if (viewMode === 'activities' && isActivity(item)) {
+        matchesFilter = item.type?.toLowerCase() === activeFilter.toLowerCase();
+      } else {
+        matchesFilter = item.room === activeFilter;
+      }
+
+      return matchesFilter && matchesSearch;
+    });
+
+    // 3. Separa "My Creations" vs "App Content"
+    const myCreationsList = filteredBase.filter(
+      (item) => item.category === 'My creations',
+    );
+    const appPool = filteredBase.filter(
+      (item) => item.category !== 'My creations',
+    );
+
+    // 4. Gera Recomendados (Ordenados por hora)
+    const recommendedList = getDynamicRecommendations(appPool);
+
+    // 5. Gera Lista Específica "Simple Recipes"
+    // (Apenas itens que têm esta categoria explícita)
+    const simpleRecipesList = appPool.filter(
+      (item) => item.category === 'Simple recipes',
+    );
+
+    return {
+      myCreations: myCreationsList,
+      recommended: recommendedList,
+      simpleRecipes: simpleRecipesList,
+      isEmpty: filteredBase.length === 0,
+    };
+  }, [viewMode, activeFilter, searchQuery, myActivities]);
+
+  const handleViewModeChange = (mode: 'activities' | 'scenarios') => {
+    setViewMode(mode);
+    setActiveFilter('All');
+    setSearchQuery('');
   };
 
-  // --- RENDER ---
+  const recommendationTitle = getRecommendationTitle();
+
+  if (!fontsLoaded) return null;
+
   return (
     <SafeAreaView className="flex-1 bg-[#F0F2EB]" edges={['top']}>
       <ScrollView
@@ -120,7 +143,6 @@ const UnifiedActivitiesScreen = () => {
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* 1. Header */}
         <HeaderSection
           viewMode={viewMode}
           setViewMode={handleViewModeChange}
@@ -128,65 +150,13 @@ const UnifiedActivitiesScreen = () => {
           setSearchQuery={setSearchQuery}
         />
 
-        {/* 2. Filtros */}
         <FilterBar
           options={filterOptions}
           activeFilter={activeFilter}
           onSelectFilter={setActiveFilter}
         />
 
-        {/* 3. Conteúdo Principal */}
-        {viewMode === 'activities' ? (
-          // --- MODO ATIVIDADES ---
-          <>
-            <CarouselSection
-              title="My creations"
-              // AQUI ESTÁ A MUDANÇA: Injetamos o tempo usando .map()
-              data={myCreations.map((item) => ({
-                ...item,
-                time: isActivity(item) ? getActivityTime(item) : undefined,
-              }))}
-              showTime={true}
-            />
-            <CarouselSection
-              title="Recommended"
-              // AQUI TAMBÉM
-              data={displayedRecommended.map((item) => ({
-                ...item,
-                time: isActivity(item) ? getActivityTime(item) : undefined,
-              }))}
-              showTime={true}
-            />
-            {activeFilter !== 'All' && (
-              <CarouselSection
-                title="Simple recipes"
-                // E AQUI TAMBÉM
-                data={simpleRecipes.map((item) => ({
-                  ...item,
-                  time: isActivity(item) ? getActivityTime(item) : undefined,
-                }))}
-                showTime={true}
-              />
-            )}
-          </>
-        ) : (
-          // --- MODO CENÁRIOS ---
-          <>
-            <CarouselSection
-              title="My creations"
-              data={myCreations}
-              showTime={false}
-            />
-            <CarouselSection
-              title="Recommended"
-              data={displayedRecommended}
-              showTime={false}
-            />
-          </>
-        )}
-
-        {/* 4. Estado Vazio */}
-        {filteredData.length === 0 && (
+        {processedData.isEmpty ? (
           <View className="mt-10 px-8 items-center">
             <Ionicons
               name="search-outline"
@@ -201,10 +171,48 @@ const UnifiedActivitiesScreen = () => {
               No {viewMode} found matching &quot;{activeFilter}&quot;.
             </Text>
           </View>
+        ) : (
+          <>
+            {/* 1. MY CREATIONS */}
+            {processedData.myCreations.length > 0 && (
+              <CarouselSection
+                title="My creations"
+                data={processedData.myCreations.map((item) => ({
+                  ...item,
+                  time: isActivity(item) ? getActivityTime(item) : undefined,
+                }))}
+                showTime={viewMode === 'activities'}
+              />
+            )}
+
+            {/* 2. RECOMMENDED (LIMITADO A 5) */}
+            {/* Aparece sempre, mas cortamos (.slice) para mostrar apenas os top 5 */}
+            {processedData.recommended.length > 0 && (
+              <CarouselSection
+                title={recommendationTitle} // "Recommended"
+                data={processedData.recommended.slice(0, 5).map((item) => ({
+                  ...item,
+                  time: isActivity(item) ? getActivityTime(item) : undefined,
+                }))}
+                showTime={viewMode === 'activities'}
+              />
+            )}
+            {viewMode === 'activities' &&
+              activeFilter === 'Cooking' &&
+              processedData.simpleRecipes.length > 0 && (
+                <CarouselSection
+                  title="Simple recipes"
+                  data={processedData.simpleRecipes.map((item) => ({
+                    ...item,
+                    time: isActivity(item) ? getActivityTime(item) : undefined,
+                  }))}
+                  showTime={true}
+                />
+              )}
+          </>
         )}
       </ScrollView>
 
-      {/* 5. Menu Flutuante */}
       <FabMenu isOpen={isMenuOpen} setIsOpen={setIsMenuOpen} />
     </SafeAreaView>
   );
