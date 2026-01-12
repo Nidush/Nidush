@@ -12,7 +12,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
-const profiles = [
+// Definição do tipo para os perfis
+interface Profile {
+  id: number;
+  name: string;
+  avatar: any; // Tipagem para o require() de imagens locais
+}
+
+const profiles: Profile[] = [
   {
     id: 1,
     name: 'Laura Rossi',
@@ -32,7 +39,7 @@ const profiles = [
 
 export default function ProfileSelection() {
   const router = useRouter();
-  const hostName = 'Laura';
+  const hostName: string = 'Laura';
 
   return (
     <SafeAreaView className="flex-1 bg-[#F5F7F0]" edges={['top']}>
