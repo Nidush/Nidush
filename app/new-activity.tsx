@@ -44,7 +44,6 @@ export default function NewActivityFlow() {
   const totalSteps = 6;
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
-  // Hook para controlar manualmente as margens de segurança (Notch e Barra inferior)
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -86,8 +85,6 @@ export default function NewActivityFlow() {
     if (content) {
       setActivityName(content.title);
       setDescription(content.description || '');
-
-      // 2. MUDANÇA: Pré-preenche a imagem com a imagem do conteúdo
       setActivityImage(content.image);
     }
   };
@@ -273,12 +270,6 @@ export default function NewActivityFlow() {
               )}
             </ScrollView>
 
-            {/* BOTÃO FLUTUANTE MANUAL 
-               - Posicionado com 'absolute' e 'bottom: 0'
-               - paddingBottom usa o 'insets.bottom' para respeitar a barra do iPhone
-               - bg-transparent garante que não cria blocos brancos
-            */}
-            {/* BOTÃO FLUTUANTE MANUAL */}
             {!isKeyboardVisible && !isNextDisabled() && (
               <View
                 className="absolute left-0 right-0 items-center bg-transparent pointer-events-box-none"
@@ -293,7 +284,7 @@ export default function NewActivityFlow() {
                   onPress={step === 6 ? handleSave : nextStep}
                 >
                   <Text
-                    className="text-white text-lg"
+                    className="text-white text-2xl"
                     style={{ fontFamily: 'Nunito_700Bold' }}
                   >
                     {step === 6 ? 'Save' : 'Continue'}

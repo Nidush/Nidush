@@ -2,9 +2,17 @@ import {
   Ionicons,
   MaterialCommunityIcons,
   MaterialIcons,
-} from '@expo/vector-icons'; // <--- Adicionado MaterialCommunityIcons
+} from '@expo/vector-icons';
+import MaskedView from '@react-native-masked-view/masked-view'; // <--- Importado
+import { LinearGradient } from 'expo-linear-gradient'; // <--- Importado
 import React from 'react';
-import { Image, ImageBackground, Text, View } from 'react-native';
+import {
+  Image,
+  Platform, // <--- Importado
+  StyleSheet, // <--- Importado
+  Text,
+  View,
+} from 'react-native';
 import { ReviewCard } from '../ReviewCard';
 import { ScenarioReviewCard } from '../ScenarioReviewCard';
 import { StepWrapper } from '../StepWrapper';
@@ -41,14 +49,11 @@ interface Step6Props {
   onJumpToStep: (step: number) => void;
 }
 
-// --- HELPER FUNCTIONS PARA ÍCONES DINÂMICOS ---
-
-// 1. Escolhe o ícone da Atividade (Retorna o Componente JSX)
+// --- HELPER FUNCTIONS ---
 const getActivityIcon = (type: string) => {
   const lowerType = type ? type.toLowerCase() : '';
   const props = { size: 24, color: '#354F52' };
 
-  // MUDANÇA 1: Cooking agora usa o Chapéu de Cozinha do MaterialCommunityIcons
   if (
     lowerType.includes('cook') ||
     lowerType.includes('eat') ||
@@ -57,7 +62,6 @@ const getActivityIcon = (type: string) => {
     return <MaterialCommunityIcons name="chef-hat" {...props} />;
   }
 
-  // Restantes usam MaterialIcons
   let iconName: keyof typeof MaterialIcons.glyphMap = 'category';
 
   if (lowerType.includes('meditat') || lowerType.includes('relax'))
@@ -81,19 +85,15 @@ const getActivityIcon = (type: string) => {
   return <MaterialIcons name={iconName} {...props} />;
 };
 
-// 2. Escolhe o ícone da Divisão (Room)
 const getRoomIcon = (room: string) => {
   const lowerRoom = room ? room.toLowerCase() : '';
   const props = { size: 24, color: '#354F52' };
 
-  // MUDANÇA 2: Kitchen agora usa o ícone 'restaurant' (Garfo e Faca)
   if (lowerRoom.includes('kitchen') || lowerRoom.includes('dining')) {
     return <MaterialIcons name="restaurant" {...props} />;
   }
 
-  // Restantes
   let iconName: keyof typeof MaterialIcons.glyphMap = 'room';
-
   if (lowerRoom.includes('bed')) iconName = 'bed';
   else if (lowerRoom.includes('living') || lowerRoom.includes('lounge'))
     iconName = 'weekend';
@@ -130,7 +130,6 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
       <ReviewCard label="Activity Type" onEdit={() => onJumpToStep(1)}>
         <View className="flex-row items-center">
           <View className="w-11 h-11 rounded-lg bg-[#C8E2C8] justify-center items-center mr-3">
-            {/* Chama a função que já retorna o ícone correto */}
             {getActivityIcon(data.activityType)}
           </View>
           <Text
@@ -142,30 +141,74 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
         </View>
       </ReviewCard>
 
-      {/* Contents */}
+      {/* Contents - ESTILO ATUALIZADO */}
+      {/* Contents - CORRIGIDO */}
       <ReviewCard label="Contents" onEdit={() => onJumpToStep(2)}>
         {content && content.image ? (
-          <ImageBackground
-            source={content.image}
-            className="w-full h-[120px] overflow-hidden rounded-xl"
-          >
-            <View className="flex-1 bg-black/30 p-3 justify-end">
+          // Container Principal: w-full obriga a ocupar a largura toda do ReviewCard
+          <View className="w-full h-[120px] relative rounded-xl overflow-hidden bg-gray-900">
+            {/* 1. Blur Background */}
+            <View style={StyleSheet.absoluteFill}>
+              <Image
+                source={content.image}
+                // ADICIONADO: w-full h-full para forçar o preenchimento
+                className="w-full h-full"
+                resizeMode="cover"
+                blurRadius={Platform.OS === 'ios' ? 70 : 50}
+              />
+              <View className="absolute inset-0" />
+            </View>
+
+            {/* 2. Masked Image */}
+            <MaskedView
+              style={StyleSheet.absoluteFill}
+              maskElement={
+                <LinearGradient
+                  colors={['black', 'black', 'transparent']}
+                  locations={[0, 0.1, 0.5]}
+                  style={StyleSheet.absoluteFill}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                />
+              }
+            >
+              <Image
+                source={content.image}
+                // ADICIONADO: w-full h-full para forçar o preenchimento
+                className="w-full h-full"
+                resizeMode="cover"
+              />
+            </MaskedView>
+
+            {/* 3. Text Legibility Gradient */}
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.8)']}
+              locations={[0.4, 0.7, 1]}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+
+            {/* 4. Content Info */}
+            <View className="absolute bottom-0 w-full p-3 z-30">
               <Text
-                className="text-white text-base shadow-sm"
+                className="text-white text-lg leading-tight mb-2"
                 style={{ fontFamily: 'Nunito_700Bold' }}
+                numberOfLines={2}
               >
                 {content.title}
               </Text>
-              <View className="flex-row items-center gap-3 mt-1">
+
+              <View className="flex-row items-center gap-3 opacity-95">
                 <View className="flex-row items-center gap-1">
-                  <Ionicons name="time-outline" size={12} color="white" />
+                  <Ionicons name="time-outline" size={16} color="white" />
                   <Text
-                    className="text-white text-xs"
-                    style={{ fontFamily: 'Nunito_400Regular' }}
+                    className="text-white text-md"
+                    style={{ fontFamily: 'Nunito_600SemiBold' }}
                   >
                     {content.duration}
                   </Text>
                 </View>
+
                 <View className="flex-row items-center gap-1">
                   <Ionicons
                     name={
@@ -173,19 +216,19 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
                         ? 'headset'
                         : 'play-circle'
                     }
-                    size={12}
+                    size={16}
                     color="white"
                   />
                   <Text
-                    className="text-white text-xs capitalize"
-                    style={{ fontFamily: 'Nunito_400Regular' }}
+                    className="text-white text-md capitalize"
+                    style={{ fontFamily: 'Nunito_600SemiBold' }}
                   >
                     {content.type}
                   </Text>
                 </View>
               </View>
             </View>
-          </ImageBackground>
+          </View>
         ) : (
           <Text className="text-gray-400 italic">No content selected</Text>
         )}
@@ -195,7 +238,6 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
       <ReviewCard label="Room" onEdit={() => onJumpToStep(3)}>
         <View className="flex-row items-center">
           <View className="w-11 h-11 rounded-lg bg-[#C8E2C8] justify-center items-center mr-3">
-            {/* Chama a função que já retorna o ícone correto */}
             {getRoomIcon(data.room)}
           </View>
           <Text

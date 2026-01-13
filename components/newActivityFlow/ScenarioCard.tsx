@@ -1,5 +1,5 @@
-import { Content } from '@/constants/data/types';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Scenario } from '@/constants/data'; // Ajusta o import conforme o teu ficheiro de tipos
+import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
@@ -15,47 +15,29 @@ import {
 const clsx = (...classes: (string | boolean | undefined | null)[]) =>
   classes.filter(Boolean).join(' ');
 
-interface ContentCardProps {
-  item: Content;
+interface ScenarioCardProps {
+  item: Scenario;
   isSelected: boolean;
   onSelect: (id: string) => void;
-  type?: 'small' | 'large';
 }
 
-export const ContentCard = ({
+export const ScenarioCard = ({
   item,
   isSelected,
   onSelect,
-  type = 'small',
-}: ContentCardProps) => {
-  // --- NOVA LÓGICA DE ÍCONES ---
-  // Esta função decide qual ícone mostrar baseado no tipo de conteúdo
-  const getIconName = (contentType: string): keyof typeof Ionicons.glyphMap => {
-    switch (contentType) {
-      case 'video':
-      case 'workout':
-        return 'play-circle';
-      case 'recipe':
-        return 'book';
-      case 'audio':
-      case 'meditation':
-      default:
-        return 'headset';
-    }
-  };
-
+}: ScenarioCardProps) => {
   return (
     <TouchableOpacity
       onPress={() => onSelect(item.id)}
       activeOpacity={0.9}
       className={clsx(
         'relative rounded-2xl overflow-hidden bg-gray-900',
-        type === 'large'
-          ? 'w-full aspect-square mb-3'
-          : 'w-[48%] aspect-square',
+        // 'w-full' faz com que ele preencha o container de 48% do pai
+        // 'aspect-square' garante que é um quadrado perfeito
+        'w-full aspect-square',
       )}
     >
-      {/* 1. Fundo */}
+      {/* --- CAMADA 1: FUNDO COM BLUR --- */}
       <View style={StyleSheet.absoluteFill}>
         <Image
           source={item.image}
@@ -66,7 +48,7 @@ export const ContentCard = ({
         <View className="absolute inset-0 bg-black/20" />
       </View>
 
-      {/* 2. Máscara */}
+      {/* --- CAMADA 2: IMAGEM MASCARADA (Fade) --- */}
       <MaskedView
         style={StyleSheet.absoluteFill}
         maskElement={
@@ -84,7 +66,7 @@ export const ContentCard = ({
         />
       </MaskedView>
 
-      {/* 3. Gradiente de Texto */}
+      {/* --- CAMADA 3: GRADIENTE DE LEITURA --- */}
       <LinearGradient
         colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.8)']}
         locations={[0.4, 0.7, 1]}
@@ -92,51 +74,33 @@ export const ContentCard = ({
         pointerEvents="none"
       />
 
-      {/* 4. Ícone Opções */}
+      {/* --- CAMADA 4: ÍCONE DE OPÇÕES --- */}
       <TouchableOpacity className="absolute top-2.5 right-1 z-20 p-1">
         <MaterialIcons name="more-vert" size={24} color="white" />
       </TouchableOpacity>
 
-      {/* 5. Texto e Info */}
+      {/* --- CAMADA 5: TEXTO E INFO --- */}
       <View className="absolute bottom-0 w-full p-3 z-30">
         <Text
           numberOfLines={2}
-          className={clsx(
-            'text-white leading-tight mb-2',
-            type === 'large' ? 'text-xl' : 'text-[16px]',
-          )}
+          className="text-white text-[16px] leading-tight mb-2"
           style={{ fontFamily: 'Nunito_700Bold' }}
         >
           {item.title}
         </Text>
 
-        <View className="opacity-95 gap-1">
-          <View className="flex-row items-center">
-            {/* ÍCONE ATUALIZADO AQUI */}
-            <Ionicons name={getIconName(item.type)} size={16} color="white" />
-            <Text
-              className="text-white text-md ml-1.5 capitalize"
-              style={{ fontFamily: 'Nunito_600SemiBold' }}
-            >
-              {item.type}
-            </Text>
-          </View>
-
-          {item.duration && (
-            <View className="flex-row items-center">
-              <MaterialIcons name="access-time" size={16} color="white" />
-              <Text
-                className="text-white text-md ml-1.5"
-                style={{ fontFamily: 'Nunito_600SemiBold' }}
-              >
-                {item.duration}
-              </Text>
-            </View>
-          )}
+        <View className="flex-row items-center opacity-95">
+          <MaterialCommunityIcons name="door" size={16} color="white" />
+          <Text
+            className="text-white text-md ml-1.5"
+            style={{ fontFamily: 'Nunito_600SemiBold' }}
+          >
+            {item.room}
+          </Text>
         </View>
       </View>
 
-      {/* Borda Flutuante */}
+      {/* --- CAMADA 6: BORDA FLUTUANTE --- */}
       <View
         pointerEvents="none"
         className={clsx(

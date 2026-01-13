@@ -1,12 +1,9 @@
-import { SCENARIOS } from '@/constants/data'; // Importa os dados reais
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { SCENARIOS } from '@/constants/data'; // Ajusta o caminho dos dados
+import { MaterialIcons } from '@expo/vector-icons';
 import React, { useMemo } from 'react';
-import { ImageBackground, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
+import { ScenarioCard } from '../ScenarioCard'; // Importa o componente criado acima
 import { StepWrapper } from '../StepWrapper';
-
-// Utilitário para classes condicionais
-const clsx = (...classes: (string | boolean | undefined | null)[]) =>
-  classes.filter(Boolean).join(' ');
 
 interface Step4Props {
   selected: string;
@@ -19,11 +16,14 @@ export const Step4_Environment = ({
   onSelect,
   roomName,
 }: Step4Props) => {
-  // 1. Filtrar Cenários pela Sala Selecionada
+  // 1. FILTRAGEM (Case Insensitive)
   const filteredScenarios = useMemo(() => {
-    // Se não houver sala selecionada (caso raro), retorna vazio
     if (!roomName) return [];
-    return SCENARIOS.filter((s) => s.room === roomName);
+
+    // Converte tudo para minúsculas e remove espaços para garantir match
+    const targetRoom = roomName.toLowerCase().trim();
+
+    return SCENARIOS.filter((s) => s.room.toLowerCase().trim() === targetRoom);
   }, [roomName]);
 
   return (
@@ -32,84 +32,58 @@ export const Step4_Environment = ({
       subtitle={`Select a scenario for the ${roomName || 'room'} or create a new one.`}
     >
       <Text
-        className="text-lg text-[#2F4F4F] my-3"
-        style={{ fontFamily: 'Nunito_700Bold' }}
+        className="text-2xl text-[#2F4F4F] my-3"
+        style={{ fontFamily: 'Nunito_600SemiBold' }}
       >
         Scenarios
       </Text>
 
-      <View className="flex-row flex-wrap gap-3 justify-between">
-        {/* Renderiza os cenários filtrados */}
+      {/* --- GRID LAYOUT ---
+          flex-wrap: permite cair para a linha de baixo
+          justify-between: afasta os items para as pontas
+          gap-y-4: espaçamento vertical
+      */}
+      <View className="flex-row flex-wrap justify-between gap-y-4">
+        {/* Lista de Cenários */}
         {filteredScenarios.map((env) => (
-          <TouchableOpacity
-            key={env.id}
-            className={clsx(
-              'w-[48%] h-[148px] rounded-3xl overflow-hidden border-[3px]',
-              selected === env.id ? 'border-[#548F53]' : 'border-transparent',
-            )}
-            onPress={() => onSelect(env.id)}
-            activeOpacity={0.8}
-          >
-            <ImageBackground
-              // Usa a imagem do objeto (require)
-              source={env.image}
-              className="flex-1"
-              imageStyle={{ borderRadius: 20 }}
-            >
-              {/* Ícone de opções */}
-              <TouchableOpacity className="absolute top-2.5 right-1 z-10">
-                <MaterialIcons name="more-vert" size={24} color="white" />
-              </TouchableOpacity>
-
-              {/* Overlay Escuro para leitura do texto */}
-              <View className="flex-1 p-3 justify-end bg-black/30">
-                <Text
-                  className="text-white text-sm shadow-sm"
-                  style={{ fontFamily: 'Nunito_700Bold' }}
-                >
-                  {env.title}
-                </Text>
-
-                <View className="flex-row items-center gap-1 mt-0.5">
-                  <MaterialIcons name="door-front" size={16} color="white" />
-                  <Text
-                    className="text-white text-xs shadow-sm"
-                    style={{ fontFamily: 'Nunito_400Regular' }}
-                  >
-                    {env.room}
-                  </Text>
-                </View>
-              </View>
-            </ImageBackground>
-          </TouchableOpacity>
+          // O Wrapper define a largura da coluna (48%)
+          <View key={env.id} className="w-[48%]">
+            <ScenarioCard
+              item={env}
+              isSelected={selected === env.id}
+              onSelect={onSelect}
+            />
+          </View>
         ))}
 
-        {/* Caso não existam cenários para esta sala */}
+        {/* Mensagem de Estado Vazio */}
         {filteredScenarios.length === 0 && (
-          <View className="w-full mb-3">
+          <View className="w-full mb-3 p-4">
             <Text
-              className="text-[#6A7D5B] text-sm text-center italic"
-              style={{ fontFamily: 'Nunito_400Regular' }}
+              className="text-[#6A7D5B] text-sm text-center"
+              style={{ fontFamily: 'Nunito_600SemiBold' }}
             >
-              No presets found for {roomName}. Create your own below.
+              No Scenarios found for &apos;{roomName}&apos;.
             </Text>
           </View>
         )}
 
-        {/* Botão Create Scene (Sempre Visível) */}
-        <TouchableOpacity
-          className="w-[48%] h-[148px] bg-[#D1E4D1] rounded-3xl justify-center items-center"
-          activeOpacity={0.7}
-          // onPress={() => console.log('Navegar para criar cenário')}
-        >
-          <Ionicons name="add" size={40} color="#354F52" />
-          <Text
-            className="text-[#354F52] text-base mt-2"
-            style={{ fontFamily: 'Nunito_600SemiBold' }}
+        {/* Botão Create Scene (Também ocupa 48% e é quadrado) */}
+        <View className="w-[48%] aspect-square">
+          <TouchableOpacity
+            className="w-full h-full bg-[#D1E4D1] rounded-2xl justify-center items-center"
+            activeOpacity={0.7}
+            // onPress={() => console.log('Criar')}
           >
-            Create Scene
-          </Text>
-        </TouchableOpacity>
+            <MaterialIcons name="add" size={48} color="#354F52" />
+            <Text
+              className="text-[#354F52] text-xl mt-2"
+              style={{ fontFamily: 'Nunito_600SemiBold' }}
+            >
+              Create Scene
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </StepWrapper>
   );
