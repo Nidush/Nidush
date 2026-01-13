@@ -34,11 +34,11 @@ export default function Routines() {
     );
   };
 
-  return (
+ return (
     <SafeAreaView className="flex-1 bg-[#F1F3EA]" edges={['top']}>
       <StatusBar barStyle="dark-content" />
 
-      {/* 1. Header */}
+      {/* Header */}
       <View className="items-center mt-2 mb-6">
         <Text 
           className="text-3xl font-semibold text-[#354F52]" 
@@ -51,33 +51,28 @@ export default function Routines() {
       {/* Search Bar */}
       <View className="px-5 mb-6">
         <View className="flex-row items-center border border-[#BDC7C2] rounded-full px-4 h-12 bg-transparent">
-          <MaterialIcons 
-            name="search" 
-            size={24} 
-            color="#7A8C85" 
-            style={{ marginRight: 10 }} 
-          />
+          <MaterialIcons name="search" size={24} color="#7A8C85" style={{ marginRight: 10 }} />
           <TextInput
+            testID="search-input" // ADICIONADO
             placeholder="Search..."
             placeholderTextColor="#7A8C85"
             className="flex-1 h-full text-base text-[#2C3A35]"
-            style={{ 
-              fontFamily: 'Nunito_600SemiBold', 
-              paddingVertical: 0 
-            }}
+            style={{ fontFamily: 'Nunito_600SemiBold', paddingVertical: 0 }}
             textAlignVertical="center"
           />
         </View>
       </View>
 
-      {/*Lista de rotinas com scroll */}
+      {/* Lista de rotinas */}
       <ScrollView 
+        testID="routines-scrollview" // ADICIONADO
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 130 }} 
         showsVerticalScrollIndicator={false}
       >
         {routines.map((item) => (
           <RoutineCard
             key={item.id}
+            testID={`routine-card-${item.id}`} // ADICIONADO (Certifique-se que o componente RoutineCard aceita testID)
             title={item.title}
             days={item.days}
             time={item.time}
@@ -89,8 +84,10 @@ export default function Routines() {
         ))}
       </ScrollView>
 
-      {/* Botão + estático */}
-      <AddRoomDevice actions={[]} isStatic={true} />
+      {/* Botão + */}
+      <View testID="add-routine-container">
+         <AddRoomDevice actions={[]} isStatic={true} />
+      </View>
 
     </SafeAreaView>
   );
