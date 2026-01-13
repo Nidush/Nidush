@@ -72,7 +72,7 @@ export default function Routines() {
         {routines.map((item) => (
           <RoutineCard
             key={item.id}
-            testID={`routine-card-${item.id}`} // ADICIONADO (Certifique-se que o componente RoutineCard aceita testID)
+            testID={`routine-card-${item.id}`} // ADICIONADO
             title={item.title}
             days={item.days}
             time={item.time}

@@ -32,7 +32,7 @@ describe('Routines Screen', () => {
     // Verifica o título principal
     expect(screen.getByText('Routines')).toBeTruthy();
     
-    // Verifica se os títulos das rotinas (que vimos no log) aparecem
+    // Verifica se os títulos das rotinas aparecem
     expect(screen.getByText('Sunrise Awakening')).toBeTruthy();
     expect(screen.getByText('Gym Hour')).toBeTruthy();
   });
@@ -40,11 +40,9 @@ describe('Routines Screen', () => {
   test('deve alternar o estado de uma rotina ao clicar', () => {
     render(<Routines />);
     
-    // No seu código, o switch está dentro de um TouchableOpacity com testID
-    // Vamos usar o testID que já está no seu Routines.tsx
     const gymSwitch = screen.getByTestId('routine-card-2');
     
-    // O teste de "press" valida se a função toggleRoutine não quebra a app
+    // O teste de "press" para a função toggleRoutine
     fireEvent.press(gymSwitch);
     
     expect(gymSwitch).toBeTruthy();
