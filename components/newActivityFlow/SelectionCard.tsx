@@ -18,7 +18,7 @@ export const SelectionCard = ({
   onPress,
 }: SelectionCardProps) => (
   <TouchableOpacity
-    className={`w-[48%] h-[150px] bg-[#BBDABA] rounded-3xl justify-center items-center border-[3px] ${
+    className={`w-[48%] h-[150px] bg-[#BBDABA] rounded-2xl justify-center items-center border-[3px] ${
       isSelected ? 'border-[#548F53]' : 'border-transparent'
     }`}
     onPress={onPress}

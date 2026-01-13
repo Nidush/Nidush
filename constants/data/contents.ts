@@ -5,6 +5,8 @@ export const CONTENTS: Record<string, Content> = {
   c1: {
     id: 'c1',
     title: 'Italian Pasta Tutorial',
+    description:
+      'Learn the secrets of authentic Italian pasta making. A simple yet delicious guide for a perfect dinner.',
     type: 'recipe',
     category: 'cooking',
     duration: '45 min',
@@ -18,6 +20,8 @@ export const CONTENTS: Record<string, Content> = {
   c3: {
     id: 'c3',
     title: 'Fudgy Brownies',
+    description:
+      'Rich, gooey, and incredibly chocolatey. These brownies are the ultimate treat for any sweet tooth.',
     type: 'recipe',
     category: 'cooking',
     duration: '50 min',
@@ -41,6 +45,8 @@ export const CONTENTS: Record<string, Content> = {
   c10: {
     id: 'c10',
     title: 'Classic Eggs Benedict',
+    description:
+      'Master the art of the perfect brunch with poached eggs, Canadian bacon, and creamy Hollandaise sauce.',
     category: 'cooking',
     type: 'recipe',
     duration: '30 min',
@@ -69,6 +75,8 @@ export const CONTENTS: Record<string, Content> = {
   c2: {
     id: 'c2',
     title: 'Morning Zen Guide',
+    description:
+      'Start your day with clarity and peace. A quick session to center your mind before the busy day begins.',
     type: 'video',
     category: 'meditation',
     duration: '12 min',
@@ -83,6 +91,8 @@ export const CONTENTS: Record<string, Content> = {
   c4: {
     id: 'c4',
     title: 'Deep Sleep Frequency',
+    description:
+      'Drift into a deep, restorative sleep with soothing frequencies designed to calm the nervous system.',
     type: 'audio',
     category: 'meditation',
     duration: '60 min',
@@ -91,6 +101,8 @@ export const CONTENTS: Record<string, Content> = {
   c9: {
     id: 'c9',
     title: 'Sunrise Flow Meditation',
+    description:
+      'Connect with the energy of the rising sun. Visualize warmth and light filling your body for energy.',
     type: 'video',
     category: 'meditation',
     duration: '15 min',
@@ -109,6 +121,8 @@ export const CONTENTS: Record<string, Content> = {
   c5: {
     id: 'c5',
     title: 'HIIT Cardio Blast',
+    description:
+      'Burn calories fast with high-intensity intervals. No equipment needed, just your energy!',
     type: 'video',
     category: 'workout',
     duration: '20 min',
@@ -118,6 +132,8 @@ export const CONTENTS: Record<string, Content> = {
   c6: {
     id: 'c6',
     title: 'Yoga for Back Pain',
+    description:
+      'Gentle stretches to relieve tension in the lower back and improve your posture.',
     type: 'video',
     category: 'workout',
     duration: '30 min',
@@ -127,6 +143,8 @@ export const CONTENTS: Record<string, Content> = {
   c11: {
     id: 'c11',
     title: 'Daily Full Body Stretch',
+    description:
+      'Release stiffness and improve flexibility with this comprehensive full-body stretching routine.',
     type: 'video',
     category: 'workout',
     duration: '15 min',
@@ -145,6 +163,8 @@ export const CONTENTS: Record<string, Content> = {
   c7: {
     id: 'c7',
     title: 'The Power of Habit',
+    description:
+      'Explore the science behind why we do what we do and how to change things.',
     type: 'audio',
     category: 'audiobook',
     duration: '15 min',
@@ -154,6 +174,8 @@ export const CONTENTS: Record<string, Content> = {
   c8: {
     id: 'c8',
     title: 'Atomic Habits',
+    description:
+      'An easy and proven way to build good habits and break bad ones.',
     type: 'audio',
     category: 'audiobook',
     duration: '20 min',

@@ -68,12 +68,12 @@ export const ScenarioReviewCard = ({
         className="flex-row justify-between items-center"
       >
         <View className="flex-row items-center">
-          <View className="w-11 h-11 rounded-xl bg-[#C8E2C8] justify-center items-center mr-3">
+          <View className="w-11 h-11 rounded-lg bg-[#C8E2C8] justify-center items-center mr-3">
             <MaterialIcons name="landscape" size={24} color="#354F52" />
           </View>
           <Text
-            className="text-base text-[#2F4F4F]"
-            style={{ fontFamily: 'Nunito_700Bold' }}
+            className="text-lg text-[#2F4F4F]"
+            style={{ fontFamily: 'Nunito_600SemiBold' }}
           >
             {environment?.title || 'Not selected'}
           </Text>

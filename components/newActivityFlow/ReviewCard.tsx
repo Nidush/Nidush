@@ -11,8 +11,8 @@ export const ReviewCard = ({ label, onEdit, children }: ReviewCardProps) => (
   <View className="mb-5">
     <View className="flex-row justify-between items-center">
       <Text
-        className="text-lg text-[#2F4F4F]"
-        style={{ fontFamily: 'Nunito_700Bold' }}
+        className="text-xl text-[#2F4F4F]"
+        style={{ fontFamily: 'Nunito_600SemiBold' }}
       >
         {label}
       </Text>

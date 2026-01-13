@@ -1,4 +1,4 @@
-import { CONTENTS, SCENARIOS } from '@/constants/data'; // Importa dados para lookup
+import { CONTENTS, SCENARIOS } from '@/constants/data';
 import { Activity } from '@/constants/data/types';
 import {
   Nunito_400Regular,
@@ -8,9 +8,20 @@ import {
 } from '@expo-google-fonts/nunito';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import {
+  SafeAreaProvider,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 
 import {
   FlowHeader,
@@ -23,65 +34,116 @@ import {
 } from '@/components/newActivityFlow';
 
 export default function NewActivityFlow() {
-  // 1. Carregar Fontes
   let [fontsLoaded] = useFonts({
     Nunito_700Bold,
     Nunito_600SemiBold,
     Nunito_400Regular,
   });
 
-  // 2. State Management
   const [step, setStep] = useState(1);
   const totalSteps = 6;
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
-  // Estados atualizados para guardar IDs e Tipos corretos
-  const [activityType, setActivityType] = useState<Activity['type']>('general');
+  // Hook para controlar manualmente as margens de segurança (Notch e Barra inferior)
+  const insets = useSafeAreaInsets();
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  const [activityType, setActivityType] = useState<Activity['type']>('' as any);
   const [selectedContentId, setSelectedContentId] = useState('');
   const [room, setRoom] = useState('');
-  const [selectedScenarioId, setSelectedScenarioId] = useState(''); // Antes era 'environment'
-
+  const [selectedScenarioId, setSelectedScenarioId] = useState('');
   const [activityName, setActivityName] = useState('');
   const [description, setDescription] = useState('');
-  const [activityImage, setActivityImage] = useState<string | null>(null);
+  const [activityImage, setActivityImage] = useState<any>(null);
 
-  // 3. Navegação
+  useEffect(() => {
+    const keyboardShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        setKeyboardVisible(true);
+        if (step === 5 && scrollViewRef.current) {
+          setTimeout(
+            () => scrollViewRef.current?.scrollToEnd({ animated: true }),
+            100,
+          );
+        }
+      },
+    );
+    const keyboardHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardVisible(false),
+    );
+    return () => {
+      keyboardShowListener.remove();
+      keyboardHideListener.remove();
+    };
+  }, [step]);
+
+  // ... (funções handleContentSelect, nextStep, etc. mantêm-se iguais)
+  const handleContentSelect = (id: string) => {
+    setSelectedContentId(id);
+    const content = Object.values(CONTENTS).find((c) => c.id === id);
+    if (content) {
+      setActivityName(content.title);
+      setDescription(content.description || '');
+
+      // 2. MUDANÇA: Pré-preenche a imagem com a imagem do conteúdo
+      setActivityImage(content.image);
+    }
+  };
+
   const nextStep = () => {
     if (step < totalSteps) setStep(step + 1);
   };
-
   const prevStep = () => {
     if (step > 1) setStep(step - 1);
     else router.back();
   };
 
-  // 4. Validação
   const isNextDisabled = () => {
+    // Passo 1: Tipo de atividade obrigatório
     if (step === 1 && !activityType) return true;
+
+    // Passo 2: Conteúdo obrigatório
     if (step === 2 && !selectedContentId) return true;
+
+    // Passo 3: Divisão (Room) obrigatória
     if (step === 3 && !room) return true;
-    // Opcional: Validar se cenário foi escolhido no step 4
-    // if (step === 4 && !selectedScenarioId) return true;
+
+    // Passo 4: Cenário obrigatório (Adicionado agora)
+    if (step === 4 && !selectedScenarioId) return true;
+
+    // Passo 5: Nome, Descrição e Imagem obrigatórios
+    if (step === 5) {
+      const hasName = activityName && activityName.trim().length > 0;
+      const hasDesc = description && description.trim().length > 0;
+      const hasImage = !!activityImage;
+
+      // Se faltar qualquer um, esconde o botão
+      if (!hasName || !hasDesc || !hasImage) return true;
+    }
+
     return false;
   };
 
-  // 5. Salvar
-  // 5. Salvar Dados
   const handleSave = async () => {
     const contentObj = Object.values(CONTENTS).find(
       (c) => c.id === selectedContentId,
     );
 
-    // LÓGICA DE IMAGEM CORRIGIDA
     let finalImage;
 
+    // CORREÇÃO LÓGICA DA IMAGEM
     if (activityImage) {
-      // 1. Se o user fez upload, usamos essa imagem
-      finalImage = { uri: activityImage };
+      // Se for string (veio da galeria), tem de ser { uri: ... }
+      // Se for number (veio do default/require), usa-se diretamente
+      finalImage =
+        typeof activityImage === 'string'
+          ? { uri: activityImage }
+          : activityImage;
     } else if (contentObj?.image) {
-      // 2. Se não fez upload, tentamos usar a imagem do conteúdo selecionado
       finalImage = contentObj.image;
     } else {
-      // 3. Se não houver nada, usamos um placeholder (embrulhado em objeto uri)
       finalImage = { uri: 'https://picsum.photos/400/600' };
     }
 
@@ -90,7 +152,7 @@ export default function NewActivityFlow() {
       title: activityName || 'Untitled Activity',
       description,
       room,
-      image: finalImage, // Agora isto é sempre do tipo correto
+      image: finalImage, // Agora a imagem vai no formato correto
       category: 'My creations',
       type: activityType,
       contentId: selectedContentId,
@@ -103,26 +165,24 @@ export default function NewActivityFlow() {
       const parsedActivities = storedActivities
         ? JSON.parse(storedActivities)
         : [];
-
-      const updatedActivities = [newActivity, ...parsedActivities];
-
       await AsyncStorage.setItem(
         '@myActivities',
-        JSON.stringify(updatedActivities),
+        JSON.stringify([newActivity, ...parsedActivities]),
       );
-
       router.push({
         pathname: '/activity-details',
-        params: { id: newActivity.id },
+        params: {
+          id: newActivity.id,
+          isNew: 'true',
+        },
       });
     } catch (e) {
-      console.log('Erro ao salvar atividade', e);
+      console.log('Erro ao salvar', e);
     }
   };
+
   if (!fontsLoaded) return null;
 
-  // 6. Preparar dados legíveis para o Review (Step 6)
-  // Converte IDs (ex: 'c1', 's2') em Títulos (ex: 'Italian Pasta', 'Deep Focus')
   const reviewContent = Object.values(CONTENTS).find(
     (c) => c.id === selectedContentId,
   );
@@ -130,87 +190,120 @@ export default function NewActivityFlow() {
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView className="flex-1 bg-[#F9FAF7] px-5">
-        <FlowHeader
-          title="New activity"
-          step={step}
-          totalSteps={totalSteps}
-          onBack={prevStep}
-        />
+      {/* 1. View Base com a cor do tema. Removemos SafeAreaView wrapper para não cortar o fundo */}
+      <View style={{ flex: 1, backgroundColor: '#F9FAF7' }}>
+        {/* Espaçador para a Status Bar (Notch) */}
+        <View style={{ height: insets.top, backgroundColor: '#F9FAF7' }} />
 
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 140 }}
-        >
-          {step === 1 && (
-            <Step1_Type selected={activityType} onSelect={setActivityType} />
-          )}
-
-          {step === 2 && (
-            <Step2_Content
-              activityType={activityType} // Passa o tipo para filtrar a lista
-              selectedContentId={selectedContentId}
-              onSelect={setSelectedContentId}
-            />
-          )}
-
-          {step === 3 && <Step3_Room selected={room} onSelect={setRoom} />}
-
-          {step === 4 && (
-            <Step4_Environment
-              roomName={room} // Passa a sala para filtrar a lista
-              selected={selectedScenarioId}
-              onSelect={setSelectedScenarioId}
-            />
-          )}
-
-          {step === 5 && (
-            <Step5_Details
-              name={activityName}
-              setName={setActivityName}
-              desc={description}
-              setDesc={setDescription}
-              image={activityImage}
-              setImage={setActivityImage}
-            />
-          )}
-
-          {step === 6 && (
-            <Step6_Review
-              data={{
-                activityType,
-                content: reviewContent || null,
-                room,
-
-                // ALTERAÇÃO AQUI: Passa o objeto completo 'reviewScenario' (ou null)
-                environment: reviewScenario || null,
-
-                activityName,
-                description,
-                activityImage,
-              }}
-              onJumpToStep={setStep}
-            />
-          )}
-        </ScrollView>
-
-        <View className="absolute bottom-10 left-0 right-0 items-center">
-          <TouchableOpacity
-            className={`h-14 w-[210px] rounded-full justify-center items-center ${
-              isNextDisabled() ? 'bg-gray-300' : 'bg-[#548F53]'
-            }`}
-            onPress={step === 6 ? handleSave : nextStep}
-            disabled={isNextDisabled()}
-          >
-            <Text
-              className="text-white text-lg"
-              style={{ fontFamily: 'Nunito_700Bold' }}
-            >
-              {step === 6 ? 'Save' : 'Continue'}
-            </Text>
-          </TouchableOpacity>
+        {/* Header Fixo */}
+        <View className="px-5 pt-2">
+          <FlowHeader
+            title="New activity"
+            step={step}
+            totalSteps={totalSteps}
+            onBack={prevStep}
+          />
         </View>
-      </SafeAreaView>
+
+        {/* Layout do Conteúdo */}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          // Ajusta isto se o teclado ainda tapar (compensa o header)
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <View className="flex-1 relative">
+            <ScrollView
+              ref={scrollViewRef}
+              showsVerticalScrollIndicator={false}
+              // Padding horizontal aplicado aqui
+              contentContainerStyle={{
+                paddingHorizontal: 20,
+                // Padding bottom grande para o último item passar por trás do botão
+                paddingBottom: 120 + insets.bottom,
+              }}
+              keyboardShouldPersistTaps="handled"
+            >
+              {step === 1 && (
+                <Step1_Type
+                  selected={activityType}
+                  onSelect={setActivityType}
+                />
+              )}
+              {step === 2 && (
+                <Step2_Content
+                  activityType={activityType}
+                  selectedContentId={selectedContentId}
+                  onSelect={handleContentSelect}
+                />
+              )}
+              {step === 3 && <Step3_Room selected={room} onSelect={setRoom} />}
+              {step === 4 && (
+                <Step4_Environment
+                  roomName={room}
+                  selected={selectedScenarioId}
+                  onSelect={setSelectedScenarioId}
+                />
+              )}
+              {step === 5 && (
+                <Step5_Details
+                  name={activityName}
+                  setName={setActivityName}
+                  desc={description}
+                  setDesc={setDescription}
+                  image={activityImage}
+                  setImage={setActivityImage}
+                  // ADICIONAR ESTA LINHA:
+                  defaultImage={reviewContent?.image || null}
+                />
+              )}
+              {step === 6 && (
+                <Step6_Review
+                  data={{
+                    activityType,
+                    content: reviewContent || null,
+                    room,
+                    environment: reviewScenario || null,
+                    activityName,
+                    description,
+                    activityImage,
+                  }}
+                  onJumpToStep={setStep}
+                />
+              )}
+            </ScrollView>
+
+            {/* BOTÃO FLUTUANTE MANUAL 
+               - Posicionado com 'absolute' e 'bottom: 0'
+               - paddingBottom usa o 'insets.bottom' para respeitar a barra do iPhone
+               - bg-transparent garante que não cria blocos brancos
+            */}
+            {/* BOTÃO FLUTUANTE MANUAL */}
+            {!isKeyboardVisible && !isNextDisabled() && (
+              <View
+                className="absolute left-0 right-0 items-center bg-transparent pointer-events-box-none"
+                style={{
+                  bottom: 15,
+                  paddingBottom: insets.bottom > 0 ? insets.bottom : 20,
+                  paddingTop: 10,
+                }}
+              >
+                <TouchableOpacity
+                  className="h-14 w-[210px] rounded-full justify-center items-center shadow-lg bg-[#548F53]"
+                  onPress={step === 6 ? handleSave : nextStep}
+                >
+                  <Text
+                    className="text-white text-lg"
+                    style={{ fontFamily: 'Nunito_700Bold' }}
+                  >
+                    {step === 6 ? 'Save' : 'Continue'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </View>
     </SafeAreaProvider>
   );
 }
