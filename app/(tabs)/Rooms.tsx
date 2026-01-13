@@ -12,63 +12,47 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AddRoomDevice from '../../components/rooms/AddRoomDevice';
 import CategoryPill from '../../components/rooms/CategoryPill';
-import DeviceCard from '../../components/rooms/device-card';
+// Importamos o componente e os tipos que definiste lá para garantir que os campos como "type" sejam compatíveis
+import DeviceCard, { Device as DeviceBase } from '../../components/rooms/device-card';
 
-const ROOMS_DATA = [
+// --- Interfaces de Tipos ---
+interface Room {
+  id: number;
+  name: string;
+}
+
+// Estendemos a interface do DeviceCard para incluir o roomId (que é necessário nesta página)
+interface Device extends DeviceBase {
+  roomId: number;
+  level: number; // Definimos como obrigatório para a lógica desta página
+}
+
+interface MenuAction {
+  label: string;
+}
+
+// --- Dados Estáticos ---
+const ROOMS_DATA: Room[] = [
   { id: 1, name: 'Bedroom' },
   { id: 2, name: 'Living Room' },
   { id: 3, name: 'Kitchen' },
   { id: 4, name: 'Bathroom' },
 ];
 
-const INITIAL_DEVICES = [
-  {
-    id: 1,
-    name: 'Bedroom Lights',
-    type: 'light',
-    status: 'Off',
-    level: 100,
-    roomId: 1,
-  },
-  {
-    id: 2,
-    name: 'Speakers',
-    type: 'speaker',
-    status: 'Off',
-    level: 50,
-    roomId: 1,
-  },
-  {
-    id: 3,
-    name: 'Difuser',
-    type: 'difuser',
-    status: 'Off',
-    level: 0,
-    roomId: 1,
-  },
-  {
-    id: 4,
-    name: 'Air Purifier',
-    type: 'purifier',
-    status: 'Off',
-    level: 0,
-    roomId: 1,
-  },
-  {
-    id: 5,
-    name: 'Living Room Lights',
-    type: 'light',
-    status: 'Off',
-    level: 100,
-    roomId: 2,
-  },
+const INITIAL_DEVICES: Device[] = [
+  { id: 1, name: 'Bedroom Lights', type: 'light', status: 'Off', level: 100, roomId: 1 },
+  { id: 2, name: 'Speakers', type: 'speaker', status: 'Off', level: 50, roomId: 1 },
+  { id: 3, name: 'Difuser', type: 'difuser', status: 'Off', level: 0, roomId: 1 },
+  { id: 4, name: 'Air Purifier', type: 'purifier', status: 'Off', level: 0, roomId: 1 },
+  { id: 5, name: 'Living Room Lights', type: 'light', status: 'Off', level: 100, roomId: 2 },
 ];
 
 export default function Rooms() {
-  const [activeRoom, setActiveRoom] = useState(1);
-  const [devices, setDevices] = useState(INITIAL_DEVICES);
+  // Tipagem dos estados
+  const [activeRoom, setActiveRoom] = useState<number>(1);
+  const [devices, setDevices] = useState<Device[]>(INITIAL_DEVICES);
 
-  const toggleDevice = (id) => {
+  const toggleDevice = (id: number) => {
     setDevices((current) =>
       current.map((d) =>
         d.id === id ? { ...d, status: d.status === 'On' ? 'Off' : 'On' } : d,
@@ -76,7 +60,7 @@ export default function Rooms() {
     );
   };
 
-  const updateDeviceLevel = (id, newLevel) => {
+  const updateDeviceLevel = (id: number, newLevel: number) => {
     setDevices((current) =>
       current.map((d) => (d.id === id ? { ...d, level: newLevel } : d)),
     );
@@ -86,7 +70,7 @@ export default function Rooms() {
     (device) => device.roomId === activeRoom,
   );
 
-  const menuActions = [
+  const menuActions: MenuAction[] = [
     {
       label: 'Device',
     },
@@ -94,6 +78,7 @@ export default function Rooms() {
       label: 'Room',
     },
   ];
+
   return (
     <SafeAreaView className="flex-1 bg-[#F1F3EA]" edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#F2F5F0" />
@@ -108,6 +93,7 @@ export default function Rooms() {
         </Text>
       </View>
 
+      {/* Search Bar */}
       <View className="px-5 mb-6">
         <View className="flex-row items-center justify-center border border-[#BDC7C2] rounded-full px-4 h-12 bg-transparent">
           <MaterialIcons
@@ -128,6 +114,8 @@ export default function Rooms() {
           />
         </View>
       </View>
+
+      {/* Categories */}
       <View className="h-10 mb-9 flex justify-center items-center">
         <ScrollView
           horizontal
@@ -139,12 +127,13 @@ export default function Rooms() {
               key={room.id}
               item={room}
               isActive={activeRoom === room.id}
-              onPress={setActiveRoom}
+              onPress={() => setActiveRoom(room.id)}
             />
           ))}
         </ScrollView>
       </View>
 
+      {/* Devices List */}
       <FlatList
         data={filteredDevices}
         keyExtractor={(item) => item.id.toString()}
