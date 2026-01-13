@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform, Image } from 'react-native';
-import { Icons } from '../../assets/navbar/assets';
+import { Icons } from '../../assets/assets';
 
 import LogoIcon from '../../assets/images/Logo.png';
 
