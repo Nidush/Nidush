@@ -1,35 +1,37 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform, Image } from 'react-native';
+import { Icons } from '../../assets/assets';
+
+import LogoIcon from '../../assets/images/Logo.png';
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#4A665E',
-        tabBarInactiveTintColor: '#9BA3A1',
         headerShown: false,
+        tabBarActiveTintColor: '#548F53',
+        tabBarInactiveTintColor: '#354F52',
         tabBarStyle: {
           backgroundColor: '#F0F2EB',
           borderTopWidth: 0,
-          height: Platform.OS === 'ios' ? 90 : 70,
-          paddingBottom: Platform.OS === 'ios' ? 30 : 10,
-          elevation: 0,
+          height: 80, 
+          paddingBottom: Platform.OS === 'ios' ? 30 : 15,
+          paddingTop: 10, 
         },
         tabBarLabelStyle: {
-          fontFamily: 'Nunito-SemiBold',
           fontSize: 12,
+          fontFamily: 'Nunito',
         },
       }}
     >
-      {/* Home com o logo da Nidush */}
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
           tabBarIcon: ({ color }) => (
             <Image
-              source={require('../../assets/images/Logo.png')}
+              source={LogoIcon}
               style={{ width: 26, height: 26, tintColor: color }}
               resizeMode="contain"
             />
@@ -37,48 +39,27 @@ export default function TabLayout() {
         }}
       />
 
-      {/* Activities */}
       <Tabs.Screen
         name="Activities"
         options={{
           title: 'Activities',
-          tabBarIcon: ({ color }) => (
-            <Image
-              source={require('../../assets/navbar/spa.png')}
-              style={{ width: 26, height: 26, tintColor: color }}
-              resizeMode="contain"
-            />
-          ),
+          tabBarIcon: ({ color }) => <Icons.SpaIcon width={26} height={26} fill={color} />,
         }}
       />
 
-      {/* Routines */}
       <Tabs.Screen
         name="Routines"
         options={{
           title: 'Routines',
-          tabBarIcon: ({ color }) => (
-            <Image
-              source={require('../../assets/navbar/routine.png')}
-              style={{ width: 26, height: 26, tintColor: color }}
-              resizeMode="contain"
-            />
-          ),
+          tabBarIcon: ({ color }) => <Icons.RoutineIcon width={26} height={26} fill={color} />,
         }}
       />
 
-      {/* Rooms */}
       <Tabs.Screen
         name="Rooms"
         options={{
           title: 'Rooms',
-          tabBarIcon: ({ color }) => (
-            <Image
-              source={require('../../assets/navbar/auto_awesome_mosaic.png')}
-              style={{ width: 26, height: 26, tintColor: color }}
-              resizeMode="contain"
-            />
-          ),
+          tabBarIcon: ({ color }) => <Icons.RoomsIcon width={26} height={26} fill={color} />,
         }}
       />
     </Tabs>
