@@ -20,7 +20,7 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
         useNativeDriver: true,
       })
     ).start();
-  }, []);
+  }, [pulseAnim]); 
 
   const pulseStyle = {
     transform: [{ scale: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 2] }) }],
@@ -99,7 +99,7 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
                 style={{ fontFamily: 'Nunito-SemiBold', fontSize: 16 }} 
                 className="text-[#3E545C] opacity-50"
               >
-                I'll do this later
+                {"I'll do this later"}
               </Text>
             </TouchableOpacity>
           </View>

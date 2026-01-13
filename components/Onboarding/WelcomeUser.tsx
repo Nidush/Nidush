@@ -14,6 +14,9 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
   const textFade = useRef(new Animated.Value(0)).current;
   const screenFade = useRef(new Animated.Value(0)).current; 
   const [currentStep, setCurrentStep] = useState(0);
+  
+  const isMounted = useRef(true);
+  const currentAnimation = useRef<Animated.CompositeAnimation | null>(null);
 
   const phrases = [
     "Welcome home, Laura",
@@ -29,7 +32,8 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
   });
 
   useEffect(() => {
-    // 1. Entrada suave do ecrã
+    isMounted.current = true;
+
     Animated.timing(screenFade, {
       toValue: 1,
       duration: 1200,
@@ -37,30 +41,45 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
     }).start();
 
     const animateText = (step: number) => {
+      if (!isMounted.current) return;
+
       if (step >= phrases.length) {
-        // 2. Saída suave para o próximo componente (HouseName)
-        Animated.timing(screenFade, {
+        currentAnimation.current = Animated.timing(screenFade, {
           toValue: 0,
           duration: 1000,
           useNativeDriver: true,
-        }).start(() => onFinish());
+        });
+        
+        currentAnimation.current.start(() => {
+          if (isMounted.current) onFinish();
+        });
         return;
       }
       
       setCurrentStep(step);
 
-      // Animação do texto (Fade In -> Delay -> Fade Out)
-      Animated.sequence([
+      currentAnimation.current = Animated.sequence([
         Animated.timing(textFade, { toValue: 1, duration: 1200, useNativeDriver: true }),
         Animated.delay(1800),
         Animated.timing(textFade, { toValue: 0, duration: 1000, useNativeDriver: true }),
-      ]).start(() => {
-        animateText(step + 1);
+      ]);
+
+      currentAnimation.current.start(({ finished }) => {
+        if (finished && isMounted.current) {
+          animateText(step + 1);
+        }
       });
     };
 
     animateText(0);
-  }, [onFinish]);
+
+    return () => {
+      isMounted.current = false;
+      if (currentAnimation.current) {
+        currentAnimation.current.stop();
+      }
+    };
+  }, [onFinish, phrases.length, screenFade, textFade]); 
 
   return (
     <Animated.View style={{ flex: 1, backgroundColor: 'black', opacity: screenFade }}>
@@ -73,11 +92,8 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
         style={StyleSheet.absoluteFill}
       />
       
-      {/* Overlay escuro para destacar o texto */}
       <View className="flex-1 bg-black/40 justify-center items-center px-10">
         <SafeAreaView className="items-center w-full" edges={['top']}>
-          
-          {/* Logo no topo */}
           <View className="absolute -top-40 items-center w-full">
             <Image
               source={require('../../assets/images/Logo.png') as ImageSourcePropType}
@@ -105,7 +121,6 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
               {phrases[currentStep]}
             </Text>
           </Animated.View>
-          
         </SafeAreaView>
       </View>
     </Animated.View>
