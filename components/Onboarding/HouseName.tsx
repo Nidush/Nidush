@@ -26,7 +26,6 @@ export default function HouseName({ onNext }: { onNext: () => void }) {
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} bounces={false}>
           <SafeAreaView className="flex-1 px-[28px]">
             
-            {/* Header - Mesma altura e margem do SignUp */}
             <View className="items-center mt-[15px] h-[60px] justify-center">
               <Image 
                 source={require('../../assets/images/Logo.png')} 
@@ -35,7 +34,6 @@ export default function HouseName({ onNext }: { onNext: () => void }) {
               />
             </View>
 
-            {/* Conteúdo - Alinhado com o estilo do Welcome Home */}
             <View className="mt-[25px]">
               <Text 
                 style={{ fontFamily: 'Nunito-ExtraBold' }} 
@@ -51,7 +49,6 @@ export default function HouseName({ onNext }: { onNext: () => void }) {
                 Giving it a name is the first step to making this space truly yours.
               </Text>
 
-              {/* Input - Exatamente igual ao estilo do First Name/Email no SignUp */}
               <View className="w-full mb-[15px]">
                 <Text 
                   style={{ fontFamily: 'Nunito-SemiBold' }} 
@@ -67,7 +64,6 @@ export default function HouseName({ onNext }: { onNext: () => void }) {
                 />
               </View>
 
-              {/* Botão - Mesmo tamanho [230px] e altura [54px] do Join Nidush */}
               <TouchableOpacity 
                 onPress={onNext}
                 activeOpacity={0.8}
@@ -86,7 +82,6 @@ export default function HouseName({ onNext }: { onNext: () => void }) {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Wave de Fundo - Idêntico ao SignUp */}
       <View 
         className="absolute bottom-0 overflow-hidden" 
         style={{ width: width, height: height * 0.18 }} 
