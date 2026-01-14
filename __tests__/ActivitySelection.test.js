@@ -1,5 +1,10 @@
+import React from 'react'; 
 import { render, fireEvent, waitFor, cleanup, act } from '@testing-library/react-native';
 import ActivitySelection from '../components/Onboarding/ActivitySelection';
+
+jest.mock('expo-status-bar', () => ({
+  StatusBar: 'StatusBar',
+}));
 
 jest.mock('@expo/vector-icons', () => ({
   MaterialIcons: 'MaterialIcons',
@@ -46,4 +51,4 @@ describe('ActivitySelection', () => {
 
     expect(onFinishMock).toHaveBeenCalledTimes(1);
   });
-}); 
+});
