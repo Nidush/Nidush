@@ -4,6 +4,13 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
+import {
+  useFonts,
+  Nunito_400Regular,
+  Nunito_600SemiBold,
+  Nunito_700Bold,
+} from '@expo-google-fonts/nunito';
+
 interface WelcomeUserProps {
   onFinish: () => void;
 }
@@ -11,6 +18,12 @@ interface WelcomeUserProps {
 const BACKGROUND_VIDEO = require('../../assets/videos/nidush_video7.mp4');
 
 const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
+  const [fontsLoaded] = useFonts({
+    'Nunito_400Regular': Nunito_400Regular,
+    'Nunito_600SemiBold': Nunito_600SemiBold,
+    'Nunito_700Bold': Nunito_700Bold,
+  });
+
   const [dims, setDims] = useState(Dimensions.get('window'));
   const textFade = useRef(new Animated.Value(0)).current;
   const screenFade = useRef(new Animated.Value(0)).current; 
@@ -42,6 +55,8 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
   }, [player]);
 
   useEffect(() => {
+    if (!fontsLoaded) return;
+
     Animated.timing(screenFade, {
       toValue: 1,
       duration: 1200,
@@ -71,7 +86,9 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
 
     animateText(0);
 
-  }, [onFinish, screenFade, textFade, phrases.length]); 
+  }, [onFinish, screenFade, textFade, phrases.length, fontsLoaded]); 
+
+  if (!fontsLoaded) return null;
 
   return (
     <Animated.View style={{ flex: 1, backgroundColor: 'black', opacity: screenFade }}>
@@ -121,7 +138,7 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
           >
             <Text 
               style={{ 
-                fontFamily: 'Nunito-ExtraBold', 
+                fontFamily: 'Nunito_700Bold', 
                 fontSize: isWebPC ? 80 : 40,
                 lineHeight: isWebPC ? 90 : 48
               }} 

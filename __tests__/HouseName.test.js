@@ -7,13 +7,19 @@ jest.mock('expo-status-bar', () => ({
 
 jest.mock('react-native/Libraries/Image/RelativeImageStub', () => 'RelativeImageStub');
 
+jest.mock('@expo-google-fonts/nunito', () => ({
+  useFonts: () => [true],
+  Nunito_400Regular: 'Nunito_400Regular',
+  Nunito_600SemiBold: 'Nunito_600SemiBold',
+  Nunito_700Bold: 'Nunito_700Bold',
+}));
+
 describe('HouseName', () => {
   test('onNext é chamado ao clicar no botão', () => {
     const onNextMock = jest.fn();
     
     const { getByText } = render(<HouseName onNext={onNextMock} />);
     
-    // Simula o clique no botão
     const button = getByText('Create my home');
     fireEvent.press(button);
     

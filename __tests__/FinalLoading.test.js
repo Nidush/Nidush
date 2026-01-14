@@ -15,6 +15,13 @@ jest.mock('@/constants/loadingData', () => ({
   TIPS: ['Test Tip 1', 'Test Tip 2'],
 }));
 
+jest.mock('@expo-google-fonts/nunito', () => ({
+  useFonts: () => [true],
+  Nunito_400Regular: 'Nunito_400Regular',
+  Nunito_600SemiBold: 'Nunito_600SemiBold',
+  Nunito_700Bold: 'Nunito_700Bold',
+}));
+
 jest.useFakeTimers();
 
 describe('FinalLoading', () => {
