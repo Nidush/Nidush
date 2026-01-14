@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform, Image } from 'react-native';
-import { Icons } from '../../assets/navbar/assets';
+import { Icons } from '../../assets/assets';
 
 import LogoIcon from '../../assets/images/Logo.png';
 
@@ -10,17 +10,18 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#4A665E',
-        tabBarInactiveTintColor: '#9BA3A1',
+        tabBarActiveTintColor: '#548F53',
+        tabBarInactiveTintColor: '#354F52',
         tabBarStyle: {
           backgroundColor: '#F0F2EB',
           borderTopWidth: 0,
-          height: Platform.OS === 'ios' ? 90 : 70,
-          paddingBottom: Platform.OS === 'ios' ? 30 : 10,
+          height: 80, 
+          paddingBottom: Platform.OS === 'ios' ? 30 : 15,
+          paddingTop: 10, 
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          fontFamily: 'Nunito-SemiBold',
+          fontFamily: 'Nunito',
         },
       }}
     >

@@ -60,22 +60,14 @@ export default function Routines() {
 
       <View className="px-5 mb-6">
         <View className="flex-row items-center border border-[#BDC7C2] rounded-full px-4 h-12 bg-transparent">
-          <MaterialIcons 
-            name="search" 
-            size={24} 
-            color="#7A8C85" 
-            style={{ marginRight: 10 }} 
-          />
+          <MaterialIcons name="search" size={24} color="#7A8C85" style={{ marginRight: 10 }} />
           <TextInput
             placeholder="Search routines..."
             placeholderTextColor="#7A8C85"
             value={searchQuery}
             onChangeText={setSearchQuery}
             className="flex-1 h-full text-base text-[#2C3A35]"
-            style={{ 
-              fontFamily: 'Nunito_600SemiBold', 
-              paddingVertical: 0 
-            }}
+            style={{ fontFamily: 'Nunito_600SemiBold', paddingVertical: 0 }}
             textAlignVertical="center"
             autoCorrect={false}
           />
@@ -88,6 +80,7 @@ export default function Routines() {
       </View>
 
       <ScrollView 
+        testID="routines-scrollview" // ADICIONADO
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 130 }} 
         showsVerticalScrollIndicator={false}
       >

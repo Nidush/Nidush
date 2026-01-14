@@ -12,7 +12,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 
-const profiles = [
+interface Profile {
+  id: number;
+  name: string;
+  avatar: any;
+}
+
+const profiles: Profile[] = [
   {
     id: 1,
     name: 'Laura Rossi',
@@ -32,7 +38,7 @@ const profiles = [
 
 export default function ProfileSelection() {
   const router = useRouter();
-  const hostName = 'Laura';
+  const hostName: string = 'Laura';
 
   return (
     <SafeAreaView className="flex-1 bg-[#F5F7F0]" edges={['top']}>
@@ -56,6 +62,7 @@ export default function ProfileSelection() {
           {profiles.map((profile) => (
             <TouchableOpacity
               key={profile.id}
+              testID={`profile-item-${profile.id}`}
               activeOpacity={0.7}
               onPress={() => router.replace('/(tabs)')}
               className="items-center w-[45%]"
@@ -78,6 +85,7 @@ export default function ProfileSelection() {
 
           {/* Botão Add Profile  */}
           <TouchableOpacity
+            testID="add-profile-button"
             activeOpacity={0.7}
             className="items-center w-[45%]"
           >
@@ -93,7 +101,7 @@ export default function ProfileSelection() {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity className="mt-12">
+        <TouchableOpacity className="mt-12" testID="manage-profiles-button">
           <Text
             className="text-lg text-[#548F53] underline"
             style={{ fontFamily: 'Nunito_700Bold' }}
