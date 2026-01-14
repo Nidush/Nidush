@@ -19,7 +19,6 @@ jest.mock('expo-status-bar', () => ({
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaView: ({ children }) => children,
 }));
-
 describe('WelcomeUser', () => {
   test('renderiza sem crashar e mostra primeira frase', () => {
     const onFinishMock = jest.fn();
