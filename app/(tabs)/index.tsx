@@ -87,10 +87,7 @@ export default function Index() {
       >
         <HomeHeader userName="Laura" />
 
-        <StateWidget
-          title="Total Focus"
-          image={require('@/assets/images/foto.png')}
-        />
+        <StateWidget />
 
         <Text
           style={{ fontFamily: 'Nunito_600SemiBold' }}

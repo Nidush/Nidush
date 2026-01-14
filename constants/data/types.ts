@@ -63,3 +63,16 @@ export interface Activity {
   contentId?: string;
   keywords?: string[];
 }
+
+export type UserState = 'RELAXED' | 'FOCUSED' | 'STRESSED' | 'ANXIOUS';
+
+export interface WearableData {
+  deviceId: string;
+  timestamp: number;
+  heartRate: number; // BPM (Batimentos por minuto)
+  hrv: number; // ms (Heart Rate Variability - Indicador chave de stress)
+  skinTemperature: number; // Celsius (Pele fria pode indicar ansiedade aguda)
+  eda: number; // µS (Atividade Eletrodérmica/Suor - Stress agudo)
+  stressScore: number; // 0-100 (Calculado com base nos anteriores)
+  detectedState: UserState; // O estado inferido
+}

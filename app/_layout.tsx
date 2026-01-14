@@ -1,6 +1,6 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import './../global.css';
 
 export default function RootLayout() {
@@ -11,7 +11,7 @@ export default function RootLayout() {
     const checkOnboarding = async () => {
       try {
         // Remova a linha abaixo após testar, para que ele lembre da escolha:
-        await AsyncStorage.removeItem('@viewedOnboarding');
+        //await AsyncStorage.removeItem('@viewedOnboarding');
 
         const viewed = await AsyncStorage.getItem('@viewedOnboarding');
 
@@ -19,7 +19,7 @@ export default function RootLayout() {
           router.replace('/(tabs)');
         } else {
           router.replace('/onboarding');
-        } 
+        }
       } catch (e) {
         router.replace('/onboarding');
       } finally {

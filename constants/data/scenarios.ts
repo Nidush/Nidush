@@ -29,6 +29,8 @@ export const SCENARIOS: Scenario[] = [
       'sunset',
       'focus',
       'lo-fi',
+      'relaxed',
+      'heat',
     ],
   },
   {
@@ -59,6 +61,8 @@ export const SCENARIOS: Scenario[] = [
       'afternoon',
       'reading',
       'office',
+      'quiet',
+      'focused',
     ],
   },
   {
@@ -88,6 +92,7 @@ export const SCENARIOS: Scenario[] = [
       'calm',
       'morning',
       'afternoon',
+      'relaxed',
     ],
   },
   {
@@ -116,6 +121,8 @@ export const SCENARIOS: Scenario[] = [
       'kitchen',
       'evening',
       'afternoon',
+      'focused',
+      'slow',
     ],
   },
   {
@@ -147,6 +154,8 @@ export const SCENARIOS: Scenario[] = [
       'bed',
       'lavender',
       'sleepy',
+      'stress',
+      'anxiety',
     ],
   },
   {
@@ -181,6 +190,7 @@ export const SCENARIOS: Scenario[] = [
       'calm',
       'meditation',
       'zen',
+      'stress',
     ],
   },
   {
@@ -215,6 +225,8 @@ export const SCENARIOS: Scenario[] = [
       'jazz',
       'night',
       'love',
+      'relaxed',
+      'simple',
     ],
   },
   {
@@ -250,6 +262,7 @@ export const SCENARIOS: Scenario[] = [
       'floral',
       'calm',
       'spring',
+      'anxiety',
     ],
   },
   {
@@ -281,6 +294,8 @@ export const SCENARIOS: Scenario[] = [
       'evening',
       'afternoon',
       'book',
+      'focused',
+      'focus',
     ],
   },
 ];
