@@ -1,50 +1,88 @@
-# Welcome to your Expo app 👋
+<p align="center">
+  <img src="./assets/images/Logo.png" alt="Nidush Logo" width="200" />
+</p>
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+# Nidush
 
-## Get started
+> **University Project - MVP | Master's in Communication and Web Technologies (MCTW)**
 
-1. Install dependencies
+**Nidush** is a smart home solution developed as a Minimum Viable Product (MVP) for the **Altice Labs** challenge. It focuses on humanizing smart spaces by transforming them into active environments for emotional care, specifically designed for individuals dealing with anxiety in urban contexts.
 
-   ```bash
-   npm install
-   ```
+[![Web Preview](https://img.shields.io/badge/Preview-Web_Version-00ADAD?style=for-the-badge&logo=netlify)](https://nidush.tdw-mctw.pt/onboarding)
+[![React Native](https://img.shields.io/badge/React_Native-Expo-61DAFB?style=for-the-badge&logo=react)](https://reactnative.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/NativeWind-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://www.nativewind.dev/)
+[![CI/CD Nidush](https://github.com/Nidush/Nidush/actions/workflows/cicd-nidush.yml/badge.svg?branch=main)](https://github.com/Nidush/Nidush/actions/workflows/cicd-nidush.yml)
 
-2. Start the app
+## MVP Features
 
-   ```bash
-   npx expo start
-   ```
+* **Guided Activities:** Immersive sessions (Meditation, Cooking, Workout, Audiobooks) that synchronize digital content with physical ambient changes (lighting/sound).
+* **Atmospheric Scenarios:** Quick presets to change a room's vibe (e.g., "Relaxation" in the Living Room).
+* **Onboarding:** Introduction to the app's ecosystem.
+* **Activity Creator:** A step-by-step wizard to build personalized wellness experiences.
+* **Privacy & Multi-profiles:** Support for private rooms and multiple resident profiles to ensure trust and avoid environmental conflicts.
+* **Distraction-Free Focus:** Capability to suppress notifications during activities to minimize psychological pressure.
 
-In the output, you'll find options to open the app in a
+## Tech Stack
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+* **Frontend:** React Native (Expo)
+* **Language:** TypeScript
+* **Styling:** NativeWind (Tailwind CSS)
+* **Navigation:** Expo Router
+* **Integrations (Planned):** Spotify API for immersive soundscapes and Wearable data sync for real-time stress monitoring.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+---
 
-## Get a fresh project
+## Getting Started
 
-When you're ready, run:
+To explore the Nidush MVP locally:
 
-```bash
-npm run reset-project
-```
+### Prerequisites
+* Node.js (LTS)
+* Expo Go app installed on your smartphone
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### Installation
 
-## Learn more
+1.  **Clone the repository:**
+    ```bash
+    git clone [https://github.com/Nidush/Nidush.git](https://github.com/Nidush/Nidush.git)
+    cd Nidush
+    ```
 
-To learn more about developing your project with Expo, look at the following resources:
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+3.  **Start the development server:**
+    ```bash
+    npx expo start
+    ```
 
-## Join the community
+### Running the App
+* Scan the **QR Code** in your terminal with the **Expo Go** app.
+* For web preview: Press `w` (requires web setup).
 
-Join our community of developers creating universal apps.
+---
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Live Preview (Web)
+
+The current state of the app can be viewed here:
+[nidush.tdw-mctw.pt](https://nidush.tdw-mctw.pt/onboarding)
+
+*Note: As a mobile-first application, some features are best experienced in a native environment. As an MVP, some features are currently in the development.*
+
+---
+
+## Contributors
+
+Developed as part of the **TDW/MCTW Master's program** for the Altice Labs challenge, by **Group 4**:
+
+* [Eduarda Carvalho](https://github.com/eduardahfc) - 113578
+* [Gabriel Teixeira](https://github.com/GabrielTeixei) - 107876
+* [Mariana Peixe](https://github.com/MarianaPeixe7) - 113262
+* [Pedro Teixeira](https://github.com/pedroteixeira04) - 114323
+
+---
+
+*Nidush: Your home, your safe space.*

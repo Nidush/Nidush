@@ -28,7 +28,6 @@ import {
 } from '@/constants/data';
 import { SMART_HOME_DEVICES } from '@/constants/devices';
 
-// 1. DEFINIÇÃO DO TIPO PARA O ESTADO DO ALERTA
 type AlertConfigState = {
   visible: boolean;
   title: string;
@@ -51,7 +50,6 @@ export default function ActivityDetails() {
 
   const isActivity = mainItem ? 'type' in mainItem : false;
 
-  // 2. CORREÇÃO DO USESTATE (Adicionado <AlertConfigState>)
   const [alertConfig, setAlertConfig] = useState<AlertConfigState>({
     visible: false,
     title: '',
@@ -64,7 +62,6 @@ export default function ActivityDetails() {
 
   // Notificação de "Atividade Criada"
   useEffect(() => {
-    // Restaurada a condição para só mostrar se for nova
     if (isNew === 'true') {
       setShowToast(true);
       const timer = setTimeout(() => {
@@ -123,6 +120,40 @@ export default function ActivityDetails() {
   const closeAlert = () =>
     setAlertConfig((prev) => ({ ...prev, visible: false }));
 
+  // --- LÓGICA DO BOTÃO COMEÇAR ---
+  const handleStartPress = () => {
+    if (!mainItem) return;
+
+    // Verifica se é uma atividade E se o tipo é meditação
+    const isMeditation =
+      isActivity && (mainItem as Activity).type === 'meditation';
+
+    if (isMeditation) {
+      // Se for meditação, inicia normalmente
+      router.push({
+        pathname: '/LoadingActivity',
+        params: {
+          id: mainItem.id,
+          title: mainItem.title,
+          type: 'activity',
+          focusMode: focusEnabled.toString(),
+        },
+      });
+    } else {
+      // Se for outro tipo ou Cenário, mostra o aviso
+      setAlertConfig({
+        visible: true,
+        title: 'Coming Soon',
+        message:
+          'This feature will be available soon for this type of activity or scenario.',
+        confirmText: 'OK',
+        cancelText: '',
+        isDestructive: false,
+        onConfirm: undefined,
+      });
+    }
+  };
+
   // Handlers do Menu
   const handleAddToShortcuts = () => {
     setAlertConfig({
@@ -167,7 +198,7 @@ export default function ActivityDetails() {
               '@myActivities',
               JSON.stringify(updatedActivities),
             );
-            router.navigate('/(tabs)');
+            router.navigate('/Activities');
           }
         } catch (e) {
           console.log('Error while trying to delete', e);
@@ -270,17 +301,7 @@ export default function ActivityDetails() {
         <TouchableOpacity
           activeOpacity={0.9}
           className="bg-[#548F53] w-72 py-4 rounded-full flex-row items-center justify-center shadow-lg shadow-[#548F53]/40"
-          onPress={() =>
-            router.push({
-              pathname: '/LoadingActivity',
-              params: {
-                id: mainItem.id,
-                title: mainItem.title,
-                type: isActivity ? 'activity' : 'scenario',
-                focusMode: focusEnabled.toString(),
-              },
-            })
-          }
+          onPress={handleStartPress}
         >
           <Text
             className="text-white text-2xl mr-2"

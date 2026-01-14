@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Image, ImageSourcePropType, Animated, StyleSheet } from 'react-native';
+import { View, Text, Image, Animated, Dimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -11,12 +11,12 @@ interface WelcomeUserProps {
 const BACKGROUND_VIDEO = require('../../assets/videos/nidush_video7.mp4');
 
 const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
+  const [dims, setDims] = useState(Dimensions.get('window'));
   const textFade = useRef(new Animated.Value(0)).current;
   const screenFade = useRef(new Animated.Value(0)).current; 
   const [currentStep, setCurrentStep] = useState(0);
-  
-  const isMounted = useRef(true);
-  const currentAnimation = useRef<Animated.CompositeAnimation | null>(null);
+
+  const isWebPC = dims.width > 768;
 
   const phrases = [
     "Welcome home, Laura",
@@ -24,16 +24,24 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
     "Let's continue your journey"
   ];
 
+  useEffect(() => {
+    const sub = Dimensions.addEventListener('change', ({ window }) => setDims(window));
+    return () => sub.remove();
+  }, []);
+
   const player = useVideoPlayer(BACKGROUND_VIDEO, (p) => {
     p.loop = true;
-    p.muted = true;
-    p.playbackRate = 0.6; 
-    p.play();
+    p.muted = true; 
+    p.playbackRate = 0.6;
   });
 
   useEffect(() => {
-    isMounted.current = true;
+    if (player) {
+      player.play();
+    }
+  }, [player]);
 
+  useEffect(() => {
     Animated.timing(screenFade, {
       toValue: 1,
       duration: 1200,
@@ -41,64 +49,60 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
     }).start();
 
     const animateText = (step: number) => {
-      if (!isMounted.current) return;
-
       if (step >= phrases.length) {
-        currentAnimation.current = Animated.timing(screenFade, {
+        Animated.timing(screenFade, {
           toValue: 0,
           duration: 1000,
           useNativeDriver: true,
-        });
-        
-        currentAnimation.current.start(() => {
-          if (isMounted.current) onFinish();
-        });
+        }).start(() => onFinish());
         return;
       }
       
       setCurrentStep(step);
 
-      currentAnimation.current = Animated.sequence([
+      Animated.sequence([
         Animated.timing(textFade, { toValue: 1, duration: 1200, useNativeDriver: true }),
         Animated.delay(1800),
         Animated.timing(textFade, { toValue: 0, duration: 1000, useNativeDriver: true }),
-      ]);
-
-      currentAnimation.current.start(({ finished }) => {
-        if (finished && isMounted.current) {
-          animateText(step + 1);
-        }
+      ]).start(() => {
+        animateText(step + 1);
       });
     };
 
     animateText(0);
 
-    return () => {
-      isMounted.current = false;
-      if (currentAnimation.current) {
-        currentAnimation.current.stop();
-      }
-    };
-  }, [onFinish, phrases.length, screenFade, textFade]); 
+  }, [onFinish, screenFade, textFade, phrases.length]); 
 
   return (
     <Animated.View style={{ flex: 1, backgroundColor: 'black', opacity: screenFade }}>
       <StatusBar style="light" />
       
-      <VideoView
-        player={player}
-        nativeControls={false}
-        contentFit="cover"
-        style={StyleSheet.absoluteFill}
-      />
+      <View style={{ width: dims.width, height: dims.height, position: 'absolute' }}>
+        <VideoView
+          player={player}
+          nativeControls={false}
+          contentFit="cover"
+          style={{ width: '100%', height: '100%' }}
+        />
+      </View>
       
-      <View className="flex-1 bg-black/40 justify-center items-center px-10">
-        <SafeAreaView className="items-center w-full" edges={['top']}>
-          <View className="absolute -top-40 items-center w-full">
+      <View 
+        className="flex-1 bg-black/40 justify-center items-center px-10"
+        style={{ zIndex: 2 }}
+      >
+        <SafeAreaView className="items-center w-full flex-1 justify-center" edges={['top']}>
+          
+          <View 
+            style={{ position: 'absolute', top: isWebPC ? 60 : 40 }} 
+            className="items-center w-full"
+          >
             <Image
-              source={require('../../assets/images/Logo.png') as ImageSourcePropType}
-              className="w-12 h-12"
-              style={{ tintColor: '#FFFFFF' }}
+              source={require('../../assets/images/Logo.png')}
+              style={{ 
+                width: isWebPC ? 80 : 50, 
+                height: isWebPC ? 80 : 50, 
+                tintColor: '#FFFFFF' 
+              }}
               resizeMode="contain"
             />
           </View>
@@ -106,25 +110,33 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
           <Animated.View 
             style={{ 
               opacity: textFade, 
+              maxWidth: isWebPC ? 900 : 400,
               transform: [{ 
                 scale: textFade.interpolate({ 
                   inputRange: [0, 1], 
-                  outputRange: [0.9, 1] 
+                  outputRange: [0.95, 1] 
                 }) 
               }] 
             }}
           >
             <Text 
-              style={{ fontFamily: 'Nunito-ExtraBold', fontSize: 40 }} 
-              className="text-white text-center leading-tight"
+              style={{ 
+                fontFamily: 'Nunito-ExtraBold', 
+                fontSize: isWebPC ? 80 : 40,
+                lineHeight: isWebPC ? 90 : 48
+              }} 
+              className="text-white text-center"
             >
               {phrases[currentStep]}
             </Text>
           </Animated.View>
+          
         </SafeAreaView>
       </View>
     </Animated.View>
   );
 };
+
+WelcomeUser.displayName = 'WelcomeUser';
 
 export default WelcomeUser;

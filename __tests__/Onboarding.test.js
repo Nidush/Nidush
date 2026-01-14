@@ -1,9 +1,6 @@
-import React from 'react';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import Onboarding from '../app/onboarding';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// 1. MOCK DO EXPO-VIDEO (Fundamental para não dar erro de export)
 jest.mock('expo-video', () => ({
   useVideoPlayer: jest.fn(() => ({
     play: jest.fn(),
@@ -13,12 +10,10 @@ jest.mock('expo-video', () => ({
   VideoView: 'VideoView',
 }));
 
-// 2. MOCK DO STATUS BAR
 jest.mock('expo-status-bar', () => ({
   StatusBar: () => null,
 }));
 
-// 3. OUTROS MOCKS
 jest.mock('@react-native-async-storage/async-storage', () => 
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
 );

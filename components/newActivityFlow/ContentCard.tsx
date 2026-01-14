@@ -1,5 +1,5 @@
 import { Content } from '@/constants/data/types';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons'; // <--- Ionicons removido
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
@@ -28,19 +28,20 @@ export const ContentCard = ({
   onSelect,
   type = 'small',
 }: ContentCardProps) => {
-  // --- NOVA LÓGICA DE ÍCONES ---
-  // Esta função decide qual ícone mostrar baseado no tipo de conteúdo
-  const getIconName = (contentType: string): keyof typeof Ionicons.glyphMap => {
+  // --- LÓGICA DE ÍCONES (MATERIAL ICONS) ---
+  const getIconName = (
+    contentType: string,
+  ): keyof typeof MaterialIcons.glyphMap => {
     switch (contentType) {
       case 'video':
       case 'workout':
-        return 'play-circle';
+        return 'play-circle-filled'; // Ícone de Play preenchido
       case 'recipe':
-        return 'book';
+        return 'menu-book'; // Ícone de livro aberto (bom para receitas)
       case 'audio':
       case 'meditation':
       default:
-        return 'headset';
+        return 'headset'; // Ícone de auscultadores
     }
   };
 
@@ -112,8 +113,12 @@ export const ContentCard = ({
 
         <View className="opacity-95 gap-1">
           <View className="flex-row items-center">
-            {/* ÍCONE ATUALIZADO AQUI */}
-            <Ionicons name={getIconName(item.type)} size={16} color="white" />
+            {/* MUDANÇA AQUI: Ionicons substituído por MaterialIcons */}
+            <MaterialIcons
+              name={getIconName(item.type)}
+              size={16}
+              color="white"
+            />
             <Text
               className="text-white text-md ml-1.5 capitalize"
               style={{ fontFamily: 'Nunito_600SemiBold' }}
