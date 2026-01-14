@@ -7,7 +7,7 @@ import {
   Dimensions,
   Image,
   Animated,
-  StyleSheet,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -15,9 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
-const { width, height } = Dimensions.get('window');
 const SLIDE_DURATION = 5000;
-
 const WELCOME_VIDEO = require('../assets/videos/nidush_video1.mp4');
 
 const SLIDES = [
@@ -29,21 +27,28 @@ const SLIDES = [
   { id: '6', title: 'Shall we begin your\njourney to peace?', description: 'Join us to silence the noise and start the creation of your safe space.', video: require('../assets/videos/nidush_video7.mp4'), isLast: true },
 ];
 
-// --- COMPONENTE DE VÍDEO OTIMIZADO ---
-const VideoSlide = memo(({ videoSource, isActive }: { videoSource: any; isActive: boolean }) => {
+const VideoSlide = memo(({ videoSource, isActive, dims }: { videoSource: any; isActive: boolean; dims: any }) => {
   const player = useVideoPlayer(videoSource, (p) => {
     p.loop = true;
     p.muted = true;
-    p.staysActiveInBackground = true;
-    if (isActive) p.play();
   });
-
+  
   useEffect(() => {
-    if (isActive) {
-      player.play();
-    } else {
-      player.pause();
-    }
+    let isMounted = true;
+    const handlePlay = async () => {
+      try {
+        if (isActive) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          if (isMounted) await player.play();
+        } else {
+          player.pause();
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    handlePlay();
+    return () => { isMounted = false; };
   }, [isActive, player]);
 
   return (
@@ -51,13 +56,12 @@ const VideoSlide = memo(({ videoSource, isActive }: { videoSource: any; isActive
       player={player} 
       nativeControls={false} 
       contentFit="cover" 
-      style={StyleSheet.absoluteFill} 
+      style={{ width: dims.width, height: dims.height, position: 'absolute' }} 
     />
   );
 });
 VideoSlide.displayName = 'VideoSlide';
 
-// --- INDICADORES DE PROGRESSO ---
 const AnimatedIndicator = ({ index, currentIndex, duration, isPlaying }: any) => {
   const widthAnim = useRef(new Animated.Value(0)).current;
 
@@ -84,16 +88,21 @@ const AnimatedIndicator = ({ index, currentIndex, duration, isPlaying }: any) =>
   );
 };
 
-// --- COMPONENTE PRINCIPAL ---
 export default function Onboarding() {
+  const [dims, setDims] = useState(Dimensions.get('window'));
   const [showWelcome, setShowWelcome] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollRef = useRef<FlatList>(null);
   const router = useRouter();
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
+  useEffect(() => {
+    const sub = Dimensions.addEventListener('change', ({ window }) => setDims(window));
+    return () => sub.remove();
+  }, []);
+
   const finishOnboarding = useCallback(async () => {
-    Animated.timing(fadeAnim, { toValue: 0, duration: 1000, useNativeDriver: true }).start(async () => {
+    Animated.timing(fadeAnim, { toValue: 0, duration: 800, useNativeDriver: true }).start(async () => {
       try {
         await AsyncStorage.setItem('@viewedOnboarding', 'true');
         router.replace('/signup');
@@ -101,8 +110,7 @@ export default function Onboarding() {
         router.replace('/signup');
       }
     });
-  }, [router, fadeAnim]);
-
+  }, [router, fadeAnim]); 
   const handleDiscover = () => {
     Animated.timing(fadeAnim, { toValue: 0, duration: 800, useNativeDriver: true }).start(() => {
       setShowWelcome(false);
@@ -111,18 +119,21 @@ export default function Onboarding() {
   };
 
   const goToNext = useCallback(() => {
-    if (currentIndex < SLIDES.length - 1) {
-      const nextIndex = currentIndex + 1;
-      scrollRef.current?.scrollToIndex({ index: nextIndex, animated: true });
-      setCurrentIndex(nextIndex);
-    }
-  }, [currentIndex]);
+    setCurrentIndex((prev) => {
+      if (prev < SLIDES.length - 1) {
+        const next = prev + 1;
+        scrollRef.current?.scrollToIndex({ index: next, animated: true });
+        return next;
+      }
+      return prev;
+    });
+  }, []);
 
   const goToPrev = () => {
     if (currentIndex > 0) {
-      const prevIndex = currentIndex - 1;
-      scrollRef.current?.scrollToIndex({ index: prevIndex, animated: true });
-      setCurrentIndex(prevIndex);
+      const prev = currentIndex - 1;
+      scrollRef.current?.scrollToIndex({ index: prev, animated: true });
+      setCurrentIndex(prev);
     }
   };
 
@@ -133,59 +144,57 @@ export default function Onboarding() {
     }
   }, [showWelcome, currentIndex, goToNext]);
 
-  const renderItem = ({ item, index }: any) => {
-    const shouldRenderVideo = Math.abs(currentIndex - index) <= 1;
-
-    return (
-      <View style={{ width, height }} className="bg-black">
-        {shouldRenderVideo && (
-          <VideoSlide videoSource={item.video} isActive={currentIndex === index} />
-        )}
+  const renderItem = ({ item, index }: any) => (
+    <View style={{ width: dims.width, height: dims.height }} className="bg-black relative overflow-hidden">
+      {Math.abs(currentIndex - index) <= 1 && (
+        <VideoSlide videoSource={item.video} isActive={currentIndex === index} dims={dims} />
+      )}
+      
+      <View className="flex-1 bg-black/20">
+        <TouchableOpacity className="absolute left-0 top-0 bottom-0 w-1/4 z-10" onPress={goToPrev} activeOpacity={1} />
+        <TouchableOpacity className="absolute right-0 top-0 bottom-0 w-3/4 z-10" onPress={goToNext} activeOpacity={1} />
         
-        <View className="flex-1 bg-black/30">
-          <TouchableOpacity
-            className="absolute left-0 top-0 bottom-0 w-1/4 z-10"
-            onPress={goToPrev}
-            activeOpacity={1}
-          />
-          <TouchableOpacity
-            className="absolute right-0 top-0 bottom-0 w-3/4 z-10"
-            onPress={goToNext}
-            activeOpacity={1}
-          />
-
-          <SafeAreaView className="flex-1 justify-between px-6 z-20" edges={['top', 'bottom']} pointerEvents="box-none">
-            <View className="flex-row justify-between items-center mt-12 h-12" pointerEvents="box-none">
+        <SafeAreaView className="flex-1 z-20" edges={['top', 'bottom']} pointerEvents="box-none">
+          <View className="flex-1 w-full max-w-[1200px] mx-auto px-8 md:px-12" pointerEvents="box-none">
+            
+            <View className="flex-row justify-between items-center mt-6 md:mt-10 h-12" pointerEvents="box-none">
               <Image 
                 source={require('../assets/images/Logo.png')} 
-                className="w-12 h-12" 
-                style={{ tintColor: '#FFFFFF' }} 
+                style={{ width: dims.width > 768 ? 60 : 48, height: dims.width > 768 ? 60 : 48, tintColor: '#FFFFFF' }} 
                 resizeMode="contain" 
               />
-              {!item.isLast && (
-                <TouchableOpacity onPress={finishOnboarding} className="p-2">
-                  <Text className="text-white text-lg font-medium opacity-80">Skip</Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity onPress={finishOnboarding} className="p-2">
+                <Text style={{ fontFamily: 'Nunito-Medium' }} className="text-white text-lg md:text-xl opacity-80">Skip</Text>
+              </TouchableOpacity>
             </View>
 
-            <View className="mt-auto mb-12" pointerEvents="none">
-              <Text className="text-white text-[32px] font-bold leading-[42px] mb-4">{item.title}</Text>
-              <Text className="text-white text-[17px] leading-6 opacity-90 pr-10">{item.description}</Text>
+            <View className="mt-auto mb-16 md:mb-24 self-start w-full max-w-[750px]" pointerEvents="none">
+              <Text 
+                style={{ fontFamily: 'Nunito-Bold' }} 
+                className="text-white text-[34px] md:text-7xl font-bold leading-[42px] md:leading-[80px] mb-6"
+              >
+                {item.title}
+              </Text>
+              <Text 
+                style={{ fontFamily: 'Nunito-Regular' }} 
+                className="text-white text-[18px] md:text-2xl leading-7 md:leading-9 opacity-90 pr-10"
+              >
+                {item.description}
+              </Text>
             </View>
 
-            <View className={`${item.isLast ? 'h-40' : 'h-10'} justify-center items-center mb-10`} pointerEvents="box-none">
+            <View className={`${item.isLast ? 'h-32 md:h-48' : 'h-10'} justify-center items-center`} pointerEvents="box-none">
               {item.isLast && (
                 <TouchableOpacity 
                   onPress={finishOnboarding} 
-                  className="bg-[#589158] w-[260px] py-5 rounded-full items-center shadow-lg"
+                  className="bg-[#589158] px-14 py-5 rounded-full items-center mb-12 shadow-lg active:scale-95"
                 >
-                  <Text className="text-white font-bold text-xl">Begin Journey</Text>
+                  <Text style={{ fontFamily: 'Nunito-Bold' }} className="text-white font-bold text-xl md:text-2xl">Begin Journey</Text>
                 </TouchableOpacity>
               )}
             </View>
-          </SafeAreaView>
-        </View>
+          </View>
+        </SafeAreaView>
       </View>
     );
   };
@@ -195,18 +204,26 @@ export default function Onboarding() {
       <StatusBar style="light" />
       
       {showWelcome ? (
-        <View className="flex-1">
-          <VideoSlide videoSource={WELCOME_VIDEO} isActive={true} />
-          <View className="flex-1 bg-black/20 justify-end items-center pb-24">
-            <SafeAreaView className="items-center w-full px-6">
-              <Image source={require('../assets/images/Logo.png')} className="w-64 h-64 mb-10" resizeMode="contain" />
-              <Text className="text-4xl font-bold text-white text-center">Welcome to Nidush</Text>
-              <Text className="text-xl text-white mt-4 text-center">Your safe space starts here.</Text>
+        <View style={{ width: dims.width, height: dims.height }}>
+          <VideoSlide videoSource={WELCOME_VIDEO} isActive={true} dims={dims} />
+          <View className="flex-1 bg-black/10 justify-end items-center pb-24">
+            <SafeAreaView className="items-center w-full px-6 max-w-[1000px]">
+              <Image 
+                source={require('../assets/images/Logo.png')} 
+                style={{ 
+                  width: dims.width > 768 ? 280 : 220, 
+                  height: dims.width > 768 ? 280 : 220, 
+                  marginBottom: 30 
+                }} 
+                resizeMode="contain" 
+              />
+              <Text style={{ fontFamily: 'Nunito-Bold' }} className="text-5xl md:text-8xl font-bold text-white text-center">Welcome to Nidush</Text>
+              <Text style={{ fontFamily: 'Nunito-Regular' }} className="text-xl md:text-3xl text-white mt-4 text-center opacity-80">Your safe space starts here.</Text>
               <TouchableOpacity 
-                className="bg-[#589158] w-[240px] py-4 rounded-full mt-20 shadow-md items-center" 
+                className="bg-[#589158] px-16 py-5 rounded-full mt-16 shadow-md items-center active:scale-95" 
                 onPress={handleDiscover}
               >
-                <Text className="text-white text-xl font-bold">Discover</Text>
+                <Text style={{ fontFamily: 'Nunito-Bold' }} className="text-white text-xl md:text-2xl font-bold">Discover</Text>
               </TouchableOpacity>
             </SafeAreaView>
           </View>
@@ -214,26 +231,28 @@ export default function Onboarding() {
       ) : (
         <View className="flex-1">
           <FlatList
+            key={`list-${dims.width}`} 
             ref={scrollRef}
             data={SLIDES}
             renderItem={renderItem}
             horizontal
             pagingEnabled
-            scrollEnabled={false}
-            getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
-            keyExtractor={(item) => item.id}
+            scrollEnabled={Platform.OS !== 'web'}
+            showsHorizontalScrollIndicator={false}
+            getItemLayout={(_, index) => ({ length: dims.width, offset: dims.width * index, index })}
           />
-          
-          <View className="flex-row absolute bottom-[8%] w-full px-6 z-50">
-            {SLIDES.map((_, index) => (
-              <AnimatedIndicator 
-                key={index} 
-                index={index} 
-                currentIndex={currentIndex} 
-                duration={SLIDE_DURATION} 
-                isPlaying={!showWelcome} 
-              />
-            ))}
+          <View className="absolute bottom-[8%] md:bottom-[6%] w-full z-50 pointer-events-none">
+            <View className="flex-row w-full max-w-[1200px] mx-auto px-10 md:px-12">
+              {SLIDES.map((_, index) => (
+                <AnimatedIndicator 
+                  key={index} 
+                  index={index} 
+                  currentIndex={currentIndex} 
+                  duration={SLIDE_DURATION} 
+                  isPlaying={true} 
+                />
+              ))}
+            </View>
           </View>
         </View>
       )}
