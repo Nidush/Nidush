@@ -4,6 +4,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 
+import {
+  useFonts,
+  Nunito_400Regular,
+  Nunito_600SemiBold,
+  Nunito_700Bold,
+} from '@expo-google-fonts/nunito';
+
 type MaterialIconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
 const ACTIVITIES = [
@@ -14,6 +21,12 @@ const ACTIVITIES = [
 ];
 
 export default function ActivitySelection({ onFinish }: { onFinish: () => void }) {
+  const [fontsLoaded] = useFonts({
+    'Nunito_400Regular': Nunito_400Regular,
+    'Nunito_600SemiBold': Nunito_600SemiBold,
+    'Nunito_700Bold': Nunito_700Bold,
+  });
+
   const [selected, setSelected] = useState<string[]>([]);
   const [dims, setDims] = useState(Dimensions.get('window'));
 
@@ -21,6 +34,8 @@ export default function ActivitySelection({ onFinish }: { onFinish: () => void }
     const sub = Dimensions.addEventListener('change', ({ window }) => setDims(window));
     return () => sub.remove();
   }, []);
+
+  if (!fontsLoaded) return null;
 
   const isWebPC = dims.width > 768;
 
@@ -34,16 +49,14 @@ export default function ActivitySelection({ onFinish }: { onFinish: () => void }
       <StatusBar style="dark" />
       
       <SafeAreaView className="flex-1">
-        {/* CONTAINER CENTRAL  */}
         <View 
           style={{ maxWidth: 600, width: '100%', alignSelf: 'center' }} 
           className="flex-1 px-[28px]"
         >
           
-          {/* Header */}
           <View className={`items-center justify-center ${isWebPC ? 'mt-[30px] mb-[10px]' : 'mt-4'} h-[60px]`}>
             <Text 
-              style={{ fontFamily: 'Nunito-Bold' }} 
+              style={{ fontFamily: 'Nunito_700Bold' }} 
               className="text-xl text-[#2F4F4F]"
             >
               Welcome
@@ -56,29 +69,28 @@ export default function ActivitySelection({ onFinish }: { onFinish: () => void }
           >
             <View className={isWebPC ? 'mt-4' : 'mt-8'}>
               <Text 
-                style={{ fontFamily: 'Nunito-ExtraBold' }} 
+                style={{ fontFamily: 'Nunito_700Bold' }}
                 className="text-[32px] text-[#2F4F4F] leading-[38px]"
               >
                 Select the activities{"\n"}that you like
               </Text>
 
-              {/* Grid Atividades */}
               <View className="flex-row flex-wrap justify-between mt-8">
                 {ACTIVITIES.map((item) => {
                   const isSelected = selected.includes(item.id);
                   return (
                     <TouchableOpacity
                       key={item.id}
+                      testID={`activity-${item.id}`} 
                       onPress={() => toggleActivity(item.id)}
                       activeOpacity={0.8}
-                      testID={`activity-${item.id}`}
                       className={`w-[48%] h-[145px] rounded-[28px] justify-center items-center mb-4 border-[3px] 
                         ${isSelected ? 'border-[#548F53] bg-[#C8E2C8]' : 'border-transparent bg-[#BBDABA]'}`}
                     >
                       <MaterialIcons name={item.icon} size={48} color="#354F52" />
                       
                       <Text 
-                        style={{ fontFamily: 'Nunito-SemiBold' }} 
+                        style={{ fontFamily: 'Nunito_600SemiBold' }} 
                         className="text-[#354F52] mt-2"
                       >
                         {item.id}
@@ -97,13 +109,13 @@ export default function ActivitySelection({ onFinish }: { onFinish: () => void }
 
             {isWebPC && (
                <TouchableOpacity
+               testID="enter-button" 
                onPress={onFinish}
                disabled={selected.length === 0}
-               testID="enter-button-web"
                className={`h-[60px] rounded-full justify-center items-center bg-[#548F53] mt-8 mb-10
                  ${selected.length > 0 ? 'opacity-100' : 'opacity-40'}`}
              >
-               <Text style={{ fontFamily: 'Nunito-Bold' }} className="text-lg text-white">
+               <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-lg text-white">
                  Enter my safe space
                </Text>
              </TouchableOpacity>
@@ -113,19 +125,18 @@ export default function ActivitySelection({ onFinish }: { onFinish: () => void }
           {!isWebPC && (
             <View className="absolute bottom-10 left-[28px] right-[28px]">
               <TouchableOpacity
+                testID="enter-button" 
                 onPress={onFinish}
                 disabled={selected.length === 0}
-                testID="enter-button"
                 className={`h-[60px] rounded-full justify-center items-center bg-[#548F53] 
                   ${selected.length > 0 ? 'opacity-100' : 'opacity-40'}`}
               >
-                <Text style={{ fontFamily: 'Nunito-Bold' }} className="text-lg text-white">
+                <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-lg text-white">
                   Enter my safe space
                 </Text>
               </TouchableOpacity>
             </View>
           )}
-
         </View>
       </SafeAreaView>
     </View>

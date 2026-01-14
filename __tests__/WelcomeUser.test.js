@@ -16,6 +16,13 @@ jest.mock('expo-status-bar', () => ({
   StatusBar: 'StatusBar',
 }));
 
+jest.mock('@expo-google-fonts/nunito', () => ({
+  useFonts: () => [true],
+  Nunito_400Regular: 'Nunito_400Regular',
+  Nunito_600SemiBold: 'Nunito_600SemiBold',
+  Nunito_700Bold: 'Nunito_700Bold',
+}));
+
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaView: ({ children }) => children,
 }));
