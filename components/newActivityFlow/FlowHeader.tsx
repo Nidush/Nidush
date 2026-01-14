@@ -21,7 +21,7 @@ export const FlowHeader = ({ title, step, totalSteps, onBack }: any) => (
       <TouchableOpacity onPress={() => router.back()}>
         {/* Botão Cancel com Text nativo */}
         <Text
-          className="text-[#548F53] text-base"
+          className="text-[#548F53] text-lg"
           style={{ fontFamily: 'Nunito_600SemiBold' }}
         >
           Cancel

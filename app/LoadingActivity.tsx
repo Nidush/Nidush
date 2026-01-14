@@ -7,15 +7,21 @@ import TipDisplay from '../components/loading/TipDisplay';
 import { TIPS } from '../constants/loadingData';
 
 const LoadingActivity = () => {
-  const { title, id } = useLocalSearchParams();
+  // Recebemos o ID da ActivityDetails
+  const { title, id } = useLocalSearchParams<{ title: string; id: string }>();
+
   const randomTip = useMemo(() => {
     return TIPS[Math.floor(Math.random() * TIPS.length)];
   }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      router.replace('/ActiveSession');
-    }, 15000);
+      // AQUI: Passamos o ID adiante para a ActiveSession saber o que carregar
+      router.replace({
+        pathname: '/ActiveSession',
+        params: { id: id },
+      });
+    }, 5000); // Reduzi para 5s para testes (pode manter 15000)
 
     return () => clearTimeout(timer);
   }, [id]);
@@ -30,7 +36,7 @@ const LoadingActivity = () => {
         className="text-[#354F52] text-xl text-center"
         style={{ fontFamily: 'Nunito_600SemiBold' }}
       >
-        Initializing “{title || 'Gratitude Flow'}”...
+        Initializing “{title || 'Session'}”...
       </Text>
       <BreathingLoader />
       <TipDisplay tip={randomTip} />

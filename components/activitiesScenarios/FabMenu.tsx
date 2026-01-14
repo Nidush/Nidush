@@ -1,7 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
 import React from 'react';
-import { Pressable, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated'; // <--- Importar Reanimated
 
 interface FabMenuProps {
   isOpen: boolean;
@@ -11,15 +20,30 @@ interface FabMenuProps {
 export const FabMenu = ({ isOpen, setIsOpen }: FabMenuProps) => {
   return (
     <>
-      {/* OVERLAY ESCURO */}
+      {/* 1. OVERLAY DESFOCADO COM ANIMAÇÃO 
+          Envolvemos apenas o fundo num Animated.View para ter FadeIn/FadeOut 
+      */}
       {isOpen && (
-        <Pressable
-          className="absolute inset-0 bg-black/20 z-[5]"
-          onPress={() => setIsOpen(false)}
-        />
+        <Animated.View
+          className="absolute inset-0 z-[5]"
+          entering={FadeIn.duration(300)} // Aparece em 300ms
+          exiting={FadeOut.duration(300)} // Desaparece em 300ms
+        >
+          <BlurView
+            intensity={Platform.OS === 'android' ? 10 : 10}
+            tint="light"
+            experimentalBlurMethod="dimezisBlurView"
+            // Nota: backgroundColor deve estar no style
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: 'rgba(240, 242, 235, 0.1)' },
+            ]}
+          >
+            <Pressable className="flex-1" onPress={() => setIsOpen(false)} />
+          </BlurView>
+        </Animated.View>
       )}
 
-      {/* OPÇÕES DO MENU */}
       {isOpen && (
         <View className="absolute bottom-[110px] right-[25px] items-end z-[11]">
           {/* Opção 1: Scenario */}
