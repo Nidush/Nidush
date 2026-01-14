@@ -68,9 +68,13 @@ const AnimatedIndicator = ({ index, currentIndex, duration, isPlaying }: any) =>
   useEffect(() => {
     if (index === currentIndex && isPlaying) {
       widthAnim.setValue(0);
-      Animated.timing(widthAnim, { toValue: 100, duration, useNativeDriver: false }).start();
+      Animated.timing(widthAnim, { 
+        toValue: 1, 
+        duration: duration, 
+        useNativeDriver: false 
+      }).start();
     } else {
-      widthAnim.setValue(index <= currentIndex ? 100 : 0);
+      widthAnim.setValue(index < currentIndex ? 1 : 0);
     }
   }, [currentIndex, isPlaying, index, duration, widthAnim]); 
 
@@ -78,7 +82,7 @@ const AnimatedIndicator = ({ index, currentIndex, duration, isPlaying }: any) =>
     <View className="h-[5px] flex-1 mx-1 rounded-full bg-white/30 overflow-hidden">
       <Animated.View 
         className="h-full bg-[#78B478]" 
-        style={{ width: widthAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }) }} 
+        style={{ width: widthAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }} 
       />
     </View>
   );
@@ -102,7 +106,9 @@ export default function Onboarding() {
       try {
         await AsyncStorage.setItem('@viewedOnboarding', 'true');
         router.replace('/signup');
-      } catch { router.replace('/signup'); }
+      } catch {
+        router.replace('/signup');
+      }
     });
   }, [router, fadeAnim]); 
   const handleDiscover = () => {
@@ -190,8 +196,8 @@ export default function Onboarding() {
           </View>
         </SafeAreaView>
       </View>
-    </View>
-  );
+    );
+  };
 
   return (
     <Animated.View style={{ flex: 1, backgroundColor: 'black', opacity: fadeAnim }}>

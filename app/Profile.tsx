@@ -11,7 +11,10 @@ export default function Profile() {
     <SafeAreaView className="flex-1 bg-[#F5F7F0]" edges={['top']}>
       {/* Header */}
       <View className="flex-row justify-between items-center px-6 py-4">
-        <TouchableOpacity onPress={() => router.replace('/(tabs)')}>
+        <TouchableOpacity 
+          onPress={() => router.replace('/(tabs)')}
+          testID="back-button"
+        >
           <MaterialIcons name="chevron-left" size={32} color="#4A5D4E" />
         </TouchableOpacity>
         <Text
@@ -41,7 +44,10 @@ export default function Profile() {
         </View>
 
         {/* Hobbies */}
-        <View className="bg-[#F5F7F0] rounded-[24px] p-5 mb-4 border border-[#D1D9C5]">
+        <View 
+          className="bg-[#F5F7F0] rounded-[24px] p-5 mb-4 border border-[#D1D9C5]"
+          testID="hobbies-container"
+        >
           <View className="flex-row justify-between items-center mb-4">
             <Text
               className="text-lg text-[#4A5D4E]"
@@ -49,7 +55,7 @@ export default function Profile() {
             >
               Hobby Preferences
             </Text>
-            <TouchableOpacity>
+            <TouchableOpacity testID="edit-hobbies-button">
               <Text
                 className="text-[#5B8C51] underline"
                 style={{ fontFamily: 'Nunito_700Bold' }}
@@ -84,21 +90,25 @@ export default function Profile() {
             Associated Wearables
           </Text>
 
-          {/* Ícones de relógio do MaterialIcons */}
           <DeviceItem
             name="Apple Watch"
             status="Connected"
             connected
             icon="watch"
+            testID="device-apple-watch"
           />
           <DeviceItem
             name="Mi Band"
             status="Disconnected"
             connected={false}
             icon="watch"
+            testID="device-mi-band"
           />
 
-          <TouchableOpacity className="bg-[#5B8C51] py-3.5 rounded-full items-center mt-4 shadow-sm">
+          <TouchableOpacity 
+            className="bg-[#5B8C51] py-3.5 rounded-full items-center mt-4 shadow-sm"
+            testID="add-device-button"
+          >
             <Text
               className="text-white text-xl"
               style={{ fontFamily: 'Nunito_700Bold' }}
@@ -108,20 +118,34 @@ export default function Profile() {
           </TouchableOpacity>
         </View>
 
-        {/* Menu Principal com MaterialIcons do Design */}
+        {/* Menu Principal */}
         <View className="bg-[#F5F7F0] rounded-[24px] px-2 mb-4 border border-[#D1D9C5]">
-          <MenuItem icon="account-circle" label="Account Information" />
-          <MenuItem icon="notifications-none" label="Notifications" />
+          <MenuItem 
+            icon="account-circle" 
+            label="Account Information" 
+            testID="menu-account"
+          />
+          <MenuItem 
+            icon="notifications-none" 
+            label="Notifications" 
+            testID="menu-notifications"
+          />
           <MenuItem
             icon="admin-panel-settings"
             label="Privacy & Data"
             border={false}
+            testID="menu-privacy"
           />
         </View>
 
         {/* Menu Secundário */}
         <View className="bg-[#F5F7F0] rounded-[24px] px-2 mb-6 border border-[#D1D9C5]">
-          <MenuItem icon="group" label="Residents" border={false} />
+          <MenuItem 
+            icon="group" 
+            label="Residents" 
+            border={false} 
+            testID="menu-residents"
+          />
         </View>
 
         {/* Botão Logout */}
@@ -129,6 +153,7 @@ export default function Profile() {
           <TouchableOpacity
             className="bg-[#5B8C51] px-12 py-3.5 rounded-full shadow-sm"
             onPress={() => router.replace('/profile-selection')}
+            testID="logout-button"
           >
             <Text
               className="text-white text-xl"
@@ -143,9 +168,9 @@ export default function Profile() {
   );
 }
 
-function DeviceItem({ name, status, connected, icon }: any) {
+function DeviceItem({ name, status, connected, icon, testID }: any) {
   return (
-    <View className="flex-row items-center mb-4">
+    <View className="flex-row items-center mb-4" testID={testID}>
       <View className="bg-[#E8EDDF] p-2 rounded-xl">
         <MaterialIcons name={icon} size={28} color="#4A5D4E" />
       </View>
@@ -172,9 +197,10 @@ function DeviceItem({ name, status, connected, icon }: any) {
   );
 }
 
-function MenuItem({ icon, label, border = true }: any) {
+function MenuItem({ icon, label, border = true, testID }: any) {
   return (
     <TouchableOpacity
+      testID={testID}
       className={`flex-row justify-between items-center py-5 px-4 ${border ? 'border-b border-[#D1D9C5]' : ''}`}
     >
       <View className="flex-row items-center">

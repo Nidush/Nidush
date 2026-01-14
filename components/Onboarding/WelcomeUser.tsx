@@ -15,6 +15,9 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
   const textFade = useRef(new Animated.Value(0)).current;
   const screenFade = useRef(new Animated.Value(0)).current; 
   const [currentStep, setCurrentStep] = useState(0);
+  
+  const isMounted = useRef(true);
+  const currentAnimation = useRef<Animated.CompositeAnimation | null>(null);
 
   const isWebPC = dims.width > 768;
 
@@ -49,12 +52,18 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
     }).start();
 
     const animateText = (step: number) => {
+      if (!isMounted.current) return;
+
       if (step >= phrases.length) {
         Animated.timing(screenFade, {
           toValue: 0,
           duration: 1000,
           useNativeDriver: true,
-        }).start(() => onFinish());
+        });
+        
+        currentAnimation.current.start(() => {
+          if (isMounted.current) onFinish();
+        });
         return;
       }
       
@@ -64,8 +73,12 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
         Animated.timing(textFade, { toValue: 1, duration: 1200, useNativeDriver: true }),
         Animated.delay(1800),
         Animated.timing(textFade, { toValue: 0, duration: 1000, useNativeDriver: true }),
-      ]).start(() => {
-        animateText(step + 1);
+      ]);
+
+      currentAnimation.current.start(({ finished }) => {
+        if (finished && isMounted.current) {
+          animateText(step + 1);
+        }
       });
     };
 
@@ -130,7 +143,6 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
               {phrases[currentStep]}
             </Text>
           </Animated.View>
-          
         </SafeAreaView>
       </View>
     </Animated.View>

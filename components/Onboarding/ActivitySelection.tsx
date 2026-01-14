@@ -13,7 +13,11 @@ const ACTIVITIES = [
   { id: 'Reading', icon: 'menu-book' as MaterialIconName },
 ];
 
-export default function ActivitySelection({ onFinish }: { onFinish: () => void }) {
+type Props = {
+  onFinish: () => void;
+};
+
+export default function ActivitySelection({ onFinish }: Props) {
   const [selected, setSelected] = useState<string[]>([]);
   const [dims, setDims] = useState(Dimensions.get('window'));
 
@@ -25,11 +29,8 @@ export default function ActivitySelection({ onFinish }: { onFinish: () => void }
   const isWebPC = dims.width > 768;
 
   const toggleActivity = (id: string) => {
-    if (selected.includes(id)) {
-      setSelected(selected.filter(i => i !== id));
-    } else {
-      setSelected([...selected, id]);
-    }
+    if (selected.includes(id)) setSelected(selected.filter(i => i !== id));
+    else setSelected([...selected, id]);
   };
 
   return (
@@ -122,13 +123,12 @@ export default function ActivitySelection({ onFinish }: { onFinish: () => void }
         >
           <TouchableOpacity 
             onPress={onFinish}
-            activeOpacity={0.9}
             disabled={selected.length === 0}
             className={`h-[60px] ${isWebPC ? 'w-[300px]' : 'w-[260px]'} rounded-full justify-center items-center shadow-md ${
               selected.length > 0 ? 'bg-[#548F53]' : 'bg-[#548F53] opacity-40'
             }`}
           >
-            <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-white text-lg">
+            <Text className="text-lg text-white font-bold">
               Enter my safe space
             </Text>
           </TouchableOpacity>
