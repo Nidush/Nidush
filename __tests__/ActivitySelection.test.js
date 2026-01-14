@@ -1,8 +1,11 @@
-import React from 'react';
+import React from 'react'; 
 import { render, fireEvent, waitFor, cleanup, act } from '@testing-library/react-native';
 import ActivitySelection from '../components/Onboarding/ActivitySelection';
 
-// Mock silenciando avisos de ícones
+jest.mock('expo-status-bar', () => ({
+  StatusBar: 'StatusBar',
+}));
+
 jest.mock('@expo/vector-icons', () => ({
   MaterialIcons: 'MaterialIcons',
   Ionicons: 'Ionicons',
@@ -17,7 +20,6 @@ describe('ActivitySelection', () => {
   });
 
   afterEach(() => {
-    // Resolve o erro "You called act(...) without await"
     act(() => {
       jest.runOnlyPendingTimers();
     });
@@ -35,7 +37,6 @@ describe('ActivitySelection', () => {
     fireEvent.press(meditation); 
     fireEvent.press(meditation); 
 
-    // Verificando se o botão de enter existe
     expect(getByTestId('enter-button')).toBeTruthy();
   });
 
@@ -50,4 +51,4 @@ describe('ActivitySelection', () => {
 
     expect(onFinishMock).toHaveBeenCalledTimes(1);
   });
-}); 
+});

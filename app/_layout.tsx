@@ -2,6 +2,7 @@ import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import './../global.css';
+
 export default function RootLayout() {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
@@ -18,13 +19,14 @@ export default function RootLayout() {
           router.replace('/(tabs)');
         } else {
           router.replace('/onboarding');
-        }
+        } 
       } catch (e) {
         router.replace('/onboarding');
       } finally {
         setIsLoading(false);
       }
     };
+
     checkOnboarding();
   }, []);
 

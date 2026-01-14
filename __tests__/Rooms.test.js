@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, fireEvent, within } from '@testing-library/react-native';
 import Rooms from '../app/(tabs)/Rooms'; 
 import { SafeAreaProvider } from 'react-native-safe-area-context';

@@ -12,9 +12,10 @@ interface RoutineCardProps {
   isActive: boolean;
   image: any;
   onToggle: () => void;
+  testID?: string; // ADICIONADO PARA TESTES
 }
 
-const RoutineCard = ({ title, days, time, room, isActive, image, onToggle }: RoutineCardProps) => {
+const RoutineCard = ({ title, days, time, room, isActive, image, onToggle, testID }: RoutineCardProps) => {
   return (
     <View className="w-full mb-5 relative overflow-hidden rounded-[25px] bg-[#2C3A35]" style={{ height: 170 }}>
       
@@ -34,7 +35,7 @@ const RoutineCard = ({ title, days, time, room, isActive, image, onToggle }: Rou
         maskElement={
           <LinearGradient
             colors={['black', 'black', 'transparent']}
-            locations={[0, 0.2, 0.75]} // Começa a desvanecer aos 20% da altura
+            locations={[0, 0.2, 0.75]}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
             style={StyleSheet.absoluteFill}
@@ -89,6 +90,7 @@ const RoutineCard = ({ title, days, time, room, isActive, image, onToggle }: Rou
 
         {/* Switch - direita*/}
         <TouchableOpacity 
+          testID={testID} // APLICADO PARA O TESTE
           activeOpacity={0.8}
           onPress={onToggle}
           className={`w-[60px] h-[32px] rounded-full px-1 justify-center ${isActive ? 'bg-[#548F53]' : 'bg-white/30'}`}
