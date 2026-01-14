@@ -8,7 +8,7 @@ export interface Device {
   id: number;
   name: string;
   type: DeviceType;
-  status: string;
+  status: 'On' | 'Off';
   level?: number;
 }
 
