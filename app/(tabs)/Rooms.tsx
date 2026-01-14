@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   FlatList,
   ScrollView,
@@ -7,24 +7,22 @@ import {
   Text,
   TextInput,
   View,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AddRoomDevice from '../../components/rooms/AddRoomDevice';
 import CategoryPill from '../../components/rooms/CategoryPill';
-// Importamos o componente e os tipos que definiste lá para garantir que os campos como "type" sejam compatíveis
 import DeviceCard, { Device as DeviceBase } from '../../components/rooms/device-card';
 
-// --- Interfaces de Tipos ---
 interface Room {
   id: number;
   name: string;
 }
 
-// Estendemos a interface do DeviceCard para incluir o roomId (que é necessário nesta página)
 interface Device extends DeviceBase {
   roomId: number;
-  level: number; // Definimos como obrigatório para a lógica desta página
+  level: number; 
 }
 
 interface MenuAction {
@@ -48,9 +46,10 @@ const INITIAL_DEVICES: Device[] = [
 ];
 
 export default function Rooms() {
-  // Tipagem dos estados
+  // --- Estados ---
   const [activeRoom, setActiveRoom] = useState<number>(1);
   const [devices, setDevices] = useState<Device[]>(INITIAL_DEVICES);
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   const toggleDevice = (id: number) => {
     setDevices((current) =>
@@ -66,17 +65,20 @@ export default function Rooms() {
     );
   };
 
-  const filteredDevices = devices.filter(
-    (device) => device.roomId === activeRoom,
-  );
+  const filteredDevices = useMemo(() => {
+    return devices.filter((device) => {
+      const matchesRoom = device.roomId === activeRoom;
+      const matchesSearch = device.name
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase());
+      
+      return matchesRoom && matchesSearch;
+    });
+  }, [devices, activeRoom, searchQuery]);
 
   const menuActions: MenuAction[] = [
-    {
-      label: 'Device',
-    },
-    {
-      label: 'Room',
-    },
+    { label: 'Device' },
+    { label: 'Room' },
   ];
 
   return (
@@ -93,7 +95,7 @@ export default function Rooms() {
         </Text>
       </View>
 
-      {/* Search Bar */}
+      {/* Search Bar Funcional */}
       <View className="px-5 mb-6">
         <View className="flex-row items-center justify-center border border-[#BDC7C2] rounded-full px-4 h-12 bg-transparent">
           <MaterialIcons
@@ -103,15 +105,23 @@ export default function Rooms() {
             style={{ marginRight: 10 }}
           />
           <TextInput
-            placeholder="Search..."
+            placeholder="Search devices..."
             placeholderTextColor="#7A8C85"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
             className="flex-1 h-full text-base text-[#2C3A35]"
             style={{
               fontFamily: 'Nunito_600SemiBold',
               paddingVertical: 0,
             }}
             textAlignVertical="center"
+            autoCorrect={false}
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <MaterialIcons name="close" size={20} color="#7A8C85" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -127,7 +137,9 @@ export default function Rooms() {
               key={room.id}
               item={room}
               isActive={activeRoom === room.id}
-              onPress={() => setActiveRoom(room.id)}
+              onPress={() => {
+                setActiveRoom(room.id);
+              }}
             />
           ))}
         </ScrollView>
@@ -149,21 +161,24 @@ export default function Rooms() {
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
-          <View className="items-center mt-36 justify-center">
+          <View className="items-center mt-36 justify-center px-10">
             <MaterialCommunityIcons
-              name="home-plus"
+              name={searchQuery ? "selection-search" : "home-plus"}
               size={80}
               color="#354F52"
             />
             <Text
-              className="text-[#7A8C85] mt-5 text-lg"
+              className="text-[#7A8C85] mt-5 text-lg text-center"
               style={{ fontFamily: 'Nunito_600SemiBold' }}
             >
-              Your devices will live here.
+              {searchQuery 
+                ? `No devices found for "${searchQuery}"`
+                : "Your devices will live here."}
             </Text>
           </View>
         }
       />
+      
       <AddRoomDevice actions={menuActions} />
     </SafeAreaView>
   );
