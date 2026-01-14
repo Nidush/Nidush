@@ -71,52 +71,100 @@ export const CONTENTS: Record<string, Content> = {
     ],
   },
 
-  // --- MEDITAÇÃO ---
   c2: {
     id: 'c2',
     title: 'Morning Zen Guide',
-    description:
-      'Start your day with clarity and peace. A quick session to center your mind before the busy day begins.',
-    type: 'video',
+    description: 'Start your day with clarity and peace.',
+    type: 'audio',
     category: 'meditation',
-    duration: '12 min',
+    duration: '8 min',
     image: require('@/assets/meditation_content/video_sessions/morning_zen.png'),
     instructions: [
-      'Sit down comfortably.',
-      'Put your hand on your heart. Take 3 deep breaths.',
-      'Find 3 things you are grateful for right now.',
-      'Smile and open your eyes.',
+      {
+        text: 'Sit down comfortably in a quiet place',
+        description:
+          'Find a comfortable seated position, either on a chair or on a cushion on the floor. Keep your back straight but relaxed.',
+        // duration: undefined (Manual)
+      },
+      {
+        text: 'Put your hand on your heart. Take 3 deep breaths',
+        description:
+          'Gently place your right hand over your heart center. Take a deep breath in through your nose, hold it for a moment, and exhale slowly through your mouth. Repeat this three times.',
+        duration: 30,
+      },
+      {
+        text: 'Find 3 things you are grateful',
+        description:
+          'With your eyes closed, think about three simple things in your life that you are grateful for today. Let that feeling of gratitude fill your chest.',
+        duration: 60,
+      },
+      {
+        text: 'Smile and open your eyes',
+        description:
+          'Now, gently bring a smile to your face. Feel the lightness it brings. When you feel ready, slowly open your eyes to start your day.',
+        // duration: undefined (Manual)
+      },
     ],
   },
+
   c4: {
     id: 'c4',
     title: 'Deep Sleep Frequency',
-    description:
-      'Drift into a deep, restorative sleep with soothing frequencies designed to calm the nervous system.',
-    type: 'audio',
+    description: 'Drift into a deep, restorative sleep.',
+    type: 'video',
     category: 'meditation',
     duration: '60 min',
     image: require('@/assets/meditation_activities/my_creations/gratitude_flow.png'),
+    // Sem instruções (Audio puro)
   },
+
   c9: {
     id: 'c9',
     title: 'Sunrise Flow Meditation',
-    description:
-      'Connect with the energy of the rising sun. Visualize warmth and light filling your body for energy.',
-    type: 'video',
+    description: 'Connect with the energy of the rising sun.',
+    type: 'audio',
     category: 'meditation',
     duration: '15 min',
     image: require('@/assets/activities_for_you/sunrise_flow.png'),
     instructions: [
-      'Find a comfortable seated position, preferably facing a window with natural light.',
-      'Close your eyes and take deep breaths, inhaling through your nose and exhaling through your mouth.',
-      'Visualize the sun rising, filling your body with warmth and golden energy.',
-      'Scan your body from head to toe, releasing any tension you find.',
-      'Set a clear and positive intention for the day ahead.',
-      'Gently open your eyes and stretch your arms towards the sky.',
+      {
+        text: 'Find a comfortable seated position, facing a window.',
+        description:
+          'Sit comfortably facing a window or a source of natural light. Place your hands on your knees, palms facing up to receive energy.',
+        // Manual
+      },
+      {
+        text: 'Close your eyes and take deep breaths.',
+        description:
+          'Gently close your eyes. Begin to deepen your breath, inhaling fully through your nose and sighing it out through your mouth.',
+        duration: 60,
+      },
+      {
+        text: 'Visualize the sun rising, filling you with warmth.',
+        description:
+          'Imagine a golden sun rising in front of you. Feel its warm rays touching your skin and filling your entire body with golden, healing energy.',
+        duration: 120,
+      },
+      {
+        text: 'Scan your body from head to toe, releasing tension.',
+        description:
+          'Bring your attention to the top of your head. Slowly scan down through your body, relaxing your jaw, your shoulders, and your stomach as you go.',
+        duration: 60,
+      },
+      {
+        text: 'Set a clear and positive intention for the day.',
+        description:
+          'Ask yourself: how do I want to feel today? Set a clear, positive intention for the day ahead.',
+        duration: 60,
+      },
+      {
+        text: 'Gently open your eyes and stretch your arms.',
+        description:
+          'Take one last deep breath. Gently blink your eyes open and reach your arms up towards the sky, embracing the new day.',
+        // Manual final
+      },
     ],
   },
-
   // --- WORKOUT ---
   c5: {
     id: 'c5',

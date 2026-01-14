@@ -1,81 +1,296 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router, useLocalSearchParams } from 'expo-router';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
+import {
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 
-type MaterialIconName = React.ComponentProps<typeof MaterialIcons>['name'];
+// Componentes Visuais
+import { ExitModal } from '@/components/activeSession/ExitModal';
+import { SessionControls } from '@/components/activeSession/SessionControls';
+import { SessionHeader } from '@/components/activeSession/SessionHeader';
+import { SessionVideo } from '@/components/activeSession/SessionVideo';
+import { SessionVisuals } from '@/components/activeSession/SessionVisuals';
+import { SessionWave } from '@/components/activeSession/SessionWave';
 
-const ACTIVITIES = [
-  { id: 'Meditation', icon: 'self-improvement' as MaterialIconName },
-  { id: 'Deep Breathing', icon: 'air' as MaterialIconName },
-  { id: 'Yoga', icon: 'fitness-center' as MaterialIconName },
-  { id: 'Reading', icon: 'menu-book' as MaterialIconName },
-];
+// Dados
+import {
+  ACTIVITIES,
+  Activity,
+  CONTENTS,
+  Scenario,
+  SCENARIOS,
+} from '@/constants/data';
 
-type Props = { onFinish: () => void; };
+type FormattedInstruction = {
+  text: string;
+  duration?: number;
+  description?: string;
+};
 
-export default function ActivitySelection({ onFinish }: Props) {
-  const [selected, setSelected] = useState<string[]>([]);
+export default function ActiveSession() {
+  const { id } = useLocalSearchParams<{ id: string }>();
 
-  const toggleActivity = (id: string) => {
-    if (selected.includes(id)) setSelected(selected.filter(i => i !== id));
-    else setSelected([...selected, id]);
+  // --- 1. STATE ---
+  const [loading, setLoading] = useState(true);
+  const [sessionData, setSessionData] = useState<{
+    title: string;
+    room: string;
+    playlistName: string;
+    image?: any;
+    instructions: FormattedInstruction[];
+    type: 'audio' | 'video' | 'mixed';
+    videoUrl?: string;
+  } | null>(null);
+
+  const [isActive, setIsActive] = useState(true);
+  const [isMusicPlaying, setIsMusicPlaying] = useState(true);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [showExitModal, setShowExitModal] = useState(false);
+
+  // --- 2. ANIMATION VALUES ---
+  const progress = useSharedValue(0);
+  const contentOpacity = useSharedValue(1);
+  const pulseScale = useSharedValue(1);
+
+  const isVideoSession = sessionData?.type === 'video';
+
+  // --- 3. LOAD DATA ---
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      let foundItem: Activity | Scenario | undefined = ACTIVITIES.find(
+        (a) => a.id === id,
+      );
+      if (!foundItem) {
+        const stored = await AsyncStorage.getItem('@myActivities');
+        if (stored)
+          foundItem = JSON.parse(stored).find((a: any) => a.id === id);
+      }
+      if (!foundItem) foundItem = SCENARIOS.find((s) => s.id === id);
+
+      if (!foundItem) {
+        console.error('Item not found:', id);
+        router.replace('/Activities');
+        return;
+      }
+
+      let rawInstructions: any[] = [];
+      let playlistName = 'Relaxing Music';
+      let contentType: 'audio' | 'video' | 'mixed' = 'audio';
+      let videoUrl: string | undefined = undefined;
+
+      if ('contentId' in foundItem && foundItem.contentId) {
+        const content = CONTENTS[foundItem.contentId];
+        if (content) {
+          rawInstructions = content.instructions || [];
+          playlistName = content.title;
+          if (content.type === 'video') {
+            contentType = 'video';
+            videoUrl = (content as any).videoUrl;
+          }
+        }
+      }
+
+      if (contentType !== 'video') {
+        const relatedScenario =
+          'scenarioId' in foundItem
+            ? SCENARIOS.find((s) => s.id === foundItem.scenarioId)
+            : !('type' in foundItem)
+              ? foundItem
+              : undefined;
+        if (relatedScenario?.playlist) playlistName = relatedScenario.playlist;
+      }
+
+      const formattedInstructions = rawInstructions.map((step) => {
+        if (typeof step === 'string')
+          return { text: step, duration: undefined, description: undefined };
+        return step;
+      });
+
+      setSessionData({
+        title: foundItem.title,
+        room: foundItem.room || 'Living Room',
+        playlistName: playlistName,
+        image: foundItem.image,
+        instructions: formattedInstructions,
+        type: contentType,
+        videoUrl: videoUrl,
+      });
+
+      setSecondsLeft(formattedInstructions[0]?.duration || 0);
+    } catch (e) {
+      console.error('Error loading session:', e);
+      router.replace('/Activities');
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // --- 4. ANIMATIONS & TIMER ---
+  useEffect(() => {
+    if (isVideoSession) return;
+    if (isActive) {
+      pulseScale.value = withRepeat(
+        withSequence(
+          withTiming(1.08, { duration: 2000 }),
+          withTiming(1, { duration: 2000 }),
+        ),
+        -1,
+        true,
+      );
+    } else {
+      pulseScale.value = withTiming(1);
+    }
+  }, [isActive, isVideoSession, pulseScale]);
+
+  const handleNextStep = useCallback(() => {
+    if (!sessionData) return;
+    const totalSteps = sessionData.instructions.length;
+
+    if (currentStepIndex < totalSteps - 1) {
+      const nextIndex = currentStepIndex + 1;
+      contentOpacity.value = withSequence(
+        withTiming(0, { duration: 300 }),
+        withTiming(1, { duration: 300 }),
+      );
+      setTimeout(() => {
+        setCurrentStepIndex(nextIndex);
+        const nextDuration = sessionData.instructions[nextIndex].duration;
+        setSecondsLeft(nextDuration || 0);
+      }, 300);
+    } else {
+      router.replace('/Activities');
+    }
+  }, [currentStepIndex, sessionData, contentOpacity]);
+
+  useEffect(() => {
+    if (isVideoSession) return;
+    let interval: any = null;
+    const currentStep = sessionData?.instructions[currentStepIndex];
+    const isTimedStep = currentStep?.duration !== undefined;
+
+    if (isActive && isTimedStep && secondsLeft > 0) {
+      interval = setInterval(() => setSecondsLeft((prev) => prev - 1), 1000);
+    } else if (isActive && isTimedStep && secondsLeft === 0) {
+      handleNextStep();
+    }
+    return () => clearInterval(interval);
+  }, [
+    isActive,
+    secondsLeft,
+    sessionData,
+    currentStepIndex,
+    handleNextStep,
+    isVideoSession,
+  ]);
+
+  useEffect(() => {
+    if (sessionData && !isVideoSession && sessionData.instructions.length > 0) {
+      const percent =
+        ((currentStepIndex + 1) / sessionData.instructions.length) * 100;
+
+      progress.value = withTiming(percent, { duration: 500 });
+    }
+  }, [currentStepIndex, sessionData, isVideoSession, progress]);
+
+  // --- 5. HANDLERS ---
+  const handleToggleSession = () => {
+    const newState = !isActive;
+    setIsActive(newState);
+    setIsMusicPlaying(newState);
   };
 
-  return (
-    <SafeAreaView className="flex-1 bg-[#F9FAF7] items-center">
-      <View className="flex-1 w-full max-w-[600px] px-[28px]">
-        
-        <View className="items-center h-[60px] justify-center mt-4">
-          <Text className="text-xl text-[#2F4F4F] font-bold">Welcome</Text>
-        </View>
+  const handleToggleMusic = () => {
+    setIsMusicPlaying((prev) => !prev);
+  };
 
-        <ScrollView 
-          contentContainerStyle={{ paddingBottom: 160 }} 
-          showsVerticalScrollIndicator={false}
-        >
-          <View className="mt-8">
-            <Text className="text-[32px] text-[#2F4F4F] leading-[38px] font-bold text-center sm:text-left">
-              Select the activities{"\n"}that you like
-            </Text>
-            <View className="flex-row flex-wrap justify-between mt-8">
-              {ACTIVITIES.map((item) => {
-                const isSelected = selected.includes(item.id);
-                return (
-                  <TouchableOpacity
-                    key={item.id}
-                    onPress={() => toggleActivity(item.id)}
-                    activeOpacity={0.8}
-                    testID={`activity-${item.id}`}
-                    className={`w-[48%] sm:w-[23%] h-[145px] rounded-[28px] justify-center items-center mb-4 border-[3px] transition-all
-                      ${isSelected ? 'border-[#548F53] bg-[#C8E2C8]' : 'border-transparent bg-[#BBDABA]'}`}
-                  >
-                    <MaterialIcons name={item.icon} size={48} color="#354F52" />
-                    <Text className="text-[#354F52] mt-2 font-medium">{item.id}</Text>
-                    {isSelected && (
-                      <View className="absolute top-3 right-3">
-                        <Ionicons name="checkmark-circle" size={24} color="#548F53" />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        </ScrollView>
-        
-        <View className="absolute bottom-10 left-[28px] right-[28px] items-center">
-          <TouchableOpacity
-            onPress={onFinish}
-            disabled={selected.length === 0}
-            testID="enter-button"
-            className={`w-full max-w-[400px] h-[60px] rounded-full justify-center items-center bg-[#548F53] 
-              ${selected.length > 0 ? 'opacity-100' : 'opacity-40'}`}
-          >
-            <Text className="text-lg text-white font-bold">Enter my safe space</Text>
-          </TouchableOpacity>
-        </View>
+  const handleCancel = () => {
+    setIsActive(false);
+    setIsMusicPlaying(false);
+    setShowExitModal(true);
+  };
+
+  const handleResume = () => {
+    setShowExitModal(false);
+    setIsActive(true);
+    setIsMusicPlaying(true);
+  };
+
+  // --- 6. RENDER SEGURO ---
+  // IMPORTANTE: Esta verificação acontece ANTES de qualquer acesso a sessionData
+  if (loading || !sessionData) {
+    return (
+      <View className="flex-1 justify-center items-center bg-[#F1F4EE]">
+        <ActivityIndicator size="large" color="#5E8C5D" />
       </View>
+    );
+  }
+
+  // AGORA é seguro aceder a sessionData e calcular variáveis
+  const currentStep = sessionData.instructions[currentStepIndex];
+
+  // VERIFICAÇÃO DE SEGURANÇA para array vazio (embora o loadData previna)
+  if (!currentStep) return null;
+
+  const isLastStep = currentStepIndex === sessionData.instructions.length - 1;
+
+  return (
+    <SafeAreaView className="flex-1 bg-[#F1F4EE]">
+      <ExitModal
+        visible={showExitModal}
+        onResume={handleResume}
+        onEnd={() => router.replace('/Activities')}
+      />
+
+      <SessionHeader
+        title={sessionData.title}
+        onBack={() => router.back()}
+        onCancel={handleCancel}
+      />
+
+      {isVideoSession ? (
+        <SessionVideo
+          videoUrl={sessionData.videoUrl}
+          poster={sessionData.image}
+        />
+      ) : (
+        <>
+          <SessionVisuals
+            text={currentStep.text}
+            stepIndex={currentStepIndex}
+            pulseScale={pulseScale}
+            contentOpacity={contentOpacity}
+          />
+
+          <SessionWave />
+
+          <SessionControls
+            isActive={isActive}
+            isMusicPlaying={isMusicPlaying}
+            secondsLeft={secondsLeft}
+            isManualStep={currentStep.duration === undefined}
+            isLastStep={isLastStep} // <--- Passamos agora para aqui
+            onNextStep={handleNextStep}
+            playlistName={sessionData.playlistName}
+            room={sessionData.room}
+            image={sessionData.image}
+            progress={progress}
+            onToggleSession={handleToggleSession}
+            onToggleMusic={handleToggleMusic}
+          />
+        </>
+      )}
     </SafeAreaView>
   );
 }

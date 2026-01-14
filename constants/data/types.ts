@@ -5,6 +5,11 @@ export interface Ingredient {
   item: string;
   amount: string;
 }
+export type InstructionStep = {
+  text: string;
+  duration?: number; // Em segundos. Se for undefined/null, é manual (o utilizador clica para avançar)
+  description?: string;
+};
 
 // Conteúdo
 export interface Content {
@@ -15,7 +20,7 @@ export interface Content {
   description: string;
   duration: string;
   image: ImageSourcePropType;
-  instructions?: string[];
+  instructions?: (string | InstructionStep)[];
   ingredients?: Ingredient[];
   videoUrl?: string;
   author?: string;
