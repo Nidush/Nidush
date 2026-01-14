@@ -1,14 +1,18 @@
+<p align="center">
+  <img src="./assets/images/Logo.png" alt="Nidush Logo" width="200" />
+</p>
+
 # Nidush
 
 > **University Project - MVP | Master's in Communication and Web Technologies (MCTW)**
 
 **Nidush** is a smart home solution developed as a Minimum Viable Product (MVP) for the **Altice Labs** challenge. It focuses on humanizing smart spaces by transforming them into active environments for emotional care, specifically designed for individuals dealing with anxiety in urban contexts.
 
-[![CI/CD Nidush](https://github.com/Nidush/Nidush/actions/workflows/cicd-nidush.yml/badge.svg?branch=main)](https://github.com/Nidush/Nidush/actions/workflows/cicd-nidush.yml)
 [![Web Preview](https://img.shields.io/badge/Preview-Web_Version-00ADAD?style=for-the-badge&logo=netlify)](https://nidush.tdw-mctw.pt/onboarding)
 [![React Native](https://img.shields.io/badge/React_Native-Expo-61DAFB?style=for-the-badge&logo=react)](https://reactnative.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/NativeWind-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://www.nativewind.dev/)
+[![CI/CD Nidush](https://github.com/Nidush/Nidush/actions/workflows/cicd-nidush.yml/badge.svg?branch=main)](https://github.com/Nidush/Nidush/actions/workflows/cicd-nidush.yml)
 
 ## MVP Features
 
@@ -72,7 +76,12 @@ The current state of the app can be viewed here:
 
 ## Contributors
 
-Developed as part of the **TDW/MCTW Master's program** for the Altice Labs challenge, by group 4, Nidush - Eduarda Carvalho 113578 | Gabriel Teixeira 107876  |  Mariana Peixe 113262 | Pedro Teixeira 114323 
+Developed as part of the **TDW/MCTW Master's program** for the Altice Labs challenge, by **Group 4**:
+
+* [Eduarda Carvalho](https://github.com/eduardahfc) - 113578
+* [Gabriel Teixeira](https://github.com/GabrielTeixei) - 107876
+* [Mariana Peixe](https://github.com/MarianaPeixe7) - 113262
+* [Pedro Teixeira](https://github.com/pedroteixeira04) - 114323
 
 ---
 
