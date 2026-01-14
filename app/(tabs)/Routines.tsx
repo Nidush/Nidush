@@ -1,11 +1,10 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import React, { useState } from 'react';
-import { ScrollView, StatusBar, Text, TextInput, View } from 'react-native';
+import React, { useState, useMemo } from 'react'; 
+import { ScrollView, StatusBar, Text, TextInput, View, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AddRoomDevice from '../../components/rooms/AddRoomDevice';
 import RoutineCard from '../../components/routines/RoutineCard';
-
 
 interface Routine {
   id: number;
@@ -18,7 +17,7 @@ interface Routine {
 }
 
 export default function Routines() {
-  // Estado das rotinas
+  // 1. Estado para as rotinas
   const [routines, setRoutines] = useState<Routine[]>([
     { id: 1, title: 'Sunrise Awakening', days: 'Mon-Fri', time: '7:15 am', room: 'Bedroom', active: true, image: require('../../assets/Scenarios/routines/sunrise_awakening.png') },
     { id: 2, title: 'Gym Hour', days: 'Tue & Thu', time: '6:00 pm', room: 'Living Room', active: false, image: require('../../assets/Scenarios/routines/gym_hour.png') },
@@ -27,52 +26,61 @@ export default function Routines() {
     { id: 5, title: 'Deep Sleep Transition', days: 'Daily', time: '11:30 pm', room: 'Bedroom', active: true, image: require('../../assets/Scenarios/routines/deep_sleep_transition.png') },
   ]);
 
-  // Função para ligar/desligar o switch da rotina
+  const [searchQuery, setSearchQuery] = useState('');
+
   const toggleRoutine = (id: number) => {
     setRoutines((current) =>
       current.map((r) => (r.id === id ? { ...r, active: !r.active } : r))
     );
   };
 
- return (
+  const filteredRoutines = useMemo(() => {
+    return routines.filter((routine) => {
+      const searchLower = searchQuery.toLowerCase();
+      return (
+        routine.title.toLowerCase().includes(searchLower) ||
+        routine.room.toLowerCase().includes(searchLower)
+      );
+    });
+  }, [routines, searchQuery]);
+return (
     <SafeAreaView className="flex-1 bg-[#F1F3EA]" edges={['top']}>
       <StatusBar barStyle="dark-content" />
 
       {/* Header */}
       <View className="items-center mt-2 mb-6">
-        <Text 
-          className="text-3xl font-semibold text-[#354F52]" 
-          style={{ fontFamily: 'Nunito_600SemiBold' }}
-        >
+        <Text className="text-3xl font-semibold text-[#354F52]" style={{ fontFamily: 'Nunito_600SemiBold' }}>
           Routines
         </Text>
       </View>
 
-      {/* Search Bar */}
       <View className="px-5 mb-6">
         <View className="flex-row items-center border border-[#BDC7C2] rounded-full px-4 h-12 bg-transparent">
           <MaterialIcons name="search" size={24} color="#7A8C85" style={{ marginRight: 10 }} />
           <TextInput
-            testID="search-input" // ADICIONADO
-            placeholder="Search..."
+            testID="search-input" // ADICIONADO AQUI
+            placeholder="Search routines..."
             placeholderTextColor="#7A8C85"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
             className="flex-1 h-full text-base text-[#2C3A35]"
             style={{ fontFamily: 'Nunito_600SemiBold', paddingVertical: 0 }}
             textAlignVertical="center"
+            autoCorrect={false}
           />
+          {/* ... resto do input */}
         </View>
       </View>
 
-      {/* Lista de rotinas */}
       <ScrollView 
-        testID="routines-scrollview" // ADICIONADO
+        testID="routines-scrollview" 
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 130 }} 
         showsVerticalScrollIndicator={false}
       >
-        {routines.map((item) => (
+        {filteredRoutines.map((item) => (
           <RoutineCard
             key={item.id}
-            testID={`routine-card-${item.id}`} // ADICIONADO
+            testID={`routine-card-${item.id}`} // ADICIONADO AQUI
             title={item.title}
             days={item.days}
             time={item.time}
@@ -84,11 +92,10 @@ export default function Routines() {
         ))}
       </ScrollView>
 
-      {/* Botão + */}
+      {/* Adicione o testID no container do botão */}
       <View testID="add-routine-container">
-         <AddRoomDevice actions={[]} isStatic={true} />
+        <AddRoomDevice actions={[]} isStatic={true} />
       </View>
-
     </SafeAreaView>
   );
 }

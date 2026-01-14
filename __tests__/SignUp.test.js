@@ -10,9 +10,7 @@ jest.spyOn(Animated, 'timing').mockImplementation(() => ({
   start: (cb) => cb && cb(),
 }));
 
-/* ===============================
-   MOCKS GLOBAIS
-================================ */
+
 jest.mock('expo-router', () => ({
   useRouter: jest.fn(),
 }));
@@ -28,10 +26,7 @@ jest.mock('react-native-safe-area-context', () => ({
   SafeAreaView: ({ children }) => children,
 }));
 
-/* ===============================
-   MOCK DOS COMPONENTES
-   (usando require interno!)
-================================ */
+
 
 jest.mock('../components/Onboarding/WelcomeUser', () => {
   const React = require('react');
@@ -76,15 +71,8 @@ jest.mock('../components/Onboarding/FinalLoading', () => {
   );
 });
 
-/* ===============================
-   IMPORT DO COMPONENTE
-   (DEPOIS DOS MOCKS)
-================================ */
 import SignUp from '../app/signup';
 
-/* ===============================
-   TESTES
-================================ */
 
 describe('SignUp – fluxo completo 100%', () => {
   const mockReplace = jest.fn();

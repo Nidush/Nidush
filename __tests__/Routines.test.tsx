@@ -2,7 +2,6 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import React from 'react';
 import Routines from '../app/(tabs)/Routines';
 
-// Mocks essenciais para evitar erros de módulos nativos
 jest.mock('@expo/vector-icons', () => ({
   MaterialIcons: 'MaterialIcons',
   MaterialCommunityIcons: 'MaterialCommunityIcons',
@@ -29,10 +28,8 @@ describe('Routines Screen', () => {
   test('deve renderizar o título e as rotinas corretamente', () => {
     render(<Routines />);
     
-    // Verifica o título principal
     expect(screen.getByText('Routines')).toBeTruthy();
     
-    // Verifica se os títulos das rotinas aparecem
     expect(screen.getByText('Sunrise Awakening')).toBeTruthy();
     expect(screen.getByText('Gym Hour')).toBeTruthy();
   });
@@ -42,7 +39,6 @@ describe('Routines Screen', () => {
     
     const gymSwitch = screen.getByTestId('routine-card-2');
     
-    // O teste de "press" para a função toggleRoutine
     fireEvent.press(gymSwitch);
     
     expect(gymSwitch).toBeTruthy();
@@ -50,11 +46,9 @@ describe('Routines Screen', () => {
 
   test('deve renderizar a barra de pesquisa e o botão de adicionar', () => {
     render(<Routines />);
-    
-    // Verifica o input de pesquisa via testID
+  
     expect(screen.getByTestId('search-input')).toBeTruthy();
     
-    // Verifica o container do botão de adicionar via testID
     expect(screen.getByTestId('add-routine-container')).toBeTruthy();
   });
 });
