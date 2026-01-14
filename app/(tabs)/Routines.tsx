@@ -1,11 +1,10 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import React, { useState } from 'react';
-import { ScrollView, StatusBar, Text, TextInput, View } from 'react-native';
+import React, { useState, useMemo } from 'react'; 
+import { ScrollView, StatusBar, Text, TextInput, View, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AddRoomDevice from '../../components/rooms/AddRoomDevice';
 import RoutineCard from '../../components/routines/RoutineCard';
-
 
 interface Routine {
   id: number;
@@ -18,7 +17,7 @@ interface Routine {
 }
 
 export default function Routines() {
-  // Estado das rotinas
+  // 1. Estado para as rotinas
   const [routines, setRoutines] = useState<Routine[]>([
     { id: 1, title: 'Sunrise Awakening', days: 'Mon-Fri', time: '7:15 am', room: 'Bedroom', active: true, image: require('../../assets/Scenarios/routines/sunrise_awakening.png') },
     { id: 2, title: 'Gym Hour', days: 'Tue & Thu', time: '6:00 pm', room: 'Living Room', active: false, image: require('../../assets/Scenarios/routines/gym_hour.png') },
@@ -27,14 +26,25 @@ export default function Routines() {
     { id: 5, title: 'Deep Sleep Transition', days: 'Daily', time: '11:30 pm', room: 'Bedroom', active: true, image: require('../../assets/Scenarios/routines/deep_sleep_transition.png') },
   ]);
 
-  // Função para ligar/desligar o switch da rotina
+  const [searchQuery, setSearchQuery] = useState('');
+
   const toggleRoutine = (id: number) => {
     setRoutines((current) =>
       current.map((r) => (r.id === id ? { ...r, active: !r.active } : r))
     );
   };
 
- return (
+  const filteredRoutines = useMemo(() => {
+    return routines.filter((routine) => {
+      const searchLower = searchQuery.toLowerCase();
+      return (
+        routine.title.toLowerCase().includes(searchLower) ||
+        routine.room.toLowerCase().includes(searchLower)
+      );
+    });
+  }, [routines, searchQuery]);
+
+  return (
     <SafeAreaView className="flex-1 bg-[#F1F3EA]" edges={['top']}>
       <StatusBar barStyle="dark-content" />
 
@@ -48,47 +58,55 @@ export default function Routines() {
         </Text>
       </View>
 
-      {/* Search Bar */}
       <View className="px-5 mb-6">
         <View className="flex-row items-center border border-[#BDC7C2] rounded-full px-4 h-12 bg-transparent">
           <MaterialIcons name="search" size={24} color="#7A8C85" style={{ marginRight: 10 }} />
           <TextInput
-            testID="search-input" // ADICIONADO
-            placeholder="Search..."
+            placeholder="Search routines..."
             placeholderTextColor="#7A8C85"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
             className="flex-1 h-full text-base text-[#2C3A35]"
             style={{ fontFamily: 'Nunito_600SemiBold', paddingVertical: 0 }}
             textAlignVertical="center"
+            autoCorrect={false}
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <MaterialIcons name="close" size={20} color="#7A8C85" />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
-      {/* Lista de rotinas */}
       <ScrollView 
         testID="routines-scrollview" // ADICIONADO
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 130 }} 
         showsVerticalScrollIndicator={false}
       >
-        {routines.map((item) => (
-          <RoutineCard
-            key={item.id}
-            testID={`routine-card-${item.id}`} // ADICIONADO
-            title={item.title}
-            days={item.days}
-            time={item.time}
-            room={item.room}
-            isActive={item.active}
-            image={item.image}
-            onToggle={() => toggleRoutine(item.id)}
-          />
-        ))}
+        {filteredRoutines.length > 0 ? (
+          filteredRoutines.map((item) => (
+            <RoutineCard
+              key={item.id}
+              title={item.title}
+              days={item.days}
+              time={item.time}
+              room={item.room}
+              isActive={item.active}
+              image={item.image}
+              onToggle={() => toggleRoutine(item.id)}
+            />
+          ))
+        ) : (
+          <View className="items-center mt-20">
+            <Text className="text-[#7A8C85] text-lg" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+              No routines found.
+            </Text>
+          </View>
+        )}
       </ScrollView>
 
-      {/* Botão + */}
-      <View testID="add-routine-container">
-         <AddRoomDevice actions={[]} isStatic={true} />
-      </View>
-
+      <AddRoomDevice actions={[]} isStatic={true} />
     </SafeAreaView>
   );
 }
