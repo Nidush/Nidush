@@ -43,17 +43,13 @@ export default function Routines() {
       );
     });
   }, [routines, searchQuery]);
-
-  return (
+return (
     <SafeAreaView className="flex-1 bg-[#F1F3EA]" edges={['top']}>
       <StatusBar barStyle="dark-content" />
 
       {/* Header */}
       <View className="items-center mt-2 mb-6">
-        <Text 
-          className="text-3xl font-semibold text-[#354F52]" 
-          style={{ fontFamily: 'Nunito_600SemiBold' }}
-        >
+        <Text className="text-3xl font-semibold text-[#354F52]" style={{ fontFamily: 'Nunito_600SemiBold' }}>
           Routines
         </Text>
       </View>
@@ -62,6 +58,7 @@ export default function Routines() {
         <View className="flex-row items-center border border-[#BDC7C2] rounded-full px-4 h-12 bg-transparent">
           <MaterialIcons name="search" size={24} color="#7A8C85" style={{ marginRight: 10 }} />
           <TextInput
+            testID="search-input" // ADICIONADO AQUI
             placeholder="Search routines..."
             placeholderTextColor="#7A8C85"
             value={searchQuery}
@@ -71,42 +68,34 @@ export default function Routines() {
             textAlignVertical="center"
             autoCorrect={false}
           />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <MaterialIcons name="close" size={20} color="#7A8C85" />
-            </TouchableOpacity>
-          )}
+          {/* ... resto do input */}
         </View>
       </View>
 
       <ScrollView 
-        testID="routines-scrollview" // ADICIONADO
+        testID="routines-scrollview" 
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 130 }} 
         showsVerticalScrollIndicator={false}
       >
-        {filteredRoutines.length > 0 ? (
-          filteredRoutines.map((item) => (
-            <RoutineCard
-              key={item.id}
-              title={item.title}
-              days={item.days}
-              time={item.time}
-              room={item.room}
-              isActive={item.active}
-              image={item.image}
-              onToggle={() => toggleRoutine(item.id)}
-            />
-          ))
-        ) : (
-          <View className="items-center mt-20">
-            <Text className="text-[#7A8C85] text-lg" style={{ fontFamily: 'Nunito_600SemiBold' }}>
-              No routines found.
-            </Text>
-          </View>
-        )}
+        {filteredRoutines.map((item) => (
+          <RoutineCard
+            key={item.id}
+            testID={`routine-card-${item.id}`} // ADICIONADO AQUI
+            title={item.title}
+            days={item.days}
+            time={item.time}
+            room={item.room}
+            isActive={item.active}
+            image={item.image}
+            onToggle={() => toggleRoutine(item.id)}
+          />
+        ))}
       </ScrollView>
 
-      <AddRoomDevice actions={[]} isStatic={true} />
+      {/* Adicione o testID no container do botão */}
+      <View testID="add-routine-container">
+        <AddRoomDevice actions={[]} isStatic={true} />
+      </View>
     </SafeAreaView>
   );
 }
