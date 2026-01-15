@@ -15,6 +15,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
+import * as SplashScreen from 'expo-splash-screen';
+import {
+  useFonts,
+  Nunito_400Regular,
+  Nunito_600SemiBold,
+  Nunito_700Bold,
+} from '@expo-google-fonts/nunito';
+
+SplashScreen.preventAutoHideAsync();
+
 const SLIDE_DURATION = 5000;
 const WELCOME_VIDEO = require('../assets/videos/nidush_video1.mp4');
 
@@ -85,12 +95,24 @@ const AnimatedIndicator = ({ index, currentIndex, duration, isPlaying }: any) =>
 };
 
 export default function Onboarding() {
+  const [fontsLoaded] = useFonts({
+    'Nunito_400Regular': Nunito_400Regular,
+    'Nunito_600SemiBold': Nunito_600SemiBold,
+    'Nunito_700Bold': Nunito_700Bold,
+  });
+
   const [dims, setDims] = useState(Dimensions.get('window'));
   const [showWelcome, setShowWelcome] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollRef = useRef<FlatList>(null);
   const router = useRouter();
   const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
 
   useEffect(() => {
     const sub = Dimensions.addEventListener('change', ({ window }) => setDims(window));
@@ -105,6 +127,7 @@ export default function Onboarding() {
       } catch { router.replace('/signup'); }
     });
   }, [router, fadeAnim]); 
+
   const handleDiscover = () => {
     Animated.timing(fadeAnim, { toValue: 0, duration: 800, useNativeDriver: true }).start(() => {
       setShowWelcome(false);
@@ -138,6 +161,8 @@ export default function Onboarding() {
     }
   }, [showWelcome, currentIndex, goToNext]);
 
+  if (!fontsLoaded) return null;
+
   const renderItem = ({ item, index }: any) => (
     <View style={{ width: dims.width, height: dims.height }} className="bg-black relative overflow-hidden">
       {Math.abs(currentIndex - index) <= 1 && (
@@ -158,19 +183,19 @@ export default function Onboarding() {
                 resizeMode="contain" 
               />
               <TouchableOpacity onPress={finishOnboarding} className="p-2">
-                <Text style={{ fontFamily: 'Nunito-Medium' }} className="text-white text-lg md:text-xl opacity-80">Skip</Text>
+                <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-white text-lg md:text-xl opacity-80">Skip</Text>
               </TouchableOpacity>
             </View>
 
             <View className="mt-auto mb-16 md:mb-24 self-start w-full max-w-[750px]" pointerEvents="none">
               <Text 
-                style={{ fontFamily: 'Nunito-Bold' }} 
-                className="text-white text-[34px] md:text-7xl font-bold leading-[42px] md:leading-[80px] mb-6"
+                style={{ fontFamily: 'Nunito_700Bold' }} 
+                className="text-white text-[34px] md:text-7xl leading-[42px] md:leading-[80px] mb-6"
               >
                 {item.title}
               </Text>
               <Text 
-                style={{ fontFamily: 'Nunito-Regular' }} 
+                style={{ fontFamily: 'Nunito_400Regular' }} 
                 className="text-white text-[18px] md:text-2xl leading-7 md:leading-9 opacity-90 pr-10"
               >
                 {item.description}
@@ -183,7 +208,7 @@ export default function Onboarding() {
                   onPress={finishOnboarding} 
                   className="bg-[#589158] px-14 py-5 rounded-full items-center mb-12 shadow-lg active:scale-95"
                 >
-                  <Text style={{ fontFamily: 'Nunito-Bold' }} className="text-white font-bold text-xl md:text-2xl">Begin Journey</Text>
+                  <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-white text-xl md:text-2xl">Begin Journey</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -211,13 +236,13 @@ export default function Onboarding() {
                 }} 
                 resizeMode="contain" 
               />
-              <Text style={{ fontFamily: 'Nunito-Bold' }} className="text-5xl md:text-8xl font-bold text-white text-center">Welcome to Nidush</Text>
-              <Text style={{ fontFamily: 'Nunito-Regular' }} className="text-xl md:text-3xl text-white mt-4 text-center opacity-80">Your safe space starts here.</Text>
+              <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-5xl md:text-8xl text-white text-center">Welcome to Nidush</Text>
+              <Text style={{ fontFamily: 'Nunito_400Regular' }} className="text-xl md:text-3xl text-white mt-4 text-center opacity-80">Your safe space starts here.</Text>
               <TouchableOpacity 
                 className="bg-[#589158] px-16 py-5 rounded-full mt-16 shadow-md items-center active:scale-95" 
                 onPress={handleDiscover}
               >
-                <Text style={{ fontFamily: 'Nunito-Bold' }} className="text-white text-xl md:text-2xl font-bold">Discover</Text>
+                <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-white text-xl md:text-2xl">Discover</Text>
               </TouchableOpacity>
             </SafeAreaView>
           </View>

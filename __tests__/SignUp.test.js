@@ -15,6 +15,14 @@ jest.mock('expo-router', () => ({
   useRouter: jest.fn(),
 }));
 
+jest.mock('@expo-google-fonts/nunito', () => ({
+  useFonts: () => [true],
+  Nunito_400Regular: 'Nunito_400Regular',
+  Nunito_600SemiBold: 'Nunito_600SemiBold',
+  Nunito_700Bold: 'Nunito_700Bold',
+}));
+
+
 jest.mock('expo-status-bar', () => ({
   StatusBar: () => null,
 }));

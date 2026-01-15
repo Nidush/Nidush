@@ -4,7 +4,6 @@ import { Animated } from 'react-native';
 
 Animated.loop = jest.fn(() => ({ start: jest.fn() }));
 
-// Mock dos ícones
 jest.mock('@expo/vector-icons', () => ({
   MaterialIcons: 'MaterialIcons',
   Ionicons: 'Ionicons',
@@ -12,6 +11,13 @@ jest.mock('@expo/vector-icons', () => ({
 
 jest.mock('../assets/assets', () => ({
   Icons: { devices: () => null },
+}));
+
+jest.mock('@expo-google-fonts/nunito', () => ({
+  useFonts: () => [true],
+  Nunito_400Regular: 'Nunito_400Regular',
+  Nunito_600SemiBold: 'Nunito_600SemiBold',
+  Nunito_700Bold: 'Nunito_700Bold',
 }));
 
 describe('WearableSync', () => {
