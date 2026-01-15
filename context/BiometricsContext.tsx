@@ -148,10 +148,7 @@ export const BiometricsProvider = ({
       (segment) => segment === 'onboarding' || segment === 'profile-selection',
     );
 
-    // Se estivermos nessas páginas, NÃO INICIA o simulador
     if (isOnboarding) {
-      // Opcional: Podes fazer reset aos dados se quiseres
-      // setData(null);
       return;
     }
     const interval = setInterval(() => {

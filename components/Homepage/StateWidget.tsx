@@ -5,7 +5,6 @@ import React from 'react';
 import { Image, Platform, StyleSheet, Text, View } from 'react-native';
 
 import { UserState } from '@/constants/data/types';
-// --- ALTERAÇÃO 1: Importar o Contexto ---
 import { useBiometrics } from '@/context/BiometricsContext';
 
 const STATE_STYLES: Record<
@@ -49,7 +48,6 @@ const STATE_STYLES: Record<
 };
 
 export const StateWidget = () => {
-  // --- ALTERAÇÃO 2: Usar o hook do Contexto ---
   const { currentState } = useBiometrics();
 
   const activeStyle = STATE_STYLES[currentState];

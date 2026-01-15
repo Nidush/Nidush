@@ -11,6 +11,7 @@ export const SCENARIOS: Scenario[] = [
     category: 'My creations',
     playlist: 'Lo-Fi Beats',
     focusMode: false,
+    shortcuts: false,
     devices: [
       {
         deviceId: 'dev_light_living',
@@ -43,6 +44,7 @@ export const SCENARIOS: Scenario[] = [
     category: 'My creations',
     playlist: 'Focus Playlist',
     focusMode: true,
+    shortcuts: false,
     devices: [
       {
         deviceId: 'dev_light_bed',
@@ -73,6 +75,7 @@ export const SCENARIOS: Scenario[] = [
     room: 'Bedroom',
     image: require('@/assets/Scenarios/forest_bathing.png'),
     focusMode: false,
+    shortcuts: false,
     playlist: 'Spotify Nature Sounds',
     devices: [
       {
@@ -103,6 +106,7 @@ export const SCENARIOS: Scenario[] = [
     room: 'Kitchen',
     image: require('@/assets/Scenarios/slow_cooking.png'),
     focusMode: false,
+    shortcuts: false,
     playlist: 'Cooking Vibes',
     devices: [
       {
@@ -133,6 +137,7 @@ export const SCENARIOS: Scenario[] = [
     room: 'Bedroom',
     image: require('@/assets/Scenarios/moonlight_bay.png'),
     focusMode: true,
+    shortcuts: true,
     playlist: 'Calm Ocean Waves',
     devices: [
       {
@@ -166,6 +171,7 @@ export const SCENARIOS: Scenario[] = [
     room: 'Bedroom',
     image: require('@/assets/Scenarios/lavender_dream.png'),
     focusMode: true,
+    shortcuts: false,
     playlist: 'Calm Piano & Ambient',
     devices: [
       {
@@ -202,6 +208,7 @@ export const SCENARIOS: Scenario[] = [
     image: require('@/assets/Scenarios/dinner_date.png'),
     category: 'My creations',
     focusMode: true,
+    shortcuts: false,
     playlist: 'Smooth Jazz Essentials',
     devices: [
       {
@@ -238,6 +245,7 @@ export const SCENARIOS: Scenario[] = [
     image: require('@/assets/Scenarios/rose_garden.png'),
     category: 'My creations',
     focusMode: false,
+    shortcuts: false,
     playlist: 'Secret Garden Ambience',
     devices: [
       {
@@ -273,6 +281,7 @@ export const SCENARIOS: Scenario[] = [
     room: 'Bedroom',
     image: require('@/assets/Scenarios/rainy_library.png'),
     focusMode: true,
+    shortcuts: false,
     playlist: 'Heavy Rain & Lo-Fi',
     devices: [
       {
@@ -304,16 +313,16 @@ export const SCENARIOS: Scenario[] = [
     description:
       'Transform your living room into a private theater. Dimmed dark blue lighting and a cozy temperature create the ultimate movie-watching experience.',
     room: 'Living Room',
-    // Nota: Certifica-te de que tens uma imagem ou usa uma existente como placeholder
     image: require('@/assets/Scenarios/cinema_night.png'),
-    focusMode: true, // Ativado para evitar distrações durante o filme
+    focusMode: true,
+    shortcuts: true,
     playlist: 'Epic Movie Scores',
     devices: [
       {
         deviceId: 'dev_light_living',
         state: 'on',
-        value: '#1A1A50', // Um azul muito escuro (Midnight Blue) para não refletir no ecrã
-        brightness: '15%', // Luz fraca
+        value: '#1A1A50',
+        brightness: '15%',
       },
       {
         deviceId: 'dev_speaker_living',
@@ -323,7 +332,7 @@ export const SCENARIOS: Scenario[] = [
       {
         deviceId: 'dev_thermostat_main',
         state: 'on',
-        value: 23, // Uma temperatura confortável para estar no sofá
+        value: 23,
       },
     ],
     keywords: [
@@ -346,6 +355,7 @@ export const SCENARIOS: Scenario[] = [
     room: 'Kitchen',
     image: require('@/assets/Scenarios/morning_brew.png'),
     focusMode: false,
+    shortcuts: false,
     playlist: 'Coffee Shop Acoustic',
     devices: [
       {
@@ -375,6 +385,92 @@ export const SCENARIOS: Scenario[] = [
       'acoustic',
       'calm',
       'sunrise',
+    ],
+  },
+  {
+    id: 's12',
+    title: "Chef's Kitchen",
+    description:
+      'Bright, crisp lighting ensures safety and precision while chopping, accompanied by an upbeat playlist to keep the creative energy flowing.',
+    room: 'Kitchen',
+    image: require('@/assets/Scenarios/slow_cooking.png'),
+    category: 'My creations',
+    focusMode: false,
+    shortcuts: false,
+    playlist: 'Upbeat Cooking Jazz',
+    devices: [
+      {
+        deviceId: 'dev_light_kitchen',
+        state: 'on',
+        value: '#FFFFFF',
+        brightness: '100%',
+      },
+      {
+        deviceId: 'dev_speaker_kitchen',
+        state: 'on',
+        value: 'Upbeat Cooking Jazz',
+      },
+      {
+        deviceId: 'dev_thermostat_main',
+        state: 'on',
+        value: 22,
+      },
+    ],
+    keywords: [
+      'cooking',
+      'kitchen',
+      'food',
+      'dinner',
+      'lunch',
+      'energy',
+      'fun',
+      'creative',
+      'active',
+    ],
+  },
+  {
+    id: 's13',
+    title: 'Inner Sanctuary',
+    description:
+      'A sacred space for your mind. Deep indigo lighting and pure silence (or soft binaural beats) help you disconnect from the world and turn inward.',
+    room: 'Bedroom',
+    image: require('@/assets/Scenarios/inner_sanctuary.png'),
+    focusMode: true,
+    shortcuts: false,
+    playlist: 'Theta Waves & Silence',
+    devices: [
+      {
+        deviceId: 'dev_light_bed',
+        state: 'on',
+        value: '#4B0082',
+        brightness: '20%',
+      },
+      {
+        deviceId: 'dev_speaker_bed',
+        state: 'on',
+        value: 'Theta Waves & Silence',
+      },
+      {
+        deviceId: 'dev_diffuser_bed',
+        state: 'on',
+        value: 'Jasmine & Sandalwood',
+      },
+      {
+        deviceId: 'dev_purifier_bed',
+        state: 'on',
+        value: 'Silent',
+      },
+    ],
+    keywords: [
+      'meditation',
+      'zen',
+      'calm',
+      'quiet',
+      'spiritual',
+      'anxious',
+      'stress',
+      'recovery',
+      'sleep',
     ],
   },
 ];

@@ -11,6 +11,7 @@ export const ACTIVITIES: Activity[] = [
     type: 'cooking',
     contentId: 'c1',
     scenarioId: 's4',
+    shortcuts: false,
     keywords: [
       'evening',
       'dinner',
@@ -32,6 +33,7 @@ export const ACTIVITIES: Activity[] = [
     type: 'meditation',
     contentId: 'c9',
     scenarioId: 's1',
+    shortcuts: false,
     keywords: [
       'morning',
       'energy',
@@ -53,6 +55,7 @@ export const ACTIVITIES: Activity[] = [
     type: 'meditation',
     contentId: 'c2',
     scenarioId: 's5',
+    shortcuts: false,
     keywords: [
       'morning',
       'gratitude',
@@ -72,6 +75,7 @@ export const ACTIVITIES: Activity[] = [
     type: 'cooking',
     contentId: 'c3',
     scenarioId: 's3',
+    shortcuts: false,
     keywords: [
       'chocolate',
       'dessert',
@@ -92,6 +96,7 @@ export const ACTIVITIES: Activity[] = [
     type: 'meditation',
     contentId: 'c2',
     scenarioId: 's5',
+    shortcuts: false,
     keywords: [
       'morning',
       'zen',
@@ -113,6 +118,7 @@ export const ACTIVITIES: Activity[] = [
     type: 'cooking',
     contentId: 'c10',
     scenarioId: 's4',
+    shortcuts: false,
     keywords: [
       'morning',
       'breakfast',
@@ -134,6 +140,7 @@ export const ACTIVITIES: Activity[] = [
     category: 'Simple recipes',
     type: 'cooking',
     contentId: 'c14',
+    shortcuts: false,
     keywords: [
       'evening',
       'dinner',
@@ -150,10 +157,11 @@ export const ACTIVITIES: Activity[] = [
     description:
       'Unwind after a long day with an engaging audiobook summary. The perfect way to calm your mind and disconnect from screens before sleep.',
     room: 'Bedroom',
-    image: require('@/assets/Scenarios/deep_focus.png'),
+    image: require('@/assets/activities_for_you/evening_read.png'),
     type: 'audiobooks',
     contentId: 'c8',
     scenarioId: 's2',
+    shortcuts: false,
     keywords: [
       'evening',
       'night',
@@ -176,6 +184,7 @@ export const ACTIVITIES: Activity[] = [
     category: 'Simple recipes',
     type: 'cooking',
     contentId: 'c13',
+    shortcuts: false,
     keywords: [
       'dessert',
       'chocolate',
@@ -198,6 +207,7 @@ export const ACTIVITIES: Activity[] = [
     category: 'Simple recipes',
     type: 'cooking',
     contentId: 'c12',
+    shortcuts: false,
     keywords: [
       'lunch',
       'dinner',
@@ -223,6 +233,7 @@ export const ACTIVITIES: Activity[] = [
     type: 'workout',
     contentId: 'c11',
     scenarioId: 's6',
+    shortcuts: false,
     keywords: [
       'morning',
       'evening',
@@ -238,7 +249,7 @@ export const ACTIVITIES: Activity[] = [
     ],
   },
   {
-    id: 'a15',
+    id: '15',
     title: 'Visualization for Success',
     description:
       'Boost your confidence and clarity by mentally rehearsing your goals. A powerful technique used by athletes and leaders to prime the brain for achievement.',
@@ -248,6 +259,7 @@ export const ACTIVITIES: Activity[] = [
     type: 'meditation',
     contentId: 'c15',
     scenarioId: 's2',
+    shortcuts: false,
     keywords: [
       'focus',
       'work',
@@ -259,6 +271,56 @@ export const ACTIVITIES: Activity[] = [
       'productivity',
       'anxious',
       'stress',
+      'recovery',
+    ],
+  },
+  {
+    id: '16',
+    title: 'Cooking Time',
+    description:
+      'Transform your kitchen into a culinary studio. Engage your senses, focus on the flavors, and create something delicious from scratch.',
+    room: 'Kitchen',
+    image: require('@/assets/shortcuts/cooking_time.png'),
+    category: 'My creations',
+    type: 'cooking',
+    contentId: 'c16',
+    scenarioId: 's12',
+    shortcuts: true,
+    keywords: [
+      'cooking',
+      'kitchen',
+      'food',
+      'relax',
+      'creative',
+      'dinner',
+      'evening',
+      'fun',
+      'focus',
+      'stressed',
+    ],
+  },
+  {
+    id: '17',
+    title: 'Meditation Time',
+    description:
+      'Dedicate time to stillness. Disconnect from external noise and reconnect with your inner peace through guided breathwork and a calming atmosphere.',
+    room: 'Bedroom',
+    image: require('@/assets/shortcuts/meditation_time.png'),
+    category: 'Meditation',
+    type: 'meditation',
+    contentId: 'c17',
+    scenarioId: 's13',
+    shortcuts: true,
+    keywords: [
+      'meditation',
+      'zen',
+      'calm',
+      'relax',
+      'breathing',
+      'anxious',
+      'stressed',
+      'morning',
+      'evening',
       'recovery',
     ],
   },

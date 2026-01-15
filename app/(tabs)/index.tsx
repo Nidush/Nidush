@@ -14,7 +14,8 @@ import { CarouselSection } from '../../components/activitiesScenarios/CarouselSe
 import { HomeHeader } from '../../components/Homepage/HomeHeader';
 import { StateWidget } from '../../components/Homepage/StateWidget';
 
-import { ACTIVITIES, CONTENTS } from '@/constants/data';
+// 1. IMPORTAR TUDO O QUE PRECISAS DOS DADOS
+import { ACTIVITIES, CONTENTS, SCENARIOS } from '@/constants/data';
 import { useBiometrics } from '@/context/BiometricsContext';
 import { getDynamicRecommendations } from '@/utils/recommendationEngine';
 
@@ -26,69 +27,71 @@ export default function Index() {
   });
 
   const { currentState } = useBiometrics();
+
+  // --- LÓGICA DO CARROSSEL (Recomendações) ---
   const dynamicActivities = useMemo(() => {
-    // 1. Filtrar
     const appActivities = ACTIVITIES.filter(
       (item) => item.category !== 'My creations',
     );
-
-    // 2. Ordenar
     const sortedList = getDynamicRecommendations(
       appActivities,
       currentState,
     ).slice(0, 5);
 
-    // 3. Mapear (Com as correções de TypeScript)
     return sortedList.map((item) => {
       let duration: string | undefined = undefined;
       if ('contentId' in item && item.contentId) {
         const contentData = (CONTENTS as any)[item.contentId];
-
         if (contentData) {
           duration = contentData.duration;
         }
       }
-
-      return {
-        ...item,
-        time: duration,
-      };
+      return { ...item, time: duration };
     });
   }, [currentState]);
 
-  const dynamicTitle = useMemo(() => {
-    return 'Activities for you';
-  }, []);
-  const shortcuts = [
-    {
-      id: 's1',
-      title: 'Cooking Time',
-      time: '50min',
-      room: 'Kitchen',
-      image: require('../../assets/shortcuts/cooking_time.png'),
-    },
-    {
-      id: 's2',
-      title: 'Meditation Time',
-      time: '15min',
-      room: 'Bedroom',
-      image: require('../../assets/shortcuts/meditation_time.png'),
-    },
-    {
-      id: 's3',
-      title: 'Skincare Time',
-      time: '10min',
-      room: 'Bathroom',
-      image: require('../../assets/shortcuts/skincare_time.png'),
-    },
-    {
-      id: 's4',
-      title: 'Reading Time',
-      time: '45min',
-      room: 'Living Room',
-      image: require('../../assets/shortcuts/reading_time.png'),
-    },
-  ];
+  const dynamicTitle = useMemo(() => 'Activities for you', []);
+
+  // --- NOVA LÓGICA DOS SHORTCUTS (USANDO 'shortcuts' NO PLURAL) ---
+  const shortcuts = useMemo(() => {
+    // 1. Filtrar ATIVIDADES onde shortcuts === true
+    const favActivities = ACTIVITIES.filter(
+      (a: any) => a.shortcuts === true,
+    ).map((item) => {
+      // Tentar encontrar a duração no CONTENTS
+      let duration = undefined;
+      if (item.contentId && (CONTENTS as any)[item.contentId]) {
+        duration = (CONTENTS as any)[item.contentId].duration;
+      }
+
+      return {
+        id: item.id,
+        title: item.title,
+        room: item.room,
+        image: item.image,
+        time: duration,
+        // Adicionamos type activity para ajudar na lógica se precisares
+        type: 'activity',
+      };
+    });
+
+    // 2. Filtrar CENÁRIOS onde shortcuts === true
+    const favScenarios = SCENARIOS.filter((s: any) => s.shortcuts === true).map(
+      (item) => {
+        return {
+          id: item.id,
+          title: item.title,
+          room: item.room,
+          image: item.image,
+          time: undefined, // Cenários não costumam ter duração definida nos cards
+          type: 'scenario',
+        };
+      },
+    );
+
+    // 3. Juntar as duas listas
+    return [...favActivities, ...favScenarios];
+  }, []); // Dependência vazia (calcula apenas ao montar o componente)
 
   if (!fontsLoaded) return null;
 
@@ -112,6 +115,7 @@ export default function Index() {
           />
         </View>
 
+        {/* SECÇÃO SHORTCUTS DINÂMICA */}
         <View className="flex-row justify-between items-center mb-4 mt-2">
           <Text
             style={{ fontFamily: 'Nunito_600SemiBold' }}
@@ -130,25 +134,35 @@ export default function Index() {
         </View>
 
         <View className="flex-row flex-wrap justify-between pb-10">
-          {shortcuts.map((item) => (
-            <View key={item.id} className="w-[48%] mb-4">
-              <UnifiedCard
-                id={item.id}
-                title={item.title}
-                image={item.image}
-                time={item.time}
-                room={item.room}
-                width="100%"
-                aspectRatio={1.1}
-                onPress={() =>
-                  router.push({
-                    pathname: '/activity-details',
-                    params: { id: item.id },
-                  })
-                }
-              />
-            </View>
-          ))}
+          {shortcuts.length > 0 ? (
+            shortcuts.map((item) => (
+              <View key={item.id} className="w-[48%] mb-4">
+                <UnifiedCard
+                  id={item.id}
+                  title={item.title}
+                  image={item.image}
+                  time={item.time}
+                  room={item.room}
+                  width="100%"
+                  aspectRatio={0.95}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/activity-details',
+                      params: { id: item.id },
+                    })
+                  }
+                />
+              </View>
+            ))
+          ) : (
+            // Mensagem caso não haja shortcuts definidos
+            <Text
+              style={{ fontFamily: 'Nunito_400Regular' }}
+              className="text-gray-500 w-full text-center mt-2 italic"
+            >
+              {'No shortcuts selected yet. Click "Edit" to add some!'}
+            </Text>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>

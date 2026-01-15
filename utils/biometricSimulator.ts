@@ -1,5 +1,4 @@
 import { WearableData } from '@/constants/data/types';
-// Certifica-te que importas a função atualizada
 import { inferStateFromData } from './biometricLogic';
 
 const randomRange = (min: number, max: number) =>
@@ -11,22 +10,17 @@ export const generateBiometricsFromStress = (
   const now = Date.now();
   const safeStress = Math.max(0, Math.min(100, stressLevel));
 
-  // 1. BPM (Simulação)
   const bpmBase = 60 + safeStress * 0.7;
   const bpm = Math.floor(bpmBase + randomRange(-5, 5));
 
-  // 2. HRV (Simulação - Inverso do stress)
   const hrvBase = 100 - safeStress * 0.85;
   const hrv = Math.floor(hrvBase + randomRange(-5, 5));
 
-  // 3. EDA (Simulação - Aumenta com o stress)
-  // Relaxed: 1-3 µS | Stressed: 5-15 µS | Anxious: 15-30 µS
   let eda = randomRange(1, 3);
   if (safeStress > 50) eda = randomRange(5, 15);
   if (safeStress > 80) eda = randomRange(15, 30);
 
-  // 4. Diagnóstico (AGORA USAMOS O EDA AQUI)
-  const detectedState = inferStateFromData(bpm, hrv, eda); // <--- ALTERAÇÃO AQUI
+  const detectedState = inferStateFromData(bpm, hrv, eda);
 
   return {
     deviceId: 'mock_apple_watch_s9',

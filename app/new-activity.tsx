@@ -149,11 +149,12 @@ export default function NewActivityFlow() {
       title: activityName || 'Untitled Activity',
       description,
       room,
-      image: finalImage, // Agora a imagem vai no formato correto
+      image: finalImage,
       category: 'My creations',
       type: activityType,
       contentId: selectedContentId,
       scenarioId: selectedScenarioId,
+      shortcuts: false,
       keywords: [activityType, room, 'custom'],
     };
 
@@ -187,12 +188,8 @@ export default function NewActivityFlow() {
 
   return (
     <SafeAreaProvider>
-      {/* 1. View Base com a cor do tema. Removemos SafeAreaView wrapper para não cortar o fundo */}
       <View style={{ flex: 1, backgroundColor: '#F9FAF7' }}>
-        {/* Espaçador para a Status Bar (Notch) */}
         <View style={{ height: insets.top, backgroundColor: '#F9FAF7' }} />
-
-        {/* Header Fixo */}
         <View className="px-5 pt-2">
           <FlowHeader
             title="New activity"
@@ -201,22 +198,17 @@ export default function NewActivityFlow() {
             onBack={prevStep}
           />
         </View>
-
-        {/* Layout do Conteúdo */}
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          // Ajusta isto se o teclado ainda tapar (compensa o header)
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
           <View className="flex-1 relative">
             <ScrollView
               ref={scrollViewRef}
               showsVerticalScrollIndicator={false}
-              // Padding horizontal aplicado aqui
               contentContainerStyle={{
                 paddingHorizontal: 20,
-                // Padding bottom grande para o último item passar por trás do botão
                 paddingBottom: 120 + insets.bottom,
               }}
               keyboardShouldPersistTaps="handled"
@@ -250,7 +242,6 @@ export default function NewActivityFlow() {
                   setDesc={setDescription}
                   image={activityImage}
                   setImage={setActivityImage}
-                  // ADICIONAR ESTA LINHA:
                   defaultImage={reviewContent?.image || null}
                 />
               )}

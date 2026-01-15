@@ -1,7 +1,6 @@
 import { Content } from './types';
 
 export const CONTENTS: Record<string, Content> = {
-  // --- RECEITAS ---
   c1: {
     id: 'c1',
     title: 'Italian Pasta Tutorial',
@@ -157,6 +156,32 @@ export const CONTENTS: Record<string, Content> = {
       'Serve immediately topped with fresh parmesan.',
     ],
   },
+  c16: {
+    id: 'c16',
+    title: 'Homemade Pizza Night',
+    description:
+      'Fun, interactive, and delicious. Making your own pizza from scratch is the ultimate way to enjoy your time in the kitchen.',
+    type: 'recipe',
+    category: 'cooking',
+    duration: '40 min',
+    image: require('@/assets/cooking_activities/recommended/pizza.png'),
+    ingredients: [
+      { item: 'Pizza Dough', amount: '1 ball' },
+      { item: 'Tomato Sauce', amount: '150ml' },
+      { item: 'Mozzarella Cheese', amount: '200g' },
+      { item: 'Fresh Basil', amount: 'Handful' },
+      { item: 'Olive Oil', amount: 'Drizzle' },
+      { item: 'Toppings', amount: 'Your choice' },
+    ],
+    instructions: [
+      'Preheat your oven to the highest setting (usually 250°C).',
+      'Roll out the dough on a floured surface to your desired thickness.',
+      'Spread a thin layer of tomato sauce, leaving a border for the crust.',
+      'Sprinkle generously with mozzarella and add your favorite toppings.',
+      'Bake for 10-12 minutes until the crust is golden and cheese is bubbly.',
+      'Finish with fresh basil and a drizzle of olive oil before serving.',
+    ],
+  },
 
   c2: {
     id: 'c2',
@@ -295,8 +320,7 @@ export const CONTENTS: Record<string, Content> = {
     type: 'audio',
     category: 'meditation',
     duration: '10 min',
-    // Estou a usar esta imagem como placeholder, ajusta se tiveres uma de "sucesso" ou "montanha"
-    image: require('@/assets/activities_for_you/sunrise_flow.png'),
+    image: require('@/assets/meditation_activities/recommended/visualization_for_success.png'),
     instructions: [
       {
         text: 'Find a comfortable, upright position.',
@@ -329,6 +353,48 @@ export const CONTENTS: Record<string, Content> = {
       },
     ],
   },
+  c17: {
+    id: 'c17',
+    title: 'Mindful Breathing Guide',
+    description:
+      'A simple but powerful session to anchor yourself in the present moment using the 4-7-8 breathing technique.',
+    type: 'audio',
+    category: 'meditation',
+    duration: '15 min',
+    image: require('@/assets/meditation_content/audio_sessions/today_is_good.png'),
+    instructions: [
+      {
+        text: 'Prepare your posture.',
+        description:
+          'Sit comfortably with a straight spine or lie down flat. Relax your jaw and drop your shoulders away from your ears.',
+        duration: 60,
+      },
+      {
+        text: 'Inhale deeply (Count of 4).',
+        description:
+          'Breathe in quietly through your nose for 4 seconds. Feel your belly rise.',
+        duration: 4,
+      },
+      {
+        text: 'Hold the breath (Count of 7).',
+        description:
+          'Hold your breath gently for 7 seconds. Keep your body relaxed, do not tense up.',
+        duration: 7,
+      },
+      {
+        text: 'Exhale completely (Count of 8).',
+        description:
+          'Exhale forcefully through your mouth, making a whoosh sound, for 8 seconds. Empty your lungs completely.',
+        duration: 8,
+      },
+      {
+        text: 'Repeat the cycle.',
+        description:
+          'Continue this pattern for the next few minutes. Let thoughts come and go like clouds.',
+        duration: 300,
+      },
+    ],
+  },
 
   // --- AUDIOBOOKS ---
   c7: {
@@ -339,7 +405,7 @@ export const CONTENTS: Record<string, Content> = {
     type: 'audio',
     category: 'audiobook',
     duration: '15 min',
-    image: require('@/assets/Scenarios/deep_focus.png'),
+    image: require('@/assets/audiobooks/power_of_habit.png'),
     author: 'Charles Duhigg',
   },
   c8: {
@@ -350,7 +416,7 @@ export const CONTENTS: Record<string, Content> = {
     type: 'audio',
     category: 'audiobook',
     duration: '20 min',
-    image: require('@/assets/Scenarios/deep_focus.png'),
+    image: require('@/assets/audiobooks/atomic_habits.png'),
     author: 'James Clear',
   },
 };
