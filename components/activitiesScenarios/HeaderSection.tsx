@@ -17,7 +17,9 @@ export const HeaderSection = ({
 }: HeaderSectionProps) => {
   return (
     <View className="px-4">
+      {/* TOGGLE BUTTONS */}
       <View className="flex-row bg-[#F0F2EB] p-1 border border-[#BDC7C2] rounded-full mb-[15px] h-[50px] mt-4">
+        {/* BOTÃO ACTIVITIES */}
         <TouchableOpacity
           onPress={() => setViewMode('activities')}
           className={`flex-1 justify-center items-center rounded-[25px] ${
@@ -28,6 +30,8 @@ export const HeaderSection = ({
             className={`${
               viewMode === 'activities' ? 'text-white' : 'text-[#2D3E27]'
             } text-xl`}
+            // AQUI ESTÁ A ALTERAÇÃO:
+            // Se estiver selecionado usa Bold, se não usa SemiBold
             style={{
               fontFamily:
                 viewMode === 'activities'
@@ -39,6 +43,7 @@ export const HeaderSection = ({
           </Text>
         </TouchableOpacity>
 
+        {/* BOTÃO SCENARIOS */}
         <TouchableOpacity
           onPress={() => setViewMode('scenarios')}
           className={`flex-1 justify-center items-center rounded-[25px] ${
@@ -49,6 +54,8 @@ export const HeaderSection = ({
             className={`${
               viewMode === 'scenarios' ? 'text-white' : 'text-[#2D3E27]'
             } text-xl`}
+            // AQUI ESTÁ A ALTERAÇÃO:
+            // Se estiver selecionado usa Bold, se não usa SemiBold
             style={{
               fontFamily:
                 viewMode === 'scenarios'
@@ -61,6 +68,7 @@ export const HeaderSection = ({
         </TouchableOpacity>
       </View>
 
+      {/* SEARCH BAR */}
       <View className="flex-row items-center justify-center border border-[#BDC7C2] rounded-full px-4 h-12 bg-transparent mb-6">
         <MaterialIcons
           name="search"

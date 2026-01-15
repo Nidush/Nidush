@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { ReviewCard } from './ReviewCard';
 
+// Habilitar animações no Android
 if (
   Platform.OS === 'android' &&
   UIManager.setLayoutAnimationEnabledExperimental
@@ -17,6 +18,7 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
+// Interfaces
 interface ScenarioDevice {
   deviceId: string;
   state: string;
@@ -37,6 +39,7 @@ interface ScenarioReviewCardProps {
   onEdit: () => void;
 }
 
+// Helper para ícones (movido para aqui)
 const getDeviceIcon = (id: string) => {
   if (id.includes('light')) return 'lightbulb';
   if (id.includes('speaker')) return 'speaker';
@@ -82,6 +85,7 @@ export const ScenarioReviewCard = ({
         />
       </TouchableOpacity>
 
+      {/* Dropdown Content */}
       {isExpanded && environment && (
         <View className="mt-4 border-t border-[#DDE5D7] pt-3">
           <View className="flex-row justify-between mb-4">

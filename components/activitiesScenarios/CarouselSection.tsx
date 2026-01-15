@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
 import { ScrollView, Text, View } from 'react-native';
+// Importe o novo card
 import { UnifiedCard } from './UnifiedCard';
 
 interface CarouselSectionProps {
@@ -42,7 +43,7 @@ export const CarouselSection = ({
               image={item.image}
               time={showTime ? item.time : undefined}
               room={item.room}
-              width={180}
+              width={180} // Defina a largura fixa para o carrossel aqui
               aspectRatio={1}
               onPress={() =>
                 router.push({
