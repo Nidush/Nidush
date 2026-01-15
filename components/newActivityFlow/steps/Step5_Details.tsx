@@ -11,7 +11,7 @@ interface Step5Props {
   setDesc: (t: string) => void;
   image: any;
   setImage: (img: any) => void;
-  defaultImage: any;
+  defaultImage: any; // <--- NOVA PROP: Imagem original
 }
 
 export const Step5_Details = ({
@@ -21,7 +21,7 @@ export const Step5_Details = ({
   setDesc,
   image,
   setImage,
-  defaultImage,
+  defaultImage, // <--- Receber a prop
 }: Step5Props) => {
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -39,12 +39,15 @@ export const Step5_Details = ({
     if (!result.canceled) setImage(result.assets[0].uri);
   };
 
+  // Função para restaurar a imagem original
   const handleResetImage = () => {
     setImage(defaultImage);
   };
 
+  // Verifica se a imagem atual é diferente da original para mostrar o botão
   const hasChangedImage = image !== defaultImage;
 
+  // Helper para resolver a fonte da imagem
   const imageSource = typeof image === 'string' ? { uri: image } : image;
 
   return (
@@ -59,6 +62,7 @@ export const Step5_Details = ({
         Image
       </Text>
 
+      {/* Visualização da Imagem */}
       <View className="w-full aspect-square bg-[#C8E2C8] rounded-3xl justify-center items-center overflow-hidden border border-[#DDE5D7]">
         {image ? (
           <Image
@@ -71,7 +75,9 @@ export const Step5_Details = ({
         )}
       </View>
 
+      {/* ÁREA DE BOTÕES DA IMAGEM */}
       <View className="mt-4 mb-6 flex-row justify-center items-center gap-3">
+        {/* Botão de Escolher Nova */}
         <TouchableOpacity
           onPress={pickImage}
           className="bg-[#E8F3E8] px-4 py-2.5 rounded-xl border border-[#C8E2C8] flex-row items-center"
@@ -85,6 +91,7 @@ export const Step5_Details = ({
           </Text>
         </TouchableOpacity>
 
+        {/* Botão de Reset (Só aparece se a imagem mudou) */}
         {hasChangedImage && defaultImage && (
           <TouchableOpacity
             onPress={handleResetImage}
@@ -101,6 +108,7 @@ export const Step5_Details = ({
         )}
       </View>
 
+      {/* Campos de Texto */}
       <Text
         className="text-lg text-[#2F4F4F] mb-2"
         style={{ fontFamily: 'Nunito_700Bold' }}

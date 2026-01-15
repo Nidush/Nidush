@@ -114,21 +114,25 @@ export const ActivityHeader = ({
           </TouchableOpacity>
         </View>
 
+        {/* --- MODAL DO MENU --- */}
         <Modal
           transparent
           visible={menuVisible}
           animationType="fade"
           onRequestClose={() => setMenuVisible(false)}
         >
+          {/* 1. O BLUR DO FUNDO (Substitui o fundo escuro) */}
           <BlurView
             intensity={Platform.OS === 'android' ? 10 : 10}
-            tint="dark"
+            tint="dark" // 'dark' para simular o escurecimento, 'light' para clarear
             experimentalBlurMethod="dimezisBlurView"
             style={StyleSheet.absoluteFill}
           />
 
+          {/* 2. AREA DE TOQUE PARA FECHAR */}
           <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
             <View style={{ flex: 1 }}>
+              {/* 3. O MENU EM SI (Sólido e nítido) */}
               <View
                 className="absolute top-14 right-5 bg-white rounded-xl w-52 overflow-hidden"
                 style={{

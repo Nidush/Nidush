@@ -16,6 +16,7 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Esta é a função que está a dar erro
 export const useActivities = () => {
   const context = useContext(ActivityContext);
   if (!context) return { activities: [], addActivity: () => {} };

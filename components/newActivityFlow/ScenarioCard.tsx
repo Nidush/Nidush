@@ -1,4 +1,4 @@
-import { Scenario } from '@/constants/data';
+import { Scenario } from '@/constants/data'; // Ajusta o import conforme o teu ficheiro de tipos
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -32,9 +32,12 @@ export const ScenarioCard = ({
       activeOpacity={0.9}
       className={clsx(
         'relative rounded-2xl overflow-hidden bg-gray-900',
+        // 'w-full' faz com que ele preencha o container de 48% do pai
+        // 'aspect-square' garante que é um quadrado perfeito
         'w-full aspect-square',
       )}
     >
+      {/* --- CAMADA 1: FUNDO COM BLUR --- */}
       <View style={StyleSheet.absoluteFill}>
         <Image
           source={item.image}
@@ -45,6 +48,7 @@ export const ScenarioCard = ({
         <View className="absolute inset-0 bg-black/20" />
       </View>
 
+      {/* --- CAMADA 2: IMAGEM MASCARADA (Fade) --- */}
       <MaskedView
         style={StyleSheet.absoluteFill}
         maskElement={
@@ -61,6 +65,8 @@ export const ScenarioCard = ({
           resizeMode="cover"
         />
       </MaskedView>
+
+      {/* --- CAMADA 3: GRADIENTE DE LEITURA --- */}
       <LinearGradient
         colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.8)']}
         locations={[0.4, 0.7, 1]}
@@ -68,10 +74,12 @@ export const ScenarioCard = ({
         pointerEvents="none"
       />
 
+      {/* --- CAMADA 4: ÍCONE DE OPÇÕES --- */}
       <TouchableOpacity className="absolute top-2.5 right-1 z-20 p-1">
         <MaterialIcons name="more-vert" size={24} color="white" />
       </TouchableOpacity>
 
+      {/* --- CAMADA 5: TEXTO E INFO --- */}
       <View className="absolute bottom-0 w-full p-3 z-30">
         <Text
           numberOfLines={2}
@@ -92,6 +100,7 @@ export const ScenarioCard = ({
         </View>
       </View>
 
+      {/* --- CAMADA 6: BORDA FLUTUANTE --- */}
       <View
         pointerEvents="none"
         className={clsx(

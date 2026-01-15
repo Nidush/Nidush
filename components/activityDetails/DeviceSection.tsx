@@ -105,6 +105,7 @@ export const DeviceSection = ({ devices }: DeviceSectionProps) => {
                         style={{ fontFamily: 'Nunito_600SemiBold' }}
                       >
                         {config.value}
+                        {/* AQUI ESTÁ A ALTERAÇÃO: Adiciona ºC se for termóstato */}
                         {realDevice.type === 'thermostat' ? 'ºC' : ''}
                       </Text>
                     )}

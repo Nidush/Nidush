@@ -2,7 +2,6 @@ import { CarouselSection } from '@/components/activitiesScenarios/CarouselSectio
 import { FabMenu } from '@/components/activitiesScenarios/FabMenu';
 import { FilterBar } from '@/components/activitiesScenarios/FilterBar';
 import { HeaderSection } from '@/components/activitiesScenarios/HeaderSection';
-import { useBiometrics } from '@/context/BiometricsContext';
 import {
   Nunito_400Regular,
   Nunito_600SemiBold,
@@ -16,6 +15,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Platform, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+// --- DADOS ---
 import {
   ACTIVITIES,
   Activity,
@@ -23,11 +23,13 @@ import {
   Scenario,
   SCENARIOS,
 } from '@/constants/data';
-import { getDynamicRecommendations } from '@/utils/recommendationEngine';
+import {
+  getDynamicRecommendations,
+  getRecommendationTitle,
+} from '@/utils/recommendationEngine';
 
 const UnifiedActivitiesScreen = () => {
-  const { currentState } = useBiometrics();
-
+  // --- STATE ---
   const [viewMode, setViewMode] = useState<'activities' | 'scenarios'>(
     'activities',
   );
@@ -36,6 +38,7 @@ const UnifiedActivitiesScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [myActivities, setMyActivities] = useState<Activity[]>([]);
 
+  // --- EFEITOS ---
   useFocusEffect(
     useCallback(() => {
       const loadActivities = async () => {
@@ -51,6 +54,8 @@ const UnifiedActivitiesScreen = () => {
     Nunito_600SemiBold,
     Nunito_400Regular,
   });
+
+  // --- LÓGICA ---
 
   const filterOptions =
     viewMode === 'activities'
@@ -68,14 +73,18 @@ const UnifiedActivitiesScreen = () => {
     return undefined;
   };
 
+  // --- PROCESSAMENTO DE DADOS (useMemo) ---
   const processedData = useMemo(() => {
+    // 1. Seleciona Base
     const baseData =
       viewMode === 'activities' ? [...myActivities, ...ACTIVITIES] : SCENARIOS;
 
+    // 2. Filtra (Pesquisa + Pill selecionada)
     const filteredBase = baseData.filter((item) => {
       const matchesSearch = item.title
         .toLowerCase()
         .includes(searchQuery.toLowerCase());
+
       if (activeFilter === 'All') return matchesSearch;
 
       let matchesFilter = false;
@@ -84,9 +93,11 @@ const UnifiedActivitiesScreen = () => {
       } else {
         matchesFilter = item.room === activeFilter;
       }
+
       return matchesFilter && matchesSearch;
     });
 
+    // 3. Separa "My Creations" vs "App Content"
     const myCreationsList = filteredBase.filter(
       (item) => item.category === 'My creations',
     );
@@ -94,8 +105,11 @@ const UnifiedActivitiesScreen = () => {
       (item) => item.category !== 'My creations',
     );
 
-    const recommendedList = getDynamicRecommendations(appPool, currentState);
+    // 4. Gera Recomendados (Ordenados por hora)
+    const recommendedList = getDynamicRecommendations(appPool);
 
+    // 5. Gera Lista Específica "Simple Recipes"
+    // (Apenas itens que têm esta categoria explícita)
     const simpleRecipesList = appPool.filter(
       (item) => item.category === 'Simple recipes',
     );
@@ -106,13 +120,15 @@ const UnifiedActivitiesScreen = () => {
       simpleRecipes: simpleRecipesList,
       isEmpty: filteredBase.length === 0,
     };
-  }, [viewMode, activeFilter, searchQuery, myActivities, currentState]);
+  }, [viewMode, activeFilter, searchQuery, myActivities]);
 
   const handleViewModeChange = (mode: 'activities' | 'scenarios') => {
     setViewMode(mode);
     setActiveFilter('All');
     setSearchQuery('');
   };
+
+  const recommendationTitle = getRecommendationTitle();
 
   if (!fontsLoaded) return null;
 
@@ -155,6 +171,7 @@ const UnifiedActivitiesScreen = () => {
           </View>
         ) : (
           <>
+            {/* 1. MY CREATIONS */}
             {processedData.myCreations.length > 0 && (
               <CarouselSection
                 title="My creations"
@@ -166,9 +183,11 @@ const UnifiedActivitiesScreen = () => {
               />
             )}
 
+            {/* 2. RECOMMENDED (LIMITADO A 5) */}
+            {/* Aparece sempre, mas cortamos (.slice) para mostrar apenas os top 5 */}
             {processedData.recommended.length > 0 && (
               <CarouselSection
-                title="Recommended"
+                title={recommendationTitle} // "Recommended"
                 data={processedData.recommended.slice(0, 5).map((item) => ({
                   ...item,
                   time: isActivity(item) ? getActivityTime(item) : undefined,
@@ -176,7 +195,6 @@ const UnifiedActivitiesScreen = () => {
                 showTime={viewMode === 'activities'}
               />
             )}
-
             {viewMode === 'activities' &&
               activeFilter === 'Cooking' &&
               processedData.simpleRecipes.length > 0 && (
@@ -192,6 +210,7 @@ const UnifiedActivitiesScreen = () => {
           </>
         )}
       </ScrollView>
+
       <FabMenu isOpen={isMenuOpen} setIsOpen={setIsMenuOpen} />
     </SafeAreaView>
   );

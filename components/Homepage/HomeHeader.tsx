@@ -47,15 +47,10 @@ export const HomeHeader = ({ userName }: HomeHeaderProps) => {
         </Pressable>
 
         <Link href="/Profile" asChild>
-          <Pressable style={{ width: 60, height: 60 }}>
+          <Pressable>
             <Image
               source={require('@/assets/avatars/profile.png')}
-              className="rounded-full"
-              style={{
-                width: 60,
-                height: 60,
-                resizeMode: 'cover',
-              }}
+              className="w-16 h-16 rounded-full"
             />
           </Pressable>
         </Link>
