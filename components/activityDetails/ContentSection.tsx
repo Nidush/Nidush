@@ -1,9 +1,8 @@
 import { Ingredient } from '@/constants/data';
-import { MaterialCommunityIcons } from '@expo/vector-icons'; // Opcional: para ícone de tempo
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React from 'react';
 import { Text, View } from 'react-native';
 
-// Definimos o tipo do passo aqui ou importamos de types.ts se tiveres exportado
 type InstructionStep = {
   text: string;
   duration?: number;
@@ -11,7 +10,6 @@ type InstructionStep = {
 
 interface ContentSectionProps {
   ingredients?: Ingredient[];
-  // Agora aceita strings OU objetos com a nova estrutura
   instructions: (string | InstructionStep)[];
 }
 
@@ -21,7 +19,6 @@ export const ContentSection = ({
 }: ContentSectionProps) => {
   return (
     <>
-      {/* Ingredientes */}
       {ingredients && ingredients.length > 0 && (
         <View className="mb-8">
           <Text
@@ -53,8 +50,6 @@ export const ContentSection = ({
           </View>
         </View>
       )}
-
-      {/* Instruções */}
       {instructions.length > 0 && (
         <View className="mb-4">
           <Text
@@ -64,7 +59,6 @@ export const ContentSection = ({
             Instructions
           </Text>
           {instructions.map((step, i) => {
-            // LÓGICA DE VERIFICAÇÃO DE TIPO
             const isObject = typeof step !== 'string';
             const stepText = isObject ? (step as InstructionStep).text : step;
             const duration = isObject
@@ -89,7 +83,6 @@ export const ContentSection = ({
                     {stepText}
                   </Text>
 
-                  {/* (Opcional) Mostrar visualmente que este passo tem tempo */}
                   {duration && (
                     <View className="flex-row items-center mt-1">
                       <MaterialCommunityIcons
@@ -97,7 +90,10 @@ export const ContentSection = ({
                         size={14}
                         color="#548F53"
                       />
-                      <Text className="text-[#548F53] text-xs ml-1 font-bold">
+                      <Text
+                        className="text-[#548F53] text-xs ml-1"
+                        style={{ fontFamily: 'Nunito_700Bold' }}
+                      >
                         {duration < 60
                           ? `${duration}s`
                           : `${Math.floor(duration / 60)} min`}

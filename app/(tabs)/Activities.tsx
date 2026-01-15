@@ -68,7 +68,6 @@ const UnifiedActivitiesScreen = () => {
     return undefined;
   };
 
-  // --- PROCESSAMENTO DE DADOS (Mantém a ordenação inteligente) ---
   const processedData = useMemo(() => {
     const baseData =
       viewMode === 'activities' ? [...myActivities, ...ACTIVITIES] : SCENARIOS;
@@ -95,7 +94,6 @@ const UnifiedActivitiesScreen = () => {
       (item) => item.category !== 'My creations',
     );
 
-    // Continua a ordenar baseada no stress, mas o título será fixo
     const recommendedList = getDynamicRecommendations(appPool, currentState);
 
     const simpleRecipesList = appPool.filter(
@@ -109,8 +107,6 @@ const UnifiedActivitiesScreen = () => {
       isEmpty: filteredBase.length === 0,
     };
   }, [viewMode, activeFilter, searchQuery, myActivities, currentState]);
-
-  // --- REMOVIDO: Bloco useMemo do currentTitle ---
 
   const handleViewModeChange = (mode: 'activities' | 'scenarios') => {
     setViewMode(mode);
@@ -159,7 +155,6 @@ const UnifiedActivitiesScreen = () => {
           </View>
         ) : (
           <>
-            {/* 1. MY CREATIONS */}
             {processedData.myCreations.length > 0 && (
               <CarouselSection
                 title="My creations"
@@ -171,10 +166,8 @@ const UnifiedActivitiesScreen = () => {
               />
             )}
 
-            {/* 2. RECOMMENDED (TÍTULO FIXO) */}
             {processedData.recommended.length > 0 && (
               <CarouselSection
-                // ALTERAÇÃO AQUI: Passamos a função diretamente, ignorando o estado de stress no texto
                 title="Recommended"
                 data={processedData.recommended.slice(0, 5).map((item) => ({
                   ...item,
@@ -184,7 +177,6 @@ const UnifiedActivitiesScreen = () => {
               />
             )}
 
-            {/* 3. SIMPLE RECIPES */}
             {viewMode === 'activities' &&
               activeFilter === 'Cooking' &&
               processedData.simpleRecipes.length > 0 && (

@@ -1,5 +1,5 @@
 import { Content } from '@/constants/data/types';
-import { MaterialIcons } from '@expo/vector-icons'; // <--- Ionicons removido
+import { MaterialIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
@@ -28,20 +28,19 @@ export const ContentCard = ({
   onSelect,
   type = 'small',
 }: ContentCardProps) => {
-  // --- LÓGICA DE ÍCONES (MATERIAL ICONS) ---
   const getIconName = (
     contentType: string,
   ): keyof typeof MaterialIcons.glyphMap => {
     switch (contentType) {
       case 'video':
       case 'workout':
-        return 'play-circle-filled'; // Ícone de Play preenchido
+        return 'play-circle-filled';
       case 'recipe':
-        return 'menu-book'; // Ícone de livro aberto (bom para receitas)
+        return 'menu-book';
       case 'audio':
       case 'meditation':
       default:
-        return 'headset'; // Ícone de auscultadores
+        return 'headset';
     }
   };
 
@@ -56,7 +55,6 @@ export const ContentCard = ({
           : 'w-[48%] aspect-square',
       )}
     >
-      {/* 1. Fundo */}
       <View style={StyleSheet.absoluteFill}>
         <Image
           source={item.image}
@@ -67,7 +65,6 @@ export const ContentCard = ({
         <View className="absolute inset-0 bg-black/20" />
       </View>
 
-      {/* 2. Máscara */}
       <MaskedView
         style={StyleSheet.absoluteFill}
         maskElement={
@@ -85,7 +82,6 @@ export const ContentCard = ({
         />
       </MaskedView>
 
-      {/* 3. Gradiente de Texto */}
       <LinearGradient
         colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.8)']}
         locations={[0.4, 0.7, 1]}
@@ -93,12 +89,10 @@ export const ContentCard = ({
         pointerEvents="none"
       />
 
-      {/* 4. Ícone Opções */}
       <TouchableOpacity className="absolute top-2.5 right-1 z-20 p-1">
         <MaterialIcons name="more-vert" size={24} color="white" />
       </TouchableOpacity>
 
-      {/* 5. Texto e Info */}
       <View className="absolute bottom-0 w-full p-3 z-30">
         <Text
           numberOfLines={2}
@@ -113,7 +107,6 @@ export const ContentCard = ({
 
         <View className="opacity-95 gap-1">
           <View className="flex-row items-center">
-            {/* MUDANÇA AQUI: Ionicons substituído por MaterialIcons */}
             <MaterialIcons
               name={getIconName(item.type)}
               size={16}
@@ -141,7 +134,6 @@ export const ContentCard = ({
         </View>
       </View>
 
-      {/* Borda Flutuante */}
       <View
         pointerEvents="none"
         className={clsx(

@@ -78,7 +78,6 @@ export default function NewActivityFlow() {
     };
   }, [step]);
 
-  // ... (funções handleContentSelect, nextStep, etc. mantêm-se iguais)
   const handleContentSelect = (id: string) => {
     setSelectedContentId(id);
     const content = Object.values(CONTENTS).find((c) => c.id === id);
@@ -98,25 +97,19 @@ export default function NewActivityFlow() {
   };
 
   const isNextDisabled = () => {
-    // Passo 1: Tipo de atividade obrigatório
     if (step === 1 && !activityType) return true;
 
-    // Passo 2: Conteúdo obrigatório
     if (step === 2 && !selectedContentId) return true;
 
-    // Passo 3: Divisão (Room) obrigatória
     if (step === 3 && !room) return true;
 
-    // Passo 4: Cenário obrigatório (Adicionado agora)
     if (step === 4 && !selectedScenarioId) return true;
 
-    // Passo 5: Nome, Descrição e Imagem obrigatórios
     if (step === 5) {
       const hasName = activityName && activityName.trim().length > 0;
       const hasDesc = description && description.trim().length > 0;
       const hasImage = !!activityImage;
 
-      // Se faltar qualquer um, esconde o botão
       if (!hasName || !hasDesc || !hasImage) return true;
     }
 
@@ -130,10 +123,7 @@ export default function NewActivityFlow() {
 
     let finalImage;
 
-    // CORREÇÃO LÓGICA DA IMAGEM
     if (activityImage) {
-      // Se for string (veio da galeria), tem de ser { uri: ... }
-      // Se for number (veio do default/require), usa-se diretamente
       finalImage =
         typeof activityImage === 'string'
           ? { uri: activityImage }

@@ -60,7 +60,6 @@ export default function ActivityDetails() {
     onConfirm: undefined,
   });
 
-  // Notificação de "Atividade Criada"
   useEffect(() => {
     if (isNew === 'true') {
       setShowToast(true);
@@ -71,7 +70,6 @@ export default function ActivityDetails() {
     }
   }, [isNew]);
 
-  // Carregamento de Dados
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -120,16 +118,13 @@ export default function ActivityDetails() {
   const closeAlert = () =>
     setAlertConfig((prev) => ({ ...prev, visible: false }));
 
-  // --- LÓGICA DO BOTÃO COMEÇAR ---
   const handleStartPress = () => {
     if (!mainItem) return;
 
-    // Verifica se é uma atividade E se o tipo é meditação
     const isMeditation =
       isActivity && (mainItem as Activity).type === 'meditation';
 
     if (isMeditation) {
-      // Se for meditação, inicia normalmente
       router.push({
         pathname: '/LoadingActivity',
         params: {
@@ -140,7 +135,6 @@ export default function ActivityDetails() {
         },
       });
     } else {
-      // Se for outro tipo ou Cenário, mostra o aviso
       setAlertConfig({
         visible: true,
         title: 'Coming Soon',
@@ -154,7 +148,6 @@ export default function ActivityDetails() {
     }
   };
 
-  // Handlers do Menu
   const handleAddToShortcuts = () => {
     setAlertConfig({
       visible: true,
@@ -296,7 +289,6 @@ export default function ActivityDetails() {
         </View>
       </ScrollView>
 
-      {/* Botão de Start */}
       <View className="absolute bottom-10 left-0 right-0 items-center px-5 z-0">
         <TouchableOpacity
           activeOpacity={0.9}
@@ -317,7 +309,6 @@ export default function ActivityDetails() {
         </TouchableOpacity>
       </View>
 
-      {/* Notificação Toast */}
       {showToast && (
         <View
           className="absolute top-14 left-5 right-5 bg-[#F0F2EB] p-4 rounded-2xl shadow-lg flex-row justify-between items-center z-50 border border-[#E8F3E8]"
@@ -342,7 +333,6 @@ export default function ActivityDetails() {
         </View>
       )}
 
-      {/* Alerta Personalizado */}
       <CustomAlert
         visible={alertConfig.visible}
         title={alertConfig.title}
