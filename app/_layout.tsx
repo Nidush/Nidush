@@ -12,7 +12,7 @@ export default function RootLayout() {
     const checkOnboarding = async () => {
       try {
         // Remover a linha abaixo após testar, para que lembre da escolha:
-        //await AsyncStorage.removeItem('@viewedOnboarding');
+        await AsyncStorage.removeItem('@viewedOnboarding');
 
         const viewed = await AsyncStorage.getItem('@viewedOnboarding');
 
@@ -36,6 +36,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="(tabs)" />
+
         <Stack.Screen name="profile-selection" />
         <Stack.Screen name="activity-details" />
       </Stack>
