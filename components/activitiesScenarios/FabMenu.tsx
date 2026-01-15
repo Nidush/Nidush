@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated'; // <--- Importar Reanimated
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 interface FabMenuProps {
   isOpen: boolean;
@@ -20,20 +20,16 @@ interface FabMenuProps {
 export const FabMenu = ({ isOpen, setIsOpen }: FabMenuProps) => {
   return (
     <>
-      {/* 1. OVERLAY DESFOCADO COM ANIMAÇÃO 
-          Envolvemos apenas o fundo num Animated.View para ter FadeIn/FadeOut 
-      */}
       {isOpen && (
         <Animated.View
           className="absolute inset-0 z-[5]"
-          entering={FadeIn.duration(300)} // Aparece em 300ms
-          exiting={FadeOut.duration(300)} // Desaparece em 300ms
+          entering={FadeIn.duration(300)}
+          exiting={FadeOut.duration(300)}
         >
           <BlurView
             intensity={Platform.OS === 'android' ? 10 : 10}
             tint="light"
             experimentalBlurMethod="dimezisBlurView"
-            // Nota: backgroundColor deve estar no style
             style={[
               StyleSheet.absoluteFill,
               { backgroundColor: 'rgba(240, 242, 235, 0.1)' },
@@ -46,7 +42,6 @@ export const FabMenu = ({ isOpen, setIsOpen }: FabMenuProps) => {
 
       {isOpen && (
         <View className="absolute bottom-[110px] right-[25px] items-end z-[11]">
-          {/* Opção 1: Scenario */}
           <TouchableOpacity
             className="mb-4"
             onPress={() => {
@@ -62,7 +57,6 @@ export const FabMenu = ({ isOpen, setIsOpen }: FabMenuProps) => {
             </Text>
           </TouchableOpacity>
 
-          {/* Opção 2: Activity */}
           <TouchableOpacity
             className="mb-4"
             onPress={() => {
@@ -80,7 +74,6 @@ export const FabMenu = ({ isOpen, setIsOpen }: FabMenuProps) => {
         </View>
       )}
 
-      {/* BOTÃO PRINCIPAL (FAB) */}
       <TouchableOpacity
         activeOpacity={0.9}
         className="absolute bottom-8 right-6 bg-[#548F53] w-[65px] h-[65px] rounded-full justify-center items-center z-[10] shadow-lg shadow-black/40"

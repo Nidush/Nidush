@@ -45,7 +45,6 @@ export const Step2_Content = ({
 
     return (
       <View className="mb-8">
-        {/* Título: Mantém alinhado com o resto (sem margem negativa) */}
         <Text
           className="text-2xl text-[#2F4F4F] mb-3"
           style={{ fontFamily: 'Nunito_600SemiBold' }}
@@ -53,12 +52,6 @@ export const Step2_Content = ({
           {title}
         </Text>
 
-        {/* FLATLIST CORRIGIDA:
-           1. className="-mx-5": Margem negativa de 20px para anular o padding do ecrã pai.
-              Isto faz a lista esticar até às bordas laterais.
-           2. contentContainerStyle px-5: Adiciona padding interno de 20px
-              para que o primeiro item comece alinhado com o texto.
-        */}
         <FlatList
           data={data}
           horizontal
@@ -67,7 +60,6 @@ export const Step2_Content = ({
           contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            // MUDANÇA AQUI: Aumentar largura para w-[170px]
             <View className="w-[170px]">
               <ContentCard
                 item={item}
@@ -98,7 +90,6 @@ export const Step2_Content = ({
         </View>
       )}
 
-      {/* Removemos a View wrapper anterior que podia estar a limitar a largura */}
       {renderCarousel('Recipes', recipes)}
       {renderCarousel('Video sessions', videos)}
       {renderCarousel('Audio sessions', audios)}

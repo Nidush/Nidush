@@ -10,7 +10,6 @@ import {
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// Componentes Visuais
 import { ExitModal } from '@/components/activeSession/ExitModal';
 import { SessionControls } from '@/components/activeSession/SessionControls';
 import { SessionHeader } from '@/components/activeSession/SessionHeader';
@@ -18,7 +17,6 @@ import { SessionVideo } from '@/components/activeSession/SessionVideo';
 import { SessionVisuals } from '@/components/activeSession/SessionVisuals';
 import { SessionWave } from '@/components/activeSession/SessionWave';
 
-// Dados
 import {
   ACTIVITIES,
   Activity,
@@ -54,14 +52,12 @@ export default function ActiveSession() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [showExitModal, setShowExitModal] = useState(false);
 
-  // --- 2. ANIMATION VALUES ---
   const progress = useSharedValue(0);
   const contentOpacity = useSharedValue(1);
   const pulseScale = useSharedValue(1);
 
   const isVideoSession = sessionData?.type === 'video';
 
-  // --- 3. LOAD DATA ---
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
@@ -137,7 +133,6 @@ export default function ActiveSession() {
     loadData();
   }, [loadData]);
 
-  // --- 4. ANIMATIONS & TIMER ---
   useEffect(() => {
     if (isVideoSession) return;
     if (isActive) {
@@ -204,7 +199,6 @@ export default function ActiveSession() {
     }
   }, [currentStepIndex, sessionData, isVideoSession, progress]);
 
-  // --- 5. HANDLERS ---
   const handleToggleSession = () => {
     const newState = !isActive;
     setIsActive(newState);
@@ -227,8 +221,6 @@ export default function ActiveSession() {
     setIsMusicPlaying(true);
   };
 
-  // --- 6. RENDER SEGURO ---
-  // IMPORTANTE: Esta verificação acontece ANTES de qualquer acesso a sessionData
   if (loading || !sessionData) {
     return (
       <View className="flex-1 justify-center items-center bg-[#F1F4EE]">
@@ -237,10 +229,8 @@ export default function ActiveSession() {
     );
   }
 
-  // AGORA é seguro aceder a sessionData e calcular variáveis
   const currentStep = sessionData.instructions[currentStepIndex];
 
-  // VERIFICAÇÃO DE SEGURANÇA para array vazio (embora o loadData previna)
   if (!currentStep) return null;
 
   const isLastStep = currentStepIndex === sessionData.instructions.length - 1;
@@ -280,7 +270,7 @@ export default function ActiveSession() {
             isMusicPlaying={isMusicPlaying}
             secondsLeft={secondsLeft}
             isManualStep={currentStep.duration === undefined}
-            isLastStep={isLastStep} // <--- Passamos agora para aqui
+            isLastStep={isLastStep}
             onNextStep={handleNextStep}
             playlistName={sessionData.playlistName}
             room={sessionData.room}

@@ -7,7 +7,6 @@ import { StepWrapper } from '../StepWrapper';
 
 type MaterialIconName = ComponentProps<typeof MaterialIcons>['name'];
 
-// Mapeamento visual para os tipos de dados
 const ACTIVITY_TYPES_MAP: Record<
   string,
   { label: string; icon: MaterialIconName }
@@ -24,7 +23,6 @@ interface Step1Props {
 }
 
 export const Step1_Type = ({ selected, onSelect }: Step1Props) => {
-  // Converte o objeto em array para o map
   const options = Object.entries(ACTIVITY_TYPES_MAP).map(([key, value]) => ({
     id: key as Activity['type'],
     ...value,
