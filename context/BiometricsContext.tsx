@@ -7,7 +7,6 @@ import {
 } from '@/constants/data/types';
 import { generateBiometricsFromStress } from '@/utils/biometricSimulator';
 import { getDynamicRecommendations } from '@/utils/recommendationEngine';
-import * as Notifications from 'expo-notifications';
 import { useSegments } from 'expo-router';
 import React, {
   createContext,
@@ -17,19 +16,8 @@ import React, {
   useState,
 } from 'react';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
-
-const isScenario = (item: Activity | Scenario): item is Scenario => {
-  return !('type' in item);
-};
+const isScenario = (item: Activity | Scenario): item is Scenario =>
+  !('type' in item);
 
 const ACTIVITY_TEMPLATES = {
   ANXIOUS: [
@@ -69,9 +57,19 @@ const SCENARIO_TEMPLATES = {
   ],
 };
 
+export interface StressAlert {
+  title: string;
+  body: string;
+  itemId: string;
+  type: UserState;
+  isScenario: boolean;
+}
+
 interface BiometricsContextType {
   data: WearableData | null;
   currentState: UserState;
+  activeAlert: StressAlert | null;
+  dismissAlert: () => void;
 }
 
 const BiometricsContext = createContext<BiometricsContextType | undefined>(
@@ -86,25 +84,20 @@ export const BiometricsProvider = ({
   const [data, setData] = useState<WearableData | null>(null);
   const [currentState, setCurrentState] = useState<UserState>('RELAXED');
 
+  const [activeAlert, setActiveAlert] = useState<StressAlert | null>(null);
+
   const stressLevelRef = useRef(10);
   const trendRef = useRef<'UP' | 'DOWN'>('UP');
   const previousStateRef = useRef<UserState>('RELAXED');
   const segments = useSegments();
 
-  useEffect(() => {
-    async function requestPermissions() {
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== 'granted') console.log('Notification permission denied');
-    }
-    requestPermissions();
-  }, []);
+  const dismissAlert = () => setActiveAlert(null);
 
-  const sendHealthAlert = async (state: UserState) => {
+  const sendHealthAlert = (state: UserState) => {
     const availableItems = [...ACTIVITIES, ...SCENARIOS].filter(
       (i) => i.category !== 'My creations',
     );
     const allRecommendations = getDynamicRecommendations(availableItems, state);
-
     const topCandidates = allRecommendations.slice(0, 3);
 
     let topPick: Activity | Scenario | null = null;
@@ -117,29 +110,22 @@ export const BiometricsProvider = ({
 
     const itemName = topPick.title;
     const itemIsScenario = isScenario(topPick);
-
     const stateKey = state === 'ANXIOUS' ? 'ANXIOUS' : 'STRESSED';
-
     const templateList = itemIsScenario
       ? SCENARIO_TEMPLATES[stateKey]
       : ACTIVITY_TEMPLATES[stateKey];
 
     const randomTemplateIndex = Math.floor(Math.random() * templateList.length);
     const messageBody = templateList[randomTemplateIndex](itemName);
+    const title =
+      state === 'ANXIOUS' ? '⚠️ Anxiety Relief' : '⚡ Stress Detected';
 
-    const title = state === 'ANXIOUS' ? 'Anxiety Relief' : 'Stress Detected';
-
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: title,
-        body: messageBody,
-        data: {
-          itemId: topPick.id,
-          isScenario: itemIsScenario,
-          type: state,
-        },
-      },
-      trigger: null,
+    setActiveAlert({
+      title,
+      body: messageBody,
+      itemId: topPick.id,
+      type: state,
+      isScenario: itemIsScenario,
     });
   };
 
@@ -148,9 +134,8 @@ export const BiometricsProvider = ({
       (segment) => segment === 'onboarding' || segment === 'profile-selection',
     );
 
-    if (isOnboarding) {
-      return;
-    }
+    if (isOnboarding) return;
+
     const interval = setInterval(() => {
       if (trendRef.current === 'UP') {
         stressLevelRef.current += Math.floor(Math.random() * 20);
@@ -183,7 +168,9 @@ export const BiometricsProvider = ({
   }, [segments]);
 
   return (
-    <BiometricsContext.Provider value={{ data, currentState }}>
+    <BiometricsContext.Provider
+      value={{ data, currentState, activeAlert, dismissAlert }}
+    >
       {children}
     </BiometricsContext.Provider>
   );
