@@ -39,7 +39,6 @@ export const UnifiedCard = ({
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.9}
-      // REMOVIDO O 'mb-4' DAQUI PARA CONTROLAR O ESPAÇAMENTO NO PAI
       className="relative rounded-2xl overflow-hidden bg-gray-900"
       style={{ width: width as any, aspectRatio }}
     >

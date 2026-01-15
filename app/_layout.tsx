@@ -1,6 +1,7 @@
+import { BiometricsProvider } from '@/context/BiometricsContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import './../global.css';
 
 export default function RootLayout() {
@@ -10,8 +11,8 @@ export default function RootLayout() {
   useEffect(() => {
     const checkOnboarding = async () => {
       try {
-        // Remova a linha abaixo após testar, para que ele lembre da escolha:
-        //  await AsyncStorage.removeItem('@viewedOnboarding');
+        // Remover a linha abaixo após testar, para que lembre da escolha:
+        //await AsyncStorage.removeItem('@viewedOnboarding');
 
         const viewed = await AsyncStorage.getItem('@viewedOnboarding');
 
@@ -19,7 +20,7 @@ export default function RootLayout() {
           router.replace('/(tabs)');
         } else {
           router.replace('/onboarding');
-        } 
+        }
       } catch (e) {
         router.replace('/onboarding');
       } finally {
@@ -31,18 +32,13 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="onboarding" />
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="profile-selection" />
-      <Stack.Screen name="activity-details" />
-      <Stack.Screen name="ActiveSession" />
-      <Stack.Screen name="LoadingActivity" />
-      <Stack.Screen name="modal" />
-      <Stack.Screen name="new-activity" />
-      <Stack.Screen name="new-scenario" />
-      <Stack.Screen name="Profile" />
-      <Stack.Screen name="signup" />
-    </Stack>
+    <BiometricsProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="onboarding" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="profile-selection" />
+        <Stack.Screen name="activity-details" />
+      </Stack>
+    </BiometricsProvider>
   );
 }

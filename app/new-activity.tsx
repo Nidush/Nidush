@@ -78,7 +78,6 @@ export default function NewActivityFlow() {
     };
   }, [step]);
 
-  // ... (funções handleContentSelect, nextStep, etc. mantêm-se iguais)
   const handleContentSelect = (id: string) => {
     setSelectedContentId(id);
     const content = Object.values(CONTENTS).find((c) => c.id === id);
@@ -98,25 +97,19 @@ export default function NewActivityFlow() {
   };
 
   const isNextDisabled = () => {
-    // Passo 1: Tipo de atividade obrigatório
     if (step === 1 && !activityType) return true;
 
-    // Passo 2: Conteúdo obrigatório
     if (step === 2 && !selectedContentId) return true;
 
-    // Passo 3: Divisão (Room) obrigatória
     if (step === 3 && !room) return true;
 
-    // Passo 4: Cenário obrigatório (Adicionado agora)
     if (step === 4 && !selectedScenarioId) return true;
 
-    // Passo 5: Nome, Descrição e Imagem obrigatórios
     if (step === 5) {
       const hasName = activityName && activityName.trim().length > 0;
       const hasDesc = description && description.trim().length > 0;
       const hasImage = !!activityImage;
 
-      // Se faltar qualquer um, esconde o botão
       if (!hasName || !hasDesc || !hasImage) return true;
     }
 
@@ -130,10 +123,7 @@ export default function NewActivityFlow() {
 
     let finalImage;
 
-    // CORREÇÃO LÓGICA DA IMAGEM
     if (activityImage) {
-      // Se for string (veio da galeria), tem de ser { uri: ... }
-      // Se for number (veio do default/require), usa-se diretamente
       finalImage =
         typeof activityImage === 'string'
           ? { uri: activityImage }
@@ -149,11 +139,12 @@ export default function NewActivityFlow() {
       title: activityName || 'Untitled Activity',
       description,
       room,
-      image: finalImage, // Agora a imagem vai no formato correto
+      image: finalImage,
       category: 'My creations',
       type: activityType,
       contentId: selectedContentId,
       scenarioId: selectedScenarioId,
+      shortcuts: false,
       keywords: [activityType, room, 'custom'],
     };
 
@@ -187,12 +178,8 @@ export default function NewActivityFlow() {
 
   return (
     <SafeAreaProvider>
-      {/* 1. View Base com a cor do tema. Removemos SafeAreaView wrapper para não cortar o fundo */}
       <View style={{ flex: 1, backgroundColor: '#F9FAF7' }}>
-        {/* Espaçador para a Status Bar (Notch) */}
         <View style={{ height: insets.top, backgroundColor: '#F9FAF7' }} />
-
-        {/* Header Fixo */}
         <View className="px-5 pt-2">
           <FlowHeader
             title="New activity"
@@ -201,22 +188,17 @@ export default function NewActivityFlow() {
             onBack={prevStep}
           />
         </View>
-
-        {/* Layout do Conteúdo */}
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          // Ajusta isto se o teclado ainda tapar (compensa o header)
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
           <View className="flex-1 relative">
             <ScrollView
               ref={scrollViewRef}
               showsVerticalScrollIndicator={false}
-              // Padding horizontal aplicado aqui
               contentContainerStyle={{
                 paddingHorizontal: 20,
-                // Padding bottom grande para o último item passar por trás do botão
                 paddingBottom: 120 + insets.bottom,
               }}
               keyboardShouldPersistTaps="handled"
@@ -250,7 +232,6 @@ export default function NewActivityFlow() {
                   setDesc={setDescription}
                   image={activityImage}
                   setImage={setActivityImage}
-                  // ADICIONAR ESTA LINHA:
                   defaultImage={reviewContent?.image || null}
                 />
               )}

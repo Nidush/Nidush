@@ -1,42 +1,65 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
-import {
-  Image,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import React from 'react';
+import { Image, Platform, StyleSheet, Text, View } from 'react-native';
 
-interface ActiveScenarioProps {
-  title: string;
-  image: any;
-  onPlay?: (isPlaying: boolean) => void;
-}
+import { UserState } from '@/constants/data/types';
+import { useBiometrics } from '@/context/BiometricsContext';
 
-export const StateWidget = ({ title, image, onPlay }: ActiveScenarioProps) => {
-  const [isPlaying, setIsPlaying] = useState(false);
+const STATE_STYLES: Record<
+  UserState,
+  {
+    color: string;
+    icon: keyof typeof MaterialIcons.glyphMap;
+    label: string;
+    phrase: string;
+    bgImage: any;
+  }
+> = {
+  RELAXED: {
+    color: '#548F53',
+    icon: 'spa',
+    label: 'Relaxed',
+    phrase: 'Enjoy these precious moments!',
+    bgImage: require('@/assets/widget/relaxed.png'),
+  },
+  FOCUSED: {
+    color: '#354F52',
+    icon: 'visibility',
+    label: 'Focused',
+    phrase: "You're in the zone! Keep it up.",
+    bgImage: require('@/assets/widget/focused.png'),
+  },
+  STRESSED: {
+    color: '#D97706',
+    icon: 'warning',
+    label: 'Stressed',
+    phrase: 'Take a deep breath and pause.',
+    bgImage: require('@/assets/widget/stressed.png'),
+  },
+  ANXIOUS: {
+    color: '#DB2777',
+    icon: 'health-and-safety',
+    label: 'Anxiety',
+    phrase: "We're here to help you calm down.",
+    bgImage: require('@/assets/widget/anxiety.png'),
+  },
+};
 
-  const handlePress = () => {
-    const newState = !isPlaying;
-    setIsPlaying(newState);
+export const StateWidget = () => {
+  const { currentState } = useBiometrics();
 
-    if (onPlay) {
-      onPlay(newState);
-    }
-  };
+  const activeStyle = STATE_STYLES[currentState];
 
   return (
-    <View className="w-full mb-6 relative overflow-hidden rounded-[15px] bg-gray-900">
-      <View style={[StyleSheet.absoluteFill, { transform: [{ scale: 1.4 }] }]}>
+    <View className="w-full mb-6 relative overflow-hidden rounded-3xl shadow-xl h-44">
+      <View style={[StyleSheet.absoluteFill]}>
         <Image
-          source={image}
-          style={StyleSheet.absoluteFill}
-          resizeMode="cover"
-          blurRadius={Platform.OS === 'ios' ? 50 : 50}
+          source={activeStyle.bgImage}
+          style={[StyleSheet.absoluteFill, { opacity: 0.7 }]}
+          resizeMode="contain"
+          blurRadius={Platform.OS === 'ios' ? 70 : 50}
         />
       </View>
 
@@ -45,7 +68,7 @@ export const StateWidget = ({ title, image, onPlay }: ActiveScenarioProps) => {
         maskElement={
           <LinearGradient
             colors={['black', 'black', 'transparent']}
-            locations={[0, 0.4, 0.9]}
+            locations={[0, 0.1, 0.7]}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
             style={StyleSheet.absoluteFill}
@@ -53,59 +76,51 @@ export const StateWidget = ({ title, image, onPlay }: ActiveScenarioProps) => {
         }
       >
         <Image
-          source={image}
+          source={activeStyle.bgImage}
           style={StyleSheet.absoluteFill}
-          resizeMode="cover"
+          resizeMode="contain"
         />
       </MaskedView>
 
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.2)', 'rgba(0,0,0,0.1)']}
-        locations={[0.2, 0.5, 1]}
-        style={StyleSheet.absoluteFill}
+        colors={[activeStyle.color, 'transparent', 'rgba(0,0,0,0.8)']}
+        locations={[0.2, 0.7, 1]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[StyleSheet.absoluteFill, { opacity: 0.85 }]}
         pointerEvents="none"
       />
 
-      <View className="flex-row justify-between items-center p-5 z-10">
-        <View className="flex-1">
+      <View className="flex-1 justify-center p-6 z-10">
+        <View className="flex-row items-center mb-3">
+          <View className="bg-white/20 p-1 rounded-full mr-2 animate-pulse">
+            <MaterialIcons name="circle" size={8} color="#4ADE80" />
+          </View>
           <Text
             style={{ fontFamily: 'Nunito_600SemiBold' }}
-            className="text-white opacity-90 text-[14px]"
+            className="text-white opacity-90 text-lg tracking-widest"
           >
-            Active Scenario
+            {"You're currently feeling"}
           </Text>
-          <Text
-            style={{
-              fontFamily: 'Nunito_700Bold',
-            }}
-            className="text-white text-[24px]"
-          >
-            {title}
-          </Text>
-
-          <View className="flex-row mt-2">
-            {['speaker', 'lightbulb-outline', 'music-note'].map((icon, idx) => (
-              <View
-                key={idx}
-                className="bg-white/20 p-[6px] rounded-full mr-2 border border-white/10"
-              >
-                <MaterialIcons name={icon as any} size={14} color="white" />
-              </View>
-            ))}
-          </View>
         </View>
 
-        <Pressable
-          onPress={handlePress}
-          style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
-          className="bg-white/60 w-20 h-20 rounded-full mr-2 border border-white/10 justify-center items-center shadow-lg"
-        >
-          <MaterialIcons
-            name={isPlaying ? 'pause' : 'play-arrow'}
-            size={52}
-            color="#548F53"
-          />
-        </Pressable>
+        <View className="flex-row items-center">
+          <View>
+            <Text
+              style={{ fontFamily: 'Nunito_700Bold' }}
+              className="text-white text-4xl shadow-sm leading-9"
+            >
+              {activeStyle.label}
+            </Text>
+
+            <Text
+              style={{ fontFamily: 'Nunito_600SemiBold' }}
+              className="text-white text-md mt-3"
+            >
+              {activeStyle.phrase}
+            </Text>
+          </View>
+        </View>
       </View>
     </View>
   );
