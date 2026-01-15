@@ -57,7 +57,6 @@ const SCENARIO_TEMPLATES = {
   ],
 };
 
-// 1. NOVO TIPO PARA O ALERTA
 export interface StressAlert {
   title: string;
   body: string;
@@ -85,7 +84,6 @@ export const BiometricsProvider = ({
   const [data, setData] = useState<WearableData | null>(null);
   const [currentState, setCurrentState] = useState<UserState>('RELAXED');
 
-  // 2. ESTADO DO ALERTA VISUAL
   const [activeAlert, setActiveAlert] = useState<StressAlert | null>(null);
 
   const stressLevelRef = useRef(10);
@@ -93,12 +91,9 @@ export const BiometricsProvider = ({
   const previousStateRef = useRef<UserState>('RELAXED');
   const segments = useSegments();
 
-  // (Removemos o useEffect de permissões pois já não usamos expo-notifications)
-
   const dismissAlert = () => setActiveAlert(null);
 
   const sendHealthAlert = (state: UserState) => {
-    // Lógica de recomendação (Mantida igual)
     const availableItems = [...ACTIVITIES, ...SCENARIOS].filter(
       (i) => i.category !== 'My creations',
     );
@@ -125,7 +120,6 @@ export const BiometricsProvider = ({
     const title =
       state === 'ANXIOUS' ? '⚠️ Anxiety Relief' : '⚡ Stress Detected';
 
-    // 3. EM VEZ DE NOTIFICAÇÃO, ATUALIZAMOS O ESTADO
     setActiveAlert({
       title,
       body: messageBody,
