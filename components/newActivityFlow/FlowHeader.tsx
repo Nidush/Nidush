@@ -10,7 +10,6 @@ export const FlowHeader = ({ title, step, totalSteps, onBack }: any) => (
         <Ionicons name="chevron-back" size={28} color="#2F4F4F" />
       </TouchableOpacity>
 
-      {/* Título com Text nativo */}
       <Text
         className="text-2xl text-[#354F52]"
         style={{ fontFamily: 'Nunito_700Bold' }}
@@ -19,7 +18,6 @@ export const FlowHeader = ({ title, step, totalSteps, onBack }: any) => (
       </Text>
 
       <TouchableOpacity onPress={() => router.back()}>
-        {/* Botão Cancel com Text nativo */}
         <Text
           className="text-[#548F53] text-lg"
           style={{ fontFamily: 'Nunito_600SemiBold' }}

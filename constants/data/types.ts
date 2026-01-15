@@ -1,17 +1,15 @@
 import { ImageSourcePropType } from 'react-native';
 
-// Ingredientes
 export interface Ingredient {
   item: string;
   amount: string;
 }
 export type InstructionStep = {
   text: string;
-  duration?: number; // Em segundos. Se for undefined/null, é manual (o utilizador clica para avançar)
+  duration?: number;
   description?: string;
 };
 
-// Conteúdo
 export interface Content {
   id: string;
   title: string;
@@ -26,7 +24,6 @@ export interface Content {
   author?: string;
 }
 
-// Configuração de Dispositivo
 export interface ScenarioDeviceState {
   deviceId: string;
   state: 'on' | 'off';
@@ -34,7 +31,6 @@ export interface ScenarioDeviceState {
   brightness?: string;
 }
 
-// Cenário
 export interface Scenario {
   id: string;
   title: string;
@@ -45,10 +41,10 @@ export interface Scenario {
   devices: ScenarioDeviceState[];
   playlist?: string;
   focusMode: boolean;
+  shortcuts: boolean;
   keywords?: string[];
 }
 
-// Atividade
 export interface Activity {
   id: string;
   title: string;
@@ -57,9 +53,21 @@ export interface Activity {
   image: ImageSourcePropType;
   category?: 'My creations' | 'Simple recipes' | 'For the morning' | string;
   type: 'cooking' | 'meditation' | 'workout' | 'audiobooks' | 'general';
-
-  // Relacionamentos
   scenarioId?: string;
   contentId?: string;
+  shortcuts: boolean;
   keywords?: string[];
+}
+
+export type UserState = 'RELAXED' | 'FOCUSED' | 'STRESSED' | 'ANXIOUS';
+
+export interface WearableData {
+  deviceId: string;
+  timestamp: number;
+  heartRate: number;
+  hrv: number;
+  skinTemperature: number;
+  eda: number;
+  stressScore: number;
+  detectedState: UserState;
 }

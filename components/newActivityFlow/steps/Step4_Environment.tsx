@@ -1,8 +1,8 @@
-import { SCENARIOS } from '@/constants/data'; // Ajusta o caminho dos dados
+import { SCENARIOS } from '@/constants/data';
 import { MaterialIcons } from '@expo/vector-icons';
 import React, { useMemo } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
-import { ScenarioCard } from '../ScenarioCard'; // Importa o componente criado acima
+import { ScenarioCard } from '../ScenarioCard';
 import { StepWrapper } from '../StepWrapper';
 
 interface Step4Props {
@@ -16,11 +16,9 @@ export const Step4_Environment = ({
   onSelect,
   roomName,
 }: Step4Props) => {
-  // 1. FILTRAGEM (Case Insensitive)
   const filteredScenarios = useMemo(() => {
     if (!roomName) return [];
 
-    // Converte tudo para minúsculas e remove espaços para garantir match
     const targetRoom = roomName.toLowerCase().trim();
 
     return SCENARIOS.filter((s) => s.room.toLowerCase().trim() === targetRoom);
@@ -38,15 +36,8 @@ export const Step4_Environment = ({
         Scenarios
       </Text>
 
-      {/* --- GRID LAYOUT ---
-          flex-wrap: permite cair para a linha de baixo
-          justify-between: afasta os items para as pontas
-          gap-y-4: espaçamento vertical
-      */}
       <View className="flex-row flex-wrap justify-between gap-y-4">
-        {/* Lista de Cenários */}
         {filteredScenarios.map((env) => (
-          // O Wrapper define a largura da coluna (48%)
           <View key={env.id} className="w-[48%]">
             <ScenarioCard
               item={env}
@@ -56,7 +47,6 @@ export const Step4_Environment = ({
           </View>
         ))}
 
-        {/* Mensagem de Estado Vazio */}
         {filteredScenarios.length === 0 && (
           <View className="w-full mb-3 p-4">
             <Text
@@ -68,12 +58,10 @@ export const Step4_Environment = ({
           </View>
         )}
 
-        {/* Botão Create Scene (Também ocupa 48% e é quadrado) */}
         <View className="w-[48%] aspect-square">
           <TouchableOpacity
             className="w-full h-full bg-[#D1E4D1] rounded-2xl justify-center items-center"
             activeOpacity={0.7}
-            // onPress={() => console.log('Criar')}
           >
             <MaterialIcons name="add" size={48} color="#354F52" />
             <Text
