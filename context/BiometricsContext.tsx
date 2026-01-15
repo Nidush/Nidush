@@ -1,6 +1,14 @@
-import { UserState, WearableData } from '@/constants/data/types';
+import { ACTIVITIES, SCENARIOS } from '@/constants/data';
+import {
+  Activity,
+  Scenario,
+  UserState,
+  WearableData,
+} from '@/constants/data/types';
 import { generateBiometricsFromStress } from '@/utils/biometricSimulator';
+import { getDynamicRecommendations } from '@/utils/recommendationEngine';
 import * as Notifications from 'expo-notifications';
+import { useSegments } from 'expo-router';
 import React, {
   createContext,
   useContext,
@@ -9,7 +17,6 @@ import React, {
   useState,
 } from 'react';
 
-// --- CONFIGURAÇÃO DE NOTIFICAÇÕES (Mantida igual) ---
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -20,48 +27,57 @@ Notifications.setNotificationHandler({
   }),
 });
 
-const ANXIOUS_MESSAGES = [
-  {
-    title: 'Need a moment of peace?',
-    body: "Things seem a bit overwhelming right now. How about we relax together with 'Moonlight Bay'?",
-  },
-  {
-    title: "Let's breathe together",
-    body: "I noticed your heart is racing a bit. Why not let the 'Moonlight Bay' atmosphere ground you?",
-  },
-  {
-    title: 'The world can wait...',
-    body: "You deserve a few minutes of quiet. Let's transform your space into a sanctuary of calm.",
-  },
-];
+const isScenario = (item: Activity | Scenario): item is Scenario => {
+  return !('type' in item);
+};
 
-const STRESSED_MESSAGES = [
-  {
-    title: 'Time for a quick reset?',
-    body: "You've been doing great, but a little break might feel good. Want to try 'Forest Bathing'?",
-  },
-  {
-    title: 'Feeling a bit tense?',
-    body: "A quick refresh could work wonders. Let's bring the 'Forest Bathing' energy to your room.",
-  },
-  {
-    title: 'Recharge your energy',
-    body: 'Even a small pause helps you stay focused. Shall we activate a calming forest environment?',
-  },
-];
+const ACTIVITY_TEMPLATES = {
+  ANXIOUS: [
+    (name: string) =>
+      `Things seem overwhelming. How about we relax together with '${name}'?`,
+    (name: string) =>
+      `I noticed your heart is racing. Let the practice of '${name}' ground you.`,
+    (name: string) =>
+      `Take a break from the world. Try '${name}' for a few minutes.`,
+  ],
+  STRESSED: [
+    (name: string) =>
+      `You've been pushing hard. A quick session of '${name}' might help.`,
+    (name: string) =>
+      `Feeling tense? '${name}' could be exactly what you need right now.`,
+    (name: string) =>
+      `Time to recharge. Let's do some '${name}' to regain focus.`,
+  ],
+};
 
-// 1. DEFINIÇÃO DO TIPO DE DADOS DO CONTEXTO
+const SCENARIO_TEMPLATES = {
+  ANXIOUS: [
+    (name: string) =>
+      `It's too loud inside your head. Let me transform your room into '${name}'.`,
+    (name: string) =>
+      `Need a safe space? I can activate the '${name}' atmosphere for you right now.`,
+    (name: string) =>
+      `Let's dim the lights. Switching to '${name}' might bring you peace.`,
+  ],
+  STRESSED: [
+    (name: string) =>
+      `Change your environment, change your mood. Shall we switch to '${name}'?`,
+    (name: string) =>
+      `The '${name}' setting is perfect for lowering stress. Want to try it?`,
+    (name: string) =>
+      `Create a sanctuary of calm. Activating '${name}' implies instant relief.`,
+  ],
+};
+
 interface BiometricsContextType {
   data: WearableData | null;
   currentState: UserState;
 }
 
-// 2. CRIAÇÃO DO CONTEXTO
 const BiometricsContext = createContext<BiometricsContextType | undefined>(
   undefined,
 );
 
-// 3. O PROVIDER (A TUA LÓGICA VIVE AQUI AGORA)
 export const BiometricsProvider = ({
   children,
 }: {
@@ -73,37 +89,72 @@ export const BiometricsProvider = ({
   const stressLevelRef = useRef(10);
   const trendRef = useRef<'UP' | 'DOWN'>('UP');
   const previousStateRef = useRef<UserState>('RELAXED');
+  const segments = useSegments();
 
-  // Pedir permissões ao iniciar a App
   useEffect(() => {
     async function requestPermissions() {
       const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== 'granted') {
-        console.log('Permission for notifications not granted.');
-      }
+      if (status !== 'granted') console.log('Notification permission denied');
     }
     requestPermissions();
   }, []);
 
   const sendHealthAlert = async (state: UserState) => {
-    const messagePool =
-      state === 'ANXIOUS' ? ANXIOUS_MESSAGES : STRESSED_MESSAGES;
-    const randomIndex = Math.floor(Math.random() * messagePool.length);
-    const selectedMessage = messagePool[randomIndex];
+    const availableItems = [...ACTIVITIES, ...SCENARIOS].filter(
+      (i) => i.category !== 'My creations',
+    );
+    const allRecommendations = getDynamicRecommendations(availableItems, state);
+
+    const topCandidates = allRecommendations.slice(0, 3);
+
+    let topPick: Activity | Scenario | null = null;
+    if (topCandidates.length > 0) {
+      const randomIndex = Math.floor(Math.random() * topCandidates.length);
+      topPick = topCandidates[randomIndex];
+    }
+
+    if (!topPick) return;
+
+    const itemName = topPick.title;
+    const itemIsScenario = isScenario(topPick);
+
+    const stateKey = state === 'ANXIOUS' ? 'ANXIOUS' : 'STRESSED';
+
+    const templateList = itemIsScenario
+      ? SCENARIO_TEMPLATES[stateKey]
+      : ACTIVITY_TEMPLATES[stateKey];
+
+    const randomTemplateIndex = Math.floor(Math.random() * templateList.length);
+    const messageBody = templateList[randomTemplateIndex](itemName);
+
+    const title = state === 'ANXIOUS' ? 'Anxiety Relief' : 'Stress Detected';
 
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: selectedMessage.title,
-        body: selectedMessage.body,
+        title: title,
+        body: messageBody,
+        data: {
+          itemId: topPick.id,
+          isScenario: itemIsScenario,
+          type: state,
+        },
       },
       trigger: null,
     });
   };
 
-  // O MOTOR DE SIMULAÇÃO
   useEffect(() => {
+    const isOnboarding = segments.some(
+      (segment) => segment === 'onboarding' || segment === 'profile-selection',
+    );
+
+    // Se estivermos nessas páginas, NÃO INICIA o simulador
+    if (isOnboarding) {
+      // Opcional: Podes fazer reset aos dados se quiseres
+      // setData(null);
+      return;
+    }
     const interval = setInterval(() => {
-      // Simulação de subida/descida do stress
       if (trendRef.current === 'UP') {
         stressLevelRef.current += Math.floor(Math.random() * 20);
         if (stressLevelRef.current >= 100) trendRef.current = 'DOWN';
@@ -112,16 +163,13 @@ export const BiometricsProvider = ({
         if (stressLevelRef.current <= 10) trendRef.current = 'UP';
       }
 
-      // Garante limites entre 0 e 100
       stressLevelRef.current = Math.max(
         0,
         Math.min(100, stressLevelRef.current),
       );
-
       const newData = generateBiometricsFromStress(stressLevelRef.current);
       const newState = newData.detectedState;
 
-      // Verifica se o estado mudou para enviar notificação
       if (
         (newState === 'ANXIOUS' || newState === 'STRESSED') &&
         newState !== previousStateRef.current
@@ -132,12 +180,10 @@ export const BiometricsProvider = ({
       previousStateRef.current = newState;
       setCurrentState(newState);
       setData(newData);
-
-      // Nota: 30000 = 30 segundos. Para testes podes baixar para 3000 (3s).
     }, 10000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [segments]);
 
   return (
     <BiometricsContext.Provider value={{ data, currentState }}>
@@ -146,11 +192,9 @@ export const BiometricsProvider = ({
   );
 };
 
-// 4. HOOK PARA CONSUMIR OS DADOS
 export const useBiometrics = () => {
   const context = useContext(BiometricsContext);
-  if (!context) {
+  if (!context)
     throw new Error('useBiometrics must be used within a BiometricsProvider');
-  }
   return context;
 };

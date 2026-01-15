@@ -61,7 +61,7 @@ const STATE_KEYWORDS: Record<UserState, string[]> = {
 const NEGATIVE_KEYWORDS: Record<UserState, string[]> = {
   RELAXED: ['work', 'gym', 'stress'],
   FOCUSED: ['party', 'sleep', 'distraction'],
-  STRESSED: ['work', 'focus', 'deadline', 'party', 'loud', 'gym'], // Evitar trabalho quando stressado
+  STRESSED: ['work', 'focus', 'deadline', 'party', 'loud', 'gym'],
   ANXIOUS: ['work', 'horror', 'loud', 'party', 'intensity'],
 };
 

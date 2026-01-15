@@ -298,4 +298,83 @@ export const SCENARIOS: Scenario[] = [
       'focus',
     ],
   },
+  {
+    id: 's10',
+    title: 'Cinema Night',
+    description:
+      'Transform your living room into a private theater. Dimmed dark blue lighting and a cozy temperature create the ultimate movie-watching experience.',
+    room: 'Living Room',
+    // Nota: Certifica-te de que tens uma imagem ou usa uma existente como placeholder
+    image: require('@/assets/Scenarios/cinema_night.png'),
+    focusMode: true, // Ativado para evitar distrações durante o filme
+    playlist: 'Epic Movie Scores',
+    devices: [
+      {
+        deviceId: 'dev_light_living',
+        state: 'on',
+        value: '#1A1A50', // Um azul muito escuro (Midnight Blue) para não refletir no ecrã
+        brightness: '15%', // Luz fraca
+      },
+      {
+        deviceId: 'dev_speaker_living',
+        state: 'on',
+        value: 'Epic Movie Scores',
+      },
+      {
+        deviceId: 'dev_thermostat_main',
+        state: 'on',
+        value: 23, // Uma temperatura confortável para estar no sofá
+      },
+    ],
+    keywords: [
+      'movie',
+      'night',
+      'evening',
+      'entertainment',
+      'relax',
+      'cinema',
+      'dark',
+      'cozy',
+      'fun',
+    ],
+  },
+  {
+    id: 's11',
+    title: 'Morning Brew',
+    description:
+      'Start your day with the aroma of fresh coffee. Warm, gentle lighting and soft acoustic tunes create the perfect wake-up routine.',
+    room: 'Kitchen',
+    image: require('@/assets/Scenarios/morning_brew.png'),
+    focusMode: false,
+    playlist: 'Coffee Shop Acoustic',
+    devices: [
+      {
+        deviceId: 'dev_light_kitchen',
+        state: 'on',
+        value: '#FFE4B5',
+        brightness: '75%',
+      },
+      {
+        deviceId: 'dev_speaker_kitchen',
+        state: 'on',
+        value: 'Coffee Shop Acoustic',
+      },
+      {
+        deviceId: 'dev_thermostat_main',
+        state: 'on',
+        value: 21,
+      },
+    ],
+    keywords: [
+      'morning',
+      'coffee',
+      'breakfast',
+      'kitchen',
+      'start',
+      'energy',
+      'acoustic',
+      'calm',
+      'sunrise',
+    ],
+  },
 ];

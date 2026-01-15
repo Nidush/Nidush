@@ -25,7 +25,7 @@ export const CONTENTS: Record<string, Content> = {
     type: 'recipe',
     category: 'cooking',
     duration: '50 min',
-    image: require('@/assets/cooking_activities/simple_recipes/chocolate_cake.png'),
+    image: require('@/assets/cooking_activities/recommended/brownies.png'),
     ingredients: [
       { item: 'Unsalted Butter', amount: '225g' },
       { item: 'Sugar', amount: '400g' },
@@ -70,6 +70,93 @@ export const CONTENTS: Record<string, Content> = {
       'Garnish with chopped chives and serve immediately.',
     ],
   },
+  c12: {
+    id: 'c12',
+    title: 'Pasta Primo',
+    description:
+      'A vibrant and fresh pasta dish featuring seasonal vegetables, garlic, and a touch of parmesan. Perfect for a quick, healthy meal.',
+    type: 'recipe',
+    category: 'cooking',
+    duration: '25 min',
+    image: require('@/assets/cooking_activities/simple_recipes/pasta.png'),
+    ingredients: [
+      { item: 'Penne Pasta', amount: '400g' },
+      { item: 'Cherry Tomatoes', amount: '200g' },
+      { item: 'Zucchini', amount: '1 medium' },
+      { item: 'Olive Oil', amount: '3 tbsp' },
+      { item: 'Garlic', amount: '2 cloves' },
+      { item: 'Parmesan Cheese', amount: '50g' },
+      { item: 'Fresh Basil', amount: 'Handful' },
+    ],
+    instructions: [
+      'Bring a large pot of salted water to a boil and cook pasta until al dente.',
+      'In a large pan, sauté minced garlic and sliced zucchini in olive oil over medium heat.',
+      'Add halved cherry tomatoes and cook for 3-4 minutes until they soften slightly.',
+      'Drain the pasta (reserving a splash of cooking water) and toss it into the pan with the vegetables.',
+      'Stir in the reserved pasta water to create a light glossy sauce.',
+      'Serve hot, topped with fresh basil leaves and grated parmesan.',
+    ],
+  },
+
+  c13: {
+    id: 'c13',
+    title: 'Classic Chocolate Cake',
+    description:
+      'A timeless favorite. This moist and rich chocolate cake is perfect for birthdays or just treating yourself.',
+    type: 'recipe',
+    category: 'cooking',
+    duration: '60 min',
+    image: require('@/assets/cooking_activities/simple_recipes/chocolate_cake.png'),
+    ingredients: [
+      { item: 'All-Purpose Flour', amount: '250g' },
+      { item: 'Sugar', amount: '300g' },
+      { item: 'Cocoa Powder', amount: '75g' },
+      { item: 'Eggs', amount: '2 large' },
+      { item: 'Milk', amount: '240ml' },
+      { item: 'Vegetable Oil', amount: '120ml' },
+      { item: 'Baking Powder', amount: '2 tsp' },
+      { item: 'Boiling Water', amount: '240ml' },
+    ],
+    instructions: [
+      'Preheat oven to 175°C and grease a round cake pan.',
+      'Whisk together sugar, flour, cocoa, baking powder, baking soda, and salt in a large bowl.',
+      'Add eggs, milk, oil, and vanilla extract. Beat on medium speed for 2 minutes.',
+      'Stir in boiling water by hand (the batter will be thin, but that is normal).',
+      'Pour batter into the prepared pan.',
+      'Bake for 30-35 minutes or until a wooden toothpick inserted in the center comes out clean.',
+      'Cool completely in the pan before removing to frost.',
+    ],
+  },
+  c14: {
+    id: 'c14',
+    title: 'Spicy Vodka Pasta',
+    description:
+      'A creamy, rich, and slightly spicy tomato sauce with a splash of vodka. Restaurant quality made at home.',
+    type: 'recipe',
+    category: 'cooking',
+    duration: '25 min',
+    image: require('@/assets/cooking_activities/simple_recipes/vodka_pasta.png'),
+    ingredients: [
+      { item: 'Penne or Rigatoni', amount: '400g' },
+      { item: 'Heavy Cream', amount: '150ml' },
+      { item: 'Tomato Paste', amount: '100g' },
+      { item: 'Vodka', amount: '3 tbsp' },
+      { item: 'Butter', amount: '50g' },
+      { item: 'Onion', amount: '1 small' },
+      { item: 'Garlic', amount: '2 cloves' },
+      { item: 'Chili Flakes', amount: '1 tsp' },
+      { item: 'Parmesan', amount: 'Grated' },
+    ],
+    instructions: [
+      'Boil pasta in salted water until al dente. Save a cup of pasta water.',
+      'In a large pan, melt butter and sauté chopped onion and garlic until soft.',
+      'Add tomato paste and chili flakes, cooking for 3-5 mins until the paste turns dark red (this is key!).',
+      'Pour in the vodka to deglaze the pan and cook for 2 mins to evaporate the alcohol.',
+      'Lower the heat and stir in the heavy cream until smooth.',
+      'Toss in the cooked pasta and a splash of pasta water. Mix vigorously until the sauce coats the pasta.',
+      'Serve immediately topped with fresh parmesan.',
+    ],
+  },
 
   c2: {
     id: 'c2',
@@ -84,7 +171,6 @@ export const CONTENTS: Record<string, Content> = {
         text: 'Sit down comfortably in a quiet place',
         description:
           'Find a comfortable seated position, either on a chair or on a cushion on the floor. Keep your back straight but relaxed.',
-        // duration: undefined (Manual)
       },
       {
         text: 'Put your hand on your heart. Take 3 deep breaths',
@@ -102,7 +188,6 @@ export const CONTENTS: Record<string, Content> = {
         text: 'Smile and open your eyes',
         description:
           'Now, gently bring a smile to your face. Feel the lightness it brings. When you feel ready, slowly open your eyes to start your day.',
-        // duration: undefined (Manual)
       },
     ],
   },
@@ -115,7 +200,6 @@ export const CONTENTS: Record<string, Content> = {
     category: 'meditation',
     duration: '60 min',
     image: require('@/assets/meditation_activities/my_creations/gratitude_flow.png'),
-    // Sem instruções (Audio puro)
   },
 
   c9: {
@@ -131,7 +215,6 @@ export const CONTENTS: Record<string, Content> = {
         text: 'Find a comfortable seated position, facing a window.',
         description:
           'Sit comfortably facing a window or a source of natural light. Place your hands on your knees, palms facing up to receive energy.',
-        // Manual
       },
       {
         text: 'Close your eyes and take deep breaths.',
@@ -161,11 +244,9 @@ export const CONTENTS: Record<string, Content> = {
         text: 'Gently open your eyes and stretch your arms.',
         description:
           'Take one last deep breath. Gently blink your eyes open and reach your arms up towards the sky, embracing the new day.',
-        // Manual final
       },
     ],
   },
-  // --- WORKOUT ---
   c5: {
     id: 'c5',
     title: 'HIIT Cardio Blast',
@@ -204,6 +285,48 @@ export const CONTENTS: Record<string, Content> = {
       'Cat-Cow Stretch: On hands and knees, inhale to arch your back (Cow) and exhale to round it (Cat).',
       'Child’s Pose: Sit back on your heels, reach arms forward and rest your forehead on the floor.',
       'Cobra Pose: Lie on your stomach, place hands under shoulders and gently lift your chest.',
+    ],
+  },
+  c15: {
+    id: 'c15',
+    title: 'Visualization for Success',
+    description:
+      'Boost your confidence and clarity by mentally rehearsing your goals. A powerful technique used by athletes and leaders to prime the brain for achievement.',
+    type: 'audio',
+    category: 'meditation',
+    duration: '10 min',
+    // Estou a usar esta imagem como placeholder, ajusta se tiveres uma de "sucesso" ou "montanha"
+    image: require('@/assets/activities_for_you/sunrise_flow.png'),
+    instructions: [
+      {
+        text: 'Find a comfortable, upright position.',
+        description:
+          'Sit in a chair with your feet flat on the floor and hands resting on your lap. Close your eyes and take three deep, centering breaths.',
+        duration: 60,
+      },
+      {
+        text: 'Visualize your specific goal.',
+        description:
+          'Bring to mind a specific goal or task you want to achieve today. See it clearly. Where are you? Who is with you? What are you doing?',
+        duration: 90,
+      },
+      {
+        text: 'Engage all your senses.',
+        description:
+          'Don’t just see it. Feel the texture of the desk or equipment. Hear the sounds around you. Feel the emotion of confidence and competence flowing through you.',
+        duration: 120,
+      },
+      {
+        text: 'Experience the moment of completion.',
+        description:
+          'Fast forward to the moment you finish the task successfully. Feel the relief, the pride, and the satisfaction. Lock that feeling into your body.',
+        duration: 60,
+      },
+      {
+        text: 'Return with confidence.',
+        description:
+          'Slowly bring your awareness back to the room. Carry that feeling of success with you as you open your eyes.',
+      },
     ],
   },
 

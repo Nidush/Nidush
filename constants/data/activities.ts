@@ -91,6 +91,7 @@ export const ACTIVITIES: Activity[] = [
     image: require('@/assets/meditation_content/video_sessions/morning_zen.png'),
     type: 'meditation',
     contentId: 'c2',
+    scenarioId: 's5',
     keywords: [
       'morning',
       'zen',
@@ -132,6 +133,7 @@ export const ACTIVITIES: Activity[] = [
     image: require('@/assets/cooking_activities/simple_recipes/vodka_pasta.png'),
     category: 'Simple recipes',
     type: 'cooking',
+    contentId: 'c14',
     keywords: [
       'evening',
       'dinner',
@@ -173,6 +175,7 @@ export const ACTIVITIES: Activity[] = [
     image: require('@/assets/cooking_activities/simple_recipes/chocolate_cake.png'),
     category: 'Simple recipes',
     type: 'cooking',
+    contentId: 'c13',
     keywords: [
       'dessert',
       'chocolate',
@@ -194,6 +197,7 @@ export const ACTIVITIES: Activity[] = [
     image: require('@/assets/cooking_activities/simple_recipes/pasta.png'),
     category: 'Simple recipes',
     type: 'cooking',
+    contentId: 'c12',
     keywords: [
       'lunch',
       'dinner',
@@ -231,6 +235,31 @@ export const ACTIVITIES: Activity[] = [
       'stressed',
       'anxious',
       'anxiety',
+    ],
+  },
+  {
+    id: 'a15',
+    title: 'Visualization for Success',
+    description:
+      'Boost your confidence and clarity by mentally rehearsing your goals. A powerful technique used by athletes and leaders to prime the brain for achievement.',
+    room: 'Bedroom',
+    image: require('@/assets/meditation_activities/recommended/visualization_for_success.png'),
+    category: 'Meditation',
+    type: 'meditation',
+    contentId: 'c15',
+    scenarioId: 's2',
+    keywords: [
+      'focus',
+      'work',
+      'success',
+      'confidence',
+      'morning',
+      'goals',
+      'mindset',
+      'productivity',
+      'anxious',
+      'stress',
+      'recovery',
     ],
   },
 ];

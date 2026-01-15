@@ -52,8 +52,8 @@ export const HomeHeader = ({ userName }: HomeHeaderProps) => {
               source={require('@/assets/avatars/profile.png')}
               className="rounded-full"
               style={{
-                width: 64,
-                height: 64,
+                width: 60,
+                height: 60,
                 resizeMode: 'cover',
               }}
             />

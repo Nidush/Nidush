@@ -9,14 +9,12 @@ import React, { useMemo } from 'react';
 import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// Componentes
 import { UnifiedCard } from '@/components/activitiesScenarios/UnifiedCard';
 import { CarouselSection } from '../../components/activitiesScenarios/CarouselSection';
 import { HomeHeader } from '../../components/Homepage/HomeHeader';
 import { StateWidget } from '../../components/Homepage/StateWidget';
 
-// Dados e Lógica
-import { ACTIVITIES, CONTENTS } from '@/constants/data'; // <--- IMPORTANTE: CONTENTS
+import { ACTIVITIES, CONTENTS } from '@/constants/data';
 import { useBiometrics } from '@/context/BiometricsContext';
 import { getDynamicRecommendations } from '@/utils/recommendationEngine';
 
@@ -28,8 +26,6 @@ export default function Index() {
   });
 
   const { currentState } = useBiometrics();
-  // --- LÓGICA DE DADOS CORRIGIDA ---
-  // 5. GERAR A LISTA DINÂMICA
   const dynamicActivities = useMemo(() => {
     // 1. Filtrar
     const appActivities = ACTIVITIES.filter(
@@ -61,11 +57,8 @@ export default function Index() {
   }, [currentState]);
 
   const dynamicTitle = useMemo(() => {
-    if (currentState === 'ANXIOUS' || currentState === 'STRESSED') {
-      return 'Recommended for calming';
-    }
     return 'Activities for you';
-  }, [currentState]);
+  }, []);
   const shortcuts = [
     {
       id: 's1',
@@ -74,7 +67,6 @@ export default function Index() {
       room: 'Kitchen',
       image: require('../../assets/shortcuts/cooking_time.png'),
     },
-    // ... outros atalhos ...
     {
       id: 's2',
       title: 'Meditation Time',
@@ -112,7 +104,6 @@ export default function Index() {
 
         <StateWidget />
 
-        {/* Carrossel Dinâmico */}
         <View className="-mx-5">
           <CarouselSection
             title={dynamicTitle}
@@ -121,7 +112,6 @@ export default function Index() {
           />
         </View>
 
-        {/* Shortcuts */}
         <View className="flex-row justify-between items-center mb-4 mt-2">
           <Text
             style={{ fontFamily: 'Nunito_600SemiBold' }}
