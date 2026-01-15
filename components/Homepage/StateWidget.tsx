@@ -5,7 +5,8 @@ import React from 'react';
 import { Image, Platform, StyleSheet, Text, View } from 'react-native';
 
 import { UserState } from '@/constants/data/types';
-import { useWearableSimulator } from '@/hooks/useWearableSimulator';
+// --- ALTERAÇÃO 1: Importar o Contexto ---
+import { useBiometrics } from '@/context/BiometricsContext';
 
 const STATE_STYLES: Record<
   UserState,
@@ -48,11 +49,13 @@ const STATE_STYLES: Record<
 };
 
 export const StateWidget = () => {
-  const { currentState } = useWearableSimulator();
+  // --- ALTERAÇÃO 2: Usar o hook do Contexto ---
+  const { currentState } = useBiometrics();
+
   const activeStyle = STATE_STYLES[currentState];
 
   return (
-    <View className="w-full mb-6 relative overflow-hidden rounded-3xl  shadow-xl h-44">
+    <View className="w-full mb-6 relative overflow-hidden rounded-3xl shadow-xl h-44">
       <View style={[StyleSheet.absoluteFill]}>
         <Image
           source={activeStyle.bgImage}

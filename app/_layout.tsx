@@ -1,3 +1,4 @@
+import { BiometricsProvider } from '@/context/BiometricsContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -31,11 +32,13 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="onboarding" />
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="profile-selection" />
-      <Stack.Screen name="activity-details" />
-    </Stack>
+    <BiometricsProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="onboarding" />
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="profile-selection" />
+        <Stack.Screen name="activity-details" />
+      </Stack>
+    </BiometricsProvider>
   );
 }

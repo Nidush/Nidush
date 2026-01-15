@@ -1,8 +1,15 @@
 import { UserState, WearableData } from '@/constants/data/types';
 import { generateBiometricsFromStress } from '@/utils/biometricSimulator';
 import * as Notifications from 'expo-notifications';
-import { useEffect, useRef, useState } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 
+// --- CONFIGURAÇÃO DE NOTIFICAÇÕES (Mantida igual) ---
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -12,6 +19,7 @@ Notifications.setNotificationHandler({
     shouldShowList: true,
   }),
 });
+
 const ANXIOUS_MESSAGES = [
   {
     title: 'Need a moment of peace?',
@@ -42,7 +50,23 @@ const STRESSED_MESSAGES = [
   },
 ];
 
-export const useWearableSimulator = () => {
+// 1. DEFINIÇÃO DO TIPO DE DADOS DO CONTEXTO
+interface BiometricsContextType {
+  data: WearableData | null;
+  currentState: UserState;
+}
+
+// 2. CRIAÇÃO DO CONTEXTO
+const BiometricsContext = createContext<BiometricsContextType | undefined>(
+  undefined,
+);
+
+// 3. O PROVIDER (A TUA LÓGICA VIVE AQUI AGORA)
+export const BiometricsProvider = ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => {
   const [data, setData] = useState<WearableData | null>(null);
   const [currentState, setCurrentState] = useState<UserState>('RELAXED');
 
@@ -50,6 +74,7 @@ export const useWearableSimulator = () => {
   const trendRef = useRef<'UP' | 'DOWN'>('UP');
   const previousStateRef = useRef<UserState>('RELAXED');
 
+  // Pedir permissões ao iniciar a App
   useEffect(() => {
     async function requestPermissions() {
       const { status } = await Notifications.requestPermissionsAsync();
@@ -61,15 +86,11 @@ export const useWearableSimulator = () => {
   }, []);
 
   const sendHealthAlert = async (state: UserState) => {
-    // 1. Escolher qual lista usar
     const messagePool =
       state === 'ANXIOUS' ? ANXIOUS_MESSAGES : STRESSED_MESSAGES;
-
-    // 2. Escolher uma mensagem aleatória da lista
     const randomIndex = Math.floor(Math.random() * messagePool.length);
     const selectedMessage = messagePool[randomIndex];
 
-    // 3. Enviar a notificação
     await Notifications.scheduleNotificationAsync({
       content: {
         title: selectedMessage.title,
@@ -79,8 +100,10 @@ export const useWearableSimulator = () => {
     });
   };
 
+  // O MOTOR DE SIMULAÇÃO
   useEffect(() => {
     const interval = setInterval(() => {
+      // Simulação de subida/descida do stress
       if (trendRef.current === 'UP') {
         stressLevelRef.current += Math.floor(Math.random() * 20);
         if (stressLevelRef.current >= 100) trendRef.current = 'DOWN';
@@ -89,10 +112,16 @@ export const useWearableSimulator = () => {
         if (stressLevelRef.current <= 10) trendRef.current = 'UP';
       }
 
-      const newData = generateBiometricsFromStress(stressLevelRef.current);
+      // Garante limites entre 0 e 100
+      stressLevelRef.current = Math.max(
+        0,
+        Math.min(100, stressLevelRef.current),
+      );
 
+      const newData = generateBiometricsFromStress(stressLevelRef.current);
       const newState = newData.detectedState;
 
+      // Verifica se o estado mudou para enviar notificação
       if (
         (newState === 'ANXIOUS' || newState === 'STRESSED') &&
         newState !== previousStateRef.current
@@ -103,13 +132,25 @@ export const useWearableSimulator = () => {
       previousStateRef.current = newState;
       setCurrentState(newState);
       setData(newData);
-    }, 5000);
+
+      // Nota: 30000 = 30 segundos. Para testes podes baixar para 3000 (3s).
+    }, 10000);
 
     return () => clearInterval(interval);
   }, []);
 
-  return {
-    data,
-    currentState,
-  };
+  return (
+    <BiometricsContext.Provider value={{ data, currentState }}>
+      {children}
+    </BiometricsContext.Provider>
+  );
+};
+
+// 4. HOOK PARA CONSUMIR OS DADOS
+export const useBiometrics = () => {
+  const context = useContext(BiometricsContext);
+  if (!context) {
+    throw new Error('useBiometrics must be used within a BiometricsProvider');
+  }
+  return context;
 };

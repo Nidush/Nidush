@@ -4,20 +4,21 @@ import {
   Nunito_700Bold,
   useFonts,
 } from '@expo-google-fonts/nunito';
-import React from 'react';
-import {
-  Dimensions,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
+import { router } from 'expo-router';
+import React, { useMemo } from 'react';
+import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BaseCard } from '../../components/BaseCard';
+// Componentes
+import { UnifiedCard } from '@/components/activitiesScenarios/UnifiedCard';
+import { CarouselSection } from '../../components/activitiesScenarios/CarouselSection';
 import { HomeHeader } from '../../components/Homepage/HomeHeader';
 import { StateWidget } from '../../components/Homepage/StateWidget';
+
+// Dados e Lógica
+import { ACTIVITIES, CONTENTS } from '@/constants/data'; // <--- IMPORTANTE: CONTENTS
+import { useBiometrics } from '@/context/BiometricsContext';
+import { getDynamicRecommendations } from '@/utils/recommendationEngine';
 
 export default function Index() {
   const [fontsLoaded] = useFonts({
@@ -26,93 +27,102 @@ export default function Index() {
     Nunito_400Regular,
   });
 
-  if (!fontsLoaded) return null;
+  const { currentState } = useBiometrics();
+  // --- LÓGICA DE DADOS CORRIGIDA ---
+  // 5. GERAR A LISTA DINÂMICA
+  const dynamicActivities = useMemo(() => {
+    // 1. Filtrar
+    const appActivities = ACTIVITIES.filter(
+      (item) => item.category !== 'My creations',
+    );
 
-  const activities = [
-    {
-      title: 'Stretching',
-      time: '5min',
-      room: 'Bedroom',
-      image: require('@/assets/activities_for_you/stretching.png'),
-    },
-    {
-      title: 'Pikelets',
-      time: '17min',
-      room: 'Kitchen',
-      image: require('@/assets/activities_for_you/pikelets.png'),
-    },
-    {
-      title: 'Sunrise Flow',
-      time: '15min',
-      room: 'Living Room',
-      image: require('@/assets/activities_for_you/sunrise_flow.png'),
-    },
-  ];
+    // 2. Ordenar
+    const sortedList = getDynamicRecommendations(
+      appActivities,
+      currentState,
+    ).slice(0, 5);
 
+    // 3. Mapear (Com as correções de TypeScript)
+    return sortedList.map((item) => {
+      let duration: string | undefined = undefined;
+      if ('contentId' in item && item.contentId) {
+        const contentData = (CONTENTS as any)[item.contentId];
+
+        if (contentData) {
+          duration = contentData.duration;
+        }
+      }
+
+      return {
+        ...item,
+        time: duration,
+      };
+    });
+  }, [currentState]);
+
+  const dynamicTitle = useMemo(() => {
+    if (currentState === 'ANXIOUS' || currentState === 'STRESSED') {
+      return 'Recommended for calming';
+    }
+    return 'Activities for you';
+  }, [currentState]);
   const shortcuts = [
     {
+      id: 's1',
       title: 'Cooking Time',
       time: '50min',
       room: 'Kitchen',
       image: require('../../assets/shortcuts/cooking_time.png'),
     },
+    // ... outros atalhos ...
     {
+      id: 's2',
       title: 'Meditation Time',
       time: '15min',
       room: 'Bedroom',
       image: require('../../assets/shortcuts/meditation_time.png'),
     },
     {
+      id: 's3',
       title: 'Skincare Time',
       time: '10min',
       room: 'Bathroom',
       image: require('../../assets/shortcuts/skincare_time.png'),
     },
     {
+      id: 's4',
       title: 'Reading Time',
       time: '45min',
       room: 'Living Room',
       image: require('../../assets/shortcuts/reading_time.png'),
     },
   ];
-  const { width: SCREEN_WIDTH } = Dimensions.get('window');
-  const CARD_WIDTH = SCREEN_WIDTH * 0.42;
-  const CARD_SPACING = 12; // 12px de margem (mr-3)
+
+  if (!fontsLoaded) return null;
+
   return (
     <SafeAreaView className="flex-1 bg-[#F0F2EB]" edges={['top']}>
       <ScrollView
         className="px-5"
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 40 }}
         style={{ paddingTop: Platform.OS === 'android' ? 20 : 0 }}
       >
         <HomeHeader userName="Laura" />
 
         <StateWidget />
 
-        <Text
-          style={{ fontFamily: 'Nunito_600SemiBold' }}
-          className="text-2xl text-[#354F52] mb-4"
-        >
-          Activities for you
-        </Text>
+        {/* Carrossel Dinâmico */}
+        <View className="-mx-5">
+          <CarouselSection
+            title={dynamicTitle}
+            data={dynamicActivities}
+            showTime={true}
+          />
+        </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className="mb-6 -mx-5"
-          contentContainerStyle={{ paddingHorizontal: 20 }}
-          snapToInterval={CARD_WIDTH + CARD_SPACING}
-          decelerationRate="fast"
-          snapToAlignment="start"
-        >
-          {activities.map((item, index) => (
-            <View key={index} className="mr-3">
-              <BaseCard {...item} width={CARD_WIDTH} />
-            </View>
-          ))}
-        </ScrollView>
-
-        <View className="flex-row justify-between items-center mb-4">
+        {/* Shortcuts */}
+        <View className="flex-row justify-between items-center mb-4 mt-2">
           <Text
             style={{ fontFamily: 'Nunito_600SemiBold' }}
             className="text-2xl text-[#354F52]"
@@ -128,10 +138,25 @@ export default function Index() {
             </Text>
           </Pressable>
         </View>
+
         <View className="flex-row flex-wrap justify-between pb-10">
-          {shortcuts.map((item, index) => (
-            <View key={index} className="w-[48%] mb-4">
-              <BaseCard {...item} width="100%" />
+          {shortcuts.map((item) => (
+            <View key={item.id} className="w-[48%] mb-4">
+              <UnifiedCard
+                id={item.id}
+                title={item.title}
+                image={item.image}
+                time={item.time}
+                room={item.room}
+                width="100%"
+                aspectRatio={1.1}
+                onPress={() =>
+                  router.push({
+                    pathname: '/activity-details',
+                    params: { id: item.id },
+                  })
+                }
+              />
             </View>
           ))}
         </View>
