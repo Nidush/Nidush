@@ -8,7 +8,7 @@
 
 **Nidush** is a smart home solution developed as a Minimum Viable Product (MVP) for the **Altice Labs** challenge. It focuses on humanizing smart spaces by transforming them into active environments for emotional care, specifically designed for individuals dealing with anxiety in urban contexts.
 
-[![Web Preview](https://img.shields.io/badge/Preview-Web_Version-00ADAD?style=for-the-badge&logo=netlify)](https://nidush.tdw-mctw.pt/onboarding)
+[![Android Download](https://img.shields.io/badge/Download-Android_APK-34A853?style=for-the-badge&logo=android&logoColor=white)](https://drive.google.com/drive/folders/1574BepiHOLFtc2zvkSyJQmq_g9qTiNVV)
 [![React Native](https://img.shields.io/badge/React_Native-Expo-61DAFB?style=for-the-badge&logo=react)](https://reactnative.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/NativeWind-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://www.nativewind.dev/)
@@ -25,21 +25,24 @@
 
 ## Tech Stack
 
-* **Frontend:** React Native (Expo)
+* **Frontend:** React Native (Expo SDK 52)
 * **Language:** TypeScript
 * **Styling:** NativeWind (Tailwind CSS)
-* **Navigation:** Expo Router
+* **Navigation:** Expo Router (File-based routing)
+* **State Management:** React Context API
+* **Testing:** Jest & React Testing Library (Coverage implemented)
 * **Integrations (Planned):** Spotify API for immersive soundscapes and Wearable data sync for real-time stress monitoring.
 
 ---
 
 ## Getting Started
 
-To explore the Nidush MVP locally:
+To explore the Nidush MVP locally, follow these steps:
 
 ### Prerequisites
-* Node.js (LTS)
-* Expo Go app installed on your smartphone
+* **Node.js (LTS):** [Download here](https://nodejs.org/)
+* **Git:** To clone the repository
+* **Expo Go:** Installed on your smartphone ([Android](https://play.google.com/store/apps/details?id=host.exp.exponent) / [iOS](https://apps.apple.com/app/expo-go/id982107779))
 
 ### Installation
 
@@ -60,17 +63,18 @@ To explore the Nidush MVP locally:
     ```
 
 ### Running the App
-* Scan the **QR Code** in your terminal with the **Expo Go** app.
-* For web preview: Press `w` (requires web setup).
+* **Physical Device:** Open the **Expo Go** app and scan the QR code visible in your terminal.
+* **Android Emulator / iOS Simulator:** Press `a` or `i` in the terminal after the server starts.
+* **Clean Start:** If you encounter caching issues, run `npx expo start -c`.
 
 ---
 
-## Live Preview (Web)
+## Mobile Access (APK)
 
-The current state of the app can be viewed here:
-[nidush.tdw-mctw.pt](https://nidush.tdw-mctw.pt/onboarding)
+Since this is a mobile-first application, we recommend testing the native experience. You can download the latest Android build (APK) here:
+[**Nidush Android Build - Google Drive**](https://drive.google.com/drive/folders/1574BepiHOLFtc2zvkSyJQmq_g9qTiNVV)
 
-*Note: As a mobile-first application, some features are best experienced in a native environment. As an MVP, some features are currently in the development.*
+*Note: For security reasons, you may need to allow "Install from unknown sources" on your Android device to install the APK.*
 
 ---
 

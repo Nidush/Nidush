@@ -3,21 +3,14 @@ import {
   MaterialCommunityIcons,
   MaterialIcons,
 } from '@expo/vector-icons';
-import MaskedView from '@react-native-masked-view/masked-view'; // <--- Importado
-import { LinearGradient } from 'expo-linear-gradient'; // <--- Importado
+import MaskedView from '@react-native-masked-view/masked-view';
+import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
-import {
-  Image,
-  Platform, // <--- Importado
-  StyleSheet, // <--- Importado
-  Text,
-  View,
-} from 'react-native';
+import { Image, Platform, StyleSheet, Text, View } from 'react-native';
 import { ReviewCard } from '../ReviewCard';
 import { ScenarioReviewCard } from '../ScenarioReviewCard';
 import { StepWrapper } from '../StepWrapper';
 
-// Interfaces
 interface ScenarioDevice {
   deviceId: string;
   state: string;
@@ -49,7 +42,6 @@ interface Step6Props {
   onJumpToStep: (step: number) => void;
 }
 
-// --- HELPER FUNCTIONS ---
 const getActivityIcon = (type: string) => {
   const lowerType = type ? type.toLowerCase() : '';
   const props = { size: 24, color: '#354F52' };
@@ -126,7 +118,6 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
       title="Review and save"
       subtitle="See if everything is right and save your new activity."
     >
-      {/* Activity Type */}
       <ReviewCard label="Activity Type" onEdit={() => onJumpToStep(1)}>
         <View className="flex-row items-center">
           <View className="w-11 h-11 rounded-lg bg-[#C8E2C8] justify-center items-center mr-3">
@@ -141,17 +132,12 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
         </View>
       </ReviewCard>
 
-      {/* Contents - ESTILO ATUALIZADO */}
-      {/* Contents - CORRIGIDO */}
       <ReviewCard label="Contents" onEdit={() => onJumpToStep(2)}>
         {content && content.image ? (
-          // Container Principal: w-full obriga a ocupar a largura toda do ReviewCard
           <View className="w-full h-[120px] relative rounded-xl overflow-hidden bg-gray-900">
-            {/* 1. Blur Background */}
             <View style={StyleSheet.absoluteFill}>
               <Image
                 source={content.image}
-                // ADICIONADO: w-full h-full para forçar o preenchimento
                 className="w-full h-full"
                 resizeMode="cover"
                 blurRadius={Platform.OS === 'ios' ? 70 : 50}
@@ -159,7 +145,6 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
               <View className="absolute inset-0" />
             </View>
 
-            {/* 2. Masked Image */}
             <MaskedView
               style={StyleSheet.absoluteFill}
               maskElement={
@@ -174,13 +159,11 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
             >
               <Image
                 source={content.image}
-                // ADICIONADO: w-full h-full para forçar o preenchimento
                 className="w-full h-full"
                 resizeMode="cover"
               />
             </MaskedView>
 
-            {/* 3. Text Legibility Gradient */}
             <LinearGradient
               colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.8)']}
               locations={[0.4, 0.7, 1]}
@@ -188,7 +171,6 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
               pointerEvents="none"
             />
 
-            {/* 4. Content Info */}
             <View className="absolute bottom-0 w-full p-3 z-30">
               <Text
                 className="text-white text-lg leading-tight mb-2"
@@ -234,7 +216,6 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
         )}
       </ReviewCard>
 
-      {/* Room */}
       <ReviewCard label="Room" onEdit={() => onJumpToStep(3)}>
         <View className="flex-row items-center">
           <View className="w-11 h-11 rounded-lg bg-[#C8E2C8] justify-center items-center mr-3">
@@ -249,13 +230,11 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
         </View>
       </ReviewCard>
 
-      {/* Environment */}
       <ScenarioReviewCard
         environment={environment}
         onEdit={() => onJumpToStep(4)}
       />
 
-      {/* Activity Info */}
       <ReviewCard label="Activity Info" onEdit={() => onJumpToStep(5)}>
         <View className="flex-row items-center">
           {activityImageSource ? (

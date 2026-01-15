@@ -6,11 +6,24 @@ import BreathingLoader from '@/components/loading/BreathingLoader';
 import TipDisplay from '@/components/loading/TipDisplay';
 import { TIPS } from '@/constants/loadingData';
 
+import {
+  useFonts,
+  Nunito_400Regular,
+  Nunito_600SemiBold,
+  Nunito_700Bold,
+} from '@expo-google-fonts/nunito';
+
 interface FinalLoadingProps {
   onComplete: () => void;
 }
 
 export default function FinalLoading({ onComplete }: FinalLoadingProps) {
+  const [fontsLoaded] = useFonts({
+    'Nunito_400Regular': Nunito_400Regular,
+    'Nunito_600SemiBold': Nunito_600SemiBold,
+    'Nunito_700Bold': Nunito_700Bold,
+  });
+
   const [message, setMessage] = useState('Take a deep breath. We are preparing your safe space...');
 
   const randomTip = useMemo(() => {
@@ -32,12 +45,14 @@ export default function FinalLoading({ onComplete }: FinalLoadingProps) {
     };
   }, [onComplete]);
 
+  if (!fontsLoaded) return null;
+
   return (
     <SafeAreaView className="flex-1 bg-[#F0F2EB] px-8 items-center justify-between py-12">
       <View className="mt-4">
         <Text
           className="text-[#354F52] text-2xl text-center leading-tight"
-          style={{ fontFamily: 'Nunito_700Bold' }}
+          style={{ fontFamily: 'Nunito_700Bold' }} 
         >
           {message}
         </Text>

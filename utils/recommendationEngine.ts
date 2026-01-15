@@ -1,7 +1,151 @@
-import { Activity, Scenario } from '@/constants/data/types';
+import { Activity, Scenario, UserState } from '@/constants/data/types';
 
-// Tipos de hora do dia
 export type TimeOfDay = 'morning' | 'afternoon' | 'evening' | 'night';
+
+const STATE_KEYWORDS: Record<UserState, string[]> = {
+  RELAXED: [
+    'relaxed',
+    'relax',
+    'chill',
+    'slow',
+    'calm',
+    'quiet',
+    'cooking',
+    'pasta',
+    'italian',
+    'wine',
+    'dinner',
+    'brunch',
+    'breakfast',
+    'baking',
+    'chocolate',
+    'dessert',
+    'coffee',
+    'acoustic',
+    'jazz',
+    'entertainment',
+    'movie',
+    'cinema',
+    'fun',
+    'creative',
+    'cozy',
+    'warm',
+    'heat',
+    'sunset',
+    'romantic',
+    'date',
+    'love',
+    'comfortable',
+    'reading',
+    'book',
+    'hobby',
+    'garden',
+    'floral',
+    'spring',
+  ],
+  FOCUSED: [
+    'focus',
+    'focused',
+    'productivity',
+    'deep',
+    'work',
+    'study',
+    'learning',
+    'goals',
+    'success',
+    'confidence',
+    'mindset',
+    'visualization',
+    'office',
+    'library',
+    'reading',
+    'book',
+    'audiobook',
+    'coding',
+    'write',
+    'quick',
+    'start',
+    'energy',
+    'crisp',
+    'clear',
+    'precision',
+    'white',
+  ],
+  STRESSED: [
+    'stressed',
+    'stress',
+    'recovery',
+    'break',
+    'pause',
+    'nature',
+    'forest',
+    'green',
+    'garden',
+    'floral',
+    'rose',
+    'pine',
+    'meditation',
+    'zen',
+    'breathing',
+    'mindfulness',
+    'stretch',
+    'flexibility',
+    'release',
+    'tension',
+    'body',
+    'quiet',
+    'silence',
+    'calm',
+    'sanctuary',
+    'escape',
+  ],
+  ANXIOUS: [
+    'anxious',
+    'anxiety',
+    'panic',
+    'overwhelmed',
+    'water',
+    'ocean',
+    'rain',
+    'waves',
+    'blue',
+    'bath',
+    'sleep',
+    'bed',
+    'night',
+    'dream',
+    'lavender',
+    'sleepy',
+    'safety',
+    'safe',
+    'comfort',
+    'cozy',
+    'warm',
+    'grounding',
+    'soft',
+    'slow',
+    'breathe',
+    'spiritual',
+    'inner',
+    'productivity',
+  ],
+};
+
+const NEGATIVE_KEYWORDS: Record<UserState, string[]> = {
+  RELAXED: ['work', 'gym', 'stress', 'deadline', 'rush'],
+  FOCUSED: ['party', 'sleep', 'distraction', 'noise', 'entertainment', 'movie'],
+  STRESSED: [
+    'work',
+    'focus',
+    'deadline',
+    'party',
+    'loud',
+    'gym',
+    'horror',
+    'intensity',
+  ],
+  ANXIOUS: ['work', 'horror', 'loud', 'party', 'intensity', 'fast', 'sprint'],
+};
 
 const TIME_KEYWORDS: Record<TimeOfDay, string[]> = {
   morning: [
@@ -9,12 +153,14 @@ const TIME_KEYWORDS: Record<TimeOfDay, string[]> = {
     'sunrise',
     'breakfast',
     'brunch',
-    'energy',
-    'start',
-    'yoga',
-    'zen',
     'coffee',
+    'brew',
+    'start',
+    'energy',
     'wake',
+    'yoga',
+    'stretch',
+    'sun',
   ],
   afternoon: [
     'afternoon',
@@ -23,12 +169,10 @@ const TIME_KEYWORDS: Record<TimeOfDay, string[]> = {
     'work',
     'power',
     'gym',
-    'snack',
     'study',
-    'productivity',
-    'office',
+    'quick',
+    'active',
   ],
-  // 18h - 22h: Jantar e Relaxar
   evening: [
     'evening',
     'dinner',
@@ -37,13 +181,12 @@ const TIME_KEYWORDS: Record<TimeOfDay, string[]> = {
     'jazz',
     'party',
     'cooking',
-    'movie',
-    'social',
-    'romantic',
     'pasta',
-    'dessert',
+    'italian',
+    'romantic',
+    'cozy',
+    'relax',
   ],
-  // 22h - 05h: Dormir
   night: [
     'night',
     'sleep',
@@ -51,69 +194,77 @@ const TIME_KEYWORDS: Record<TimeOfDay, string[]> = {
     'moon',
     'dream',
     'midnight',
-    'insomnia',
     'silent',
     'dark',
     'stars',
-    'recovery',
-    'calm',
+    'movie',
+    'cinema',
+    'lavender',
   ],
 };
 
-/**
- * Determina a hora atual (usado apenas internamente para ordenar)
- */
 export const getTimeOfDay = (): TimeOfDay => {
   const hour = new Date().getHours();
-
   if (hour >= 5 && hour < 12) return 'morning';
   if (hour >= 12 && hour < 18) return 'afternoon';
   if (hour >= 18 && hour < 22) return 'evening';
   return 'night';
 };
 
-/**
- * Título Fixo (conforme pedido)
- */
-export const getRecommendationTitle = (): string => {
-  return 'Recommended';
-};
-
-/**
- * Calcula pontuação de relevância
- */
 const calculateRelevanceScore = (
   item: Activity | Scenario,
-  activeKeywords: string[],
+  timeKeywords: string[],
+  stateKeywords: string[],
+  negativeKeywords: string[],
 ): number => {
   let score = 0;
 
-  // 1. Keywords explícitas (Peso: 5)
-  if (item.keywords) {
-    item.keywords.forEach((k) => {
-      if (activeKeywords.includes(k.toLowerCase())) score += 5;
-    });
-  }
+  const rawKeywords = item.keywords || [];
+  const itemKeywords = rawKeywords.map((k) => k.toLowerCase());
 
-  // 2. Texto (Peso: 1)
-  const text = `${item.title} ${item.description} ${item.room}`.toLowerCase();
-  activeKeywords.forEach((k) => {
-    if (text.includes(k)) score += 1;
+  stateKeywords.forEach((k) => {
+    if (itemKeywords.includes(k)) score += 30;
+  });
+
+  timeKeywords.forEach((k) => {
+    if (itemKeywords.includes(k)) score += 5;
+  });
+
+  negativeKeywords.forEach((k) => {
+    if (itemKeywords.includes(k)) score -= 50;
   });
 
   return score;
 };
 
-/**
- * Retorna a lista ordenada por relevância temporal
- */
-export const getDynamicRecommendations = (items: (Activity | Scenario)[]) => {
+export const getDynamicRecommendations = (
+  items: (Activity | Scenario)[],
+  currentState: UserState = 'RELAXED',
+) => {
   const time = getTimeOfDay();
-  const currentKeywords = TIME_KEYWORDS[time];
+  const timeKeywords = TIME_KEYWORDS[time];
+
+  const safeState = currentState || 'RELAXED';
+  const stateKeywords = STATE_KEYWORDS[safeState];
+  const negativeKeywords = NEGATIVE_KEYWORDS[safeState] || [];
 
   return [...items].sort((a, b) => {
-    const scoreA = calculateRelevanceScore(a, currentKeywords);
-    const scoreB = calculateRelevanceScore(b, currentKeywords);
+    const scoreA = calculateRelevanceScore(
+      a,
+      timeKeywords,
+      stateKeywords,
+      negativeKeywords,
+    );
+    const scoreB = calculateRelevanceScore(
+      b,
+      timeKeywords,
+      stateKeywords,
+      negativeKeywords,
+    );
     return scoreB - scoreA;
   });
+};
+
+export const getRecommendationTitle = (): string => {
+  return 'Recommended';
 };

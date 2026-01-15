@@ -3,7 +3,20 @@ import { View, Text, TouchableOpacity, Image, Dimensions, Animated, Easing, Scro
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icons } from '../../assets/assets'; 
 
+import {
+  useFonts,
+  Nunito_400Regular,
+  Nunito_600SemiBold,
+  Nunito_700Bold,
+} from '@expo-google-fonts/nunito';
+
 export default function WearableSync({ onNext, onSkip }: { onNext: () => void, onSkip: () => void }) {
+  const [fontsLoaded] = useFonts({
+    'Nunito_400Regular': Nunito_400Regular,
+    'Nunito_600SemiBold': Nunito_600SemiBold,
+    'Nunito_700Bold': Nunito_700Bold,
+  });
+
   const [dims, setDims] = useState(Dimensions.get('window'));
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const brandGreen = "#5C8D58";
@@ -12,8 +25,6 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
     const sub = Dimensions.addEventListener('change', ({ window }) => setDims(window));
     return () => sub.remove();
   }, []);
-
-  const isWebPC = dims.width > 768;
 
   useEffect(() => {
     Animated.loop(
@@ -25,6 +36,10 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
       })
     ).start();
   }, [pulseAnim]);
+
+  if (!fontsLoaded) return null;
+
+  const isWebPC = dims.width > 768;
 
   const pulseStyle = {
     transform: [{ scale: pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 2] }) }],
@@ -95,14 +110,14 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
               </View>
               
               <Text 
-                style={{ fontFamily: 'Nunito-ExtraBold', fontSize: isWebPC ? 42 : 36 }} 
+                style={{ fontFamily: 'Nunito_700Bold', fontSize: isWebPC ? 42 : 36 }} 
                 className="text-[#3E545C] text-center leading-tight tracking-[-0.5px]"
               >
                 Connect your{"\n"}wearable
               </Text>
               
               <Text 
-                style={{ fontFamily: 'Nunito-Regular', fontSize: isWebPC ? 18 : 17 }} 
+                style={{ fontFamily: 'Nunito_400Regular', fontSize: isWebPC ? 18 : 17 }} 
                 className="text-[#3E545C] text-center mt-6 opacity-80 leading-[26px] px-4"
               >
                 Sync your Apple Watch or Oura Ring to help Nidush track your stress levels automatically.
@@ -115,7 +130,7 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
                   className={`${isWebPC ? 'w-[300px] h-[64px]' : 'w-[260px] h-[60px]'} bg-[#5C8D58] rounded-full justify-center items-center shadow-lg mb-6 active:scale-95`}
                 >
                   <Text 
-                    style={{ fontFamily: 'Nunito-ExtraBold', fontSize: isWebPC ? 20 : 18 }} 
+                    style={{ fontFamily: 'Nunito_700Bold', fontSize: isWebPC ? 20 : 18 }} 
                     className="text-white"
                   >
                     Start Scanning
@@ -124,7 +139,7 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
 
                 <TouchableOpacity onPress={onSkip} activeOpacity={0.6}>
                   <Text 
-                    style={{ fontFamily: 'Nunito-SemiBold', fontSize: 16 }} 
+                    style={{ fontFamily: 'Nunito_600SemiBold', fontSize: 16 }} 
                     className="text-[#3E545C] opacity-50"
                   >
                     I&apos;ll do this later

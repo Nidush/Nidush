@@ -15,6 +15,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
+import {
+  useFonts,
+  Nunito_400Regular,
+  Nunito_600SemiBold,
+  Nunito_700Bold,
+} from '@expo-google-fonts/nunito';
+
 // Componentes de Onboarding
 import WelcomeUser from '../components/Onboarding/WelcomeUser';
 import HouseName from '../components/Onboarding/HouseName';
@@ -23,6 +30,12 @@ import ActivitySelection from '../components/Onboarding/ActivitySelection';
 import FinalLoading from '../components/Onboarding/FinalLoading';
 
 export default function SignUp() {
+  const [fontsLoaded] = useFonts({
+    'Nunito_400Regular': Nunito_400Regular,
+    'Nunito_600SemiBold': Nunito_600SemiBold,
+    'Nunito_700Bold': Nunito_700Bold,
+  });
+
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState('form');
   const [dims, setDims] = useState(Dimensions.get('window'));
@@ -47,6 +60,8 @@ export default function SignUp() {
       }).start();
     });
   };
+
+  if (!fontsLoaded) return null;
 
   const isWebPC = dims.width > 768;
 
@@ -101,30 +116,44 @@ export default function SignUp() {
                 </View>
 
                 <View className={isWebPC ? 'mt-[10px]' : 'mt-[25px]'}>
-                  <Text style={{ fontFamily: 'Nunito-ExtraBold' }} className="text-[40px] text-[#3E545C] tracking-[-0.5px]">Welcome Home</Text>
-                  <Text style={{ fontFamily: 'Nunito-Regular' }} className="text-[16px] text-[#3E545C] mt-[8px] mb-[30px] leading-[22px] opacity-90">
+                  <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-[40px] text-[#3E545C] tracking-[-0.5px]">Welcome Home</Text>
+                  <Text style={{ fontFamily: 'Nunito_400Regular' }} className="text-[16px] text-[#3E545C] mt-[8px] mb-[30px] leading-[22px] opacity-90">
                     Join Nidush and let your home be your safe space.
                   </Text>
 
                   <View className="flex-row justify-between mb-[15px]">
                     <View className="w-[48%]">
-                      <Text style={{ fontFamily: 'Nunito-SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">First Name</Text>
-                      <TextInput className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]" />
+                      <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">First Name</Text>
+                      <TextInput 
+                        style={{ fontFamily: 'Nunito_400Regular' }}
+                        className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]" 
+                      />
                     </View>
                     <View className="w-[48%]">
-                      <Text style={{ fontFamily: 'Nunito-SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">Last Name</Text>
-                      <TextInput className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]" />
+                      <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">Last Name</Text>
+                      <TextInput 
+                        style={{ fontFamily: 'Nunito_400Regular' }}
+                        className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]" 
+                      />
                     </View>
                   </View>
 
                   <View className="w-full mb-[15px]">
-                    <Text style={{ fontFamily: 'Nunito-SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">Email</Text>
-                    <TextInput className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]" keyboardType="email-address" />
+                    <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">Email</Text>
+                    <TextInput 
+                      style={{ fontFamily: 'Nunito_400Regular' }}
+                      className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]" 
+                      keyboardType="email-address" 
+                    />
                   </View>
 
                   <View className="w-full mb-[15px]">
-                    <Text style={{ fontFamily: 'Nunito-SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">Password</Text>
-                    <TextInput className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]" secureTextEntry />
+                    <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">Password</Text>
+                    <TextInput 
+                      style={{ fontFamily: 'Nunito_400Regular' }}
+                      className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]" 
+                      secureTextEntry 
+                    />
                   </View>
 
                   <TouchableOpacity
@@ -132,12 +161,14 @@ export default function SignUp() {
                     className="bg-[#5C8D58] w-[230px] h-[54px] rounded-full justify-center items-center self-center mt-[15px] shadow-sm"
                     onPress={() => transitionTo('welcome')}
                   >
-                    <Text style={{ fontFamily: 'Nunito-ExtraBold' }} className="text-white text-[20px]">Join Nidush</Text>
+                    <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-white text-[20px]">Join Nidush</Text>
                   </TouchableOpacity>
 
                   <View className="flex-row justify-center mt-[20px] mb-20">
-                    <Text style={{ fontFamily: 'Nunito-Regular' }} className="text-[#3E545C] text-[15px]">Already have an account? </Text>
-                    <TouchableOpacity><Text style={{ fontFamily: 'Nunito-Bold' }} className="text-[#5C8D58] text-[15px]">Login</Text></TouchableOpacity>
+                    <Text style={{ fontFamily: 'Nunito_400Regular' }} className="text-[#3E545C] text-[15px]">Already have an account? </Text>
+                    <TouchableOpacity>
+                      <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-[#5C8D58] text-[15px]">Login</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               </View>
