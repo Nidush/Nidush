@@ -48,6 +48,7 @@ export const Step2_Content = ({
         <Text
           className="text-2xl text-[#2F4F4F] mb-3"
           style={{ fontFamily: 'Nunito_600SemiBold' }}
+          accessibilityRole="header"
         >
           {title}
         </Text>
@@ -56,6 +57,7 @@ export const Step2_Content = ({
           data={data}
           horizontal
           showsHorizontalScrollIndicator={false}
+          accessibilityLabel={`List of ${title}`}
           className="-mx-5"
           contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
           keyExtractor={(item) => item.id}

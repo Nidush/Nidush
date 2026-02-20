@@ -22,11 +22,22 @@ export const SelectionCard = ({
       isSelected ? 'border-[#548F53]' : 'border-transparent'
     }`}
     onPress={onPress}
+    accessible={true}
+    accessibilityRole="button"
+    accessibilityLabel={label}
+    accessibilityState={{ selected: isSelected }}
+    accessibilityHint="Touch to select this option"
   >
-    <MaterialIcons name={icon} size={50} color="#354F52" />
+    <MaterialIcons
+      name={icon}
+      size={50}
+      color="#354F52"
+      importantForAccessibility="no-hide-descendants"
+    />
     <Text
       className="mt-2.5 text-lg text-[#2F4F4F]"
       style={{ fontFamily: 'Nunito_700Bold' }}
+      importantForAccessibility="no"
     >
       {label}
     </Text>

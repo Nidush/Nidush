@@ -54,8 +54,16 @@ export const ContentCard = ({
           ? 'w-full aspect-square mb-3'
           : 'w-[48%] aspect-square',
       )}
+      accessible={true}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.title}, ${item.type}${item.duration ? `, duration: ${item.duration}` : ''}`}
+      accessibilityState={{ selected: isSelected }}
+      accessibilityHint="Touch to select this content"
     >
-      <View style={StyleSheet.absoluteFill}>
+      <View
+        style={StyleSheet.absoluteFill}
+        importantForAccessibility="no-hide-descendants"
+      >
         <Image
           source={item.image}
           style={StyleSheet.absoluteFill}
@@ -89,11 +97,18 @@ export const ContentCard = ({
         pointerEvents="none"
       />
 
-      <TouchableOpacity className="absolute top-2.5 right-1 z-20 p-1">
+      <TouchableOpacity
+        className="absolute top-2.5 right-1 z-20 p-1"
+        accessibilityLabel={`Details for ${item.title}`}
+        accessibilityRole="button"
+      >
         <MaterialIcons name="more-vert" size={24} color="white" />
       </TouchableOpacity>
 
-      <View className="absolute bottom-0 w-full p-3 z-30">
+      <View
+        className="absolute bottom-0 w-full p-3 z-30"
+        importantForAccessibility="no-hide-descendants"
+      >
         <Text
           numberOfLines={2}
           className={clsx(
