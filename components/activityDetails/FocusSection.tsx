@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View, AccessibilityRole } from 'react-native';
 
 interface FocusSectionProps {
   enabled: boolean;
@@ -12,10 +12,18 @@ export const FocusSection = ({ enabled, onToggle }: FocusSectionProps) => {
       <Text
         className="text-[#354F52] text-xl mb-3"
         style={{ fontFamily: 'Nunito_700Bold' }}
+        accessible
+        accessibilityRole="header"
+        accessibilityLabel="Focus Mode"
       >
         Focus Mode
       </Text>
-      <View className="flex-row items-center justify-between bg-[#F0F2EB] border border-[#548f537f] p-4 rounded-2xl">
+
+      <View
+        className="flex-row items-center justify-between bg-[#F0F2EB] border border-[#548f537f] p-4 rounded-2xl"
+        accessible
+        accessibilityRole="summary"
+      >
         <View className="flex-1 pr-4">
           <Text
             className="text-[#354F52] text-lg"
@@ -35,6 +43,11 @@ export const FocusSection = ({ enabled, onToggle }: FocusSectionProps) => {
           activeOpacity={0.8}
           onPress={() => onToggle(!enabled)}
           className={`w-14 h-7 rounded-full px-1 justify-center ${enabled ? 'bg-[#548F53]' : 'bg-gray-400/60'}`}
+          accessible
+          accessibilityRole="switch"
+          accessibilityState={{ checked: enabled }}
+          accessibilityLabel="Do Not Disturb toggle"
+          accessibilityHint={`Toggles notifications ${enabled ? 'on' : 'off'}`}
         >
           <View
             className={`w-5 h-5 bg-white rounded-full shadow-sm ${enabled ? 'self-end' : 'self-start'}`}

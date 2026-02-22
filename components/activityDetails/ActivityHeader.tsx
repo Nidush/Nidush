@@ -52,13 +52,26 @@ export const ActivityHeader = ({
     else router.back();
   };
 
-  const MenuItem = ({ icon, label, onPress, color = '#2F4F4F' }: any) => (
+  const MenuItem = ({
+    icon,
+    label,
+    onPress,
+    color = '#2F4F4F',
+  }: {
+    icon: React.ComponentProps<typeof MaterialIcons>['name'];
+    label: string;
+    onPress?: () => void;
+    color?: string;
+  }) => (
     <TouchableOpacity
       onPress={() => {
         setMenuVisible(false);
         onPress && onPress();
       }}
       className="flex-row items-center py-3 px-4 active:bg-gray-50"
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel={label}
     >
       <MaterialIcons name={icon} size={20} color={color} />
       <Text
@@ -72,6 +85,7 @@ export const ActivityHeader = ({
 
   return (
     <View className="w-full h-[450px] relative">
+      {/* Background blur + masked image */}
       <View style={StyleSheet.absoluteFill}>
         <Image
           source={imageSource}
@@ -81,6 +95,7 @@ export const ActivityHeader = ({
         />
         <View className="absolute inset-0" />
       </View>
+
       <MaskedView
         style={StyleSheet.absoluteFill}
         maskElement={
@@ -105,15 +120,28 @@ export const ActivityHeader = ({
       />
 
       <SafeAreaView style={StyleSheet.absoluteFill} edges={['top']}>
+        {/* Top navigation */}
         <View className="flex-row justify-between items-center px-5 pt-2 z-50">
-          <TouchableOpacity onPress={handleBackPress}>
+          <TouchableOpacity
+            onPress={handleBackPress}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
             <Ionicons name="chevron-back" size={28} color="white" />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setMenuVisible(true)}>
+
+          <TouchableOpacity
+            onPress={() => setMenuVisible(true)}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="Open menu"
+          >
             <MaterialIcons name="more-vert" size={28} color="white" />
           </TouchableOpacity>
         </View>
 
+        {/* Menu Modal */}
         <Modal
           transparent
           visible={menuVisible}
@@ -145,11 +173,7 @@ export const ActivityHeader = ({
                     label="Add to shortcuts"
                     onPress={onAddToShortcuts}
                   />
-                  <MenuItem
-                    icon="edit"
-                    label="Edit activity"
-                    onPress={onEdit}
-                  />
+                  <MenuItem icon="edit" label="Edit activity" onPress={onEdit} />
                   <View className="h-[1px] bg-gray-100 my-1 mx-4" />
                   <MenuItem
                     icon="delete-outline"
@@ -163,16 +187,23 @@ export const ActivityHeader = ({
           </TouchableWithoutFeedback>
         </Modal>
 
+        {/* Bottom info */}
         <View className="absolute bottom-10 px-6 w-full -z-10">
           <Text
             className="text-white text-xl tracking-wider capitalize mb-2"
             style={{ fontFamily: 'Nunito_600SemiBold' }}
+            accessible
+            accessibilityRole="header"
+            accessibilityLabel={`Type: ${type}`}
           >
             {type}
           </Text>
           <Text
             className="text-white text-4xl mt-1 shadow-sm"
             style={{ fontFamily: 'Nunito_700Bold' }}
+            accessible
+            accessibilityRole="header"
+            accessibilityLabel={`Title: ${title}`}
           >
             {title}
           </Text>
@@ -183,6 +214,8 @@ export const ActivityHeader = ({
                 <Text
                   className="text-white ml-2 text-lg"
                   style={{ fontFamily: 'Nunito_600SemiBold' }}
+                  accessible
+                  accessibilityLabel={`Duration: ${duration}`}
                 >
                   {duration}
                 </Text>
@@ -193,6 +226,8 @@ export const ActivityHeader = ({
               <Text
                 className="text-white ml-2 text-lg"
                 style={{ fontFamily: 'Nunito_600SemiBold' }}
+                accessible
+                accessibilityLabel={`Room: ${room}`}
               >
                 {room}
               </Text>

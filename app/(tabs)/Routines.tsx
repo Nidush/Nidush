@@ -17,7 +17,6 @@ interface Routine {
 }
 
 export default function Routines() {
-  // 1. Estado para as rotinas
   const [routines, setRoutines] = useState<Routine[]>([
     { id: 1, title: 'Sunrise Awakening', days: 'Mon-Fri', time: '7:15 am', room: 'Bedroom', active: true, image: require('../../assets/Scenarios/routines/sunrise_awakening.png') },
     { id: 2, title: 'Gym Hour', days: 'Tue & Thu', time: '6:00 pm', room: 'Living Room', active: false, image: require('../../assets/Scenarios/routines/gym_hour.png') },
@@ -43,22 +42,33 @@ export default function Routines() {
       );
     });
   }, [routines, searchQuery]);
-return (
-    <SafeAreaView className="flex-1 bg-[#F1F3EA]" edges={['top']}>
+
+  return (
+    <SafeAreaView className="flex-1 bg-[#F1F3EA]" edges={['top']} accessible accessibilityLabel="Routines screen">
       <StatusBar barStyle="dark-content" />
 
       {/* Header */}
       <View className="items-center mt-2 mb-6">
-        <Text className="text-3xl font-semibold text-[#354F52]" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+        <Text 
+          className="text-3xl font-semibold text-[#354F52]" 
+          style={{ fontFamily: 'Nunito_600SemiBold' }}
+          accessibilityRole="header"
+        >
           Routines
         </Text>
       </View>
 
       <View className="px-5 mb-6">
         <View className="flex-row items-center border border-[#BDC7C2] rounded-full px-4 h-12 bg-transparent">
-          <MaterialIcons name="search" size={24} color="#7A8C85" style={{ marginRight: 10 }} />
+          <MaterialIcons 
+            name="search" 
+            size={24} 
+            color="#7A8C85" 
+            style={{ marginRight: 10 }} 
+            accessible={false} 
+          />
           <TextInput
-            testID="search-input" // ADICIONADO AQUI
+            testID="search-input" 
             placeholder="Search routines..."
             placeholderTextColor="#7A8C85"
             value={searchQuery}
@@ -67,8 +77,9 @@ return (
             style={{ fontFamily: 'Nunito_600SemiBold', paddingVertical: 0 }}
             textAlignVertical="center"
             autoCorrect={false}
+            accessible
+            accessibilityLabel="Search routines"
           />
-          {/* ... resto do input */}
         </View>
       </View>
 
@@ -80,7 +91,7 @@ return (
         {filteredRoutines.map((item) => (
           <RoutineCard
             key={item.id}
-            testID={`routine-card-${item.id}`} // ADICIONADO AQUI
+            testID={`routine-card-${item.id}`}
             title={item.title}
             days={item.days}
             time={item.time}
@@ -92,8 +103,8 @@ return (
         ))}
       </ScrollView>
 
-      {/* Adicione o testID no container do botão */}
-      <View testID="add-routine-container">
+      {/* Add routine button container */}
+      <View testID="add-routine-container" accessible accessibilityLabel="Add new routine">
         <AddRoomDevice actions={[]} isStatic={true} />
       </View>
     </SafeAreaView>

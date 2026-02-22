@@ -16,14 +16,24 @@ export const MediaSection = ({
   if (!isVisible) return null;
 
   return (
-    <View className="mb-8">
+    <View className="mb-8" accessible accessibilityLabel="Media Section">
       <Text
         className="text-[#354F52] text-xl mb-3"
         style={{ fontFamily: 'Nunito_700Bold' }}
+        accessible
+        accessibilityRole="header"
+        accessibilityLabel="Selected Playlist"
       >
         Selected Playlist
       </Text>
-      <View className="flex-row items-center justify-between bg-[#F0F2EB] border border-[#548f537f] p-4 rounded-2xl">
+
+      <View
+        className="flex-row items-center justify-between bg-[#F0F2EB] border border-[#548f537f] p-4 rounded-2xl"
+        accessible
+        accessibilityRole="summary"
+        accessibilityLabel={title || 'Relaxing Sounds'}
+        accessibilityHint={`Playlist subtitle: ${subtitle}`}
+      >
         <View className="flex-1 pr-2">
           <Text
             className="text-[#354F52] text-lg"
@@ -39,7 +49,13 @@ export const MediaSection = ({
             {subtitle}
           </Text>
         </View>
-        <View className="bg-[#548F53] p-5 rounded-xl">
+
+        <View
+          className="bg-[#548F53] p-5 rounded-xl"
+          accessible
+          accessibilityRole="image"
+          accessibilityLabel="Playlist icon"
+        >
           <Ionicons name="musical-notes" size={24} color="white" />
         </View>
       </View>

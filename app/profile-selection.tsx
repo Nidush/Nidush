@@ -41,7 +41,11 @@ export default function ProfileSelection() {
   const hostName: string = 'Laura';
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F5F7F0]" edges={['top']}>
+    <SafeAreaView
+      className="flex-1 bg-[#F5F7F0]"
+      edges={['top']}
+      accessibilityLabel="Profile selection screen"
+    >
       <ScrollView
         contentContainerStyle={{
           alignItems: 'center',
@@ -54,6 +58,7 @@ export default function ProfileSelection() {
         <Text
           className="text-[32px] text-[#3A5A54] mb-12 text-center px-10"
           style={{ fontFamily: 'Nunito_700Bold' }}
+          accessibilityRole="header"
         >
           {`Who is at ${hostName}'s home?`}
         </Text>
@@ -66,12 +71,17 @@ export default function ProfileSelection() {
               activeOpacity={0.7}
               onPress={() => router.replace('/(tabs)')}
               className="items-center w-[45%]"
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel={`Select profile ${profile.name}`}
+              accessibilityHint="Navigates to the main screen"
             >
               <View className="w-[130px] h-[130px] rounded-full overflow-hidden mb-3 bg-white shadow-sm">
                 <Image
                   source={profile.avatar}
                   className="w-full h-full"
                   resizeMode="cover"
+                  accessible={false}
                 />
               </View>
               <Text
@@ -83,11 +93,15 @@ export default function ProfileSelection() {
             </TouchableOpacity>
           ))}
 
-          {/* Botão Add Profile  */}
+          {/* Botão Add Profile */}
           <TouchableOpacity
             testID="add-profile-button"
             activeOpacity={0.7}
             className="items-center w-[45%]"
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="Add new profile"
+            accessibilityHint="Creates a new profile"
           >
             <View className="w-[130px] h-[130px] rounded-full bg-[#C8E0C4] items-center justify-center mb-3">
               <MaterialIcons name="add" size={90} color="#354F52" />
@@ -101,7 +115,14 @@ export default function ProfileSelection() {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity className="mt-12" testID="manage-profiles-button">
+        <TouchableOpacity
+          className="mt-12"
+          testID="manage-profiles-button"
+          accessible
+          accessibilityRole="button"
+          accessibilityLabel="Manage profiles"
+          accessibilityHint="Opens profile management settings"
+        >
           <Text
             className="text-lg text-[#548F53] underline"
             style={{ fontFamily: 'Nunito_700Bold' }}
@@ -116,6 +137,7 @@ export default function ProfileSelection() {
         className="absolute bottom-0 w-full h-[250px] z-10"
         style={{ width: width }}
         resizeMode="stretch"
+        accessible={false}
       />
     </SafeAreaView>
   );

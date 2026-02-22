@@ -57,7 +57,11 @@ export default function ActivitySelection({
   };
 
   return (
-    <View className="flex-1 bg-[#F9FAF7]">
+    <View
+      className="flex-1 bg-[#F9FAF7]"
+      accessible
+      accessibilityLabel="Activity selection screen"
+    >
       <StatusBar style="dark" />
 
       <SafeAreaView className="flex-1">
@@ -69,6 +73,7 @@ export default function ActivitySelection({
             className={`items-center justify-center ${isWebPC ? 'mt-[30px] mb-[10px]' : 'mt-4'} h-[60px]`}
           >
             <Text
+              accessibilityRole="header"
               style={{ fontFamily: 'Nunito_700Bold' }}
               className="text-xl text-[#2F4F4F]"
             >
@@ -77,24 +82,35 @@ export default function ActivitySelection({
           </View>
 
           <ScrollView
+            accessibilityLabel="Activity options"
             contentContainerStyle={{ paddingBottom: isWebPC ? 40 : 140 }}
             showsVerticalScrollIndicator={false}
           >
             <View className={isWebPC ? 'mt-4' : 'mt-8'}>
               <Text
+                accessibilityRole="header"
                 style={{ fontFamily: 'Nunito_700Bold' }}
                 className="text-[32px] text-[#2F4F4F] leading-[38px]"
               >
                 Select the activities{'\n'}that you like
               </Text>
 
-              <View className="flex-row flex-wrap justify-between mt-8">
+              <View
+                className="flex-row flex-wrap justify-between mt-8"
+                accessibilityRole="menu"
+                accessibilityLabel="Activities list"
+              >
                 {ACTIVITIES.map((item) => {
                   const isSelected = selected.includes(item.id);
                   return (
                     <TouchableOpacity
                       key={item.id}
                       testID={`activity-${item.id}`}
+                      accessible
+                      accessibilityRole="button"
+                      accessibilityLabel={item.id}
+                      accessibilityHint="Double tap to select this activity"
+                      accessibilityState={{ selected: isSelected }}
                       onPress={() => toggleActivity(item.id)}
                       activeOpacity={0.8}
                       className={`w-[48%] h-[145px] rounded-[28px] justify-center items-center mb-4 border-[3px] 
@@ -104,6 +120,8 @@ export default function ActivitySelection({
                         name={item.icon}
                         size={48}
                         color="#354F52"
+                        accessible={false}
+                        importantForAccessibility="no"
                       />
 
                       <Text
@@ -114,7 +132,11 @@ export default function ActivitySelection({
                       </Text>
 
                       {isSelected && (
-                        <View className="absolute top-3 right-3">
+                        <View
+                          className="absolute top-3 right-3"
+                          accessible={false}
+                          importantForAccessibility="no"
+                        >
                           <Ionicons
                             name="checkmark-circle"
                             size={24}
@@ -131,6 +153,10 @@ export default function ActivitySelection({
             {isWebPC && (
               <TouchableOpacity
                 testID="enter-button"
+                accessibilityRole="button"
+                accessibilityLabel="Enter my safe space"
+                accessibilityHint="Finishes the activity selection"
+                accessibilityState={{ disabled: selected.length === 0 }}
                 onPress={onFinish}
                 disabled={selected.length === 0}
                 className={`h-[60px] rounded-full justify-center items-center bg-[#548F53] mt-8 mb-10
@@ -150,6 +176,10 @@ export default function ActivitySelection({
             <View className="absolute bottom-10 left-[28px] right-[28px]">
               <TouchableOpacity
                 testID="enter-button"
+                accessibilityRole="button"
+                accessibilityLabel="Enter my safe space"
+                accessibilityHint="Finishes the activity selection"
+                accessibilityState={{ disabled: selected.length === 0 }}
                 onPress={onFinish}
                 disabled={selected.length === 0}
                 className={`h-[60px] rounded-full justify-center items-center bg-[#548F53] 

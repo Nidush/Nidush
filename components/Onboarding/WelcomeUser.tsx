@@ -91,10 +91,15 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
   if (!fontsLoaded) return null;
 
   return (
-    <Animated.View style={{ flex: 1, backgroundColor: 'black', opacity: screenFade }}>
+    <Animated.View 
+      style={{ flex: 1, backgroundColor: 'black', opacity: screenFade }}
+      accessible
+      accessibilityLabel="Welcome screen"
+    >
       <StatusBar style="light" />
       
-      <View style={{ width: dims.width, height: dims.height, position: 'absolute' }}>
+      {/* Vídeo de fundo - ignorado para leitores de tela */}
+      <View style={{ width: dims.width, height: dims.height, position: 'absolute' }} accessible={false} importantForAccessibility="no-hide-descendants">
         <VideoView
           player={player}
           nativeControls={false}
@@ -106,12 +111,16 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
       <View 
         className="flex-1 bg-black/40 justify-center items-center px-10"
         style={{ zIndex: 2 }}
+        accessible={true}
       >
         <SafeAreaView className="items-center w-full flex-1 justify-center" edges={['top']}>
           
+          {/* Logo */}
           <View 
             style={{ position: 'absolute', top: isWebPC ? 60 : 40 }} 
             className="items-center w-full"
+            accessible
+            accessibilityLabel="Nidush logo"
           >
             <Image
               source={require('../../assets/images/Logo.png')}
@@ -124,25 +133,27 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
             />
           </View>
 
+          {/* Texto animado */}
           <Animated.View 
             style={{ 
               opacity: textFade, 
               maxWidth: isWebPC ? 900 : 400,
               transform: [{ 
-                scale: textFade.interpolate({ 
-                  inputRange: [0, 1], 
-                  outputRange: [0.95, 1] 
-                }) 
+                scale: textFade.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] }) 
               }] 
             }}
+            accessible
+            accessibilityRole="header"
+            accessibilityLiveRegion="polite"
           >
             <Text 
               style={{ 
                 fontFamily: 'Nunito_700Bold', 
                 fontSize: isWebPC ? 80 : 40,
-                lineHeight: isWebPC ? 90 : 48
-              }} 
-              className="text-white text-center"
+                lineHeight: isWebPC ? 90 : 48,
+                color: '#FFFFFF',
+                textAlign: 'center',
+              }}
             >
               {phrases[currentStep]}
             </Text>

@@ -14,7 +14,6 @@ interface CustomAlertProps {
   visible: boolean;
   title: string;
   message: string;
-  // Nova prop para decidir o ícone (opcional, default é 'info')
   type?: 'success' | 'error' | 'warning' | 'info';
   onClose: () => void;
   onConfirm?: () => void;
@@ -27,25 +26,24 @@ export const CustomAlert = ({
   visible,
   title,
   message,
-  type = 'info', // Valor por defeito
+  type = 'info',
   onClose,
   onConfirm,
   confirmText = 'OK',
   cancelText = 'Cancel',
   isDestructive = false,
 }: CustomAlertProps) => {
-  // Função para escolher o ícone e a cor baseada no tipo
   const getHeaderConfig = () => {
     switch (type) {
       case 'success':
-        return { icon: 'checkmark-circle', color: '#548F53' }; // Verde
+        return { icon: 'checkmark-circle', color: '#548F53' };
       case 'error':
-        return { icon: 'alert-circle', color: '#D32F2F' }; // Vermelho
+        return { icon: 'alert-circle', color: '#D32F2F' };
       case 'warning':
-        return { icon: 'warning', color: '#FFA000' }; // Laranja
+        return { icon: 'warning', color: '#FFA000' };
       case 'info':
       default:
-        return { icon: 'information-circle', color: '#548F53' }; // Verde/Azul
+        return { icon: 'information-circle', color: '#548F53' };
     }
   };
 
@@ -57,27 +55,31 @@ export const CustomAlert = ({
       visible={visible}
       animationType="fade"
       onRequestClose={onClose}
+      accessible
+      accessibilityViewIsModal
     >
-      {/* SUBSTITUIÇÃO: Fundo preto semi-transparente pelo BlurView */}
       <BlurView
         intensity={Platform.OS === 'android' ? 10 : 10}
-        tint="dark" // 'dark' mantém o aspeto escurecido mas com blur
+        tint="dark"
         experimentalBlurMethod="dimezisBlurView"
         className="flex-1 justify-center items-center px-6"
       >
-        {/* Deteta toque fora para fechar */}
         <TouchableWithoutFeedback onPress={onClose}>
           <View className="absolute inset-0" />
         </TouchableWithoutFeedback>
 
-        {/* Cartão Branco */}
-        <View className="bg-white w-full rounded-3xl p-6 items-center shadow-lg">
-          {/* NOVO: Ícone no topo */}
-          <View className="mb-4">
+        <View
+          accessible
+          accessibilityRole="alert"
+          accessibilityLabel={`${type} alert: ${title}. ${message}`}
+          className="bg-white w-full rounded-3xl p-6 items-center shadow-lg"
+        >
+          <View className="mb-4" accessible={false}>
             <Ionicons
               name={headerConfig.icon as any}
               size={48}
               color={headerConfig.color}
+              accessible={false}
             />
           </View>
 
@@ -95,11 +97,13 @@ export const CustomAlert = ({
             {message}
           </Text>
 
-          {/* Botões */}
           <View className="flex-row w-full space-x-3 gap-3">
             {onConfirm && (
               <TouchableOpacity
                 onPress={onClose}
+                accessible
+                accessibilityRole="button"
+                accessibilityLabel={cancelText}
                 className="flex-1 py-3 items-center"
               >
                 <Text
@@ -111,17 +115,18 @@ export const CustomAlert = ({
               </TouchableOpacity>
             )}
 
-            {/* Botão Confirmar */}
             <TouchableOpacity
               onPress={() => {
                 if (onConfirm) onConfirm();
                 onClose();
               }}
-              // Se for destrutivo (ex: apagar), podes querer mudar a cor para vermelho aqui também
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel={confirmText}
               className={`flex-1 py-3 rounded-full items-center bg-[#548F53]`}
             >
               <Text
-                className={`text-lg text-white`}
+                className="text-lg text-white"
                 style={{ fontFamily: 'Nunito_700Bold' }}
               >
                 {confirmText}

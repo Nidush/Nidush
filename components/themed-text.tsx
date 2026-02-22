@@ -1,11 +1,12 @@
 import { StyleSheet, Text, type TextProps } from 'react-native';
-
 import { useThemeColor } from '@/hooks/use-theme-color';
 
 export type ThemedTextProps = TextProps & {
   lightColor?: string;
   darkColor?: string;
   type?: 'default' | 'title' | 'defaultSemiBold' | 'subtitle' | 'link';
+  accessible?: boolean;
+  accessibilityRole?: TextProps['accessibilityRole'];
 };
 
 export function ThemedText({
@@ -13,6 +14,8 @@ export function ThemedText({
   lightColor,
   darkColor,
   type = 'default',
+  accessible = true,
+  accessibilityRole = 'text',
   ...rest
 }: ThemedTextProps) {
   const color = useThemeColor({ light: lightColor, dark: darkColor }, 'text');
@@ -28,6 +31,8 @@ export function ThemedText({
         type === 'link' ? styles.link : undefined,
         style,
       ]}
+      accessible={accessible}
+      accessibilityRole={accessibilityRole}
       {...rest}
     />
   );

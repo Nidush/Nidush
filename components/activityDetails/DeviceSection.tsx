@@ -25,9 +25,7 @@ const getDeviceIcon = (type: DeviceType, color: string) => {
         <MaterialCommunityIcons name="air-humidifier" size={20} color={color} />
       );
     case 'purifier':
-      return (
-        <MaterialCommunityIcons name="air-filter" size={20} color={color} />
-      );
+      return <MaterialCommunityIcons name="air-filter" size={20} color={color} />;
     default:
       return <Feather name="cpu" size={20} color={color} />;
   }
@@ -45,10 +43,13 @@ export const DeviceSection = ({ devices }: DeviceSectionProps) => {
       <Text
         className="text-[#354F52] text-xl mb-3"
         style={{ fontFamily: 'Nunito_700Bold' }}
+        accessible
+        accessibilityRole="header"
+        accessibilityLabel="Selected Devices"
       >
         Selected Devices
       </Text>
-      <View className="flex-row flex-wrap gap-3">
+      <View className="flex-row flex-wrap gap-3" accessible accessibilityRole="list">
         {devices.map((config, i) => {
           const realDevice = SMART_HOME_DEVICES[config.deviceId];
           if (!realDevice) return null;
@@ -59,10 +60,22 @@ export const DeviceSection = ({ devices }: DeviceSectionProps) => {
             config.value.trim().startsWith('#');
           const hasDetails = !!config.value;
 
+          // Cria label de acessibilidade detalhada
+          const accessibilityText = `${realDevice.name}${
+            hasDetails
+              ? isLight && isColorValue
+                ? `, color ${config.value}, brightness ${config.brightness || '100%'}`
+                : `, value ${config.value}${realDevice.type === 'thermostat' ? ' degrees Celsius' : ''}`
+              : ''
+          }`;
+
           return (
             <View
               key={i}
               className="w-[48%] flex-row items-center px-3 py-3 rounded-xl border border-[#548f537f]"
+              accessible
+              accessibilityRole={"summary"}
+              accessibilityLabel={accessibilityText}
             >
               {getDeviceIcon(realDevice.type, '#548F53')}
               <View className="ml-3 justify-center flex-1">

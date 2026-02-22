@@ -24,14 +24,24 @@ export const ContentSection = ({
           <Text
             className="text-[#354F52] text-xl mb-3"
             style={{ fontFamily: 'Nunito_700Bold' }}
+            accessible
+            accessibilityRole="header"
+            accessibilityLabel="Ingredients section"
           >
             Ingredients
           </Text>
-          <View className="rounded-2xl p-4 border border-[#548f537f]">
+          <View
+            className="rounded-2xl p-4 border border-[#548f537f]"
+            accessible
+            accessibilityRole="list"
+          >
             {ingredients.map((ing, i) => (
               <View
                 key={i}
                 className="flex-row justify-between py-2 border-b border-[#d5d5d5] last:border-0"
+                accessible
+                accessibilityRole="text"
+                accessibilityLabel={`${ing.item}, amount: ${ing.amount}`}
               >
                 <Text
                   className="text-[#354F52]"
@@ -50,14 +60,19 @@ export const ContentSection = ({
           </View>
         </View>
       )}
+
       {instructions.length > 0 && (
         <View className="mb-4">
           <Text
             className="text-[#354F52] text-xl mb-4"
             style={{ fontFamily: 'Nunito_700Bold' }}
+            accessible
+            accessibilityRole="header"
+            accessibilityLabel="Instructions section"
           >
             Instructions
           </Text>
+
           {instructions.map((step, i) => {
             const isObject = typeof step !== 'string';
             const stepText = isObject ? (step as InstructionStep).text : step;
@@ -66,7 +81,21 @@ export const ContentSection = ({
               : null;
 
             return (
-              <View key={i} className="flex-row mb-4">
+              <View
+                key={i}
+                className="flex-row mb-4"
+                accessible
+                accessibilityRole="text"
+                accessibilityLabel={`Step ${i + 1}: ${stepText}${
+                  duration
+                    ? `. Duration: ${
+                        duration < 60
+                          ? `${duration} seconds`
+                          : `${Math.floor(duration / 60)} minutes`
+                      }`
+                    : ''
+                }`}
+              >
                 <View className="bg-[#BBE6BA] w-8 h-8 rounded-full items-center justify-center mr-3">
                   <Text
                     className="text-[#354F52]"
