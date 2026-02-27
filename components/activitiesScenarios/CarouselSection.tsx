@@ -23,6 +23,7 @@ export const CarouselSection = ({
         <Text
           className="text-2xl text-[#354F52]"
           style={{ fontFamily: 'Nunito_600SemiBold' }}
+          accessibilityRole="header"
         >
           {title}
         </Text>

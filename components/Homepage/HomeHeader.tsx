@@ -42,12 +42,21 @@ export const HomeHeader = ({ userName }: HomeHeaderProps) => {
       </View>
 
       <View className="flex-row items-center">
-        <Pressable className="mr-4">
+        <Pressable
+          className="mr-4"
+          accessibilityRole="button"
+          accessibilityLabel="Notifications"
+        >
           <MaterialIcons name="notifications-none" size={36} color="#548F53" />
         </Pressable>
 
         <Link href="/Profile" asChild>
-          <Pressable style={{ width: 60, height: 60 }}>
+          <Pressable
+            style={{ width: 60, height: 60 }}
+            accessibilityRole="button"
+            accessibilityLabel="Go to profile"
+            accessibilityHint="Navigates to the user's profile page"
+          >
             <Image
               source={require('@/assets/avatars/profile.png')}
               className="rounded-full"
@@ -56,6 +65,8 @@ export const HomeHeader = ({ userName }: HomeHeaderProps) => {
                 height: 60,
                 resizeMode: 'cover',
               }}
+              importantForAccessibility="no" // Diz ao Android para ignorar a imagem em si, pois o Pressable já tem o Label
+              accessibilityElementsHidden={true}
             />
           </Pressable>
         </Link>

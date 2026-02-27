@@ -41,6 +41,10 @@ export const UnifiedCard = ({
       activeOpacity={0.9}
       className="relative rounded-2xl overflow-hidden bg-gray-900"
       style={{ width: width as any, aspectRatio }}
+      accessible={true}
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${time ? `Duration: ${time}.` : ''} ${room ? `Room: ${room}.` : ''}`}
+      accessibilityHint={`Press to go to the details of ${title}`}
     >
       <View style={StyleSheet.absoluteFill}>
         <Image
@@ -76,7 +80,11 @@ export const UnifiedCard = ({
         pointerEvents="none"
       />
 
-      <View className="absolute bottom-0 w-full p-4 z-30">
+      <View
+        className="absolute bottom-0 w-full p-4 z-30"
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden={true}
+      >
         <Text
           numberOfLines={2}
           className="text-white text-xl leading-tight mb-2"

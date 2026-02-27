@@ -120,6 +120,7 @@ export default function Index() {
           <Text
             style={{ fontFamily: 'Nunito_600SemiBold' }}
             className="text-2xl text-[#354F52]"
+            accessibilityRole="header"
           >
             Shortcuts
           </Text>
