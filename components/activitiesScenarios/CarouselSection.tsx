@@ -27,7 +27,12 @@ export const CarouselSection = ({
         >
           {title}
         </Text>
-        <Ionicons name="chevron-forward" size={20} color="#548F53" />
+        <Ionicons
+          name="chevron-forward"
+          size={20}
+          color="#548F53"
+          importantForAccessibility="no"
+        />
       </View>
 
       <ScrollView

@@ -18,6 +18,8 @@ export const FilterBar = ({
       showsHorizontalScrollIndicator={false}
       className="mb-6"
       contentContainerStyle={{ paddingHorizontal: 16 }}
+      accessibilityRole="tablist"
+      accessibilityLabel="Category filters"
     >
       {options.map((filter) => {
         const isActive = activeFilter === filter;
@@ -30,6 +32,10 @@ export const FilterBar = ({
                 ? 'bg-[#BBE6BA] border-transparent'
                 : 'bg-transparent border-[#BDC7C2]'
             }`}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: isActive }}
+            accessibilityLabel={filter}
+            accessibilityHint={isActive ? '' : `Filter results by ${filter}`}
           >
             <Text
               className={`${isActive ? 'text-[#548F53]' : 'text-[#354F52]'}`}

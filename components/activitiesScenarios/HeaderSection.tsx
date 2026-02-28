@@ -17,9 +17,14 @@ export const HeaderSection = ({
 }: HeaderSectionProps) => {
   return (
     <View className="px-4">
-      <View className="flex-row bg-[#F0F2EB] p-1 border border-[#BDC7C2] rounded-full mb-[15px] h-[50px] mt-4">
+      <View
+        className="flex-row bg-[#F0F2EB] p-1 border border-[#BDC7C2] rounded-full mb-[15px] h-[50px] mt-4"
+        accessibilityRole="tablist"
+      >
         <TouchableOpacity
           onPress={() => setViewMode('activities')}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: viewMode === 'activities' }}
           className={`flex-1 justify-center items-center rounded-[25px] ${
             viewMode === 'activities' ? 'bg-[#548F53]' : ''
           }`}
@@ -44,6 +49,8 @@ export const HeaderSection = ({
           className={`flex-1 justify-center items-center rounded-[25px] ${
             viewMode === 'scenarios' ? 'bg-[#548F53]' : ''
           }`}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: viewMode === 'scenarios' }}
         >
           <Text
             className={`${
@@ -67,12 +74,17 @@ export const HeaderSection = ({
           size={24}
           color="#7A8C85"
           style={{ marginRight: 10 }}
+          importantForAccessibility="no" // Android
+          accessibilityElementsHidden={true} // iOS
         />
         <TextInput
           placeholder={
             viewMode === 'activities'
               ? 'Search activities...'
               : 'Search scenarios...'
+          }
+          accessibilityLabel={
+            viewMode === 'activities' ? 'Search activities' : 'Search scenarios'
           }
           placeholderTextColor="#7A8C85"
           className="flex-1 h-full text-base text-[#2C3A35]"

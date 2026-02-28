@@ -35,19 +35,30 @@ export const FabMenu = ({ isOpen, setIsOpen }: FabMenuProps) => {
               { backgroundColor: 'rgba(240, 242, 235, 0.1)' },
             ]}
           >
-            <Pressable className="flex-1" onPress={() => setIsOpen(false)} />
+            <Pressable
+              className="flex-1"
+              onPress={() => setIsOpen(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Close background overlay"
+              accessibilityHint="Double tap anywhere to close the menu"
+            />
           </BlurView>
         </Animated.View>
       )}
 
       {isOpen && (
-        <View className="absolute bottom-[110px] right-[25px] items-end z-[11]">
+        <View
+          className="absolute bottom-[110px] right-[25px] items-end z-[11]"
+          accessibilityViewIsModal={true}
+        >
           <TouchableOpacity
             className="mb-4"
             onPress={() => {
               setIsOpen(false);
               router.push('/new-scenario');
             }}
+            accessibilityRole="button"
+            accessibilityLabel="Create new scenario"
           >
             <Text
               className="bg-[#548F53] px-10 py-4 rounded-full text-xl text-white shadow-md overflow-hidden"
@@ -63,10 +74,14 @@ export const FabMenu = ({ isOpen, setIsOpen }: FabMenuProps) => {
               setIsOpen(false);
               router.push('/new-activity');
             }}
+            accessibilityRole="button"
+            accessibilityLabel="Create new activity"
           >
             <Text
               className="bg-[#548F53] px-10 py-4 rounded-full text-xl text-white shadow-md overflow-hidden"
               style={{ fontFamily: 'Nunito_600SemiBold' }}
+              accessibilityRole="button"
+              accessibilityLabel="Create new activity"
             >
               Activity
             </Text>
@@ -78,8 +93,21 @@ export const FabMenu = ({ isOpen, setIsOpen }: FabMenuProps) => {
         activeOpacity={0.9}
         className="absolute bottom-8 right-6 bg-[#548F53] w-[65px] h-[65px] rounded-full justify-center items-center z-[10] shadow-lg shadow-black/40"
         onPress={() => setIsOpen(!isOpen)}
+        accessibilityRole="button"
+        accessibilityLabel={isOpen ? 'Close menu' : 'Open menu'}
+        accessibilityHint={
+          isOpen
+            ? 'Closes the menu'
+            : 'Opens the menu to create a new activity or scenario'
+        }
       >
-        <Ionicons name={isOpen ? 'close' : 'add'} size={36} color="white" />
+        <Ionicons
+          name={isOpen ? 'close' : 'add'}
+          size={36}
+          color="white"
+          importantForAccessibility="no" // Android
+          accessibilityElementsHidden={true}
+        />
       </TouchableOpacity>
     </>
   );
