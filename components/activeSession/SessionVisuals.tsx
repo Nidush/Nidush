@@ -56,8 +56,15 @@ export const SessionVisuals = ({
       <Animated.View
         style={[animatedIconStyle, animatedContentStyle]}
         className="items-center"
+        accessible={true}
       >
-        <View className=" mb-10">{ICON_MAP[stepIndex % ICON_MAP.length]}</View>
+        <View
+          className=" mb-10"
+          importantForAccessibility="no-hide-descendants" // Android
+          accessibilityElementsHidden={true}
+        >
+          {ICON_MAP[stepIndex % ICON_MAP.length]}
+        </View>
         <Text
           className="text-[#354F52] text-3xl text-center leading-10"
           style={{ fontFamily: 'Nunito_700Bold' }}

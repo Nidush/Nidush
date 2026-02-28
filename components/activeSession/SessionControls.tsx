@@ -52,6 +52,11 @@ export const SessionControls = ({
             activeOpacity={0.8}
             onPress={onNextStep}
             className={`px-8 py-3 rounded-full flex-row items-center shadow-sm bg-[#548F53]`}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel={
+              isLastStep ? 'Finish session' : 'Go to next step'
+            }
           >
             <Text
               className="text-white text-xl mr-2"
@@ -63,6 +68,7 @@ export const SessionControls = ({
               name={isLastStep ? 'check-circle' : 'arrow-forward'}
               size={24}
               color="white"
+              importantForAccessibility="no"
             />
           </TouchableOpacity>
         ) : (
@@ -70,6 +76,9 @@ export const SessionControls = ({
           <Text
             className="text-[#354F52] text-6xl tabular-nums"
             style={{ fontFamily: 'Nunito_700Bold' }}
+            accessible={true}
+            // Isto diz ao VoiceOver/TalkBack como lidar com conteúdo que muda muito rápido
+            accessibilityRole="timer"
           >
             {Math.floor(secondsLeft / 60)}:
             {(secondsLeft % 60).toString().padStart(2, '0')}
@@ -77,7 +86,11 @@ export const SessionControls = ({
         )}
 
         {/* Barra de Progresso (Sempre visível para contextualizar) */}
-        <View className="w-full h-1.5 bg-[#DDE5D7] mt-6 rounded-full overflow-hidden">
+        <View
+          className="w-full h-1.5 bg-[#DDE5D7] mt-6 rounded-full overflow-hidden"
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden={true}
+        >
           <Animated.View
             style={[animatedProgressStyle]}
             className="h-full bg-[#548F53]"
@@ -86,27 +99,49 @@ export const SessionControls = ({
       </View>
 
       {/* Info Card (Player de Música) */}
-      <View className="flex-row items-center border border-[#7DA87B]/20 p-4 rounded-3xl mb-8">
-        <Image source={imageSource} className="w-12 h-12 rounded-lg" />
-        <View className="flex-1 ml-4">
+      <View
+        className="flex-row items-center border border-[#7DA87B]/20 p-4 rounded-3xl mb-8"
+        accessible={false}
+      >
+        <Image
+          source={imageSource}
+          className="w-12 h-12 rounded-lg"
+          importantForAccessibility="no"
+        />
+        <View
+          className="flex-1 ml-4"
+          accessible={true}
+          accessibilityRole="text"
+          accessibilityLabel={`Background music: 'Music'}`}
+        >
           <Text
             className="text-[#354F52]"
             style={{ fontFamily: 'Nunito_700Bold' }}
+            importantForAccessibility="no-hide-descendants" // Esconde os Textos filhos
           >
             Music
           </Text>
           <Text
             className="text-[#354F52]/60 text-xs"
             style={{ fontFamily: 'Nunito_600SemiBold' }}
+            importantForAccessibility="no-hide-descendants"
           >
             Artist
           </Text>
         </View>
-        <TouchableOpacity onPress={onToggleMusic}>
+        <TouchableOpacity
+          onPress={onToggleMusic}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel={
+            isMusicPlaying ? 'Pause background music' : 'Play background music'
+          }
+        >
           <MaterialIcons
             name={isMusicPlaying ? 'pause-circle-filled' : 'play-circle-filled'}
             size={44}
             color="#548F53"
+            importantForAccessibility="no"
           />
         </TouchableOpacity>
       </View>
@@ -115,6 +150,9 @@ export const SessionControls = ({
       <TouchableOpacity
         onPress={onToggleSession}
         className="bg-[#548F53] py-4 rounded-full items-center w-52 self-center shadow-lg flex-row justify-center"
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel={isActive ? 'Pause session' : 'Resume session'}
       >
         <Text
           className="text-white text-2xl mr-3"
@@ -126,6 +164,7 @@ export const SessionControls = ({
           name={isActive ? 'pause' : 'play-arrow'}
           size={28}
           color="white"
+          importantForAccessibility="no"
         />
       </TouchableOpacity>
     </View>
