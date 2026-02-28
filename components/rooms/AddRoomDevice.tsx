@@ -13,7 +13,10 @@ interface FloatingActionMenuProps {
   isStatic?: boolean; // Nova prop opcional para saber se o botao é estático
 }
 
-export default function AddRoomDevice({ actions, isStatic = false }: FloatingActionMenuProps) {
+export default function AddRoomDevice({
+  actions,
+  isStatic = false,
+}: FloatingActionMenuProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   let [fontsLoaded] = useFonts({ Nunito_600SemiBold });
@@ -39,8 +42,8 @@ export default function AddRoomDevice({ actions, isStatic = false }: FloatingAct
       {!isStatic && isMenuOpen && (
         <View className="absolute bottom-[110px] right-[25px] items-end z-[11]">
           {actions.map((action, index) => (
-            <TouchableOpacity 
-              key={index} 
+            <TouchableOpacity
+              key={index}
               className="mb-4"
               onPress={action.onPress}
             >
@@ -61,7 +64,13 @@ export default function AddRoomDevice({ actions, isStatic = false }: FloatingAct
         onPress={handlePress}
       >
         {/* Se for estático, mostra sempre o 'add'. Se não, alterna com o 'close' */}
-        <Ionicons name={(!isStatic && isMenuOpen) ? 'close' : 'add'} size={36} color="white" />
+        <Ionicons
+          name={!isStatic && isMenuOpen ? 'close' : 'add'}
+          size={36}
+          color="white"
+          accessibilityRole="button"
+          accessibilityLabel={isMenuOpen ? 'Close menu' : 'Add device or room'}
+        />
       </TouchableOpacity>
     </>
   );

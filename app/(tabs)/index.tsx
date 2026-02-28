@@ -4,7 +4,7 @@ import {
   Nunito_700Bold,
   useFonts,
 } from '@expo-google-fonts/nunito';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import React, { useMemo } from 'react';
 import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -96,7 +96,17 @@ export default function Index() {
   if (!fontsLoaded) return null;
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F0F2EB]" edges={['top']}>
+    <SafeAreaView
+      className="flex-1 bg-[#F0F2EB]"
+      edges={['top']}
+      accessibilityLanguage="en-US"
+    >
+      <Stack.Screen
+        options={{
+          title: 'Home', // O que o leitor de ecrã pode ler como título da página
+          headerShown: false, // Esconde visualmente porque tu já tens o teu HomeHeader
+        }}
+      />
       <ScrollView
         className="px-5"
         showsVerticalScrollIndicator={false}

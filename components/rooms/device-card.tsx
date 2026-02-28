@@ -101,6 +101,41 @@ const DeviceCard = ({ item, onToggle, onUpdateLevel }: DeviceCardProps) => {
     <View
       className={`w-[48%] ${containerBg} ${borderStyle} rounded-2xl h-44 mb-4 overflow-hidden relative`}
       {...panResponder.panHandlers}
+      accessible={true} // Agrupa todo o cartão num único elemento de foco
+      accessibilityRole={isOn && isDimmable ? 'adjustable' : 'button'} // "adjustable" ativa os gestos de swipe do VoiceOver
+      accessibilityLabel={`${item.name}, ${isOn ? 'On' : 'Off'}`}
+      accessibilityValue={
+        isOn && isDimmable
+          ? { min: 0, max: 100, now: Math.round(level) }
+          : undefined
+      }
+      accessibilityHint={
+        isOn ? 'Double tap to turn off' : 'Double tap to turn on'
+      }
+      accessibilityActions={[
+        { name: 'activate', label: isOn ? 'Turn off' : 'Turn on' },
+      ]}
+      onAccessibilityAction={(event) => {
+        switch (event.nativeEvent.actionName) {
+          case 'activate': // Quando o utilizador de VoiceOver faz duplo toque no cartão
+            onToggle();
+            break;
+          case 'increment': // Quando o utilizador faz "swipe up"
+            if (isOn && isDimmable) {
+              const newLevel = Math.min(100, level + 10);
+              setLevel(newLevel);
+              onUpdateLevel(newLevel);
+            }
+            break;
+          case 'decrement': // Quando o utilizador faz "swipe down"
+            if (isOn && isDimmable) {
+              const newLevel = Math.max(0, level - 10);
+              setLevel(newLevel);
+              onUpdateLevel(newLevel);
+            }
+            break;
+        }
+      }}
     >
       {isOn && isDimmable && (
         <View
@@ -109,7 +144,10 @@ const DeviceCard = ({ item, onToggle, onUpdateLevel }: DeviceCardProps) => {
         />
       )}
       <View className="flex-1 p-4 justify-between z-10 bg-transparent">
-        <View className="flex-row justify-between items-start">
+        <View
+          className="flex-row justify-between items-start "
+          importantForAccessibility="no-hide-descendants"
+        >
           <GetDeviceIcon
             type={item.type}
             color={isOn ? '#354F52' : '#7A8C85'}
@@ -128,6 +166,8 @@ const DeviceCard = ({ item, onToggle, onUpdateLevel }: DeviceCardProps) => {
               name="power-settings-new"
               size={25}
               color={isOn ? '#FFFFFF' : '#354F52'}
+              accessibilityRole="button"
+              accessibilityLabel={isOn ? 'Turn off device' : 'Turn on device'}
             />
           </TouchableOpacity>
         </View>

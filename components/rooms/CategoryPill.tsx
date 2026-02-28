@@ -16,6 +16,10 @@ const CategoryPill = ({ item, isActive, onPress }: CategoryPillProps) => {
   return (
     <TouchableOpacity
       onPress={() => onPress(item.id)}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: isActive }}
+      accessibilityLabel={item.name}
+      accessibilityHint={isActive ? '' : `Show devices from ${item.name}`}
       className={`px-5 py-1 rounded-full border mr-3 justify-center ${
         isActive
           ? 'bg-[#BBE6BA] border-transparent'

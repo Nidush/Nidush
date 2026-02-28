@@ -26,16 +26,22 @@ export const HomeHeader = ({ userName }: HomeHeaderProps) => {
 
   return (
     <View className="flex-row justify-between items-center mb-6 mt-4">
-      <View>
+      <View
+        accessible={true}
+        accessibilityRole="header"
+        accessibilityLabel={`${greeting}, ${userName}`}
+      >
         <Text
           style={{ fontFamily: 'Nunito_600SemiBold' }}
           className="text-2xl text-[#354F52]"
+          importantForAccessibility="no-hide-descendants"
         >
           {greeting},
         </Text>
         <Text
           style={{ fontFamily: 'Nunito_700Bold' }}
           className="text-4xl text-[#354F52]"
+          importantForAccessibility="no-hide-descendants"
         >
           {userName}
         </Text>
