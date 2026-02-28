@@ -26,15 +26,10 @@ export const ContentSection = ({
             style={{ fontFamily: 'Nunito_700Bold' }}
             accessible
             accessibilityRole="header"
-            accessibilityLabel="Ingredients section"
           >
             Ingredients
           </Text>
-          <View
-            className="rounded-2xl p-4 border border-[#548f537f]"
-            accessible
-            accessibilityRole="list"
-          >
+          <View className="rounded-2xl p-4 border border-[#548f537f]">
             {ingredients.map((ing, i) => (
               <View
                 key={i}
@@ -42,6 +37,8 @@ export const ContentSection = ({
                 accessible
                 accessibilityRole="text"
                 accessibilityLabel={`${ing.item}, amount: ${ing.amount}`}
+                importantForAccessibility="no-hide-descendants"
+                accessibilityElementsHidden={true}
               >
                 <Text
                   className="text-[#354F52]"
@@ -68,7 +65,6 @@ export const ContentSection = ({
             style={{ fontFamily: 'Nunito_700Bold' }}
             accessible
             accessibilityRole="header"
-            accessibilityLabel="Instructions section"
           >
             Instructions
           </Text>
@@ -95,6 +91,8 @@ export const ContentSection = ({
                       }`
                     : ''
                 }`}
+                importantForAccessibility="no-hide-descendants"
+                accessibilityElementsHidden={true}
               >
                 <View className="bg-[#BBE6BA] w-8 h-8 rounded-full items-center justify-center mr-3">
                   <Text

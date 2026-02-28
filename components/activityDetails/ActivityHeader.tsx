@@ -86,7 +86,11 @@ export const ActivityHeader = ({
   return (
     <View className="w-full h-[450px] relative">
       {/* Background blur + masked image */}
-      <View style={StyleSheet.absoluteFill}>
+      <View
+        style={StyleSheet.absoluteFill}
+        importantForAccessibility="no"
+        accessibilityElementsHidden={true}
+      >
         <Image
           source={imageSource}
           style={{ width: '100%', height: '100%' }}
@@ -98,6 +102,8 @@ export const ActivityHeader = ({
 
       <MaskedView
         style={StyleSheet.absoluteFill}
+        importantForAccessibility="no" // Garante que a máscara também é ignorada
+        accessibilityElementsHidden={true}
         maskElement={
           <LinearGradient
             colors={['black', 'black', 'transparent']}
@@ -117,6 +123,7 @@ export const ActivityHeader = ({
         colors={['rgba(0,0,0,0.1)', 'transparent', 'rgba(0,0,0,0.8)']}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
+        importantForAccessibility="no"
       />
 
       <SafeAreaView style={StyleSheet.absoluteFill} edges={['top']}>
@@ -128,7 +135,12 @@ export const ActivityHeader = ({
             accessibilityRole="button"
             accessibilityLabel="Go back"
           >
-            <Ionicons name="chevron-back" size={28} color="white" />
+            <Ionicons
+              name="chevron-back"
+              size={28}
+              color="white"
+              importantForAccessibility="no"
+            />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -136,6 +148,7 @@ export const ActivityHeader = ({
             accessible
             accessibilityRole="button"
             accessibilityLabel="Open menu"
+            accessibilityHint="Opens a menu to edit, delete, or add to shortcuts"
           >
             <MaterialIcons name="more-vert" size={28} color="white" />
           </TouchableOpacity>
@@ -155,7 +168,12 @@ export const ActivityHeader = ({
             style={StyleSheet.absoluteFill}
           />
 
-          <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
+          <TouchableWithoutFeedback
+            onPress={() => setMenuVisible(false)}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Close menu"
+          >
             <View style={{ flex: 1 }}>
               <View
                 className="absolute top-14 right-5 bg-white rounded-xl w-52 overflow-hidden"
@@ -166,6 +184,7 @@ export const ActivityHeader = ({
                   shadowRadius: 8,
                   elevation: 10,
                 }}
+                accessibilityViewIsModal={true} // iOS: Prende o foco aqui dentro
               >
                 <View style={{ paddingTop: 5, paddingBottom: 5 }}>
                   <MenuItem
@@ -173,7 +192,11 @@ export const ActivityHeader = ({
                     label="Add to shortcuts"
                     onPress={onAddToShortcuts}
                   />
-                  <MenuItem icon="edit" label="Edit activity" onPress={onEdit} />
+                  <MenuItem
+                    icon="edit"
+                    label="Edit activity"
+                    onPress={onEdit}
+                  />
                   <View className="h-[1px] bg-gray-100 my-1 mx-4" />
                   <MenuItem
                     icon="delete-outline"
@@ -192,9 +215,7 @@ export const ActivityHeader = ({
           <Text
             className="text-white text-xl tracking-wider capitalize mb-2"
             style={{ fontFamily: 'Nunito_600SemiBold' }}
-            accessible
-            accessibilityRole="header"
-            accessibilityLabel={`Type: ${type}`}
+            accessible={false} // Esconde isto, pois vamos agrupar no título abaixo
           >
             {type}
           </Text>
@@ -203,31 +224,37 @@ export const ActivityHeader = ({
             style={{ fontFamily: 'Nunito_700Bold' }}
             accessible
             accessibilityRole="header"
-            accessibilityLabel={`Title: ${title}`}
+            // Junta o Tipo com o Título para uma leitura limpa
+            accessibilityLabel={`${type} ${title}`}
           >
             {title}
           </Text>
           <View className="flex-row items-center mt-6 space-x-6">
             {isActivity && duration && (
-              <View className="flex-row items-center mr-4">
+              <View
+                className="flex-row items-center mr-4"
+                accessible={true}
+                accessibilityRole="text"
+                accessibilityLabel={`${duration ? `Duration: ${duration}. ` : ''}Room: ${room}`}
+              >
                 <Ionicons name="time-outline" size={22} color="white" />
                 <Text
                   className="text-white ml-2 text-lg"
                   style={{ fontFamily: 'Nunito_600SemiBold' }}
-                  accessible
-                  accessibilityLabel={`Duration: ${duration}`}
                 >
                   {duration}
                 </Text>
               </View>
             )}
-            <View className="flex-row items-center">
+            <View
+              className="flex-row items-center"
+              importantForAccessibility="no-hide-descendants"
+              accessibilityElementsHidden={true}
+            >
               <MaterialCommunityIcons name="door" size={22} color="white" />
               <Text
                 className="text-white ml-2 text-lg"
                 style={{ fontFamily: 'Nunito_600SemiBold' }}
-                accessible
-                accessibilityLabel={`Room: ${room}`}
               >
                 {room}
               </Text>

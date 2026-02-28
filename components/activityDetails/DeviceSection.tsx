@@ -25,7 +25,9 @@ const getDeviceIcon = (type: DeviceType, color: string) => {
         <MaterialCommunityIcons name="air-humidifier" size={20} color={color} />
       );
     case 'purifier':
-      return <MaterialCommunityIcons name="air-filter" size={20} color={color} />;
+      return (
+        <MaterialCommunityIcons name="air-filter" size={20} color={color} />
+      );
     default:
       return <Feather name="cpu" size={20} color={color} />;
   }
@@ -45,11 +47,10 @@ export const DeviceSection = ({ devices }: DeviceSectionProps) => {
         style={{ fontFamily: 'Nunito_700Bold' }}
         accessible
         accessibilityRole="header"
-        accessibilityLabel="Selected Devices"
       >
         Selected Devices
       </Text>
-      <View className="flex-row flex-wrap gap-3" accessible accessibilityRole="list">
+      <View className="flex-row flex-wrap gap-3">
         {devices.map((config, i) => {
           const realDevice = SMART_HOME_DEVICES[config.deviceId];
           if (!realDevice) return null;
@@ -73,9 +74,12 @@ export const DeviceSection = ({ devices }: DeviceSectionProps) => {
             <View
               key={i}
               className="w-[48%] flex-row items-center px-3 py-3 rounded-xl border border-[#548f537f]"
-              accessible
-              accessibilityRole={"summary"}
+              accessible={true} // Diz que isto é um único bloco para ler
+              accessibilityRole="text" // Corrige o summary para text (já que é só informação)
               accessibilityLabel={accessibilityText}
+              // REDUÇÃO DE RUÍDO: Esconde os ícones e textos internos porque a Label acima já faz todo o trabalho!
+              importantForAccessibility="no-hide-descendants" // Android
+              accessibilityElementsHidden={true} // iOS
             >
               {getDeviceIcon(realDevice.type, '#548F53')}
               <View className="ml-3 justify-center flex-1">

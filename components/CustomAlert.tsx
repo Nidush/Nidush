@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
+  AccessibilityInfo,
   Modal,
   Platform,
   Text,
@@ -48,6 +49,11 @@ export const CustomAlert = ({
   };
 
   const headerConfig = getHeaderConfig();
+  useEffect(() => {
+    if (visible) {
+      AccessibilityInfo.announceForAccessibility(`Alert: ${title}. ${message}`);
+    }
+  }, [visible, title, message]);
 
   return (
     <Modal
@@ -55,37 +61,43 @@ export const CustomAlert = ({
       visible={visible}
       animationType="fade"
       onRequestClose={onClose}
-      accessible
-      accessibilityViewIsModal
     >
       <BlurView
         intensity={Platform.OS === 'android' ? 10 : 10}
         tint="dark"
         experimentalBlurMethod="dimezisBlurView"
         className="flex-1 justify-center items-center px-6"
+        accessibilityViewIsModal={true}
       >
-        <TouchableWithoutFeedback onPress={onClose}>
+        <TouchableWithoutFeedback
+          onPress={onClose}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss alert"
+        >
           <View className="absolute inset-0" />
         </TouchableWithoutFeedback>
 
         <View
-          accessible
           accessibilityRole="alert"
-          accessibilityLabel={`${type} alert: ${title}. ${message}`}
           className="bg-white w-full rounded-3xl p-6 items-center shadow-lg"
         >
-          <View className="mb-4" accessible={false}>
+          <View
+            className="mb-4"
+            importantForAccessibility="no"
+            accessibilityElementsHidden={true}
+          >
             <Ionicons
               name={headerConfig.icon as any}
               size={48}
               color={headerConfig.color}
-              accessible={false}
             />
           </View>
 
           <Text
             className="text-2xl text-[#354F52] mb-2 text-center"
             style={{ fontFamily: 'Nunito_700Bold' }}
+            accessibilityRole="header"
           >
             {title}
           </Text>
@@ -103,7 +115,6 @@ export const CustomAlert = ({
                 onPress={onClose}
                 accessible
                 accessibilityRole="button"
-                accessibilityLabel={cancelText}
                 className="flex-1 py-3 items-center"
               >
                 <Text
@@ -120,9 +131,10 @@ export const CustomAlert = ({
                 if (onConfirm) onConfirm();
                 onClose();
               }}
-              accessible
               accessibilityRole="button"
-              accessibilityLabel={confirmText}
+              accessibilityHint={
+                isDestructive ? 'This action cannot be undone' : ''
+              }
               className={`flex-1 py-3 rounded-full items-center bg-[#548F53]`}
             >
               <Text

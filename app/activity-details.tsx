@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
   ScrollView,
   Text,
@@ -10,12 +11,12 @@ import {
   View,
 } from 'react-native';
 
+import { ActivityHeader } from '@/components/activityDetails/ActivityHeader';
 import { ContentSection } from '@/components/activityDetails/ContentSection';
 import { DeviceSection } from '@/components/activityDetails/DeviceSection';
 import { FocusSection } from '@/components/activityDetails/FocusSection';
 import { MediaSection } from '@/components/activityDetails/MediaSection';
 import { CustomAlert } from '@/components/CustomAlert';
-import { ActivityHeader } from '@/components/activityDetails/ActivityHeader';
 
 import {
   ACTIVITIES,
@@ -63,6 +64,9 @@ export default function ActivityDetails() {
   useEffect(() => {
     if (isNew === 'true') {
       setShowToast(true);
+      AccessibilityInfo.announceForAccessibility(
+        'Activity created successfully!',
+      );
       const timer = setTimeout(() => {
         setShowToast(false);
       }, 5000);
@@ -202,23 +206,19 @@ export default function ActivityDetails() {
 
   if (loading)
     return (
-      <View
-        className="flex-1 justify-center items-center bg-[#F0F2EB]"
-        accessible={true}
-        accessibilityLabel="Loading activity details"
-      >
-        <ActivityIndicator size="large" color="#548F53" />
+      <View className="flex-1 justify-center items-center bg-[#F0F2EB]">
+        <ActivityIndicator
+          size="large"
+          color="#548F53"
+          accessibilityLabel="Loading activity details"
+        />
       </View>
     );
 
   if (!mainItem)
     return (
-      <View
-        className="flex-1 justify-center items-center bg-[#F0F2EB]"
-        accessible={true}
-        accessibilityLabel="Item not found"
-      >
-        <Text>Item not found</Text>
+      <View className="flex-1 justify-center items-center bg-[#F0F2EB]">
+        <Text accessibilityRole="header">Item not found</Text>
       </View>
     );
 
@@ -247,7 +247,17 @@ export default function ActivityDetails() {
     : null;
 
   return (
-    <View className="flex-1 bg-[#F0F2EB] relative" accessible={true}>
+    <View
+      className="flex-1 bg-[#F0F2EB] relative"
+      accessibilityLanguage="en-US"
+    >
+      <Stack.Screen
+        options={{
+          // Se já carregou, diz o nome da atividade. Se não, diz "Loading"
+          title: mainItem ? mainItem.title : 'Activity details',
+          headerShown: false, // Mantém o teu cabeçalho customizado (ActivityHeader) e esconde o nativo
+        }}
+      />
       <ScrollView
         contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
@@ -279,8 +289,6 @@ export default function ActivityDetails() {
             <Text
               className="text-[#586963] text-[16px] leading-6"
               style={{ fontFamily: 'Nunito_400Regular' }}
-              accessible={true}
-              accessibilityLabel={mainItem.description}
             >
               {mainItem.description}
             </Text>
@@ -288,11 +296,16 @@ export default function ActivityDetails() {
 
           <FocusSection enabled={focusEnabled} onToggle={setFocusEnabled} />
           <MediaSection
-            isVisible={!!(relatedScenario?.playlist || relatedContent?.videoUrl)}
+            isVisible={
+              !!(relatedScenario?.playlist || relatedContent?.videoUrl)
+            }
             title={relatedScenario?.playlist || relatedContent?.title}
             subtitle={audioStatusText}
           />
-          <ContentSection ingredients={ingredients} instructions={instructions} />
+          <ContentSection
+            ingredients={ingredients}
+            instructions={instructions}
+          />
         </View>
       </ScrollView>
 
@@ -312,6 +325,8 @@ export default function ActivityDetails() {
           <Text
             className="text-white text-2xl mr-2"
             style={{ fontFamily: 'Nunito_700Bold' }}
+            importantForAccessibility="no-hide-descendants" // REDUÇÃO RUÍDO
+            accessibilityElementsHidden={true}
           >
             {isActivity ? 'Start Activity' : 'Activate Scenario'}
           </Text>
@@ -319,6 +334,8 @@ export default function ActivityDetails() {
             name={isActivity ? 'play' : 'power'}
             size={24}
             color="white"
+            importantForAccessibility="no" // REDUÇÃO RUÍDO
+            accessibilityElementsHidden={true}
           />
         </TouchableOpacity>
       </View>
@@ -332,9 +349,8 @@ export default function ActivityDetails() {
             shadowOpacity: 0.1,
             shadowRadius: 8,
           }}
-          accessible={true}
-          accessibilityRole="alert"
-          accessibilityLabel="Activity created successfully"
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
         >
           <View className="w-10 h-10 bg-[#548F53] rounded-full justify-center items-center mr-5">
             <Ionicons name="checkmark" size={24} color="white" />
