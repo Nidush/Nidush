@@ -1,5 +1,4 @@
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
 import { useMemo, useState } from 'react';
 import {
   FlatList,
@@ -122,12 +121,6 @@ export default function Rooms() {
       edges={['top']}
       accessibilityLanguage="en-US"
     >
-      <Stack.Screen
-        options={{
-          title: 'Home', // O que o leitor de ecrã pode ler como título da página
-          headerShown: false, // Esconde visualmente porque tu já tens o teu HomeHeader
-        }}
-      />
       <StatusBar barStyle="dark-content" backgroundColor="#F2F5F0" />
 
       {/* Header */}

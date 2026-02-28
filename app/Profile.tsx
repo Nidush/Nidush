@@ -11,11 +11,11 @@ export default function Profile() {
     <SafeAreaView
       className="flex-1 bg-[#F5F7F0]"
       edges={['top']}
-      accessibilityLabel="Profile screen"
+      accessibilityLanguage="en-US"
     >
       {/* Header */}
       <View className="flex-row justify-between items-center px-6 py-4">
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={() => router.replace('/(tabs)')}
           testID="back-button"
           accessible
@@ -59,10 +59,9 @@ export default function Profile() {
         </View>
 
         {/* Hobbies */}
-        <View 
+        <View
           className="bg-[#F5F7F0] rounded-[24px] p-5 mb-4 border border-[#D1D9C5]"
           testID="hobbies-container"
-          accessibilityLabel="Hobby preferences section"
         >
           <View className="flex-row justify-between items-center mb-4">
             <Text
@@ -73,7 +72,7 @@ export default function Profile() {
               Hobby Preferences
             </Text>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               testID="edit-hobbies-button"
               accessible
               accessibilityRole="button"
@@ -132,7 +131,7 @@ export default function Profile() {
             testID="device-mi-band"
           />
 
-          <TouchableOpacity 
+          <TouchableOpacity
             className="bg-[#5B8C51] py-3.5 rounded-full items-center mt-4 shadow-sm"
             testID="add-device-button"
             accessible
@@ -151,14 +150,32 @@ export default function Profile() {
 
         {/* Menu Principal */}
         <View className="bg-[#F5F7F0] rounded-[24px] px-2 mb-4 border border-[#D1D9C5]">
-          <MenuItem icon="account-circle" label="Account Information" testID="menu-account" />
-          <MenuItem icon="notifications-none" label="Notifications" testID="menu-notifications" />
-          <MenuItem icon="admin-panel-settings" label="Privacy & Data" border={false} testID="menu-privacy" />
+          <MenuItem
+            icon="account-circle"
+            label="Account Information"
+            testID="menu-account"
+          />
+          <MenuItem
+            icon="notifications-none"
+            label="Notifications"
+            testID="menu-notifications"
+          />
+          <MenuItem
+            icon="admin-panel-settings"
+            label="Privacy & Data"
+            border={false}
+            testID="menu-privacy"
+          />
         </View>
 
         {/* Menu Secundário */}
         <View className="bg-[#F5F7F0] rounded-[24px] px-2 mb-6 border border-[#D1D9C5]">
-          <MenuItem icon="group" label="Residents" border={false} testID="menu-residents" />
+          <MenuItem
+            icon="group"
+            label="Residents"
+            border={false}
+            testID="menu-residents"
+          />
         </View>
 
         {/* Botão Logout */}
@@ -193,7 +210,6 @@ function DeviceItem({ name, status, connected, icon, testID }: any) {
       accessible
       accessibilityRole="summary"
       accessibilityLabel={`${name}, ${status}`}
-      accessibilityState={{ checked: connected }}
     >
       <View className="bg-[#E8EDDF] p-2 rounded-xl">
         <MaterialIcons name={icon} size={28} color="#4A5D4E" />
@@ -230,7 +246,6 @@ function MenuItem({ icon, label, border = true, testID }: any) {
       className={`flex-row justify-between items-center py-5 px-4 ${border ? 'border-b border-[#D1D9C5]' : ''}`}
       accessible
       accessibilityRole="button"
-      accessibilityLabel={label}
       accessibilityHint={`Opens ${label} section`}
     >
       <View className="flex-row items-center">
