@@ -57,7 +57,6 @@ export const Step2_Content = ({
           data={data}
           horizontal
           showsHorizontalScrollIndicator={false}
-          accessibilityLabel={`List of ${title}`}
           className="-mx-5"
           contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
           keyExtractor={(item) => item.id}
@@ -79,7 +78,7 @@ export const Step2_Content = ({
   return (
     <StepWrapper
       title="Choose your content"
-      subtitle={`Select content for your ${activityType} session.`}
+      subtitle={`Required: Select content for your ${activityType} session.`}
     >
       {filteredContent.length === 0 && (
         <View className="items-center mt-10">

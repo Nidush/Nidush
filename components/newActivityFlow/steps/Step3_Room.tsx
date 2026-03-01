@@ -12,7 +12,12 @@ interface Step3Props {
 export const Step3_Room = ({ selected, onSelect }: Step3Props) => {
   return (
     <StepWrapper title="Where will it happen?" subtitle="Select the room.">
-      <View className="flex-row flex-wrap gap-3 justify-between">
+      <View
+        className="flex-row flex-wrap gap-3 justify-between"
+        accessible={true}
+        accessibilityRole="radiogroup"
+        accessibilityLabel="Room options"
+      >
         {ROOMS.map((r) => (
           <SelectionCard
             key={r.id}

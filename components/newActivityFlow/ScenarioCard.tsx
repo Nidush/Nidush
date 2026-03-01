@@ -34,6 +34,10 @@ export const ScenarioCard = ({
         'relative rounded-2xl overflow-hidden bg-gray-900',
         'w-full aspect-square',
       )}
+      accessible={true}
+      accessibilityRole="radio"
+      accessibilityLabel={`${item.title}, Room: ${item.room}. Double tap to select.`}
+      accessibilityState={{ selected: isSelected }}
     >
       <View style={StyleSheet.absoluteFill}>
         <Image
@@ -47,6 +51,8 @@ export const ScenarioCard = ({
 
       <MaskedView
         style={StyleSheet.absoluteFill}
+        importantForAccessibility="no"
+        accessibilityElementsHidden={true}
         maskElement={
           <LinearGradient
             colors={['black', 'black', 'transparent']}
@@ -68,11 +74,19 @@ export const ScenarioCard = ({
         pointerEvents="none"
       />
 
-      <TouchableOpacity className="absolute top-2.5 right-1 z-20 p-1">
+      <TouchableOpacity
+        className="absolute top-2.5 right-1 z-20 p-1"
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden={true}
+      >
         <MaterialIcons name="more-vert" size={24} color="white" />
       </TouchableOpacity>
 
-      <View className="absolute bottom-0 w-full p-3 z-30">
+      <View
+        className="absolute bottom-0 w-full p-3 z-30"
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden={true}
+      >
         <Text
           numberOfLines={2}
           className="text-white text-[16px] leading-tight mb-2"

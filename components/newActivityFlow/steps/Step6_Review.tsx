@@ -119,8 +119,15 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
       subtitle="See if everything is right and save your new activity."
     >
       <ReviewCard label="Activity Type" onEdit={() => onJumpToStep(1)}>
-        <View className="flex-row items-center">
-          <View className="w-11 h-11 rounded-lg bg-[#C8E2C8] justify-center items-center mr-3">
+        <View
+          className="flex-row items-center"
+          accessible={true}
+          accessibilityLabel={`Selected activity type: ${data.activityType || 'Not selected'}`}
+        >
+          <View
+            className="w-11 h-11 rounded-lg bg-[#C8E2C8] justify-center items-center mr-3"
+            importantForAccessibility="no-hide-descendants"
+          >
             {getActivityIcon(data.activityType)}
           </View>
           <Text
@@ -134,8 +141,16 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
 
       <ReviewCard label="Contents" onEdit={() => onJumpToStep(2)}>
         {content && content.image ? (
-          <View className="w-full h-[120px] relative rounded-xl overflow-hidden bg-gray-900">
-            <View style={StyleSheet.absoluteFill}>
+          <View
+            className="w-full h-[120px] relative rounded-xl overflow-hidden bg-gray-900"
+            accessible={true}
+            accessibilityLabel={`${content.title}, Type: ${content.type}, Duration: ${content.duration}`}
+          >
+            <View
+              style={StyleSheet.absoluteFill}
+              importantForAccessibility="no-hide-descendants"
+              accessibilityElementsHidden={true}
+            >
               <Image
                 source={content.image}
                 className="w-full h-full"
@@ -147,6 +162,8 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
 
             <MaskedView
               style={StyleSheet.absoluteFill}
+              importantForAccessibility="no"
+              accessibilityElementsHidden={true}
               maskElement={
                 <LinearGradient
                   colors={['black', 'black', 'transparent']}
@@ -171,7 +188,11 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
               pointerEvents="none"
             />
 
-            <View className="absolute bottom-0 w-full p-3 z-30">
+            <View
+              className="absolute bottom-0 w-full p-3 z-30"
+              importantForAccessibility="no-hide-descendants"
+              accessibilityElementsHidden={true}
+            >
               <Text
                 className="text-white text-lg leading-tight mb-2"
                 style={{ fontFamily: 'Nunito_700Bold' }}
@@ -217,8 +238,15 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
       </ReviewCard>
 
       <ReviewCard label="Room" onEdit={() => onJumpToStep(3)}>
-        <View className="flex-row items-center">
-          <View className="w-11 h-11 rounded-lg bg-[#C8E2C8] justify-center items-center mr-3">
+        <View
+          className="flex-row items-center"
+          accessible={true}
+          accessibilityLabel={`Selected room: ${data.room || 'Not selected'}`}
+        >
+          <View
+            className="w-11 h-11 rounded-lg bg-[#C8E2C8] justify-center items-center mr-3"
+            importantForAccessibility="no-hide-descendants"
+          >
             {getRoomIcon(data.room)}
           </View>
           <Text
@@ -236,24 +264,37 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
       />
 
       <ReviewCard label="Activity Info" onEdit={() => onJumpToStep(5)}>
-        <View className="flex-row items-center">
-          {activityImageSource ? (
-            <Image
-              source={activityImageSource}
-              className="w-20 h-20 rounded-xl"
-              resizeMode="cover"
-            />
-          ) : (
-            <View className="w-20 h-24 rounded-xl bg-[#C8E2C8] justify-center items-center">
-              <MaterialIcons
-                name="image-not-supported"
-                size={24}
-                color="#354F52"
+        <View
+          className="flex-row items-center"
+          accessible={true}
+          accessibilityLabel={`Activity name: ${data.activityName || 'Untitled Activity'}. Description: ${data.description || 'No description provided'}`}
+        >
+          <View
+            importantForAccessibility="no-hide-descendants"
+            accessibilityElementsHidden={true}
+          >
+            {activityImageSource ? (
+              <Image
+                source={activityImageSource}
+                className="w-20 h-20 rounded-xl"
+                resizeMode="cover"
               />
-            </View>
-          )}
+            ) : (
+              <View className="w-20 h-24 rounded-xl bg-[#C8E2C8] justify-center items-center">
+                <MaterialIcons
+                  name="image-not-supported"
+                  size={24}
+                  color="#354F52"
+                />
+              </View>
+            )}
+          </View>
 
-          <View className="flex-1 ml-3">
+          <View
+            className="flex-1 ml-3"
+            importantForAccessibility="no-hide-descendants"
+            accessibilityElementsHidden={true}
+          >
             <Text
               className="text-[15px] text-[#2F4F4F]"
               style={{ fontFamily: 'Nunito_700Bold' }}

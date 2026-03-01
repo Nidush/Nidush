@@ -32,11 +32,17 @@ export const Step4_Environment = ({
       <Text
         className="text-2xl text-[#2F4F4F] my-3"
         style={{ fontFamily: 'Nunito_600SemiBold' }}
+        accessibilityRole="header"
       >
         Scenarios
       </Text>
 
-      <View className="flex-row flex-wrap justify-between gap-y-4">
+      <View
+        className="flex-row flex-wrap justify-between gap-y-4"
+        accessible={true}
+        accessibilityRole="radiogroup"
+        accessibilityLabel="Available scenarios"
+      >
         {filteredScenarios.map((env) => (
           <View key={env.id} className="w-[48%]">
             <ScenarioCard
@@ -62,8 +68,16 @@ export const Step4_Environment = ({
           <TouchableOpacity
             className="w-full h-full bg-[#D1E4D1] rounded-2xl justify-center items-center"
             activeOpacity={0.7}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Create new scene"
           >
-            <MaterialIcons name="add" size={48} color="#354F52" />
+            <MaterialIcons
+              name="add"
+              size={48}
+              color="#354F52"
+              importantForAccessibility="no"
+            />
             <Text
               className="text-[#354F52] text-xl mt-2"
               style={{ fontFamily: 'Nunito_600SemiBold' }}

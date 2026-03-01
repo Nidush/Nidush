@@ -55,7 +55,7 @@ export const ContentCard = ({
           : 'w-[48%] aspect-square',
       )}
       accessible={true}
-      accessibilityRole="button"
+      accessibilityRole="radio"
       accessibilityLabel={`${item.title}, ${item.type}${item.duration ? `, duration: ${item.duration}` : ''}`}
       accessibilityState={{ selected: isSelected }}
       accessibilityHint="Touch to select this content"
@@ -75,6 +75,8 @@ export const ContentCard = ({
 
       <MaskedView
         style={StyleSheet.absoluteFill}
+        importantForAccessibility="no"
+        accessibilityElementsHidden={true}
         maskElement={
           <LinearGradient
             colors={['black', 'black', 'transparent']}
@@ -99,8 +101,9 @@ export const ContentCard = ({
 
       <TouchableOpacity
         className="absolute top-2.5 right-1 z-20 p-1"
-        accessibilityLabel={`Details for ${item.title}`}
-        accessibilityRole="button"
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden={true}
       >
         <MaterialIcons name="more-vert" size={24} color="white" />
       </TouchableOpacity>
@@ -108,6 +111,7 @@ export const ContentCard = ({
       <View
         className="absolute bottom-0 w-full p-3 z-30"
         importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden={true}
       >
         <Text
           numberOfLines={2}

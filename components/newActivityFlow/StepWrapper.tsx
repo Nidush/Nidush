@@ -19,6 +19,6 @@ export const StepWrapper = ({ title, subtitle, children }: any) => (
         {subtitle}
       </Text>
     )}
-    <View accessibilityLiveRegion="polite">{children}</View>
+    <View>{children}</View>
   </View>
 );

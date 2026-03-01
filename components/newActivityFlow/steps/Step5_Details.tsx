@@ -55,19 +55,33 @@ export const Step5_Details = ({
       <Text
         className="text-lg text-[#2F4F4F] mb-2 mt-2.5"
         style={{ fontFamily: 'Nunito_700Bold' }}
+        importantForAccessibility="no"
       >
         Image
       </Text>
 
-      <View className="w-full aspect-square bg-[#C8E2C8] rounded-3xl justify-center items-center overflow-hidden border border-[#DDE5D7]">
+      <View
+        className="w-full aspect-square bg-[#C8E2C8] rounded-3xl justify-center items-center overflow-hidden border border-[#DDE5D7]"
+        accessible={true}
+        accessibilityRole="image"
+        accessibilityLabel={
+          image ? 'Selected activity cover image' : 'No image selected'
+        }
+      >
         {image ? (
           <Image
             source={imageSource}
             className="w-full h-full"
             resizeMode="cover"
+            importantForAccessibility="no"
           />
         ) : (
-          <MaterialIcons name="image" size={60} color="#354F52" />
+          <MaterialIcons
+            name="image"
+            size={60}
+            color="#354F52"
+            importantForAccessibility="no"
+          />
         )}
       </View>
 
@@ -75,8 +89,17 @@ export const Step5_Details = ({
         <TouchableOpacity
           onPress={pickImage}
           className="bg-[#E8F3E8] px-4 py-2.5 rounded-xl border border-[#C8E2C8] flex-row items-center"
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Change image"
+          accessibilityHint="Opens your device gallery to select a new cover image"
         >
-          <MaterialIcons name="edit" size={16} color="#548F53" />
+          <View
+            importantForAccessibility="no"
+            accessibilityElementsHidden={true}
+          >
+            <MaterialIcons name="edit" size={16} color="#548F53" />
+          </View>
           <Text
             className="text-[#548F53] text-sm ml-2"
             style={{ fontFamily: 'Nunito_700Bold' }}
@@ -89,8 +112,18 @@ export const Step5_Details = ({
           <TouchableOpacity
             onPress={handleResetImage}
             className="bg-[#FFE5E5] px-4 py-2.5 rounded-xl border border-[#FFC8C8] flex-row items-center"
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Reset image"
+            accessibilityHint="Reverts to the default activity image"
           >
-            <Ionicons name="refresh" size={16} color="#D32F2F" />
+            <View
+              importantForAccessibility="no"
+              accessibilityElementsHidden={true}
+            >
+              <Ionicons name="refresh" size={16} color="#D32F2F" />
+            </View>
+
             <Text
               className="text-[#D32F2F] text-sm ml-2"
               style={{ fontFamily: 'Nunito_700Bold' }}
@@ -104,6 +137,7 @@ export const Step5_Details = ({
       <Text
         className="text-lg text-[#2F4F4F] mb-2"
         style={{ fontFamily: 'Nunito_700Bold' }}
+        importantForAccessibility="no"
       >
         Activity Name
       </Text>
@@ -113,11 +147,13 @@ export const Step5_Details = ({
         style={{ fontFamily: 'Nunito_400Regular' }}
         value={name}
         onChangeText={setName}
+        accessibilityLabel="Activity Name, required field"
       />
 
       <Text
         className="text-lg text-[#2F4F4F] mb-2"
         style={{ fontFamily: 'Nunito_700Bold' }}
+        importantForAccessibility="no"
       >
         Description
       </Text>
@@ -128,6 +164,7 @@ export const Step5_Details = ({
         multiline
         value={desc}
         onChangeText={setDesc}
+        accessibilityLabel="Activity Description, required field"
       />
     </StepWrapper>
   );

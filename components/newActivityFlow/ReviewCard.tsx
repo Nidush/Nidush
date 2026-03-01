@@ -13,10 +13,17 @@ export const ReviewCard = ({ label, onEdit, children }: ReviewCardProps) => (
       <Text
         className="text-xl text-[#2F4F4F]"
         style={{ fontFamily: 'Nunito_600SemiBold' }}
+        accessibilityRole="header"
       >
         {label}
       </Text>
-      <TouchableOpacity onPress={onEdit}>
+      <TouchableOpacity
+        onPress={onEdit}
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel={`Edit ${label}`}
+        accessibilityHint={`Jumps to the ${label} step to make changes`}
+      >
         <Text
           className="text-[#548F53]"
           style={{ fontFamily: 'Nunito_600SemiBold' }}
