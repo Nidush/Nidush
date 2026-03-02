@@ -1,23 +1,12 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import React, { useState, useMemo } from 'react'; 
-import { ScrollView, StatusBar, Text, TextInput, View, TouchableOpacity } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { ScrollView, StatusBar, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
 import AddRoomDevice from '../../components/rooms/AddRoomDevice';
 import RoutineCard from '../../components/routines/RoutineCard';
 
-interface Routine {
-  id: number;
-  title: string;
-  days: string;
-  time: string;
-  room: string;
-  active: boolean;
-  image: any;
-}
-
 export default function Routines() {
-  const [routines, setRoutines] = useState<Routine[]>([
+  const [routines, setRoutines] = useState([
     { id: 1, title: 'Sunrise Awakening', days: 'Mon-Fri', time: '7:15 am', room: 'Bedroom', active: true, image: require('../../assets/Scenarios/routines/sunrise_awakening.png') },
     { id: 2, title: 'Gym Hour', days: 'Tue & Thu', time: '6:00 pm', room: 'Living Room', active: false, image: require('../../assets/Scenarios/routines/gym_hour.png') },
     { id: 3, title: 'Morning Kitchen Prep', days: 'Mon-Fri', time: '8:00 am', room: 'Kitchen', active: true, image: require('../../assets/Scenarios/routines/morning_kitchen_prep.png') },
@@ -28,66 +17,42 @@ export default function Routines() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const toggleRoutine = (id: number) => {
-    setRoutines((current) =>
-      current.map((r) => (r.id === id ? { ...r, active: !r.active } : r))
-    );
+    setRoutines((current) => current.map((r) => r.id === id ? { ...r, active: !r.active } : r));
   };
 
   const filteredRoutines = useMemo(() => {
-    return routines.filter((routine) => {
-      const searchLower = searchQuery.toLowerCase();
-      return (
-        routine.title.toLowerCase().includes(searchLower) ||
-        routine.room.toLowerCase().includes(searchLower)
-      );
-    });
+    const searchLower = searchQuery.toLowerCase();
+    return routines.filter((r) => r.title.toLowerCase().includes(searchLower) || r.room.toLowerCase().includes(searchLower));
   }, [routines, searchQuery]);
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F1F3EA]" edges={['top']} accessible accessibilityLabel="Routines screen">
+    <SafeAreaView className="flex-1 bg-[#F1F3EA]" edges={['top']}>
       <StatusBar barStyle="dark-content" />
 
-      {/* Header */}
-      <View className="items-center mt-2 mb-6">
+      <View className="items-center mt-2 mb-6 px-4">
         <Text 
-          className="text-3xl font-semibold text-[#354F52]" 
+          className="text-3xl text-[#354F52]" 
           style={{ fontFamily: 'Nunito_600SemiBold' }}
-          accessibilityRole="header"
-        >
-          Routines
-        </Text>
+          maxFontSizeMultiplier={1.3}
+        >Routines</Text>
       </View>
 
       <View className="px-5 mb-6">
-        <View className="flex-row items-center border border-[#BDC7C2] rounded-full px-4 h-12 bg-transparent">
-          <MaterialIcons 
-            name="search" 
-            size={24} 
-            color="#7A8C85" 
-            style={{ marginRight: 10 }} 
-            accessible={false} 
-          />
+        <View className="flex-row items-center border border-[#BDC7C2] rounded-full px-4 min-h-[48px]">
+          <MaterialIcons name="search" size={22} color="#7A8C85" style={{ marginRight: 10 }} />
           <TextInput
-            testID="search-input" 
             placeholder="Search routines..."
             placeholderTextColor="#7A8C85"
             value={searchQuery}
             onChangeText={setSearchQuery}
-            className="flex-1 h-full text-base text-[#2C3A35]"
-            style={{ fontFamily: 'Nunito_600SemiBold', paddingVertical: 0 }}
-            textAlignVertical="center"
-            autoCorrect={false}
-            accessible
-            accessibilityLabel="Search routines"
+            className="flex-1 text-base text-[#2C3A35]"
+            style={{ fontFamily: 'Nunito_600SemiBold' }}
+            maxFontSizeMultiplier={1.3}
           />
         </View>
       </View>
 
-      <ScrollView 
-        testID="routines-scrollview" 
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 130 }} 
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
         {filteredRoutines.map((item) => (
           <RoutineCard
             key={item.id}
@@ -103,10 +68,7 @@ export default function Routines() {
         ))}
       </ScrollView>
 
-      {/* Add routine button container */}
-      <View testID="add-routine-container" accessible accessibilityLabel="Add new routine">
-        <AddRoomDevice actions={[]} isStatic={true} />
-      </View>
+      <AddRoomDevice actions={[]} isStatic />
     </SafeAreaView>
   );
-}
+} 

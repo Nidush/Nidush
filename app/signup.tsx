@@ -65,7 +65,7 @@ export default function SignUp() {
 
   const isWebPC = dims.width > 768;
 
-  // --- Navegação ---
+  // --- Navegação Onboarding ---
   if (currentStep === 'welcome') return <WelcomeUser onFinish={() => transitionTo('house')} />;
   if (currentStep === 'house') return <Animated.View style={{ flex: 1, opacity: fadeAnim }}><HouseName onNext={() => transitionTo('wearable')} /></Animated.View>;
   if (currentStep === 'wearable') return <Animated.View style={{ flex: 1, opacity: fadeAnim }}><WearableSync onNext={() => transitionTo('activities')} onSkip={() => transitionTo('activities')} /></Animated.View>;
@@ -103,6 +103,7 @@ export default function SignUp() {
             contentContainerStyle={{ flexGrow: 1 }}
             bounces={false}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
             <SafeAreaView className="flex-1">
 
@@ -111,6 +112,7 @@ export default function SignUp() {
                 className="px-[28px] flex-1"
               >
 
+                {/* Logo */}
                 <View
                   className={`items-center ${isWebPC ? 'mt-[30px] mb-[10px]' : 'mt-[15px]'} h-[60px] justify-center`}
                   accessible
@@ -133,6 +135,7 @@ export default function SignUp() {
                     style={{ fontFamily: 'Nunito_700Bold' }}
                     className="text-[40px] text-[#3E545C]"
                     accessibilityRole="header"
+                    maxFontSizeMultiplier={1}
                   >
                     Welcome Home
                   </Text>
@@ -141,33 +144,54 @@ export default function SignUp() {
                     style={{ fontFamily: 'Nunito_400Regular' }}
                     className="text-[16px] text-[#3E545C] mt-[8px] mb-[30px]"
                     accessibilityLabel="Join Nidush and let your home be your safe space"
+                    maxFontSizeMultiplier={1.2}
                   >
                     Join Nidush and let your home be your safe space.
                   </Text>
 
-                  <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">
-                    First Name
-                  </Text>
-                  <TextInput
-                    style={{ fontFamily: 'Nunito_400Regular' }}
-                    className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB] mb-[15px]"
-                    accessibilityLabel="First Name"
-                    accessibilityHint="Enter your first name"
-                    accessibilityRole="text"
-                  />
+                  {/* CAMPOS LADO A LADO: First Name & Last Name */}
+                  <View className="flex-row mb-[15px]">
+                    <View className="flex-1 mr-[10px]">
+                      <Text 
+                        style={{ fontFamily: 'Nunito_600SemiBold' }} 
+                        className="text-[14px] text-[#3E545C] mb-[6px]"
+                        maxFontSizeMultiplier={1.2}
+                      >
+                        First Name
+                      </Text>
+                      <TextInput
+                        style={{ fontFamily: 'Nunito_400Regular' }}
+                        className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]"
+                        accessibilityLabel="First Name"
+                        accessibilityHint="Enter your first name"
+                        maxFontSizeMultiplier={1.2}
+                      />
+                    </View>
 
-                  <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">
-                    Last Name
-                  </Text>
-                  <TextInput
-                    style={{ fontFamily: 'Nunito_400Regular' }}
-                    className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB] mb-[15px]"
-                    accessibilityLabel="Last Name"
-                    accessibilityHint="Enter your last name"
-                    accessibilityRole="text"
-                  />
+                    <View className="flex-1">
+                      <Text 
+                        style={{ fontFamily: 'Nunito_600SemiBold' }} 
+                        className="text-[14px] text-[#3E545C] mb-[6px]"
+                        maxFontSizeMultiplier={1.2}
+                      >
+                        Last Name
+                      </Text>
+                      <TextInput
+                        style={{ fontFamily: 'Nunito_400Regular' }}
+                        className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]"
+                        accessibilityLabel="Last Name"
+                        accessibilityHint="Enter your last name"
+                        maxFontSizeMultiplier={1.2}
+                      />
+                    </View>
+                  </View>
 
-                  <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">
+                  {/* Email */}
+                  <Text 
+                    style={{ fontFamily: 'Nunito_600SemiBold' }} 
+                    className="text-[14px] text-[#3E545C] mb-[6px]"
+                    maxFontSizeMultiplier={1.2}
+                  >
                     Email
                   </Text>
                   <TextInput
@@ -176,10 +200,15 @@ export default function SignUp() {
                     keyboardType="email-address"
                     accessibilityLabel="Email"
                     accessibilityHint="Enter your email address"
-                    accessibilityRole="text"
+                    maxFontSizeMultiplier={1.2}
                   />
 
-                  <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">
+                  {/* Password */}
+                  <Text 
+                    style={{ fontFamily: 'Nunito_600SemiBold' }} 
+                    className="text-[14px] text-[#3E545C] mb-[6px]"
+                    maxFontSizeMultiplier={1.2}
+                  >
                     Password
                   </Text>
                   <TextInput
@@ -188,32 +217,44 @@ export default function SignUp() {
                     secureTextEntry
                     accessibilityLabel="Password"
                     accessibilityHint="Enter your password"
-                    accessibilityRole="text"
+                    maxFontSizeMultiplier={1.2}
                   />
 
+                  {/* Botão Join */}
                   <TouchableOpacity
                     activeOpacity={0.8}
                     className="bg-[#5C8D58] w-[230px] h-[54px] rounded-full justify-center items-center self-center mt-[15px]"
                     onPress={() => transitionTo('welcome')}
                     accessibilityRole="button"
                     accessibilityLabel="Join Nidush"
-                    accessibilityHint="Creates your account and continues to onboarding"
                   >
-                    <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-white text-[20px]">
+                    <Text 
+                      style={{ fontFamily: 'Nunito_700Bold' }} 
+                      className="text-white text-[20px]"
+                      maxFontSizeMultiplier={1.2}
+                    >
                       Join Nidush
                     </Text>
                   </TouchableOpacity>
 
+                  {/* Footer Login */}
                   <View className="flex-row justify-center mt-[20px] mb-20">
-                    <Text style={{ fontFamily: 'Nunito_400Regular' }} className="text-[#3E545C] text-[15px]">
+                    <Text 
+                      style={{ fontFamily: 'Nunito_400Regular' }} 
+                      className="text-[#3E545C] text-[15px]"
+                      maxFontSizeMultiplier={1.2}
+                    >
                       Already have an account?
                     </Text>
                     <TouchableOpacity
                       accessibilityRole="button"
                       accessibilityLabel="Login"
-                      accessibilityHint="Navigates to login screen"
                     >
-                      <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-[#5C8D58] text-[15px] ml-1">
+                      <Text 
+                        style={{ fontFamily: 'Nunito_700Bold' }} 
+                        className="text-[#5C8D58] text-[15px] ml-1"
+                        maxFontSizeMultiplier={1.2}
+                      >
                         Login
                       </Text>
                     </TouchableOpacity>
