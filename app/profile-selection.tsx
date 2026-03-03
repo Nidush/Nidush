@@ -56,6 +56,7 @@ export default function ProfileSelection() {
         showsVerticalScrollIndicator={false}
       >
         <Text
+          maxFontSizeMultiplier={1.1}
           className="text-[32px] text-[#3A5A54] mb-12 text-center px-10"
           style={{ fontFamily: 'Nunito_700Bold' }}
           accessibilityRole="header"
@@ -85,6 +86,7 @@ export default function ProfileSelection() {
                 />
               </View>
               <Text
+                maxFontSizeMultiplier={1.2}
                 className="text-xl text-[#3A5A54] text-center"
                 style={{ fontFamily: 'Nunito_600SemiBold' }}
               >
@@ -107,6 +109,7 @@ export default function ProfileSelection() {
               <MaterialIcons name="add" size={90} color="#354F52" />
             </View>
             <Text
+              maxFontSizeMultiplier={1.2}
               className="text-xl text-[#3A5A54] text-center"
               style={{ fontFamily: 'Nunito_600SemiBold' }}
             >
@@ -124,6 +127,7 @@ export default function ProfileSelection() {
           accessibilityHint="Opens profile management settings"
         >
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-lg text-[#548F53] underline"
             style={{ fontFamily: 'Nunito_700Bold' }}
           >
@@ -131,13 +135,13 @@ export default function ProfileSelection() {
           </Text>
         </TouchableOpacity>
       </ScrollView>
-
       <Image
         source={require('./../assets/images/Wave2.png')}
         className="absolute bottom-0 w-full h-[250px] z-10"
         style={{ width: width }}
         resizeMode="stretch"
         accessible={false}
+        importantForAccessibility="no-hide-descendants"
       />
     </SafeAreaView>
   );

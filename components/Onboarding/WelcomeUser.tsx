@@ -98,7 +98,7 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
     >
       <StatusBar style="light" />
       
-      {/* Vídeo de fundo - ignorado para leitores de tela */}
+      {/* Vídeo de fundo */}
       <View style={{ width: dims.width, height: dims.height, position: 'absolute' }} accessible={false} importantForAccessibility="no-hide-descendants">
         <VideoView
           player={player}
@@ -147,6 +147,7 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
             accessibilityLiveRegion="polite"
           >
             <Text 
+              maxFontSizeMultiplier={1.2}
               style={{ 
                 fontFamily: 'Nunito_700Bold', 
                 fontSize: isWebPC ? 80 : 40,

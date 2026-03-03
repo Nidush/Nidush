@@ -55,7 +55,7 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
       accessibilityLabel="Wearable device connection screen"
     >
       
-      {/* Wave de Fundo - ignorado */}
+      {/* Wave de Fundo - decorativo */}
       <View 
         className="absolute bottom-0 left-0 right-0 overflow-hidden" 
         style={{ width: dims.width, height: dims.height * 0.18, zIndex: 1 }} 
@@ -84,7 +84,7 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
             className="px-[28px] flex-1"
           >
             
-            {/* Header */}
+            {/* Header / Logo */}
             <View className={`items-center ${isWebPC ? 'mt-[30px] mb-[10px]' : 'mt-[15px]'} h-[60px] justify-center`}>
               <Image 
                 source={require('../../assets/images/Logo.png')} 
@@ -100,7 +100,7 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
 
             <View className="flex-1 justify-center items-center py-10">
               
-              {/* Pulse + Device Icon - decorativo */}
+              {/* Pulse Animação */}
               <View 
                 className="items-center justify-center mb-12"
                 accessible={false}
@@ -128,8 +128,9 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
                 </View>
               </View>
               
-              {/* Título */}
+              {/* Título com limitador de fonte */}
               <Text 
+                maxFontSizeMultiplier={1.2}
                 style={{ fontFamily: 'Nunito_700Bold', fontSize: isWebPC ? 42 : 36 }} 
                 className="text-[#3E545C] text-center leading-tight tracking-[-0.5px]"
                 accessibilityRole="header"
@@ -137,8 +138,9 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
                 Connect your{"\n"}wearable
               </Text>
               
-              {/* Descrição */}
+              {/* Descrição com limitador de fonte */}
               <Text 
+                maxFontSizeMultiplier={1.2}
                 style={{ fontFamily: 'Nunito_400Regular', fontSize: isWebPC ? 18 : 17 }} 
                 className="text-[#3E545C] text-center mt-6 opacity-80 leading-[26px] px-4"
                 accessibilityLabel="Sync your Apple Watch or Oura Ring to help Nidush track your stress levels automatically."
@@ -158,6 +160,7 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
                   accessibilityHint="Starts scanning your wearable to sync with Nidush"
                 >
                   <Text 
+                    maxFontSizeMultiplier={1.2}
                     style={{ fontFamily: 'Nunito_700Bold', fontSize: isWebPC ? 20 : 18 }} 
                     className="text-white"
                   >
@@ -174,6 +177,7 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
                   accessibilityHint="I will connect my wearable later"
                 >
                   <Text 
+                    maxFontSizeMultiplier={1.2}
                     style={{ fontFamily: 'Nunito_600SemiBold', fontSize: 16 }} 
                     className="text-[#3E545C] opacity-50"
                   >

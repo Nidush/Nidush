@@ -57,6 +57,7 @@ export default function FinalLoading({ onComplete }: FinalLoadingProps) {
     >
       <View className="mt-4">
         <Text
+          maxFontSizeMultiplier={1}
           accessibilityRole="header"
           accessibilityLiveRegion="polite"
           className="text-[#354F52] text-2xl text-center leading-tight"

@@ -220,7 +220,11 @@ export default function Onboarding() {
                 onPress={finishOnboarding}
                 className="p-2"
               >
-                <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-white text-lg md:text-xl opacity-80">
+                <Text 
+                  maxFontSizeMultiplier={1.2}
+                  style={{ fontFamily: 'Nunito_600SemiBold' }} 
+                  className="text-white text-lg md:text-xl opacity-80"
+                >
                   Skip
                 </Text>
               </TouchableOpacity>
@@ -228,6 +232,7 @@ export default function Onboarding() {
 
             <View className="mt-auto mb-16 md:mb-24 self-start w-full max-w-[750px]">
               <Text 
+                maxFontSizeMultiplier={1.2}
                 accessibilityRole="header"
                 style={{ fontFamily: 'Nunito_700Bold' }} 
                 className="text-white text-[34px] md:text-7xl leading-[42px] md:leading-[80px] mb-6"
@@ -236,6 +241,7 @@ export default function Onboarding() {
               </Text>
 
               <Text 
+                maxFontSizeMultiplier={1.2}
                 accessibilityLabel={item.description}
                 style={{ fontFamily: 'Nunito_400Regular' }} 
                 className="text-white text-[18px] md:text-2xl leading-7 md:leading-9 opacity-90 pr-10"
@@ -253,7 +259,11 @@ export default function Onboarding() {
                   onPress={finishOnboarding} 
                   className="bg-[#589158] px-14 py-5 rounded-full items-center mb-12 shadow-lg active:scale-95"
                 >
-                  <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-white text-xl md:text-2xl">
+                  <Text 
+                    maxFontSizeMultiplier={1.2}
+                    style={{ fontFamily: 'Nunito_700Bold' }} 
+                    className="text-white text-xl md:text-2xl"
+                  >
                     Begin Journey
                   </Text>
                 </TouchableOpacity>
@@ -285,11 +295,20 @@ export default function Onboarding() {
                 resizeMode="contain" 
               />
 
-              <Text accessibilityRole="header" style={{ fontFamily: 'Nunito_700Bold' }} className="text-5xl md:text-8xl text-white text-center">
+              <Text 
+                maxFontSizeMultiplier={1.2}
+                accessibilityRole="header" 
+                style={{ fontFamily: 'Nunito_700Bold' }} 
+                className="text-5xl md:text-8xl text-white text-center"
+              >
                 Welcome to Nidush
               </Text>
 
-              <Text style={{ fontFamily: 'Nunito_400Regular' }} className="text-xl md:text-3xl text-white mt-4 text-center opacity-80">
+              <Text 
+                maxFontSizeMultiplier={1.2}
+                style={{ fontFamily: 'Nunito_400Regular' }} 
+                className="text-xl md:text-3xl text-white mt-4 text-center opacity-80"
+              >
                 Your safe space starts here.
               </Text>
 
@@ -300,7 +319,11 @@ export default function Onboarding() {
                 className="bg-[#589158] px-16 py-5 rounded-full mt-16 shadow-md items-center active:scale-95" 
                 onPress={handleDiscover}
               >
-                <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-white text-xl md:text-2xl">
+                <Text 
+                  maxFontSizeMultiplier={1.2}
+                  style={{ fontFamily: 'Nunito_700Bold' }} 
+                  className="text-white text-xl md:text-2xl"
+                >
                   Discover
                 </Text>
               </TouchableOpacity>

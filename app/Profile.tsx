@@ -4,8 +4,23 @@ import React from 'react';
 import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import {
+  Nunito_400Regular,
+  Nunito_600SemiBold,
+  Nunito_700Bold,
+  useFonts,
+} from '@expo-google-fonts/nunito';
+
 export default function Profile() {
   const router = useRouter();
+
+  const [fontsLoaded] = useFonts({
+    Nunito_400Regular,
+    Nunito_600SemiBold,
+    Nunito_700Bold,
+  });
+
+  if (!fontsLoaded) return null;
 
   return (
     <SafeAreaView
@@ -27,6 +42,7 @@ export default function Profile() {
         </TouchableOpacity>
 
         <Text
+          maxFontSizeMultiplier={1.2}
           className="text-2xl text-[#4A5D4E]"
           style={{ fontFamily: 'Nunito_600SemiBold' }}
           accessibilityRole="header"
@@ -50,6 +66,7 @@ export default function Profile() {
             accessibilityLabel="Profile picture of Laura Rossi"
           />
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-3xl text-[#3A4D3F] mt-4"
             style={{ fontFamily: 'Nunito_700Bold' }}
             accessibilityRole="header"
@@ -65,6 +82,7 @@ export default function Profile() {
         >
           <View className="flex-row justify-between items-center mb-4">
             <Text
+              maxFontSizeMultiplier={1.2}
               className="text-lg text-[#4A5D4E]"
               style={{ fontFamily: 'Nunito_600SemiBold' }}
               accessibilityRole="header"
@@ -80,6 +98,7 @@ export default function Profile() {
               accessibilityHint="Opens the hobby preferences editor"
             >
               <Text
+                maxFontSizeMultiplier={1.2}
                 className="text-[#5B8C51] underline"
                 style={{ fontFamily: 'Nunito_700Bold' }}
               >
@@ -96,6 +115,7 @@ export default function Profile() {
                 accessible={false}
               >
                 <Text
+                  maxFontSizeMultiplier={1.2}
                   className="text-[#4A5D4E] text-sm"
                   style={{ fontFamily: 'Nunito_600SemiBold' }}
                 >
@@ -109,6 +129,7 @@ export default function Profile() {
         {/* Wearables */}
         <View className="bg-[#F5F7F0] rounded-[24px] p-5 mb-4 border border-[#D1D9C5]">
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-lg text-[#4A5D4E] mb-4"
             style={{ fontFamily: 'Nunito_600SemiBold' }}
             accessibilityRole="header"
@@ -140,6 +161,7 @@ export default function Profile() {
             accessibilityHint="Starts the process to connect a new wearable device"
           >
             <Text
+              maxFontSizeMultiplier={1.2}
               className="text-white text-xl"
               style={{ fontFamily: 'Nunito_700Bold' }}
             >
@@ -190,6 +212,7 @@ export default function Profile() {
             accessibilityHint="Logs out of the current account"
           >
             <Text
+              maxFontSizeMultiplier={1.2}
               className="text-white text-xl"
               style={{ fontFamily: 'Nunito_700Bold' }}
             >
@@ -217,6 +240,7 @@ function DeviceItem({ name, status, connected, icon, testID }: any) {
 
       <View className="ml-4">
         <Text
+          maxFontSizeMultiplier={1.2}
           className="text-base text-[#4A5D4E]"
           style={{ fontFamily: 'Nunito_600SemiBold' }}
         >
@@ -228,6 +252,7 @@ function DeviceItem({ name, status, connected, icon, testID }: any) {
             accessible={false}
           />
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-xs text-gray-500 ml-1.5"
             style={{ fontFamily: 'Nunito_400Regular' }}
           >
@@ -251,6 +276,7 @@ function MenuItem({ icon, label, border = true, testID }: any) {
       <View className="flex-row items-center">
         <MaterialIcons name={icon} size={28} color="#4A5D4E" />
         <Text
+          maxFontSizeMultiplier={1.2}
           className="text-lg text-[#4A5D4E] ml-4"
           style={{ fontFamily: 'Nunito_600SemiBold' }}
         >

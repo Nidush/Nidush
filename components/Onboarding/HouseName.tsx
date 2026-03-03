@@ -92,6 +92,7 @@ export default function HouseName({ onNext }: { onNext: () => void }) {
               {/* Conteúdo */}
               <View className={isWebPC ? 'mt-[10px]' : 'mt-[25px]'}>
                 <Text 
+                  maxFontSizeMultiplier={1.2}
                   style={{ fontFamily: 'Nunito_700Bold' }} 
                   className="text-[40px] text-[#3E545C] tracking-[-0.5px] leading-tight"
                   accessibilityRole="header"
@@ -100,6 +101,7 @@ export default function HouseName({ onNext }: { onNext: () => void }) {
                 </Text>
                 
                 <Text 
+                  maxFontSizeMultiplier={1.2}
                   style={{ fontFamily: 'Nunito_400Regular' }} 
                   className="text-[16px] text-[#3E545C] mt-[8px] mb-[30px] leading-[22px] opacity-90"
                   accessibilityLabel="Giving it a name is the first step to making this space truly yours."
@@ -110,6 +112,7 @@ export default function HouseName({ onNext }: { onNext: () => void }) {
                 {/* Input */}
                 <View className="w-full mb-[15px]">
                   <Text 
+                    maxFontSizeMultiplier={1.2}
                     style={{ fontFamily: 'Nunito_600SemiBold' }} 
                     className="text-[14px] text-[#3E545C] mb-[6px]"
                     accessibilityRole="header"
@@ -117,6 +120,7 @@ export default function HouseName({ onNext }: { onNext: () => void }) {
                     How would you like to call your home?
                   </Text>
                   <TextInput 
+                    maxFontSizeMultiplier={1.2}
                     placeholder="e.g. My Sanctuary"
                     placeholderTextColor="#AAB4AA"
                     className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB] text-[#3E545C]"
@@ -138,6 +142,7 @@ export default function HouseName({ onNext }: { onNext: () => void }) {
                   accessibilityHint="Creates your home with the name entered and proceeds to the next step"
                 >
                   <Text 
+                    maxFontSizeMultiplier={1.2}
                     style={{ fontFamily: 'Nunito_700Bold' }} 
                     className="text-white text-[20px]"
                   >

@@ -73,6 +73,7 @@ export default function ActivitySelection({
             className={`items-center justify-center ${isWebPC ? 'mt-[30px] mb-[10px]' : 'mt-4'} h-[60px]`}
           >
             <Text
+              maxFontSizeMultiplier={1.2}
               accessibilityRole="header"
               style={{ fontFamily: 'Nunito_700Bold' }}
               className="text-xl text-[#2F4F4F]"
@@ -88,6 +89,7 @@ export default function ActivitySelection({
           >
             <View className={isWebPC ? 'mt-4' : 'mt-8'}>
               <Text
+                maxFontSizeMultiplier={1.2}
                 accessibilityRole="header"
                 style={{ fontFamily: 'Nunito_700Bold' }}
                 className="text-[32px] text-[#2F4F4F] leading-[38px]"
@@ -125,8 +127,9 @@ export default function ActivitySelection({
                       />
 
                       <Text
+                        maxFontSizeMultiplier={1.2}
                         style={{ fontFamily: 'Nunito_600SemiBold' }}
-                        className="text-[#354F52] mt-2"
+                        className="text-[#354F52] mt-2 text-center px-2"
                       >
                         {item.id}
                       </Text>
@@ -163,6 +166,7 @@ export default function ActivitySelection({
                  ${selected.length > 0 ? 'opacity-100' : 'opacity-40'}`}
               >
                 <Text
+                  maxFontSizeMultiplier={1.2}
                   style={{ fontFamily: 'Nunito_700Bold' }}
                   className="text-lg text-white"
                 >
@@ -186,6 +190,7 @@ export default function ActivitySelection({
                   ${selected.length > 0 ? 'opacity-100' : 'opacity-40'}`}
               >
                 <Text
+                  maxFontSizeMultiplier={1.2}
                   style={{ fontFamily: 'Nunito_700Bold' }}
                   className="text-lg text-white"
                 >
