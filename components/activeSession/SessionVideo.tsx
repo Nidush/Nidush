@@ -23,19 +23,19 @@ export const SessionVideo = ({ videoUrl, poster }: SessionVideoProps) => {
       <View className="flex-1 justify-center items-center px-4">
         <View className="w-full aspect-video bg-black rounded-3xl overflow-hidden justify-center items-center shadow-2xl relative">
           {/* Aqui entraria o componente <WebView source={{ uri: videoUrl }} /> */}
-          <Text className="text-white font-bold mb-2">
+          <Text  maxFontSizeMultiplier={1.2} className="text-white font-bold mb-2">
             YouTube Player Placeholder
           </Text>
-          <Text className="text-gray-400 text-xs text-center px-4">
+          <Text maxFontSizeMultiplier={1.2} className="text-gray-400 text-xs text-center px-4">
             {videoUrl}
           </Text>
 
           <TouchableOpacity className="mt-4 bg-[#ff0000] px-6 py-3 rounded-full flex-row items-center">
             <Ionicons name="play" size={20} color="white" />
-            <Text className="text-white font-bold ml-2">Watch on YouTube</Text>
+            <Text   maxFontSizeMultiplier={1.2} className="text-white font-bold ml-2">Watch on YouTube</Text>
           </TouchableOpacity>
         </View>
-        <Text className="mt-8 text-[#354F52] text-center px-6 leading-6">
+        <Text  maxFontSizeMultiplier={1.2} className="mt-8 text-[#354F52] text-center px-6 leading-6">
           Watch the video tutorial above to complete your session.
         </Text>
       </View>

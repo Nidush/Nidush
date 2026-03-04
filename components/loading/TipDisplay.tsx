@@ -8,13 +8,15 @@ interface TipDisplayProps {
 const TipDisplay = ({ tip }: TipDisplayProps) => {
   return (
     <View className="items-center px-4 mb-4">
-      <Text
+      <Text 
+        maxFontSizeMultiplier={1.2}
         className="text-[#354F52] text-3xl mb-4"
         style={{ fontFamily: 'Nunito_700Bold' }}
       >
         Did you know?
       </Text>
       <Text
+        maxFontSizeMultiplier={1.2}
         className="text-[#354F52] text-center text-lg leading-6"
         style={{ fontFamily: 'Nunito_600SemiBold' }}
       >

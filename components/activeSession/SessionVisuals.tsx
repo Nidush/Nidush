@@ -66,6 +66,7 @@ export const SessionVisuals = ({
           {ICON_MAP[stepIndex % ICON_MAP.length]}
         </View>
         <Text
+          maxFontSizeMultiplier={1.2}
           className="text-[#354F52] text-3xl text-center leading-10"
           style={{ fontFamily: 'Nunito_700Bold' }}
         >

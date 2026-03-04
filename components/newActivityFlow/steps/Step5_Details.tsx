@@ -53,6 +53,7 @@ export const Step5_Details = ({
       subtitle="Select an image, name and description for the activity."
     >
       <Text
+        maxFontSizeMultiplier={1.2}
         className="text-lg text-[#2F4F4F] mb-2 mt-2.5"
         style={{ fontFamily: 'Nunito_700Bold' }}
         importantForAccessibility="no"
@@ -101,6 +102,7 @@ export const Step5_Details = ({
             <MaterialIcons name="edit" size={16} color="#548F53" />
           </View>
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-[#548F53] text-sm ml-2"
             style={{ fontFamily: 'Nunito_700Bold' }}
           >
@@ -125,6 +127,7 @@ export const Step5_Details = ({
             </View>
 
             <Text
+              maxFontSizeMultiplier={1.2}
               className="text-[#D32F2F] text-sm ml-2"
               style={{ fontFamily: 'Nunito_700Bold' }}
             >
@@ -135,6 +138,7 @@ export const Step5_Details = ({
       </View>
 
       <Text
+        maxFontSizeMultiplier={1.2}
         className="text-lg text-[#2F4F4F] mb-2"
         style={{ fontFamily: 'Nunito_700Bold' }}
         importantForAccessibility="no"
@@ -142,6 +146,7 @@ export const Step5_Details = ({
         Activity Name
       </Text>
       <TextInput
+        maxFontSizeMultiplier={1.2}
         placeholder=""
         className="bg-[#F1F5F0] rounded-2xl p-4 text-base border border-[#DDE5D7] mb-4"
         style={{ fontFamily: 'Nunito_400Regular' }}
@@ -151,6 +156,7 @@ export const Step5_Details = ({
       />
 
       <Text
+        maxFontSizeMultiplier={1.2}
         className="text-lg text-[#2F4F4F] mb-2"
         style={{ fontFamily: 'Nunito_700Bold' }}
         importantForAccessibility="no"
@@ -158,6 +164,7 @@ export const Step5_Details = ({
         Description
       </Text>
       <TextInput
+        maxFontSizeMultiplier={1.2}
         placeholder=""
         className="bg-[#F1F5F0] rounded-2xl p-4 text-base border border-[#DDE5D7] h-[120px]"
         style={{ fontFamily: 'Nunito_400Regular', textAlignVertical: 'top' }}

@@ -77,6 +77,7 @@ export const ScenarioReviewCard = ({
             <MaterialIcons name="landscape" size={24} color="#354F52" />
           </View>
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-lg text-[#2F4F4F]"
             style={{ fontFamily: 'Nunito_600SemiBold' }}
           >
@@ -107,6 +108,7 @@ export const ScenarioReviewCard = ({
                   importantForAccessibility="no"
                 />
                 <Text
+                  maxFontSizeMultiplier={1.2}
                   className="ml-2 text-[#2F4F4F] text-sm"
                   style={{ fontFamily: 'Nunito_600SemiBold' }}
                   numberOfLines={1}
@@ -124,6 +126,7 @@ export const ScenarioReviewCard = ({
                 importantForAccessibility="no"
               />
               <Text
+                maxFontSizeMultiplier={1.2}
                 className="ml-1 text-xs text-[#2F4F4F]"
                 style={{ fontFamily: 'Nunito_600SemiBold' }}
               >
@@ -133,6 +136,7 @@ export const ScenarioReviewCard = ({
           </View>
 
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-xs text-[#6A7D5B] mb-2 uppercase tracking-widest"
             style={{ fontFamily: 'Nunito_700Bold' }}
             accessibilityRole="header"
@@ -157,6 +161,7 @@ export const ScenarioReviewCard = ({
                   color="#354F52"
                 />
                 <Text
+                  maxFontSizeMultiplier={1.2}
                   className="ml-2 text-sm text-[#2F4F4F]"
                   style={{ fontFamily: 'Nunito_600SemiBold' }}
                 >
@@ -167,6 +172,7 @@ export const ScenarioReviewCard = ({
                 </Text>
               </View>
               <Text
+                maxFontSizeMultiplier={1.2}
                 className="text-sm text-[#548F53]"
                 style={{ fontFamily: 'Nunito_700Bold' }}
                 importantForAccessibility="no"

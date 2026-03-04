@@ -194,6 +194,7 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
               accessibilityElementsHidden={true}
             >
               <Text
+                maxFontSizeMultiplier={1.2}
                 className="text-white text-lg leading-tight mb-2"
                 style={{ fontFamily: 'Nunito_700Bold' }}
                 numberOfLines={2}
@@ -205,6 +206,7 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
                 <View className="flex-row items-center gap-1">
                   <Ionicons name="time-outline" size={16} color="white" />
                   <Text
+                    maxFontSizeMultiplier={1.2}
                     className="text-white text-md"
                     style={{ fontFamily: 'Nunito_600SemiBold' }}
                   >
@@ -223,6 +225,7 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
                     color="white"
                   />
                   <Text
+                    maxFontSizeMultiplier={1.2}
                     className="text-white text-md capitalize"
                     style={{ fontFamily: 'Nunito_600SemiBold' }}
                   >
@@ -233,7 +236,7 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
             </View>
           </View>
         ) : (
-          <Text className="text-gray-400 italic">No content selected</Text>
+          <Text  maxFontSizeMultiplier={1.2} className="text-gray-400 italic">No content selected</Text>
         )}
       </ReviewCard>
 
@@ -250,6 +253,7 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
             {getRoomIcon(data.room)}
           </View>
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-lg text-[#2F4F4F]"
             style={{ fontFamily: 'Nunito_600SemiBold' }}
           >
@@ -296,12 +300,14 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
             accessibilityElementsHidden={true}
           >
             <Text
+              maxFontSizeMultiplier={1.2}
               className="text-[15px] text-[#2F4F4F]"
               style={{ fontFamily: 'Nunito_700Bold' }}
             >
               {data.activityName || 'Untitled Activity'}
             </Text>
             <Text
+              maxFontSizeMultiplier={1.2}
               className="text-[13px] text-[#6A7D5B] mt-1"
               style={{ fontFamily: 'Nunito_400Regular' }}
               numberOfLines={3}

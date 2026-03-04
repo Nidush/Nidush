@@ -83,7 +83,6 @@ const INITIAL_DEVICES: Device[] = [
 ];
 
 export default function Rooms() {
-  // --- Estados ---
   const [activeRoom, setActiveRoom] = useState<number>(1);
   const [devices, setDevices] = useState<Device[]>(INITIAL_DEVICES);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -126,6 +125,7 @@ export default function Rooms() {
       {/* Header */}
       <View className="items-center mt-2 mb-6">
         <Text
+          maxFontSizeMultiplier={1.2}
           className="text-3xl font-semibold text-[#354F52]"
           style={{ fontFamily: 'Nunito_600SemiBold' }}
           accessibilityRole="header"
@@ -134,7 +134,7 @@ export default function Rooms() {
         </Text>
       </View>
 
-      {/* Search Bar Funcional */}
+      {/* Search Bar */}
       <View className="px-5 mb-6">
         <View className="flex-row items-center justify-center border border-[#BDC7C2] rounded-full px-4 h-12 bg-transparent">
           <MaterialIcons
@@ -144,6 +144,7 @@ export default function Rooms() {
             style={{ marginRight: 10 }}
           />
           <TextInput
+            maxFontSizeMultiplier={1.2}
             placeholder="Search devices..."
             accessibilityLabel="Search devices"
             placeholderTextColor="#7A8C85"
@@ -214,6 +215,7 @@ export default function Rooms() {
               color="#354F52"
             />
             <Text
+              maxFontSizeMultiplier={1.2}
               className="text-[#7A8C85] mt-5 text-lg text-center"
               style={{ fontFamily: 'Nunito_600SemiBold' }}
             >

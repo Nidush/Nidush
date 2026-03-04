@@ -88,6 +88,7 @@ export const ScenarioCard = ({
         accessibilityElementsHidden={true}
       >
         <Text
+          maxFontSizeMultiplier={1.2}
           numberOfLines={2}
           className="text-white text-[16px] leading-tight mb-2"
           style={{ fontFamily: 'Nunito_700Bold' }}
@@ -98,6 +99,7 @@ export const ScenarioCard = ({
         <View className="flex-row items-center opacity-95">
           <MaterialCommunityIcons name="door" size={16} color="white" />
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-white text-md ml-1.5"
             style={{ fontFamily: 'Nunito_600SemiBold' }}
           >

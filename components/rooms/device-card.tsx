@@ -174,6 +174,7 @@ const DeviceCard = ({ item, onToggle, onUpdateLevel }: DeviceCardProps) => {
 
         <View>
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-[#354F52] font-semibold text-base mb-1"
             numberOfLines={1}
             style={{ fontFamily: 'Nunito_600SemiBold' }}
@@ -181,6 +182,7 @@ const DeviceCard = ({ item, onToggle, onUpdateLevel }: DeviceCardProps) => {
             {item.name}
           </Text>
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-[#354F52] text-xl"
             style={{ fontFamily: 'Nunito_600SemiBold' }}
           >

@@ -21,6 +21,7 @@ export const CarouselSection = ({
     <View className="mb-8">
       <View className="flex-row items-center mb-4 px-4">
         <Text
+          maxFontSizeMultiplier={1.2}
           className="text-2xl text-[#354F52]"
           style={{ fontFamily: 'Nunito_600SemiBold' }}
           accessibilityRole="header"

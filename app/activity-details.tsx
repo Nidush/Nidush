@@ -218,7 +218,7 @@ export default function ActivityDetails() {
   if (!mainItem)
     return (
       <View className="flex-1 justify-center items-center bg-[#F0F2EB]">
-        <Text accessibilityRole="header">Item not found</Text>
+        <Text maxFontSizeMultiplier={1.2}  accessibilityRole="header">Item not found</Text>
       </View>
     );
 
@@ -280,6 +280,7 @@ export default function ActivityDetails() {
           <DeviceSection devices={devicesToShow} />
           <View className="mb-8">
             <Text
+              maxFontSizeMultiplier={1.2}
               className="text-[#354F52] text-xl mb-2"
               style={{ fontFamily: 'Nunito_700Bold' }}
               accessibilityRole="header"
@@ -287,6 +288,7 @@ export default function ActivityDetails() {
               Description
             </Text>
             <Text
+              maxFontSizeMultiplier={1.2}
               className="text-[#586963] text-[16px] leading-6"
               style={{ fontFamily: 'Nunito_400Regular' }}
             >
@@ -323,6 +325,7 @@ export default function ActivityDetails() {
           }
         >
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-white text-2xl mr-2"
             style={{ fontFamily: 'Nunito_700Bold' }}
             importantForAccessibility="no-hide-descendants" // REDUÇÃO RUÍDO
@@ -356,7 +359,8 @@ export default function ActivityDetails() {
             <Ionicons name="checkmark" size={24} color="white" />
           </View>
           <View className="flex-1">
-            <Text
+            <Text 
+              maxFontSizeMultiplier={1.2}
               className="text-[#2F4F4F] text-lg"
               style={{ fontFamily: 'Nunito_700Bold' }}
             >

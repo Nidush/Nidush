@@ -48,6 +48,7 @@ export default function AddRoomDevice({
               onPress={action.onPress}
             >
               <Text
+                maxFontSizeMultiplier={1.2}
                 className="bg-[#548F53] px-10 py-4 rounded-full text-xl text-white shadow-md overflow-hidden"
                 style={{ fontFamily: 'Nunito_600SemiBold' }}
               >

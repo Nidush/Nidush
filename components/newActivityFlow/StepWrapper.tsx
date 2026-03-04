@@ -4,6 +4,7 @@ import { Text, View } from 'react-native';
 export const StepWrapper = ({ title, subtitle, children }: any) => (
   <View className="mt-2.5">
     <Text
+      maxFontSizeMultiplier={1.2}
       accessibilityRole="header"
       className="text-[26px] text-[#2F4F4F] mb-2"
       style={{ fontFamily: 'Nunito_700Bold' }}
@@ -13,6 +14,7 @@ export const StepWrapper = ({ title, subtitle, children }: any) => (
 
     {subtitle && (
       <Text
+        maxFontSizeMultiplier={1.2}
         className="text-[15px] text-[#2F4F4F] mb-6"
         style={{ fontFamily: 'Nunito_600SemiBold' }}
       >

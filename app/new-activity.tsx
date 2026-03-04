@@ -284,6 +284,7 @@ export default function NewActivityFlow() {
                   }
                 >
                   <Text
+                    maxFontSizeMultiplier={1.2}
                     className="text-white text-2xl"
                     style={{ fontFamily: 'Nunito_700Bold' }}
                   >

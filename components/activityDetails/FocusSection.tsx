@@ -42,14 +42,14 @@ export const FocusSection = ({ enabled, onToggle }: FocusSectionProps) => {
           <Text
             className="text-[#354F52] text-lg"
             style={{ fontFamily: 'Nunito_700Bold' }}
-            maxFontSizeMultiplier={1.5} // ZOOM CHECK
+            maxFontSizeMultiplier={1.2} // ZOOM CHECK
           >
             Do Not Disturb
           </Text>
           <Text
             className="text-[#6A7D5B] text-xs mt-1"
             style={{ fontFamily: 'Nunito_600SemiBold' }}
-            maxFontSizeMultiplier={1.5} // ZOOM CHECK
+            maxFontSizeMultiplier={1.2} // ZOOM CHECK
           >
             {enabled ? 'Notifications silenced' : 'Notifications enabled'}
           </Text>

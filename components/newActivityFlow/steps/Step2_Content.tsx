@@ -46,6 +46,7 @@ export const Step2_Content = ({
     return (
       <View className="mb-8">
         <Text
+          maxFontSizeMultiplier={1.2}
           className="text-2xl text-[#2F4F4F] mb-3"
           style={{ fontFamily: 'Nunito_600SemiBold' }}
           accessibilityRole="header"
@@ -85,6 +86,7 @@ export const Step2_Content = ({
           <Text
             className="text-[#2F4F4F] text-base"
             style={{ fontFamily: 'Nunito_600SemiBold' }}
+            maxFontSizeMultiplier={1.2}
           >
             {`No content found for "${activityType}".`}
           </Text>

@@ -38,6 +38,7 @@ export const FilterBar = ({
             accessibilityHint={isActive ? '' : `Filter results by ${filter}`}
           >
             <Text
+              maxFontSizeMultiplier={1.2}
               className={`${isActive ? 'text-[#548F53]' : 'text-[#354F52]'}`}
               style={{
                 fontFamily: isActive ? 'Nunito_700Bold' : 'Nunito_600SemiBold',

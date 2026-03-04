@@ -109,6 +109,7 @@ export const StateWidget = () => {
             <MaterialIcons name="circle" size={8} color="#4ADE80" />
           </View>
           <Text
+            maxFontSizeMultiplier={1.2}
             style={{ fontFamily: 'Nunito_600SemiBold' }}
             className="text-white opacity-90 text-lg tracking-widest"
           >
@@ -119,6 +120,7 @@ export const StateWidget = () => {
         <View className="flex-row items-center">
           <View>
             <Text
+              maxFontSizeMultiplier={1.2}
               style={{ fontFamily: 'Nunito_700Bold' }}
               className="text-white text-4xl shadow-sm leading-9"
             >
@@ -126,6 +128,7 @@ export const StateWidget = () => {
             </Text>
 
             <Text
+              maxFontSizeMultiplier={1.2}
               style={{ fontFamily: 'Nunito_600SemiBold' }}
               className="text-white text-md mt-3"
             >

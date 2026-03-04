@@ -19,6 +19,7 @@ export default function NewScenarioScreen() {
 
         {/* Mensagem principal */}
         <Text 
+          maxFontSizeMultiplier={1.2}
           style={{ fontFamily: 'Nunito_700Bold' }}
           className="text-[#354F52] text-3xl text-center mb-3"
         >
@@ -27,6 +28,7 @@ export default function NewScenarioScreen() {
 
         {/* Descrição */}
         <Text 
+          maxFontSizeMultiplier={1.2}
           style={{ fontFamily: 'Nunito_600SemiBold' }}
           className="text-[#7A8C85] text-lg text-center mb-12"
         >
@@ -42,6 +44,7 @@ export default function NewScenarioScreen() {
           <View className="flex-row items-center justify-center">
             <MaterialIcons name="home" size={24} color="white" />
             <Text 
+              maxFontSizeMultiplier={1.2}
               style={{ fontFamily: 'Nunito_700Bold' }}
               className="text-white text-lg ml-2"
             >

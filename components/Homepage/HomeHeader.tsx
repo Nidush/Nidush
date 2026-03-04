@@ -32,6 +32,7 @@ export const HomeHeader = ({ userName }: HomeHeaderProps) => {
         accessibilityLabel={`${greeting}, ${userName}`}
       >
         <Text
+          maxFontSizeMultiplier={1.2}
           style={{ fontFamily: 'Nunito_600SemiBold' }}
           className="text-2xl text-[#354F52]"
           importantForAccessibility="no-hide-descendants"
@@ -39,6 +40,7 @@ export const HomeHeader = ({ userName }: HomeHeaderProps) => {
           {greeting},
         </Text>
         <Text
+          maxFontSizeMultiplier={1.2}
           style={{ fontFamily: 'Nunito_700Bold' }}
           className="text-4xl text-[#354F52]"
           importantForAccessibility="no-hide-descendants"

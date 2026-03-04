@@ -22,6 +22,7 @@ export const ContentSection = ({
       {ingredients && ingredients.length > 0 && (
         <View className="mb-8">
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-[#354F52] text-xl mb-3"
             style={{ fontFamily: 'Nunito_700Bold' }}
             accessible
@@ -41,12 +42,14 @@ export const ContentSection = ({
                 accessibilityElementsHidden={true}
               >
                 <Text
+                  maxFontSizeMultiplier={1.2}
                   className="text-[#354F52]"
                   style={{ fontFamily: 'Nunito_600SemiBold' }}
                 >
                   {ing.item}
                 </Text>
                 <Text
+                  maxFontSizeMultiplier={1.2}
                   className="text-[#548F53]"
                   style={{ fontFamily: 'Nunito_700Bold' }}
                 >
@@ -61,6 +64,7 @@ export const ContentSection = ({
       {instructions.length > 0 && (
         <View className="mb-4">
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-[#354F52] text-xl mb-4"
             style={{ fontFamily: 'Nunito_700Bold' }}
             accessible
@@ -96,6 +100,7 @@ export const ContentSection = ({
               >
                 <View className="bg-[#BBE6BA] w-8 h-8 rounded-full items-center justify-center mr-3">
                   <Text
+                    maxFontSizeMultiplier={1.2}
                     className="text-[#354F52]"
                     style={{ fontFamily: 'Nunito_700Bold' }}
                   >
@@ -104,6 +109,7 @@ export const ContentSection = ({
                 </View>
                 <View className="flex-1 mt-1">
                   <Text
+                    maxFontSizeMultiplier={1.2}
                     className="text-[#354F52] text-[16px] leading-6"
                     style={{ fontFamily: 'Nunito_400Regular' }}
                   >
@@ -118,6 +124,7 @@ export const ContentSection = ({
                         color="#548F53"
                       />
                       <Text
+                        maxFontSizeMultiplier={1.2}
                         className="text-[#548F53] text-xs ml-1"
                         style={{ fontFamily: 'Nunito_700Bold' }}
                       >

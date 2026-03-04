@@ -18,6 +18,7 @@ export const MediaSection = ({
   return (
     <View className="mb-8">
       <Text
+        maxFontSizeMultiplier={1.2}
         className="text-[#354F52] text-xl mb-3"
         style={{ fontFamily: 'Nunito_700Bold' }}
         accessible
@@ -38,6 +39,7 @@ export const MediaSection = ({
           accessibilityElementsHidden={true}
         >
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-[#354F52] text-lg"
             numberOfLines={1}
             style={{ fontFamily: 'Nunito_700Bold' }}
@@ -45,6 +47,7 @@ export const MediaSection = ({
             {title || 'Relaxing Sounds'}
           </Text>
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-[#548F53] text-xs mt-1"
             style={{ fontFamily: 'Nunito_600SemiBold' }}
           >

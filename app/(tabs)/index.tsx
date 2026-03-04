@@ -128,6 +128,7 @@ export default function Index() {
         {/* SECÇÃO SHORTCUTS DINÂMICA */}
         <View className="flex-row justify-between items-center mb-4 mt-2">
           <Text
+            maxFontSizeMultiplier={1.2}
             style={{ fontFamily: 'Nunito_600SemiBold' }}
             className="text-2xl text-[#354F52]"
             accessibilityRole="header"
@@ -136,6 +137,7 @@ export default function Index() {
           </Text>
           <Pressable>
             <Text
+              maxFontSizeMultiplier={1.2}
               style={{ fontFamily: 'Nunito_600SemiBold' }}
               className="text-[#548F53] underline text-xl"
             >
@@ -168,6 +170,7 @@ export default function Index() {
           ) : (
             // Mensagem caso não haja shortcuts definidos
             <Text
+              maxFontSizeMultiplier={1.2}
               style={{ fontFamily: 'Nunito_400Regular' }}
               className="text-gray-500 w-full text-center mt-2 italic"
             >

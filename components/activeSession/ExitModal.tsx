@@ -77,6 +77,7 @@ export const ExitModal = ({ visible, onResume, onEnd }: ExitModalProps) => {
                 </View>
 
                 <Text
+                  maxFontSizeMultiplier={1.2}
                   className="text-[#354F52] text-3xl mb-4"
                   style={{ fontFamily: 'Nunito_700Bold' }}
                   accessibilityRole="header"
@@ -84,6 +85,7 @@ export const ExitModal = ({ visible, onResume, onEnd }: ExitModalProps) => {
                   End the activity?
                 </Text>
                 <Text
+                  maxFontSizeMultiplier={1.2}
                   className="text-center mb-8 text-[#354F52] text-md"
                   style={{ fontFamily: 'Nunito_400Regular' }}
                 >
@@ -99,6 +101,7 @@ export const ExitModal = ({ visible, onResume, onEnd }: ExitModalProps) => {
                   accessibilityLabel="Resume session"
                 >
                   <Text
+                    maxFontSizeMultiplier={1.2}
                     className="text-white text-center text-2xl"
                     style={{ fontFamily: 'Nunito_700Bold' }}
                   >

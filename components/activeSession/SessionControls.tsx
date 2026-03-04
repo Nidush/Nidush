@@ -59,6 +59,7 @@ export const SessionControls = ({
             }
           >
             <Text
+              maxFontSizeMultiplier={1.2}
               className="text-white text-xl mr-2"
               style={{ fontFamily: 'Nunito_700Bold' }}
             >
@@ -74,6 +75,7 @@ export const SessionControls = ({
         ) : (
           // --- MODO TEMPO: MOSTRA O CRONÓMETRO ---
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-[#354F52] text-6xl tabular-nums"
             style={{ fontFamily: 'Nunito_700Bold' }}
             accessible={true}
@@ -115,6 +117,7 @@ export const SessionControls = ({
           accessibilityLabel={`Background music: 'Music'}`}
         >
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-[#354F52]"
             style={{ fontFamily: 'Nunito_700Bold' }}
             importantForAccessibility="no-hide-descendants" // Esconde os Textos filhos
@@ -122,6 +125,7 @@ export const SessionControls = ({
             Music
           </Text>
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-[#354F52]/60 text-xs"
             style={{ fontFamily: 'Nunito_600SemiBold' }}
             importantForAccessibility="no-hide-descendants"
@@ -155,6 +159,7 @@ export const SessionControls = ({
         accessibilityLabel={isActive ? 'Pause session' : 'Resume session'}
       >
         <Text
+          maxFontSizeMultiplier={1.2}
           className="text-white text-2xl mr-3"
           style={{ fontFamily: 'Nunito_700Bold' }}
         >

@@ -75,6 +75,7 @@ export const ActivityHeader = ({
     >
       <MaterialIcons name={icon} size={20} color={color} />
       <Text
+        maxFontSizeMultiplier={1.2}
         className="ml-3 text-[15px]"
         style={{ fontFamily: 'Nunito_600SemiBold', color: color }}
       >
@@ -213,6 +214,7 @@ export const ActivityHeader = ({
         {/* Bottom info */}
         <View className="absolute bottom-10 px-6 w-full -z-10">
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-white text-xl tracking-wider capitalize mb-2"
             style={{ fontFamily: 'Nunito_600SemiBold' }}
             accessible={false} // Esconde isto, pois vamos agrupar no título abaixo
@@ -220,6 +222,7 @@ export const ActivityHeader = ({
             {type}
           </Text>
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-white text-4xl mt-1 shadow-sm"
             style={{ fontFamily: 'Nunito_700Bold' }}
             accessible
@@ -253,6 +256,7 @@ export const ActivityHeader = ({
             >
               <MaterialCommunityIcons name="door" size={22} color="white" />
               <Text
+                maxFontSizeMultiplier={1.2}
                 className="text-white ml-2 text-lg"
                 style={{ fontFamily: 'Nunito_600SemiBold' }}
               >

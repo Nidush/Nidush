@@ -84,6 +84,7 @@ export const DeviceSection = ({ devices }: DeviceSectionProps) => {
               {getDeviceIcon(realDevice.type, '#548F53')}
               <View className="ml-3 justify-center flex-1">
                 <Text
+                  maxFontSizeMultiplier={1.2}
                   className={`text-[#354F52] text-sm capitalise ${
                     hasDetails ? 'mb-0.5' : 'mb-0'
                   }`}
@@ -110,6 +111,7 @@ export const DeviceSection = ({ devices }: DeviceSectionProps) => {
                           }}
                         />
                         <Text
+                          maxFontSizeMultiplier={1.2}
                           className="text-[#548F53] text-sm"
                           style={{ fontFamily: 'Nunito_600SemiBold' }}
                         >
@@ -118,6 +120,7 @@ export const DeviceSection = ({ devices }: DeviceSectionProps) => {
                       </>
                     ) : (
                       <Text
+                        maxFontSizeMultiplier={1.2}
                         className="text-[#548F53] text-sm"
                         style={{ fontFamily: 'Nunito_600SemiBold' }}
                       >

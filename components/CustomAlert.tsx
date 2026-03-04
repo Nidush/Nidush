@@ -95,6 +95,7 @@ export const CustomAlert = ({
           </View>
 
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-2xl text-[#354F52] mb-2 text-center"
             style={{ fontFamily: 'Nunito_700Bold' }}
             accessibilityRole="header"
@@ -103,6 +104,7 @@ export const CustomAlert = ({
           </Text>
 
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-base text-[#354F52] text-center mb-6 leading-5"
             style={{ fontFamily: 'Nunito_400Regular' }}
           >
@@ -118,6 +120,7 @@ export const CustomAlert = ({
                 className="flex-1 py-3 items-center"
               >
                 <Text
+                  maxFontSizeMultiplier={1.2}
                   className="text-[#548F53] text-lg"
                   style={{ fontFamily: 'Nunito_700Bold' }}
                 >
@@ -138,6 +141,7 @@ export const CustomAlert = ({
               className={`flex-1 py-3 rounded-full items-center bg-[#548F53]`}
             >
               <Text
+                maxFontSizeMultiplier={1.2}
                 className="text-lg text-white"
                 style={{ fontFamily: 'Nunito_700Bold' }}
               >

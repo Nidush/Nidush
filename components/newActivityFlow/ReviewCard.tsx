@@ -11,6 +11,7 @@ export const ReviewCard = ({ label, onEdit, children }: ReviewCardProps) => (
   <View className="mb-5">
     <View className="flex-row justify-between items-center">
       <Text
+        maxFontSizeMultiplier={1.2}
         className="text-xl text-[#2F4F4F]"
         style={{ fontFamily: 'Nunito_600SemiBold' }}
         accessibilityRole="header"
@@ -25,6 +26,7 @@ export const ReviewCard = ({ label, onEdit, children }: ReviewCardProps) => (
         accessibilityHint={`Jumps to the ${label} step to make changes`}
       >
         <Text
+          maxFontSizeMultiplier={1.2}
           className="text-[#548F53]"
           style={{ fontFamily: 'Nunito_600SemiBold' }}
         >

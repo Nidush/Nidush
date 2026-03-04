@@ -114,6 +114,7 @@ export const ContentCard = ({
         accessibilityElementsHidden={true}
       >
         <Text
+          maxFontSizeMultiplier={1.2}
           numberOfLines={2}
           className={clsx(
             'text-white leading-tight mb-2',
@@ -132,6 +133,7 @@ export const ContentCard = ({
               color="white"
             />
             <Text
+              maxFontSizeMultiplier={1.2}
               className="text-white text-md ml-1.5 capitalize"
               style={{ fontFamily: 'Nunito_600SemiBold' }}
             >
@@ -143,6 +145,7 @@ export const ContentCard = ({
             <View className="flex-row items-center">
               <MaterialIcons name="access-time" size={16} color="white" />
               <Text
+                maxFontSizeMultiplier={1.2}
                 className="text-white text-md ml-1.5"
                 style={{ fontFamily: 'Nunito_600SemiBold' }}
               >

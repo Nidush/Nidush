@@ -27,6 +27,7 @@ const CategoryPill = ({ item, isActive, onPress }: CategoryPillProps) => {
       }`}
     >
       <Text
+        maxFontSizeMultiplier={1.2}
         className={` ${isActive ? 'text-[#548F53]' : 'text-[#354F52]'}`}
         style={{
           fontFamily: isActive ? 'Nunito_700Bold' : 'Nunito_600SemiBold',

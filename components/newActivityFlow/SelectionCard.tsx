@@ -36,6 +36,7 @@ export const SelectionCard = ({
       accessibilityElementsHidden={true}
     />
     <Text
+      maxFontSizeMultiplier={1.2}
       className="mt-2.5 text-lg text-[#2F4F4F]"
       style={{ fontFamily: 'Nunito_700Bold' }}
     >

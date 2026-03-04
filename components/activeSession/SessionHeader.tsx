@@ -33,12 +33,13 @@ export const SessionHeader = ({
         style={{ fontFamily: 'Nunito_600SemiBold' }}
         numberOfLines={1} // Garante que não empurra os botões se crescer
         accessibilityRole="header"
-        maxFontSizeMultiplier={1.5}
+        maxFontSizeMultiplier={1.2}
       >
         {title}
       </Text>
       <TouchableOpacity onPress={onCancel}>
         <Text
+          maxFontSizeMultiplier={1.2}
           className="text-[#7DA87B] text-lg"
           style={{ fontFamily: 'Nunito_700Bold' }}
           accessible={true}

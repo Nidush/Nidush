@@ -30,6 +30,7 @@ export const HeaderSection = ({
           }`}
         >
           <Text
+            maxFontSizeMultiplier={1.2}
             className={`${
               viewMode === 'activities' ? 'text-white' : 'text-[#2D3E27]'
             } text-xl`}
@@ -52,7 +53,8 @@ export const HeaderSection = ({
           accessibilityRole="tab"
           accessibilityState={{ selected: viewMode === 'scenarios' }}
         >
-          <Text
+          <Text 
+            maxFontSizeMultiplier={1.2}
             className={`${
               viewMode === 'scenarios' ? 'text-white' : 'text-[#2D3E27]'
             } text-xl`}
@@ -78,6 +80,7 @@ export const HeaderSection = ({
           accessibilityElementsHidden={true} // iOS
         />
         <TextInput
+          maxFontSizeMultiplier={1.2}
           placeholder={
             viewMode === 'activities'
               ? 'Search activities...'

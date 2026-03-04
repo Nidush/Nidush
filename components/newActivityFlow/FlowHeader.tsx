@@ -25,7 +25,7 @@ export const FlowHeader = ({ title, step, totalSteps, onBack }: any) => (
         style={{ fontFamily: 'Nunito_700Bold' }}
         accessibilityRole="header"
         numberOfLines={1} // Protege o layout se o utilizador aumentar muito a letra
-        maxFontSizeMultiplier={1.5}
+        maxFontSizeMultiplier={1.2}
       >
         {title}
       </Text>
@@ -38,6 +38,7 @@ export const FlowHeader = ({ title, step, totalSteps, onBack }: any) => (
         accessibilityHint="Discards activity creation and returns to previous screen"
       >
         <Text
+          maxFontSizeMultiplier={1.2}
           className="text-[#548F53] text-lg"
           style={{ fontFamily: 'Nunito_600SemiBold' }}
         >
