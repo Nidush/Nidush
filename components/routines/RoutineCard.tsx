@@ -27,6 +27,8 @@ const RoutineCard = ({ title, days, time, room, isActive, image, onToggle, testI
           style={StyleSheet.absoluteFill}
           resizeMode="cover"
           blurRadius={90} 
+          accessible={false}
+          importantForAccessibility="no"
         />
       </View>
 
@@ -42,7 +44,7 @@ const RoutineCard = ({ title, days, time, room, isActive, image, onToggle, testI
           />
         }
       >
-        <Image source={image} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        <Image source={image} style={StyleSheet.absoluteFill} resizeMode="cover" accessible={false} importantForAccessibility="no" />
       </MaskedView>
 
       <LinearGradient
@@ -80,6 +82,10 @@ const RoutineCard = ({ title, days, time, room, isActive, image, onToggle, testI
           activeOpacity={0.8}
           onPress={onToggle}
           className={`w-[56px] h-[30px] rounded-full px-1 justify-center ${isActive ? 'bg-[#548F53]' : 'bg-white/30'}`}
+          accessible={true}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: isActive }}
+          accessibilityLabel={`Toggle routine ${title}`}
         >
           <View className={`w-[22px] h-[22px] bg-white rounded-full shadow-lg ${isActive ? 'self-end' : 'self-start'}`} />
         </TouchableOpacity>

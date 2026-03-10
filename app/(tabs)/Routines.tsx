@@ -48,6 +48,10 @@ export default function Routines() {
             className="flex-1 text-base text-[#2C3A35]"
             style={{ fontFamily: 'Nunito_600SemiBold' }}
             maxFontSizeMultiplier={1.3}
+            accessible={true}
+            accessibilityLabel="Search routines"
+            accessibilityHint="Type to search for a specific routine"
+            accessibilityRole="search"
           />
         </View>
       </View>

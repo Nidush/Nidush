@@ -33,19 +33,44 @@ const GetDeviceIcon = ({ type, size = 40, color, isFilled }: IconProps) => {
           name={isFilled ? 'lightbulb' : 'lightbulb-outline'}
           size={size}
           color={color}
+          accessible={false}
         />
       );
     case 'speaker':
-      return <MaterialIcons name="speaker" size={size} color={color} />;
+      return (
+        <MaterialIcons
+          name="speaker"
+          size={size}
+          color={color}
+          accessible={false}
+        />
+      );
     case 'difuser':
       return (
-        <MaterialCommunityIcons name="air-purifier" size={size} color={color} />
+        <MaterialCommunityIcons
+          name="air-purifier"
+          size={size}
+          color={color}
+          accessible={false}
+        />
       );
     case 'purifier':
-      return <MaterialIcons name="air" size={size} color={color} />;
+      return (
+        <MaterialIcons
+          name="air"
+          size={size}
+          color={color}
+          accessible={false}
+        />
+      );
     default:
       return (
-        <MaterialIcons name="lightbulb-outline" size={size} color={color} />
+        <MaterialIcons
+          name="lightbulb-outline"
+          size={size}
+          color={color}
+          accessible={false}
+        />
       );
   }
 };
@@ -103,18 +128,32 @@ const DeviceCard = ({ item, onToggle, onUpdateLevel }: DeviceCardProps) => {
       {...panResponder.panHandlers}
       accessible={true} // Agrupa todo o cartão num único elemento de foco
       accessibilityRole={isOn && isDimmable ? 'adjustable' : 'button'} // "adjustable" ativa os gestos de swipe do VoiceOver
-      accessibilityLabel={`${item.name}, ${isOn ? 'On' : 'Off'}`}
+      accessibilityLabel={
+        isOn && isDimmable
+          ? `${item.name}, On, Brightness ${Math.round(level)} percent`
+          : `${item.name}, ${isOn ? 'On' : 'Off'}`
+      }
       accessibilityValue={
         isOn && isDimmable
           ? { min: 0, max: 100, now: Math.round(level) }
           : undefined
       }
       accessibilityHint={
-        isOn ? 'Double tap to turn off' : 'Double tap to turn on'
+        isOn && isDimmable
+          ? 'Swipe up or down to adjust brightness. Double tap to turn off.'
+          : isOn
+            ? 'Double tap to turn off.'
+            : 'Double tap to turn on.'
       }
-      accessibilityActions={[
-        { name: 'activate', label: isOn ? 'Turn off' : 'Turn on' },
-      ]}
+      accessibilityActions={
+        isOn && isDimmable
+          ? [
+              { name: 'activate', label: 'Turn off' },
+              { name: 'increment', label: 'Increase brightness' },
+              { name: 'decrement', label: 'Decrease brightness' },
+            ]
+          : [{ name: 'activate', label: isOn ? 'Turn off' : 'Turn on' }]
+      }
       onAccessibilityAction={(event) => {
         switch (event.nativeEvent.actionName) {
           case 'activate': // Quando o utilizador de VoiceOver faz duplo toque no cartão
@@ -143,10 +182,13 @@ const DeviceCard = ({ item, onToggle, onUpdateLevel }: DeviceCardProps) => {
           style={{ height: `${level}%` }}
         />
       )}
-      <View className="flex-1 p-4 justify-between z-10 bg-transparent">
+      <View
+        className="flex-1 p-4 justify-between z-10 bg-transparent"
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden={true}
+      >
         <View
           className="flex-row justify-between items-start "
-          importantForAccessibility="no-hide-descendants"
         >
           <GetDeviceIcon
             type={item.type}
@@ -166,8 +208,6 @@ const DeviceCard = ({ item, onToggle, onUpdateLevel }: DeviceCardProps) => {
               name="power-settings-new"
               size={25}
               color={isOn ? '#FFFFFF' : '#354F52'}
-              accessibilityRole="button"
-              accessibilityLabel={isOn ? 'Turn off device' : 'Turn on device'}
             />
           </TouchableOpacity>
         </View>

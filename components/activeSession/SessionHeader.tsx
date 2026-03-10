@@ -37,14 +37,17 @@ export const SessionHeader = ({
       >
         {title}
       </Text>
-      <TouchableOpacity onPress={onCancel}>
+      <TouchableOpacity
+        onPress={onCancel}
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel="Cancel"
+        accessibilityHint="Ends the current session"
+      >
         <Text
           maxFontSizeMultiplier={1.2}
           className="text-[#7DA87B] text-lg"
           style={{ fontFamily: 'Nunito_700Bold' }}
-          accessible={true}
-          accessibilityRole="button"
-          accessibilityHint="Ends the current session"
         >
           Cancel
         </Text>

@@ -44,6 +44,8 @@ export default function TabLayout() {
               source={LogoIcon}
               style={{ width: 26, height: 26, tintColor: color }}
               resizeMode="contain"
+              accessible={false}
+              importantForAccessibility="no"
             />
           ),
         }}

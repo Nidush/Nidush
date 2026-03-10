@@ -6,7 +6,14 @@ import {
 } from '@expo-google-fonts/nunito';
 import { router, Stack } from 'expo-router';
 import React, { useMemo } from 'react';
-import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import {
+  Alert,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { UnifiedCard } from '@/components/activitiesScenarios/UnifiedCard';
@@ -135,7 +142,15 @@ export default function Index() {
           >
             Shortcuts
           </Text>
-          <Pressable>
+          <Pressable
+            onPress={() =>
+              Alert.alert('Shortcuts', 'Shortcuts edit feature coming soon!')
+            }
+            accessibilityRole="button"
+            accessibilityLabel="Edit shortcuts"
+            accessibilityHint="Opens the shortcuts editor."
+            hitSlop={10}
+          >
             <Text
               maxFontSizeMultiplier={1.2}
               style={{ fontFamily: 'Nunito_600SemiBold' }}

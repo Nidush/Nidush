@@ -30,9 +30,14 @@ export const SessionVideo = ({ videoUrl, poster }: SessionVideoProps) => {
             {videoUrl}
           </Text>
 
-          <TouchableOpacity className="mt-4 bg-[#ff0000] px-6 py-3 rounded-full flex-row items-center">
-            <Ionicons name="play" size={20} color="white" />
-            <Text   maxFontSizeMultiplier={1.2} className="text-white font-bold ml-2">Watch on YouTube</Text>
+          <TouchableOpacity
+            className="mt-4 bg-[#ff0000] px-6 py-3 rounded-full flex-row items-center"
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Watch on YouTube"
+          >
+            <Ionicons name="play" size={20} color="white" importantForAccessibility="no" />
+            <Text maxFontSizeMultiplier={1.2} className="text-white font-bold ml-2">Watch on YouTube</Text>
           </TouchableOpacity>
         </View>
         <Text  maxFontSizeMultiplier={1.2} className="mt-8 text-[#354F52] text-center px-6 leading-6">
@@ -66,6 +71,9 @@ export const SessionVideo = ({ videoUrl, poster }: SessionVideoProps) => {
             activeOpacity={0.8}
             onPress={() => video.current?.playAsync()}
             className="absolute inset-0 justify-center items-center bg-black/30"
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Play video"
           >
             <View className="w-20 h-20 bg-white/20 backdrop-blur-md rounded-full justify-center items-center border border-white/50">
               <Ionicons

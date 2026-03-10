@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
 import {
+  Alert,
   FlatList,
   ScrollView,
   StatusBar,
@@ -142,11 +143,14 @@ export default function Rooms() {
             size={24}
             color="#7A8C85"
             style={{ marginRight: 10 }}
+            accessible={false}
           />
           <TextInput
             maxFontSizeMultiplier={1.2}
             placeholder="Search devices..."
             accessibilityLabel="Search devices"
+            accessibilityRole="search"
+            accessibilityHint="Type to filter devices by name."
             placeholderTextColor="#7A8C85"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -159,13 +163,18 @@ export default function Rooms() {
             autoCorrect={false}
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+              accessibilityHint="Clears the current search text."
+              hitSlop={10}
+            >
               <MaterialIcons
                 name="close"
                 size={20}
                 color="#7A8C85"
-                accessibilityRole="button"
-                accessibilityLabel="Clean search"
+                accessible={false}
               />
             </TouchableOpacity>
           )}
@@ -213,6 +222,7 @@ export default function Rooms() {
               name={searchQuery ? 'selection-search' : 'home-plus'}
               size={80}
               color="#354F52"
+              accessible={false}
             />
             <Text
               maxFontSizeMultiplier={1.2}
@@ -227,7 +237,13 @@ export default function Rooms() {
         }
       />
 
-      <AddRoomDevice actions={menuActions} />
+      <AddRoomDevice
+        actions={menuActions.map((action) => ({
+          ...action,
+          onPress: () =>
+            Alert.alert('Coming Soon', `${action.label} creation coming soon!`),
+        }))}
+      />
     </SafeAreaView>
   );
 }

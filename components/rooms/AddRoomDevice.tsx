@@ -29,6 +29,11 @@ export default function AddRoomDevice({
     }
   };
 
+  const handleActionPress = (onPress?: () => void) => {
+    onPress?.();
+    if (!isStatic) setIsMenuOpen(false);
+  };
+
   return (
     <>
       {/* Só mostra o fundo e o menu se NÃO for estático E estiver aberto */}
@@ -36,6 +41,8 @@ export default function AddRoomDevice({
         <Pressable
           className="absolute inset-0 bg-black/20 z-[5]"
           onPress={() => setIsMenuOpen(false)}
+          accessible={false}
+          importantForAccessibility="no"
         />
       )}
 
@@ -45,7 +52,10 @@ export default function AddRoomDevice({
             <TouchableOpacity
               key={index}
               className="mb-4"
-              onPress={action.onPress}
+              onPress={() => handleActionPress(action.onPress)}
+              accessibilityRole="button"
+              accessibilityLabel={`Add ${action.label}`}
+              accessibilityHint={`Creates a new ${action.label.toLowerCase()}.`}
             >
               <Text
                 maxFontSizeMultiplier={1.2}
@@ -60,17 +70,31 @@ export default function AddRoomDevice({
       )}
 
       <TouchableOpacity
+        disabled={isStatic}
         activeOpacity={isStatic ? 1 : 0.9} // Se for estático, não brilha ao clicar
         className="absolute bottom-8 right-6 bg-[#548F53] w-[65px] h-[65px] rounded-full justify-center items-center z-[10] shadow-lg shadow-black/40"
         onPress={handlePress}
+        accessibilityRole="button"
+        accessibilityLabel={
+          isStatic
+            ? 'Add menu (unavailable)'
+            : isMenuOpen
+              ? 'Close add menu'
+              : 'Open add menu'
+        }
+        accessibilityHint={
+          isStatic
+            ? 'This action is not available on this screen.'
+            : 'Shows options to add a device or a room.'
+        }
+        accessibilityState={{ disabled: isStatic, expanded: !isStatic && isMenuOpen }}
       >
         {/* Se for estático, mostra sempre o 'add'. Se não, alterna com o 'close' */}
         <Ionicons
           name={!isStatic && isMenuOpen ? 'close' : 'add'}
           size={36}
           color="white"
-          accessibilityRole="button"
-          accessibilityLabel={isMenuOpen ? 'Close menu' : 'Add device or room'}
+          accessible={false}
         />
       </TouchableOpacity>
     </>

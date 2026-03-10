@@ -40,6 +40,9 @@ export default function NewScenarioScreen() {
           activeOpacity={0.8}
           onPress={() => router.replace('/(tabs)')}
           className="bg-[#548F53] py-4 px-10 rounded-full shadow-md shadow-black/20"
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Back to Home"
         >
           <View className="flex-row items-center justify-center">
             <MaterialIcons name="home" size={24} color="white" />

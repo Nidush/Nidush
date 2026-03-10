@@ -45,6 +45,9 @@ const LoadingActivity = () => {
         onPress={handleCancel}
         activeOpacity={0.8}
         className="bg-[#548F53] w-52 py-4 rounded-full shadow-lg"
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel="Cancel loading"
       >
         <Text
           maxFontSizeMultiplier={1.2}
