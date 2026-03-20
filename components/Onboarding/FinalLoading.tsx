@@ -34,7 +34,7 @@ export default function FinalLoading({ onComplete }: FinalLoadingProps) {
     const timer1 = setTimeout(() => {
       setMessage('Crafting activities for you...');
     }, 2000);
-
+      
     const timer2 = setTimeout(() => {
       onComplete();
     }, 4000);

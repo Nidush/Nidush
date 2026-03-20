@@ -119,12 +119,12 @@ export default function HouseName({ onNext }: { onNext: () => void }) {
                   activeOpacity={0.8}
                   className="bg-[#5C8D58] w-[230px] h-[54px] rounded-full justify-center items-center self-center mt-[15px] shadow-sm active:scale-95"
                 >
-                  <Text 
-                    style={{ fontFamily: 'Nunito_700Bold' }} 
-                    className="text-white text-[20px]"
-                  >
-                    Create my home
-                  </Text>
+                    <Text 
+                      style={{ fontFamily: 'Nunito_700Bold' }} 
+                      className="text-white text-[20px]"
+                    >
+                      Create my home
+                    </Text>
                 </TouchableOpacity>
               </View>
 
