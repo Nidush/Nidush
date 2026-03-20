@@ -1,20 +1,43 @@
-import { fireEvent, render } from '@testing-library/react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import Profile from '../app/Profile';
 
-// Mock do useRouter
+// Mock do router
 jest.mock('expo-router', () => ({
   useRouter: jest.fn(),
 }));
 
-// Mock dos icones
+// Mock dos ícones
 jest.mock('@expo/vector-icons', () => ({
   MaterialIcons: 'MaterialIcons',
 }));
 
-// Mock para a imagem do perfil
+// Mock imagem
 jest.mock('@/assets/avatars/profile.png', () => 1, { virtual: true });
+
+// 🔥 MOCK DO SUPABASE (IMPORTANTE para evitar async real)
+jest.mock('../utils/supabase', () => ({
+  supabase: {
+    auth: {
+      getUser: jest.fn(() =>
+        Promise.resolve({
+          data: {
+            user: {
+              email: 'laura@test.com',
+              user_metadata: {
+                first_name: 'Laura',
+                last_name: 'Rossi',
+              },
+            },
+          },
+          error: null,
+        })
+      ),
+      signOut: jest.fn(() => Promise.resolve()),
+    },
+  },
+}));
 
 describe('Profile Screen', () => {
   const mockReplace = jest.fn();
@@ -26,55 +49,65 @@ describe('Profile Screen', () => {
     });
   });
 
-  test('deve renderizar o nome do utilizador e o título da página', () => {
-    const { getByText } = render(<Profile />);
-    
-    expect(getByText('Laura Rossi')).toBeTruthy();
-    expect(getByText('Profile')).toBeTruthy();
+  test('deve renderizar nome e título', async () => {
+    const { findByText } = render(<Profile />);
+
+    expect(await findByText('Laura Rossi')).toBeTruthy();
+    expect(await findByText('Profile')).toBeTruthy();
   });
 
-  test('deve navegar para (tabs) ao clicar no botão de voltar', () => {
+  test('botão voltar navega para tabs', async () => {
     const { getByTestId } = render(<Profile />);
-    
-    const backButton = getByTestId('back-button');
-    fireEvent.press(backButton);
-    
+
+    await waitFor(() => {
+      expect(getByTestId('back-button')).toBeTruthy();
+    });
+
+    fireEvent.press(getByTestId('back-button'));
+
     expect(mockReplace).toHaveBeenCalledWith('/(tabs)');
   });
 
-  test('deve navegar para a seleção de perfil ao clicar no botão Logout', () => {
+  test('logout navega para login', async () => {
     const { getByTestId } = render(<Profile />);
-    
-    const logoutButton = getByTestId('logout-button');
-    fireEvent.press(logoutButton);
-    
-    expect(mockReplace).toHaveBeenCalledWith('/profile-selection');
+
+    fireEvent.press(getByTestId('logout-button'));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/login');
+    });
   });
 
-  test('deve renderizar as secções de menu corretamente via testID', () => {
+  test('menus renderizam', async () => {
     const { getByTestId } = render(<Profile />);
-    
-    expect(getByTestId('menu-account')).toBeTruthy();
-    expect(getByTestId('menu-notifications')).toBeTruthy();
-    expect(getByTestId('menu-residents')).toBeTruthy();
+
+    await waitFor(() => {
+      expect(getByTestId('menu-account')).toBeTruthy();
+      expect(getByTestId('menu-notifications')).toBeTruthy();
+      expect(getByTestId('menu-residents')).toBeTruthy();
+    });
   });
 
-  test('deve mostrar os dispositivos wearables configurados', () => {
+  test('dispositivos renderizam', async () => {
     const { getByTestId, getByText } = render(<Profile />);
-    
-    expect(getByTestId('device-apple-watch')).toBeTruthy();
-    expect(getByText('Connected')).toBeTruthy();
-    
-    expect(getByTestId('device-mi-band')).toBeTruthy();
-    expect(getByText('Disconnected')).toBeTruthy();
+
+    await waitFor(() => {
+      expect(getByTestId('device-apple-watch')).toBeTruthy();
+      expect(getByText('Connected')).toBeTruthy();
+
+      expect(getByTestId('device-mi-band')).toBeTruthy();
+      expect(getByText('Disconnected')).toBeTruthy();
+    });
   });
 
-  test('deve verificar a existência dos hobbies no ecrã', () => {
+  test('hobbies aparecem', async () => {
     const { getByText } = render(<Profile />);
-    
-    expect(getByText('Cooking')).toBeTruthy();
-    expect(getByText('Workout')).toBeTruthy();
-    expect(getByText('Meditation')).toBeTruthy();
-    expect(getByText('Audiobooks')).toBeTruthy();
+
+    await waitFor(() => {
+      expect(getByText('Cooking')).toBeTruthy();
+      expect(getByText('Workout')).toBeTruthy();
+      expect(getByText('Meditation')).toBeTruthy();
+      expect(getByText('Audiobooks')).toBeTruthy();
+    });
   });
 });

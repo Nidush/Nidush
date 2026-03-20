@@ -16,7 +16,8 @@ module.exports = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
   },
+  setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   transformIgnorePatterns: [
-    'node_modules/(?!(react-native|@react-native|react-native-safe-area-context|@react-navigation)/)',
+    'node_modules/(?!(react-native|@react-native|react-native-safe-area-context|@react-navigation|expo|@expo|@expo-google-fonts|react-native-url-polyfill|@supabase|@react-native-async-storage)/)',
   ],
 };
