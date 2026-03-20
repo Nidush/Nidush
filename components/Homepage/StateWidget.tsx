@@ -53,18 +53,26 @@ export const StateWidget = () => {
   const activeStyle = STATE_STYLES[currentState];
 
   return (
-    <View className="w-full mb-6 relative overflow-hidden rounded-3xl shadow-xl h-44">
+    <View
+      className="w-full mb-6 relative overflow-hidden rounded-3xl shadow-xl h-44"
+      accessible={true}
+      accessibilityLabel={`You are currently feeling ${activeStyle.label}. ${activeStyle.phrase}`}
+    >
       <View style={[StyleSheet.absoluteFill]}>
         <Image
           source={activeStyle.bgImage}
           style={[StyleSheet.absoluteFill, { opacity: 0.7 }]}
           resizeMode="contain"
+          importantForAccessibility="no-hide-descendants"
           blurRadius={Platform.OS === 'ios' ? 70 : 50}
+          accessibilityElementsHidden={true}
         />
       </View>
 
       <MaskedView
         style={StyleSheet.absoluteFill}
+        importantForAccessibility="no"
+        accessibilityElementsHidden={true}
         maskElement={
           <LinearGradient
             colors={['black', 'black', 'transparent']}
@@ -91,12 +99,17 @@ export const StateWidget = () => {
         pointerEvents="none"
       />
 
-      <View className="flex-1 justify-center p-6 z-10">
+      <View
+        className="flex-1 justify-center p-6 z-10"
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden={true}
+      >
         <View className="flex-row items-center mb-3">
           <View className="bg-white/20 p-1 rounded-full mr-2 animate-pulse">
             <MaterialIcons name="circle" size={8} color="#4ADE80" />
           </View>
           <Text
+            maxFontSizeMultiplier={1.2}
             style={{ fontFamily: 'Nunito_600SemiBold' }}
             className="text-white opacity-90 text-lg tracking-widest"
           >
@@ -107,6 +120,7 @@ export const StateWidget = () => {
         <View className="flex-row items-center">
           <View>
             <Text
+              maxFontSizeMultiplier={1.2}
               style={{ fontFamily: 'Nunito_700Bold' }}
               className="text-white text-4xl shadow-sm leading-9"
             >
@@ -114,6 +128,7 @@ export const StateWidget = () => {
             </Text>
 
             <Text
+              maxFontSizeMultiplier={1.2}
               style={{ fontFamily: 'Nunito_600SemiBold' }}
               className="text-white text-md mt-3"
             >

@@ -46,8 +46,10 @@ export const Step2_Content = ({
     return (
       <View className="mb-8">
         <Text
+          maxFontSizeMultiplier={1.2}
           className="text-2xl text-[#2F4F4F] mb-3"
           style={{ fontFamily: 'Nunito_600SemiBold' }}
+          accessibilityRole="header"
         >
           {title}
         </Text>
@@ -77,13 +79,14 @@ export const Step2_Content = ({
   return (
     <StepWrapper
       title="Choose your content"
-      subtitle={`Select content for your ${activityType} session.`}
+      subtitle={`Required: Select content for your ${activityType} session.`}
     >
       {filteredContent.length === 0 && (
         <View className="items-center mt-10">
           <Text
             className="text-[#2F4F4F] text-base"
             style={{ fontFamily: 'Nunito_600SemiBold' }}
+            maxFontSizeMultiplier={1.2}
           >
             {`No content found for "${activityType}".`}
           </Text>

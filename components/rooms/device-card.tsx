@@ -33,19 +33,44 @@ const GetDeviceIcon = ({ type, size = 40, color, isFilled }: IconProps) => {
           name={isFilled ? 'lightbulb' : 'lightbulb-outline'}
           size={size}
           color={color}
+          accessible={false}
         />
       );
     case 'speaker':
-      return <MaterialIcons name="speaker" size={size} color={color} />;
+      return (
+        <MaterialIcons
+          name="speaker"
+          size={size}
+          color={color}
+          accessible={false}
+        />
+      );
     case 'difuser':
       return (
-        <MaterialCommunityIcons name="air-purifier" size={size} color={color} />
+        <MaterialCommunityIcons
+          name="air-purifier"
+          size={size}
+          color={color}
+          accessible={false}
+        />
       );
     case 'purifier':
-      return <MaterialIcons name="air" size={size} color={color} />;
+      return (
+        <MaterialIcons
+          name="air"
+          size={size}
+          color={color}
+          accessible={false}
+        />
+      );
     default:
       return (
-        <MaterialIcons name="lightbulb-outline" size={size} color={color} />
+        <MaterialIcons
+          name="lightbulb-outline"
+          size={size}
+          color={color}
+          accessible={false}
+        />
       );
   }
 };
@@ -101,7 +126,62 @@ const DeviceCard = ({ item, onToggle, onUpdateLevel }: DeviceCardProps) => {
     <View
       className={`w-[48%] ${containerBg} ${borderStyle} rounded-2xl h-44 mb-4 overflow-hidden relative`}
       {...panResponder.panHandlers}
+      accessible={false}
     >
+      <View
+        style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+        pointerEvents="box-none"
+        accessible={true}
+        importantForAccessibility="yes"
+        accessibilityRole={isOn && isDimmable ? 'adjustable' : 'button'} // "adjustable" ativa os gestos de swipe do VoiceOver
+        accessibilityLabel={
+          isOn && isDimmable
+            ? `${item.name}, On, Brightness ${Math.round(level)} percent`
+            : `${item.name}, ${isOn ? 'On' : 'Off'}`
+        }
+        accessibilityValue={
+          isOn && isDimmable
+            ? { min: 0, max: 100, now: Math.round(level) }
+            : undefined
+        }
+        accessibilityHint={
+          isOn && isDimmable
+            ? 'Swipe up or down to adjust brightness. Double tap to turn off.'
+            : isOn
+              ? 'Double tap to turn off.'
+              : 'Double tap to turn on.'
+        }
+        accessibilityActions={
+          isOn && isDimmable
+            ? [
+                { name: 'activate', label: 'Turn off' },
+                { name: 'increment', label: 'Increase brightness' },
+                { name: 'decrement', label: 'Decrease brightness' },
+              ]
+            : [{ name: 'activate', label: isOn ? 'Turn off' : 'Turn on' }]
+        }
+        onAccessibilityAction={(event) => {
+          switch (event.nativeEvent.actionName) {
+            case 'activate': // Quando o utilizador de VoiceOver faz duplo toque no cartão
+              onToggle();
+              break;
+            case 'increment': // Quando o utilizador faz "swipe up"
+              if (isOn && isDimmable) {
+                const newLevel = Math.min(100, level + 10);
+                setLevel(newLevel);
+                onUpdateLevel(newLevel);
+              }
+              break;
+            case 'decrement': // Quando o utilizador faz "swipe down"
+              if (isOn && isDimmable) {
+                const newLevel = Math.max(0, level - 10);
+                setLevel(newLevel);
+                onUpdateLevel(newLevel);
+              }
+              break;
+          }
+        }}
+      />
       {isOn && isDimmable && (
         <View
           className={`absolute bottom-0 left-0 right-0 ${sliderFillColor}`}
@@ -109,12 +189,19 @@ const DeviceCard = ({ item, onToggle, onUpdateLevel }: DeviceCardProps) => {
         />
       )}
       <View className="flex-1 p-4 justify-between z-10 bg-transparent">
-        <View className="flex-row justify-between items-start">
-          <GetDeviceIcon
-            type={item.type}
-            color={isOn ? '#354F52' : '#7A8C85'}
-            isFilled={isOn}
-          />
+        <View
+          className="flex-row justify-between items-start "
+        >
+          <View
+            importantForAccessibility="no-hide-descendants"
+            accessibilityElementsHidden={true}
+          >
+            <GetDeviceIcon
+              type={item.type}
+              color={isOn ? '#354F52' : '#7A8C85'}
+              isFilled={isOn}
+            />
+          </View>
 
           <TouchableOpacity
             onPress={(e) => {
@@ -123,17 +210,25 @@ const DeviceCard = ({ item, onToggle, onUpdateLevel }: DeviceCardProps) => {
             }}
             className={`w-12 h-12 rounded-full border items-center justify-center 
               ${isOn ? 'bg-[#548F53] border-transparent' : 'border-[#548f537f] bg-transparent'}`}
+            accessibilityRole="button"
+            accessibilityLabel={`${isOn ? 'Turn off' : 'Turn on'} ${item.name}`}
+            accessibilityHint={isOn ? 'Double tap to turn off.' : 'Double tap to turn on.'}
           >
             <MaterialIcons
               name="power-settings-new"
               size={25}
               color={isOn ? '#FFFFFF' : '#354F52'}
+              accessible={false}
             />
           </TouchableOpacity>
         </View>
 
-        <View>
+        <View
+          importantForAccessibility="no-hide-descendants"
+          accessibilityElementsHidden={true}
+        >
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-[#354F52] font-semibold text-base mb-1"
             numberOfLines={1}
             style={{ fontFamily: 'Nunito_600SemiBold' }}
@@ -141,6 +236,7 @@ const DeviceCard = ({ item, onToggle, onUpdateLevel }: DeviceCardProps) => {
             {item.name}
           </Text>
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-[#354F52] text-xl"
             style={{ fontFamily: 'Nunito_600SemiBold' }}
           >

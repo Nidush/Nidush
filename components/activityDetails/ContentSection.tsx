@@ -22,8 +22,11 @@ export const ContentSection = ({
       {ingredients && ingredients.length > 0 && (
         <View className="mb-8">
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-[#354F52] text-xl mb-3"
             style={{ fontFamily: 'Nunito_700Bold' }}
+            accessible
+            accessibilityRole="header"
           >
             Ingredients
           </Text>
@@ -32,14 +35,21 @@ export const ContentSection = ({
               <View
                 key={i}
                 className="flex-row justify-between py-2 border-b border-[#d5d5d5] last:border-0"
+                accessible
+                accessibilityRole="text"
+                accessibilityLabel={`${ing.item}, amount: ${ing.amount}`}
+                importantForAccessibility="no-hide-descendants"
+                accessibilityElementsHidden={true}
               >
                 <Text
+                  maxFontSizeMultiplier={1.2}
                   className="text-[#354F52]"
                   style={{ fontFamily: 'Nunito_600SemiBold' }}
                 >
                   {ing.item}
                 </Text>
                 <Text
+                  maxFontSizeMultiplier={1.2}
                   className="text-[#548F53]"
                   style={{ fontFamily: 'Nunito_700Bold' }}
                 >
@@ -50,14 +60,19 @@ export const ContentSection = ({
           </View>
         </View>
       )}
+
       {instructions.length > 0 && (
         <View className="mb-4">
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-[#354F52] text-xl mb-4"
             style={{ fontFamily: 'Nunito_700Bold' }}
+            accessible
+            accessibilityRole="header"
           >
             Instructions
           </Text>
+
           {instructions.map((step, i) => {
             const isObject = typeof step !== 'string';
             const stepText = isObject ? (step as InstructionStep).text : step;
@@ -66,9 +81,26 @@ export const ContentSection = ({
               : null;
 
             return (
-              <View key={i} className="flex-row mb-4">
+              <View
+                key={i}
+                className="flex-row mb-4"
+                accessible
+                accessibilityRole="text"
+                accessibilityLabel={`Step ${i + 1}: ${stepText}${
+                  duration
+                    ? `. Duration: ${
+                        duration < 60
+                          ? `${duration} seconds`
+                          : `${Math.floor(duration / 60)} minutes`
+                      }`
+                    : ''
+                }`}
+                importantForAccessibility="no-hide-descendants"
+                accessibilityElementsHidden={true}
+              >
                 <View className="bg-[#BBE6BA] w-8 h-8 rounded-full items-center justify-center mr-3">
                   <Text
+                    maxFontSizeMultiplier={1.2}
                     className="text-[#354F52]"
                     style={{ fontFamily: 'Nunito_700Bold' }}
                   >
@@ -77,6 +109,7 @@ export const ContentSection = ({
                 </View>
                 <View className="flex-1 mt-1">
                   <Text
+                    maxFontSizeMultiplier={1.2}
                     className="text-[#354F52] text-[16px] leading-6"
                     style={{ fontFamily: 'Nunito_400Regular' }}
                   >
@@ -91,6 +124,7 @@ export const ContentSection = ({
                         color="#548F53"
                       />
                       <Text
+                        maxFontSizeMultiplier={1.2}
                         className="text-[#548F53] text-xs ml-1"
                         style={{ fontFamily: 'Nunito_700Bold' }}
                       >

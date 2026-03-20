@@ -4,9 +4,16 @@ import {
   Nunito_700Bold,
   useFonts,
 } from '@expo-google-fonts/nunito';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import React, { useMemo } from 'react';
-import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import {
+  Alert,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { UnifiedCard } from '@/components/activitiesScenarios/UnifiedCard';
@@ -96,7 +103,17 @@ export default function Index() {
   if (!fontsLoaded) return null;
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F0F2EB]" edges={['top']}>
+    <SafeAreaView
+      className="flex-1 bg-[#F0F2EB]"
+      edges={['top']}
+      accessibilityLanguage="en-US"
+    >
+      <Stack.Screen
+        options={{
+          title: 'Home', // O que o leitor de ecrã pode ler como título da página
+          headerShown: false, // Esconde visualmente porque tu já tens o teu HomeHeader
+        }}
+      />
       <ScrollView
         className="px-5"
         showsVerticalScrollIndicator={false}
@@ -118,13 +135,24 @@ export default function Index() {
         {/* SECÇÃO SHORTCUTS DINÂMICA */}
         <View className="flex-row justify-between items-center mb-4 mt-2">
           <Text
+            maxFontSizeMultiplier={1.2}
             style={{ fontFamily: 'Nunito_600SemiBold' }}
             className="text-2xl text-[#354F52]"
+            accessibilityRole="header"
           >
             Shortcuts
           </Text>
-          <Pressable>
+          <Pressable
+            onPress={() =>
+              Alert.alert('Shortcuts', 'Shortcuts edit feature coming soon!')
+            }
+            accessibilityRole="button"
+            accessibilityLabel="Edit shortcuts"
+            accessibilityHint="Opens the shortcuts editor."
+            hitSlop={10}
+          >
             <Text
+              maxFontSizeMultiplier={1.2}
               style={{ fontFamily: 'Nunito_600SemiBold' }}
               className="text-[#548F53] underline text-xl"
             >
@@ -157,6 +185,7 @@ export default function Index() {
           ) : (
             // Mensagem caso não haja shortcuts definidos
             <Text
+              maxFontSizeMultiplier={1.2}
               style={{ fontFamily: 'Nunito_400Regular' }}
               className="text-gray-500 w-full text-center mt-2 italic"
             >

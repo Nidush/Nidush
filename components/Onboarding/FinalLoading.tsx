@@ -24,7 +24,9 @@ export default function FinalLoading({ onComplete }: FinalLoadingProps) {
     'Nunito_700Bold': Nunito_700Bold,
   });
 
-  const [message, setMessage] = useState('Take a deep breath. We are preparing your safe space...');
+  const [message, setMessage] = useState(
+    'Take a deep breath. We are preparing your safe space...',
+  );
 
   const randomTip = useMemo(() => {
     return TIPS[Math.floor(Math.random() * TIPS.length)];
@@ -48,21 +50,37 @@ export default function FinalLoading({ onComplete }: FinalLoadingProps) {
   if (!fontsLoaded) return null;
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F0F2EB] px-8 items-center justify-between py-12">
+    <SafeAreaView
+      className="flex-1 bg-[#F0F2EB] px-8 items-center justify-between py-12"
+      accessible
+      accessibilityLabel="Preparing your safe space"
+    >
       <View className="mt-4">
         <Text
+          maxFontSizeMultiplier={1}
+          accessibilityRole="header"
+          accessibilityLiveRegion="polite"
           className="text-[#354F52] text-2xl text-center leading-tight"
-          style={{ fontFamily: 'Nunito_700Bold' }} 
+          style={{ fontFamily: 'Nunito_700Bold' }}
         >
           {message}
         </Text>
       </View>
 
-      <View className="flex-1 justify-center items-center">
+      <View
+        className="flex-1 justify-center items-center"
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
+      >
         <BreathingLoader />
       </View>
 
-      <View className="w-full items-center mb-6">
+      <View
+        className="w-full items-center mb-6"
+        accessible
+        accessibilityRole="summary"
+        accessibilityLabel={`Helpful tip. ${randomTip}`}
+      >
         <TipDisplay tip={randomTip} />
         <View className="h-4" />
       </View>

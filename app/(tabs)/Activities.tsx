@@ -117,8 +117,13 @@ const UnifiedActivitiesScreen = () => {
   if (!fontsLoaded) return null;
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F0F2EB]" edges={['top']}>
+    <SafeAreaView
+      className="flex-1 bg-[#F0F2EB]"
+      edges={['top']}
+      accessibilityLanguage="en-US"
+    >
       <ScrollView
+        importantForAccessibility={isMenuOpen ? 'no-hide-descendants' : 'auto'}
         contentContainerStyle={{
           paddingTop: Platform.OS === 'ios' ? 20 : 10,
           paddingBottom: 120,
@@ -139,12 +144,18 @@ const UnifiedActivitiesScreen = () => {
         />
 
         {processedData.isEmpty ? (
-          <View className="mt-10 px-8 items-center">
+          <View
+            className="mt-10 px-8 items-center"
+            accessible={true}
+            accessibilityLabel={`No ${viewMode} found matching "${activeFilter}"`}
+          >
             <Ionicons
               name="search-outline"
               size={40}
               color="#8E8E93"
               style={{ marginBottom: 10 }}
+              importantForAccessibility="no"
+              accessibilityElementsHidden={true}
             />
             <Text
               className="text-center text-[#8E8E93] text-[16px]"

@@ -21,12 +21,19 @@ export const CarouselSection = ({
     <View className="mb-8">
       <View className="flex-row items-center mb-4 px-4">
         <Text
+          maxFontSizeMultiplier={1.2}
           className="text-2xl text-[#354F52]"
           style={{ fontFamily: 'Nunito_600SemiBold' }}
+          accessibilityRole="header"
         >
           {title}
         </Text>
-        <Ionicons name="chevron-forward" size={20} color="#548F53" />
+        <Ionicons
+          name="chevron-forward"
+          size={20}
+          color="#548F53"
+          importantForAccessibility="no"
+        />
       </View>
 
       <ScrollView

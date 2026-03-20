@@ -41,6 +41,10 @@ export const UnifiedCard = ({
       activeOpacity={0.9}
       className="relative rounded-2xl overflow-hidden bg-gray-900"
       style={{ width: width as any, aspectRatio }}
+      accessible={true}
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${time ? `Duration: ${time}.` : ''} ${room ? `Room: ${room}.` : ''}`}
+      accessibilityHint={`Press to go to the details of ${title}`}
     >
       <View style={StyleSheet.absoluteFill}>
         <Image
@@ -76,8 +80,13 @@ export const UnifiedCard = ({
         pointerEvents="none"
       />
 
-      <View className="absolute bottom-0 w-full p-4 z-30">
+      <View
+        className="absolute bottom-0 w-full p-4 z-30"
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden={true}
+      >
         <Text
+          maxFontSizeMultiplier={1.2}
           numberOfLines={2}
           className="text-white text-xl leading-tight mb-2"
           style={{ fontFamily: 'Nunito_700Bold' }}
@@ -90,6 +99,7 @@ export const UnifiedCard = ({
             <View className="flex-row items-center mb-1">
               <MaterialIcons name="access-time" size={16} color="white" />
               <Text
+                maxFontSizeMultiplier={1.2}
                 className="text-white text-md ml-1.5"
                 style={{ fontFamily: 'Nunito_600SemiBold' }}
               >
@@ -102,6 +112,7 @@ export const UnifiedCard = ({
             <View className="flex-row items-center">
               <MaterialCommunityIcons name="door" size={18} color="white" />
               <Text
+                maxFontSizeMultiplier={1.2}
                 className="text-white text-md ml-1.5"
                 style={{ fontFamily: 'Nunito_600SemiBold' }}
               >
