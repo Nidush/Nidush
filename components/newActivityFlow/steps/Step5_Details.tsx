@@ -34,9 +34,15 @@ export const Step5_Details = ({
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
+      base64: true,
     });
 
-    if (!result.canceled) setImage(result.assets[0].uri);
+    if (!result.canceled) {
+      const asset = result.assets[0];
+      // Usar base64 se estiver disponível (Web), caso contrário usar URI (Mobile)
+      const imagePayload = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+      setImage(imagePayload);
+    }
   };
 
   const handleResetImage = () => {

@@ -21,6 +21,7 @@ import {
   Nunito_600SemiBold,
   Nunito_700Bold,
 } from '@expo-google-fonts/nunito';
+import { supabase } from '../utils/supabase';
 
 // Componentes de Onboarding
 import WelcomeUser from '../components/Onboarding/WelcomeUser';
@@ -40,6 +41,14 @@ export default function SignUp() {
   const [currentStep, setCurrentStep] = useState('form');
   const [dims, setDims] = useState(Dimensions.get('window'));
   const fadeAnim = useRef(new Animated.Value(1)).current;
+
+  // Estados do formulário
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     const sub = Dimensions.addEventListener('change', ({ window }) => setDims(window));
@@ -61,12 +70,41 @@ export default function SignUp() {
     });
   };
 
+  const handleSignUp = async () => {
+    if (!email || !password || !firstName || !lastName) {
+      setErrorMsg('Por favor preenche todos os campos.');
+      return;
+    }
+    setLoading(true);
+    setErrorMsg('');
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          first_name: firstName,
+          last_name: lastName,
+        }
+      }
+    });
+
+    setLoading(false);
+
+    if (error) {
+      setErrorMsg('Erro: ' + error.message);
+      return;
+    }
+
+    transitionTo('welcome');
+  };
+
   if (!fontsLoaded) return null;
 
   const isWebPC = dims.width > 768;
 
   // --- Navegação ---
-  if (currentStep === 'welcome') return <WelcomeUser onFinish={() => transitionTo('house')} />;
+  if (currentStep === 'welcome') return <WelcomeUser userName={firstName} onFinish={() => transitionTo('house')} />;
   if (currentStep === 'house') return <Animated.View style={{ flex: 1, opacity: fadeAnim }}><HouseName onNext={() => transitionTo('wearable')} /></Animated.View>;
   if (currentStep === 'wearable') return <Animated.View style={{ flex: 1, opacity: fadeAnim }}><WearableSync onNext={() => transitionTo('activities')} onSkip={() => transitionTo('activities')} /></Animated.View>;
   if (currentStep === 'activities') return <Animated.View style={{ flex: 1, opacity: fadeAnim }}><ActivitySelection onFinish={() => transitionTo('loading')} /></Animated.View>;
@@ -127,6 +165,8 @@ export default function SignUp() {
                       <TextInput 
                         style={{ fontFamily: 'Nunito_400Regular' }}
                         className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]" 
+                        value={firstName}
+                        onChangeText={setFirstName}
                       />
                     </View>
                     <View className="w-[48%]">
@@ -134,6 +174,8 @@ export default function SignUp() {
                       <TextInput 
                         style={{ fontFamily: 'Nunito_400Regular' }}
                         className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]" 
+                        value={lastName}
+                        onChangeText={setLastName}
                       />
                     </View>
                   </View>
@@ -144,6 +186,9 @@ export default function SignUp() {
                       style={{ fontFamily: 'Nunito_400Regular' }}
                       className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]" 
                       keyboardType="email-address" 
+                      autoCapitalize="none"
+                      value={email}
+                      onChangeText={setEmail}
                     />
                   </View>
 
@@ -153,20 +198,32 @@ export default function SignUp() {
                       style={{ fontFamily: 'Nunito_400Regular' }}
                       className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]" 
                       secureTextEntry 
+                      value={password}
+                      onChangeText={setPassword}
                     />
                   </View>
+
+                  {errorMsg ? (
+                    <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-red-500 text-[14px] mb-[10px] text-center">
+                      {errorMsg}
+                    </Text>
+                  ) : null}
 
                   <TouchableOpacity
                     activeOpacity={0.8}
                     className="bg-[#5C8D58] w-[230px] h-[54px] rounded-full justify-center items-center self-center mt-[15px] shadow-sm"
-                    onPress={() => transitionTo('welcome')}
+                    onPress={handleSignUp}
+                    disabled={loading}
+                    style={{ opacity: loading ? 0.7 : 1 }}
                   >
-                    <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-white text-[20px]">Join Nidush</Text>
+                    <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-white text-[20px]">
+                      {loading ? 'Joining...' : 'Join Nidush'}
+                    </Text>
                   </TouchableOpacity>
 
                   <View className="flex-row justify-center mt-[20px] mb-20">
                     <Text style={{ fontFamily: 'Nunito_400Regular' }} className="text-[#3E545C] text-[15px]">Already have an account? </Text>
-                    <TouchableOpacity>
+                    <TouchableOpacity onPress={() => router.push('/login')}>
                       <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-[#5C8D58] text-[15px]">Login</Text>
                     </TouchableOpacity>
                   </View>
