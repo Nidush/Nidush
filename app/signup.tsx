@@ -1,39 +1,40 @@
-import React, { useState, useRef, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View,
+  Animated,
+  Dimensions,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
-  Image,
-  Dimensions,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  Animated,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 
 import {
-  useFonts,
   Nunito_400Regular,
   Nunito_600SemiBold,
   Nunito_700Bold,
+  useFonts,
 } from '@expo-google-fonts/nunito';
 
 // Componentes de Onboarding
-import WelcomeUser from '../components/Onboarding/WelcomeUser';
-import HouseName from '../components/Onboarding/HouseName';
-import WearableSync from '../components/Onboarding/WearableSync'; 
 import ActivitySelection from '../components/Onboarding/ActivitySelection';
 import FinalLoading from '../components/Onboarding/FinalLoading';
+import HouseName from '../components/Onboarding/HouseName';
+import WearableSync from '../components/Onboarding/WearableSync';
+import WelcomeUser from '../components/Onboarding/WelcomeUser';
 
 export default function SignUp() {
   const [fontsLoaded] = useFonts({
-    'Nunito_400Regular': Nunito_400Regular,
-    'Nunito_600SemiBold': Nunito_600SemiBold,
-    'Nunito_700Bold': Nunito_700Bold,
+    Nunito_400Regular: Nunito_400Regular,
+    Nunito_600SemiBold: Nunito_600SemiBold,
+    Nunito_700Bold: Nunito_700Bold,
   });
 
   const router = useRouter();
@@ -42,7 +43,9 @@ export default function SignUp() {
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    const sub = Dimensions.addEventListener('change', ({ window }) => setDims(window));
+    const sub = Dimensions.addEventListener('change', ({ window }) =>
+      setDims(window),
+    );
     return () => sub.remove();
   }, []);
 
@@ -66,11 +69,44 @@ export default function SignUp() {
   const isWebPC = dims.width > 768;
 
   // --- Navegação Onboarding ---
-  if (currentStep === 'welcome') return <WelcomeUser onFinish={() => transitionTo('house')} />;
-  if (currentStep === 'house') return <Animated.View style={{ flex: 1, opacity: fadeAnim }}><HouseName onNext={() => transitionTo('wearable')} /></Animated.View>;
-  if (currentStep === 'wearable') return <Animated.View style={{ flex: 1, opacity: fadeAnim }}><WearableSync onNext={() => transitionTo('activities')} onSkip={() => transitionTo('activities')} /></Animated.View>;
-  if (currentStep === 'activities') return <Animated.View style={{ flex: 1, opacity: fadeAnim }}><ActivitySelection onFinish={() => transitionTo('loading')} /></Animated.View>;
-  if (currentStep === 'loading') return <FinalLoading onComplete={() => router.replace('/(tabs)')} />;
+  if (currentStep === 'welcome')
+    return <WelcomeUser onFinish={() => transitionTo('house')} />;
+  if (currentStep === 'house')
+    return (
+      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+        <HouseName onNext={() => transitionTo('wearable')} />
+      </Animated.View>
+    );
+  if (currentStep === 'wearable')
+    return (
+      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+        <WearableSync
+          onNext={() => transitionTo('activities')}
+          onSkip={() => transitionTo('activities')}
+        />
+      </Animated.View>
+    );
+  if (currentStep === 'activities')
+    return (
+      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+        <ActivitySelection onFinish={() => transitionTo('loading')} />
+      </Animated.View>
+    );
+  if (currentStep === 'loading')
+    return (
+      <FinalLoading
+        onComplete={async () => {
+          try {
+            // Gravamos aqui que o Onboarding (incluindo setup) foi concluído
+            await AsyncStorage.setItem('@viewedOnboarding', 'true');
+            router.replace('/(tabs)');
+          } catch (e) {
+            console.log('Error saving onboarding state', e);
+            router.replace('/(tabs)');
+          }
+        }}
+      />
+    );
 
   return (
     <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
@@ -106,12 +142,10 @@ export default function SignUp() {
             keyboardShouldPersistTaps="handled"
           >
             <SafeAreaView className="flex-1">
-
               <View
                 style={{ maxWidth: 600, width: '100%', alignSelf: 'center' }}
                 className="px-[28px] flex-1"
               >
-
                 {/* Logo */}
                 <View
                   className={`items-center ${isWebPC ? 'mt-[30px] mb-[10px]' : 'mt-[15px]'} h-[60px] justify-center`}
@@ -130,7 +164,6 @@ export default function SignUp() {
                 </View>
 
                 <View className={isWebPC ? 'mt-[10px]' : 'mt-[25px]'}>
-
                   <Text
                     style={{ fontFamily: 'Nunito_700Bold' }}
                     className="text-[40px] text-[#3E545C]"
@@ -152,8 +185,8 @@ export default function SignUp() {
                   {/* CAMPOS LADO A LADO: First Name & Last Name */}
                   <View className="flex-row mb-[15px]">
                     <View className="flex-1 mr-[10px]">
-                      <Text 
-                        style={{ fontFamily: 'Nunito_600SemiBold' }} 
+                      <Text
+                        style={{ fontFamily: 'Nunito_600SemiBold' }}
                         className="text-[14px] text-[#3E545C] mb-[6px]"
                         maxFontSizeMultiplier={1.2}
                       >
@@ -169,8 +202,8 @@ export default function SignUp() {
                     </View>
 
                     <View className="flex-1">
-                      <Text 
-                        style={{ fontFamily: 'Nunito_600SemiBold' }} 
+                      <Text
+                        style={{ fontFamily: 'Nunito_600SemiBold' }}
                         className="text-[14px] text-[#3E545C] mb-[6px]"
                         maxFontSizeMultiplier={1.2}
                       >
@@ -187,8 +220,8 @@ export default function SignUp() {
                   </View>
 
                   {/* Email */}
-                  <Text 
-                    style={{ fontFamily: 'Nunito_600SemiBold' }} 
+                  <Text
+                    style={{ fontFamily: 'Nunito_600SemiBold' }}
                     className="text-[14px] text-[#3E545C] mb-[6px]"
                     maxFontSizeMultiplier={1.2}
                   >
@@ -204,8 +237,8 @@ export default function SignUp() {
                   />
 
                   {/* Password */}
-                  <Text 
-                    style={{ fontFamily: 'Nunito_600SemiBold' }} 
+                  <Text
+                    style={{ fontFamily: 'Nunito_600SemiBold' }}
                     className="text-[14px] text-[#3E545C] mb-[6px]"
                     maxFontSizeMultiplier={1.2}
                   >
@@ -228,8 +261,8 @@ export default function SignUp() {
                     accessibilityRole="button"
                     accessibilityLabel="Join Nidush"
                   >
-                    <Text 
-                      style={{ fontFamily: 'Nunito_700Bold' }} 
+                    <Text
+                      style={{ fontFamily: 'Nunito_700Bold' }}
                       className="text-white text-[20px]"
                       maxFontSizeMultiplier={1.2}
                     >
@@ -239,8 +272,8 @@ export default function SignUp() {
 
                   {/* Footer Login */}
                   <View className="flex-row justify-center mt-[20px] mb-20">
-                    <Text 
-                      style={{ fontFamily: 'Nunito_400Regular' }} 
+                    <Text
+                      style={{ fontFamily: 'Nunito_400Regular' }}
                       className="text-[#3E545C] text-[15px]"
                       maxFontSizeMultiplier={1.2}
                     >
@@ -250,8 +283,8 @@ export default function SignUp() {
                       accessibilityRole="button"
                       accessibilityLabel="Login"
                     >
-                      <Text 
-                        style={{ fontFamily: 'Nunito_700Bold' }} 
+                      <Text
+                        style={{ fontFamily: 'Nunito_700Bold' }}
                         className="text-[#5C8D58] text-[15px] ml-1"
                         maxFontSizeMultiplier={1.2}
                       >
@@ -259,7 +292,6 @@ export default function SignUp() {
                       </Text>
                     </TouchableOpacity>
                   </View>
-
                 </View>
               </View>
             </SafeAreaView>

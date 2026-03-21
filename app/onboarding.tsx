@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -253,13 +252,10 @@ export default function Onboarding() {
       toValue: 0,
       duration: 800,
       useNativeDriver: true,
-    }).start(async () => {
-      try {
-        await AsyncStorage.setItem('@viewedOnboarding', 'true');
-        router.replace('/signup');
-      } catch {
-        router.replace('/signup');
-      }
+    }).start(() => {
+      // Removido o AsyncStorage.setItem daqui.
+      // O utilizador só "viu" o onboarding quando terminar a configuração.
+      router.replace('/signup');
     });
   }, [router, fadeAnim]);
 
