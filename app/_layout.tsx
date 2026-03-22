@@ -6,14 +6,18 @@ import './../global.css';
 
 export default function RootLayout() {
   const [isLoading, setIsLoading] = useState(true);
+  const [isReady, setIsReady] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
+    setIsReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isReady) return;
+
     const checkOnboarding = async () => {
       try {
-        // Remover a linha abaixo após testar, para que lembre da escolha:
-        await AsyncStorage.removeItem('@viewedOnboarding');
-
         const viewed = await AsyncStorage.getItem('@viewedOnboarding');
 
         if (viewed === 'true') {
@@ -29,7 +33,11 @@ export default function RootLayout() {
     };
 
     checkOnboarding();
-  }, []);
+  }, [isReady]);
+
+  if (isLoading && !isReady) {
+    return null;
+  }
 
   return (
     <BiometricsProvider>
