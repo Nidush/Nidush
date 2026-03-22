@@ -31,18 +31,44 @@ export default function Index() {
   const [myActivities, setMyActivities] = useState<Activity[]>([]);
 
   // O userName deve ser atualizado quando ganhamos foco também
-  const fetchUserName = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'Utilizador');
-    } else {
+  const fetchUserName = useCallback(async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
+      
+      if (user) {
+        setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'Utilizador');
+      } else {
+        // Tentar getUser() se session for null, às vezes ajuda na consistência
+        const { data: { user: verifiedUser } } = await supabase.auth.getUser();
+        if (verifiedUser) {
+          setUserName(verifiedUser.user_metadata?.first_name || verifiedUser.email?.split('@')[0] || 'Utilizador');
+        } else {
+          setUserName('Visitante');
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching user name:', e);
       setUserName('Visitante');
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchUserName();
-  }, []);
+
+    // Listener para mudanças de autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUserName(session.user.user_metadata?.first_name || session.user.email?.split('@')[0] || 'Utilizador');
+      } else {
+        setUserName('Visitante');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [fetchUserName]);
 
   useFocusEffect(
     useCallback(() => {

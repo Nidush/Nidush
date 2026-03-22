@@ -20,7 +20,15 @@ import {
   Nunito_700Bold,
 } from '@expo-google-fonts/nunito';
 
-export default function HouseName({ onNext }: { onNext: () => void }) {
+export default function HouseName({ 
+  onNext, 
+  houseName, 
+  setHouseName 
+}: { 
+  onNext: () => void;
+  houseName: string;
+  setHouseName: (name: string) => void;
+}) {
   const [fontsLoaded] = useFonts({
     'Nunito_400Regular': Nunito_400Regular,
     'Nunito_600SemiBold': Nunito_600SemiBold,
@@ -123,8 +131,8 @@ export default function HouseName({ onNext }: { onNext: () => void }) {
                     maxFontSizeMultiplier={1.2}
                     placeholder="e.g. My Sanctuary"
                     placeholderTextColor="#AAB4AA"
-                    className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB] text-[#3E545C]"
-                    style={{ fontFamily: 'Nunito_400Regular' }}
+                    value={houseName}
+                    onChangeText={setHouseName}
                     accessible
                     accessibilityLabel="Home name input"
                     accessibilityHint="Enter the name you want to give to your home"

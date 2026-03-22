@@ -48,6 +48,7 @@ export default function SignUp() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [houseName, setHouseName] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -107,15 +108,23 @@ export default function SignUp() {
   const isWebPC = dims.width > 768;
 
   // --- Navegação Onboarding ---
-  if (currentStep === 'welcome')
-    return <WelcomeUser onFinish={() => transitionTo('house')} />;
-  if (currentStep === 'house')
+  if (currentStep === 'welcome') {
+    return <WelcomeUser userName={firstName} onFinish={() => transitionTo('house')} />;
+  }
+
+  if (currentStep === 'house') {
     return (
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <HouseName onNext={() => transitionTo('wearable')} />
+        <HouseName 
+          houseName={houseName} 
+          setHouseName={setHouseName} 
+          onNext={() => transitionTo('wearable')} 
+        />
       </Animated.View>
     );
-  if (currentStep === 'wearable')
+  }
+
+  if (currentStep === 'wearable') {
     return (
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
         <WearableSync
@@ -124,17 +133,53 @@ export default function SignUp() {
         />
       </Animated.View>
     );
-  if (currentStep === 'activities')
+  }
+
+  if (currentStep === 'activities') {
     return (
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
         <ActivitySelection onFinish={() => transitionTo('loading')} />
       </Animated.View>
     );
-  if (currentStep === 'loading')
+  }
+
+  if (currentStep === 'loading') {
     return (
       <FinalLoading
         onComplete={async () => {
           try {
+            // Sincronização com as tabelas do public schema conforme fornecido no prompt
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (user) {
+              // 1. Criar a Home
+              const { data: homeData, error: homeError } = await supabase
+                .from('home')
+                .insert({ name: houseName || 'Nidush Home' })
+                .select('idhome')
+                .single();
+
+              if (!homeError && homeData) {
+                // 2. Criar o User no public schema
+                const { error: userError } = await supabase
+                  .from('users')
+                  .insert({
+                    first_name: firstName,
+                    last_name: lastName,
+                    email: email,
+                    home_idhome: homeData.idhome,
+                    password: password, // Seguindo o esquema fornecido: password is NOT NULL
+                    auth_uid: user.id
+                  });
+
+                if (userError) {
+                  console.error('Erro ao sincronizar user no public schema:', userError);
+                }
+              } else {
+                console.error('Erro ao criar home no public schema:', homeError);
+              }
+            }
+
             // Gravamos aqui que o Onboarding (incluindo setup) foi concluído
             await AsyncStorage.setItem('@viewedOnboarding', 'true');
             router.replace('/(tabs)');
@@ -145,12 +190,7 @@ export default function SignUp() {
         }}
       />
     );
-  // --- Navegação ---
-  if (currentStep === 'welcome') return <WelcomeUser userName={firstName} onFinish={() => transitionTo('house')} />;
-  if (currentStep === 'house') return <Animated.View style={{ flex: 1, opacity: fadeAnim }}><HouseName onNext={() => transitionTo('wearable')} /></Animated.View>;
-  if (currentStep === 'wearable') return <Animated.View style={{ flex: 1, opacity: fadeAnim }}><WearableSync onNext={() => transitionTo('activities')} onSkip={() => transitionTo('activities')} /></Animated.View>;
-  if (currentStep === 'activities') return <Animated.View style={{ flex: 1, opacity: fadeAnim }}><ActivitySelection onFinish={() => transitionTo('loading')} /></Animated.View>;
-  if (currentStep === 'loading') return <FinalLoading onComplete={() => router.replace('/(tabs)')} />;
+  }
 
   return (
     <Animated.View style={{ flex: 1, opacity: fadeAnim }}>

@@ -11,7 +11,6 @@ import './../global.css';
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const [isLoading, setIsLoading] = useState(true);
   const [isReady, setIsReady] = useState(false);
   const router = useRouter();
 
@@ -48,7 +47,7 @@ export default function RootLayout() {
       }
     };
     checkOnboarding();
-  }, [router]);
+  }, [isReady, router]);
 
   // ANIMAÇÃO HBO MAX COM JINGLE NO INÍCIO
   useEffect(() => {
