@@ -56,7 +56,7 @@ export default function RootLayout() {
 
           // C. Arranca a sequência de animação
           Animated.sequence([
-            Animated.delay(1000), // O logo fica parado por 1 segundo enquanto o som toca
+            Animated.delay(1500), // O logo fica parado por 1 segundo enquanto o som toca
 
             Animated.parallel([
               // Início da expansão imersiva
