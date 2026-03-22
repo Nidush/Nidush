@@ -7,7 +7,7 @@ import {
   useFonts,
 } from '@expo-google-fonts/nunito';
 import { supabase, uploadImage } from '../utils/supabase';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
