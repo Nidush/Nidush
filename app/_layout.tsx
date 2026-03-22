@@ -11,6 +11,8 @@ import './../global.css';
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  const [isLoading, setIsLoading] = useState(true);
+  const [isReady, setIsReady] = useState(false);
   const router = useRouter();
 
   // 1. Configura o player de áudio (certifica-te que o ficheiro existe em assets/audio/jingle.mp3)
@@ -25,6 +27,12 @@ export default function RootLayout() {
 
   // Lógica de Redirecionamento (Onboarding vs Tabs)
   useEffect(() => {
+    setIsReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isReady) return;
+
     const checkOnboarding = async () => {
       try {
         const viewed = await AsyncStorage.getItem('@viewedOnboarding');

@@ -33,7 +33,12 @@ export const UnifiedCard = ({
   aspectRatio = 1,
   onPress,
 }: UnifiedCardProps) => {
-  const imageSource = typeof image === 'string' ? { uri: image } : image;
+  const isNumeric = typeof image === 'string' && /^\d+$/.test(image);
+  const imageSource = isNumeric
+    ? { uri: `https://picsum.photos/seed/${image}/400/600` } // Fallback para ID numérico que já não existe
+    : typeof image === 'string'
+      ? { uri: image }
+      : image;
 
   return (
     <TouchableOpacity

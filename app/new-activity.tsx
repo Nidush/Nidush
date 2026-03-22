@@ -6,7 +6,7 @@ import {
   Nunito_700Bold,
   useFonts,
 } from '@expo-google-fonts/nunito';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase, uploadImage } from '../utils/supabase';
 import { router, Stack } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -154,23 +154,47 @@ export default function NewActivityFlow() {
     };
 
     try {
-      const storedActivities = await AsyncStorage.getItem('@myActivities');
-      const parsedActivities = storedActivities
-        ? JSON.parse(storedActivities)
-        : [];
-      await AsyncStorage.setItem(
-        '@myActivities',
-        JSON.stringify([newActivity, ...parsedActivities]),
-      );
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Utilizador não autenticado!");
+
+      // 1. Upload da imagem para o Storage (se for uma nova imagem local)
+      let imageUrl = finalImage?.uri || finalImage;
+      if (typeof imageUrl === 'string' && (imageUrl.startsWith('data:') || imageUrl.startsWith('file:') || imageUrl.startsWith('blob:'))) {
+        const uploadedUrl = await uploadImage(imageUrl);
+        if (uploadedUrl) imageUrl = uploadedUrl;
+      }
+
+      // 2. Tentar inserir na DB
+      const { data, error } = await supabase.from('activity').insert({
+        title: activityName || 'Untitled Activity',
+        description,
+        room,
+        image: imageUrl,
+        category: 'My creations',
+        type: activityType,
+        contentid: selectedContentId || null,
+        scenarioid: selectedScenarioId || null,
+        shortcuts: false,
+        user_iduser: user.id
+      }).select('*, idactivity').single();
+
+      if (error) {
+        console.error('Erro no Supabase:', error);
+        alert('Erro ao guardar na Base de Dados: ' + error.message);
+        return;
+      }
+
+      // Se tudo correu bem, avançar para os detalhes usando o ID gerado pelo Supabase
       router.push({
         pathname: '/activity-details',
         params: {
-          id: newActivity.id,
+          id: data.idactivity.toString(),
           isNew: 'true',
         },
       });
     } catch (e) {
-      console.log('Erro ao salvar', e);
+      console.error('Erro ao salvar:', e);
+      alert('Ocorreu um erro ao salvar a tua atividade.');
     }
   };
 
