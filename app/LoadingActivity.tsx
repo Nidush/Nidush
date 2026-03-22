@@ -33,6 +33,7 @@ const LoadingActivity = () => {
   return (
     <SafeAreaView className="flex-1 bg-[#F0F2EB] px-6 items-center justify-between py-10">
       <Text
+        maxFontSizeMultiplier={1.2}
         className="text-[#354F52] text-xl text-center"
         style={{ fontFamily: 'Nunito_600SemiBold' }}
       >
@@ -44,8 +45,12 @@ const LoadingActivity = () => {
         onPress={handleCancel}
         activeOpacity={0.8}
         className="bg-[#548F53] w-52 py-4 rounded-full shadow-lg"
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel="Cancel loading"
       >
         <Text
+          maxFontSizeMultiplier={1.2}
           className="text-white text-center text-2xl"
           style={{ fontFamily: 'Nunito_700Bold' }}
         >

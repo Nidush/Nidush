@@ -134,7 +134,12 @@ export default function SignUp() {
           className="flex-1"
           style={{ zIndex: 10 }}
         >
-          <ScrollView contentContainerStyle={{ flexGrow: 1 }} bounces={false} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            contentContainerStyle={{ flexGrow: 1 }}
+            bounces={false}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
             <SafeAreaView className="flex-1">
 
               <View
@@ -154,8 +159,22 @@ export default function SignUp() {
                 </View>
 
                 <View className={isWebPC ? 'mt-[10px]' : 'mt-[25px]'}>
-                  <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-[40px] text-[#3E545C] tracking-[-0.5px]">Welcome Home</Text>
-                  <Text style={{ fontFamily: 'Nunito_400Regular' }} className="text-[16px] text-[#3E545C] mt-[8px] mb-[30px] leading-[22px] opacity-90">
+
+                  <Text
+                    style={{ fontFamily: 'Nunito_700Bold' }}
+                    className="text-[40px] text-[#3E545C]"
+                    accessibilityRole="header"
+                    maxFontSizeMultiplier={1}
+                  >
+                    Welcome Home
+                  </Text>
+
+                  <Text
+                    style={{ fontFamily: 'Nunito_400Regular' }}
+                    className="text-[16px] text-[#3E545C] mt-[8px] mb-[30px]"
+                    accessibilityLabel="Join Nidush and let your home be your safe space"
+                    maxFontSizeMultiplier={1.2}
+                  >
                     Join Nidush and let your home be your safe space.
                   </Text>
 
@@ -225,12 +244,14 @@ export default function SignUp() {
                     </Text>
                   </TouchableOpacity>
 
+                  {/* Footer Login */}
                   <View className="flex-row justify-center mt-[20px] mb-20">
                     <Text style={{ fontFamily: 'Nunito_400Regular' }} className="text-[#3E545C] text-[15px]">Already have an account? </Text>
                     <TouchableOpacity onPress={() => router.push('/login')}>
                       <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-[#5C8D58] text-[15px]">Login</Text>
                     </TouchableOpacity>
                   </View>
+
                 </View>
               </View>
             </SafeAreaView>

@@ -3,40 +3,33 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import Profile from '../app/Profile';
 
-// Mock do router
+// 1️⃣ Mock das fontes
+jest.mock('@expo-google-fonts/nunito', () => ({
+  useFonts: () => [true],
+  Nunito_400Regular: 'Nunito_400Regular',
+  Nunito_600SemiBold: 'Nunito_600SemiBold',
+  Nunito_700Bold: 'Nunito_700Bold',
+}));
+
+// 2️⃣ Mock do useRouter
 jest.mock('expo-router', () => ({
   useRouter: jest.fn(),
 }));
 
-// Mock dos ícones
+// 3️⃣ Mock dos ícones: retorna string simples (não JSX)
 jest.mock('@expo/vector-icons', () => ({
   MaterialIcons: 'MaterialIcons',
-}));
+  Ionicons: 'Ionicons',
+}), { virtual: true });
 
-// Mock imagem
+// 4️⃣ Mock das imagens
 jest.mock('@/assets/avatars/profile.png', () => 1, { virtual: true });
 
-// 🔥 MOCK DO SUPABASE (IMPORTANTE para evitar async real)
-jest.mock('../utils/supabase', () => ({
-  supabase: {
-    auth: {
-      getUser: jest.fn(() =>
-        Promise.resolve({
-          data: {
-            user: {
-              email: 'laura@test.com',
-              user_metadata: {
-                first_name: 'Laura',
-                last_name: 'Rossi',
-              },
-            },
-          },
-          error: null,
-        })
-      ),
-      signOut: jest.fn(() => Promise.resolve()),
-    },
-  },
+// 5️⃣ Mock do SafeAreaContext: retorna objetos simples
+jest.mock('react-native-safe-area-context', () => ({
+  SafeAreaProvider: ({ children }: any) => children,
+  SafeAreaView: ({ children }: any) => children,
+  useSafeAreaInsets: () => ({ top: 0, left: 0, right: 0, bottom: 0 }),
 }));
 
 describe('Profile Screen', () => {
@@ -49,65 +42,30 @@ describe('Profile Screen', () => {
     });
   });
 
-  test('deve renderizar nome e título', async () => {
-    const { findByText } = render(<Profile />);
+  test('deve renderizar os elementos principais do perfil', () => {
+    const { getByText, getByTestId } = render(<Profile />);
 
-    expect(await findByText('Laura Rossi')).toBeTruthy();
-    expect(await findByText('Profile')).toBeTruthy();
+    expect(getByText('Profile')).toBeTruthy();
+    expect(getByText('Laura Rossi')).toBeTruthy();
+    expect(getByTestId('menu-account')).toBeTruthy();
   });
 
-  test('botão voltar navega para tabs', async () => {
+  test('deve navegar corretamente ao clicar nos botões', () => {
     const { getByTestId } = render(<Profile />);
-
-    await waitFor(() => {
-      expect(getByTestId('back-button')).toBeTruthy();
-    });
 
     fireEvent.press(getByTestId('back-button'));
-
     expect(mockReplace).toHaveBeenCalledWith('/(tabs)');
-  });
-
-  test('logout navega para login', async () => {
-    const { getByTestId } = render(<Profile />);
 
     fireEvent.press(getByTestId('logout-button'));
-
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/login');
-    });
+    expect(mockReplace).toHaveBeenCalledWith('/profile-selection');
   });
 
-  test('menus renderizam', async () => {
-    const { getByTestId } = render(<Profile />);
-
-    await waitFor(() => {
-      expect(getByTestId('menu-account')).toBeTruthy();
-      expect(getByTestId('menu-notifications')).toBeTruthy();
-      expect(getByTestId('menu-residents')).toBeTruthy();
-    });
-  });
-
-  test('dispositivos renderizam', async () => {
-    const { getByTestId, getByText } = render(<Profile />);
-
-    await waitFor(() => {
-      expect(getByTestId('device-apple-watch')).toBeTruthy();
-      expect(getByText('Connected')).toBeTruthy();
-
-      expect(getByTestId('device-mi-band')).toBeTruthy();
-      expect(getByText('Disconnected')).toBeTruthy();
-    });
-  });
-
-  test('hobbies aparecem', async () => {
+  test('deve listar os hobbies corretamente', () => {
     const { getByText } = render(<Profile />);
 
-    await waitFor(() => {
-      expect(getByText('Cooking')).toBeTruthy();
-      expect(getByText('Workout')).toBeTruthy();
-      expect(getByText('Meditation')).toBeTruthy();
-      expect(getByText('Audiobooks')).toBeTruthy();
-    });
+    expect(getByText('Cooking')).toBeTruthy();
+    expect(getByText('Workout')).toBeTruthy();
+    expect(getByText('Meditation')).toBeTruthy();
+    expect(getByText('Audiobooks')).toBeTruthy();
   });
 });

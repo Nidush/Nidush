@@ -54,8 +54,16 @@ export const ContentCard = ({
           ? 'w-full aspect-square mb-3'
           : 'w-[48%] aspect-square',
       )}
+      accessible={true}
+      accessibilityRole="radio"
+      accessibilityLabel={`${item.title}, ${item.type}${item.duration ? `, duration: ${item.duration}` : ''}`}
+      accessibilityState={{ selected: isSelected }}
+      accessibilityHint="Touch to select this content"
     >
-      <View style={StyleSheet.absoluteFill}>
+      <View
+        style={StyleSheet.absoluteFill}
+        importantForAccessibility="no-hide-descendants"
+      >
         <Image
           source={item.image}
           style={StyleSheet.absoluteFill}
@@ -67,6 +75,8 @@ export const ContentCard = ({
 
       <MaskedView
         style={StyleSheet.absoluteFill}
+        importantForAccessibility="no"
+        accessibilityElementsHidden={true}
         maskElement={
           <LinearGradient
             colors={['black', 'black', 'transparent']}
@@ -89,12 +99,22 @@ export const ContentCard = ({
         pointerEvents="none"
       />
 
-      <TouchableOpacity className="absolute top-2.5 right-1 z-20 p-1">
+      <TouchableOpacity
+        className="absolute top-2.5 right-1 z-20 p-1"
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden={true}
+      >
         <MaterialIcons name="more-vert" size={24} color="white" />
       </TouchableOpacity>
 
-      <View className="absolute bottom-0 w-full p-3 z-30">
+      <View
+        className="absolute bottom-0 w-full p-3 z-30"
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden={true}
+      >
         <Text
+          maxFontSizeMultiplier={1.2}
           numberOfLines={2}
           className={clsx(
             'text-white leading-tight mb-2',
@@ -113,6 +133,7 @@ export const ContentCard = ({
               color="white"
             />
             <Text
+              maxFontSizeMultiplier={1.2}
               className="text-white text-md ml-1.5 capitalize"
               style={{ fontFamily: 'Nunito_600SemiBold' }}
             >
@@ -124,6 +145,7 @@ export const ContentCard = ({
             <View className="flex-row items-center">
               <MaterialIcons name="access-time" size={16} color="white" />
               <Text
+                maxFontSizeMultiplier={1.2}
                 className="text-white text-md ml-1.5"
                 style={{ fontFamily: 'Nunito_600SemiBold' }}
               >

@@ -33,7 +33,12 @@ export const Step1_Type = ({ selected, onSelect }: Step1Props) => {
       title="What do you want to do?"
       subtitle="Select the activity type you want to do."
     >
-      <View className="flex-row flex-wrap gap-3 justify-between">
+      <View
+        className="flex-row flex-wrap gap-3 justify-between"
+        accessible={true}
+        accessibilityRole="radiogroup"
+        accessibilityLabel="Activity type options"
+      >
         {options.map((option) => (
           <SelectionCard
             key={option.id}

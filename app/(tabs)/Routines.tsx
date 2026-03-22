@@ -116,39 +116,38 @@ export default function Routines() {
   };
 
   const filteredRoutines = useMemo(() => {
-    return routines.filter((routine) => {
-      const searchLower = searchQuery.toLowerCase();
-      return (
-        routine.title.toLowerCase().includes(searchLower) ||
-        routine.room.toLowerCase().includes(searchLower)
-      );
-    });
+    const searchLower = searchQuery.toLowerCase();
+    return routines.filter((r) => r.title.toLowerCase().includes(searchLower) || r.room.toLowerCase().includes(searchLower));
   }, [routines, searchQuery]);
 
   return (
     <SafeAreaView className="flex-1 bg-[#F1F3EA]" edges={['top']}>
       <StatusBar barStyle="dark-content" />
 
-      {/* Header */}
-      <View className="items-center mt-2 mb-6">
-        <Text className="text-3xl font-semibold text-[#354F52]" style={{ fontFamily: 'Nunito_600SemiBold' }}>
-          Routines
-        </Text>
+      <View className="items-center mt-2 mb-6 px-4">
+        <Text 
+          className="text-3xl text-[#354F52]" 
+          style={{ fontFamily: 'Nunito_600SemiBold' }}
+          maxFontSizeMultiplier={1.3}
+        >Routines</Text>
       </View>
 
       <View className="px-5 mb-6">
-        <View className="flex-row items-center border border-[#BDC7C2] rounded-full px-4 h-12 bg-transparent">
-          <MaterialIcons name="search" size={24} color="#7A8C85" style={{ marginRight: 10 }} />
+        <View className="flex-row items-center border border-[#BDC7C2] rounded-full px-4 min-h-[48px]">
+          <MaterialIcons name="search" size={22} color="#7A8C85" style={{ marginRight: 10 }} />
           <TextInput
             testID="search-input"
             placeholder="Search routines..."
             placeholderTextColor="#7A8C85"
             value={searchQuery}
             onChangeText={setSearchQuery}
-            className="flex-1 h-full text-base text-[#2C3A35]"
-            style={{ fontFamily: 'Nunito_600SemiBold', paddingVertical: 0 }}
-            textAlignVertical="center"
-            autoCorrect={false}
+            className="flex-1 text-base text-[#2C3A35]"
+            style={{ fontFamily: 'Nunito_600SemiBold' }}
+            maxFontSizeMultiplier={1.3}
+            accessible={true}
+            accessibilityLabel="Search routines"
+            accessibilityHint="Type to search for a specific routine"
+            accessibilityRole="search"
           />
         </View>
       </View>
@@ -190,4 +189,4 @@ export default function Routines() {
       </View>
     </SafeAreaView>
   );
-}
+} 

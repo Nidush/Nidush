@@ -1,19 +1,22 @@
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
+  Alert,
   FlatList,
   ScrollView,
   StatusBar,
   Text,
   TextInput,
-  View,
   TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import AddRoomDevice from '../../components/rooms/AddRoomDevice';
 import CategoryPill from '../../components/rooms/CategoryPill';
-import DeviceCard, { Device as DeviceBase } from '../../components/rooms/device-card';
+import DeviceCard, {
+  Device as DeviceBase,
+} from '../../components/rooms/device-card';
 
 interface Room {
   id: number;
@@ -22,7 +25,7 @@ interface Room {
 
 interface Device extends DeviceBase {
   roomId: number;
-  level: number; 
+  level: number;
 }
 
 interface MenuAction {
@@ -38,15 +41,49 @@ const ROOMS_DATA: Room[] = [
 ];
 
 const INITIAL_DEVICES: Device[] = [
-  { id: 1, name: 'Bedroom Lights', type: 'light', status: 'Off', level: 100, roomId: 1 },
-  { id: 2, name: 'Speakers', type: 'speaker', status: 'Off', level: 50, roomId: 1 },
-  { id: 3, name: 'Difuser', type: 'difuser', status: 'Off', level: 0, roomId: 1 },
-  { id: 4, name: 'Air Purifier', type: 'purifier', status: 'Off', level: 0, roomId: 1 },
-  { id: 5, name: 'Living Room Lights', type: 'light', status: 'Off', level: 100, roomId: 2 },
+  {
+    id: 1,
+    name: 'Bedroom Lights',
+    type: 'light',
+    status: 'Off',
+    level: 100,
+    roomId: 1,
+  },
+  {
+    id: 2,
+    name: 'Speakers',
+    type: 'speaker',
+    status: 'Off',
+    level: 50,
+    roomId: 1,
+  },
+  {
+    id: 3,
+    name: 'Difuser',
+    type: 'difuser',
+    status: 'Off',
+    level: 0,
+    roomId: 1,
+  },
+  {
+    id: 4,
+    name: 'Air Purifier',
+    type: 'purifier',
+    status: 'Off',
+    level: 0,
+    roomId: 1,
+  },
+  {
+    id: 5,
+    name: 'Living Room Lights',
+    type: 'light',
+    status: 'Off',
+    level: 100,
+    roomId: 2,
+  },
 ];
 
 export default function Rooms() {
-  // --- Estados ---
   const [activeRoom, setActiveRoom] = useState<number>(1);
   const [devices, setDevices] = useState<Device[]>(INITIAL_DEVICES);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -71,31 +108,34 @@ export default function Rooms() {
       const matchesSearch = device.name
         .toLowerCase()
         .includes(searchQuery.toLowerCase());
-      
+
       return matchesRoom && matchesSearch;
     });
   }, [devices, activeRoom, searchQuery]);
 
-  const menuActions: MenuAction[] = [
-    { label: 'Device' },
-    { label: 'Room' },
-  ];
+  const menuActions: MenuAction[] = [{ label: 'Device' }, { label: 'Room' }];
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F1F3EA]" edges={['top']}>
+    <SafeAreaView
+      className="flex-1 bg-[#F1F3EA]"
+      edges={['top']}
+      accessibilityLanguage="en-US"
+    >
       <StatusBar barStyle="dark-content" backgroundColor="#F2F5F0" />
 
       {/* Header */}
       <View className="items-center mt-2 mb-6">
         <Text
+          maxFontSizeMultiplier={1.2}
           className="text-3xl font-semibold text-[#354F52]"
           style={{ fontFamily: 'Nunito_600SemiBold' }}
+          accessibilityRole="header"
         >
           Rooms
         </Text>
       </View>
 
-      {/* Search Bar Funcional */}
+      {/* Search Bar */}
       <View className="px-5 mb-6">
         <View className="flex-row items-center justify-center border border-[#BDC7C2] rounded-full px-4 h-12 bg-transparent">
           <MaterialIcons
@@ -103,9 +143,14 @@ export default function Rooms() {
             size={24}
             color="#7A8C85"
             style={{ marginRight: 10 }}
+            accessible={false}
           />
           <TextInput
+            maxFontSizeMultiplier={1.2}
             placeholder="Search devices..."
+            accessibilityLabel="Search devices"
+            accessibilityRole="search"
+            accessibilityHint="Type to filter devices by name."
             placeholderTextColor="#7A8C85"
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -118,8 +163,19 @@ export default function Rooms() {
             autoCorrect={false}
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <MaterialIcons name="close" size={20} color="#7A8C85" />
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+              accessibilityHint="Clears the current search text."
+              hitSlop={10}
+            >
+              <MaterialIcons
+                name="close"
+                size={20}
+                color="#7A8C85"
+                accessible={false}
+              />
             </TouchableOpacity>
           )}
         </View>
@@ -163,23 +219,31 @@ export default function Rooms() {
         ListEmptyComponent={
           <View className="items-center mt-36 justify-center px-10">
             <MaterialCommunityIcons
-              name={searchQuery ? "selection-search" : "home-plus"}
+              name={searchQuery ? 'selection-search' : 'home-plus'}
               size={80}
               color="#354F52"
+              accessible={false}
             />
             <Text
+              maxFontSizeMultiplier={1.2}
               className="text-[#7A8C85] mt-5 text-lg text-center"
               style={{ fontFamily: 'Nunito_600SemiBold' }}
             >
-              {searchQuery 
+              {searchQuery
                 ? `No devices found for "${searchQuery}"`
-                : "Your devices will live here."}
+                : 'Your devices will live here.'}
             </Text>
           </View>
         }
       />
-      
-      <AddRoomDevice actions={menuActions} />
+
+      <AddRoomDevice
+        actions={menuActions.map((action) => ({
+          ...action,
+          onPress: () =>
+            Alert.alert('Coming Soon', `${action.label} creation coming soon!`),
+        }))}
+      />
     </SafeAreaView>
   );
 }

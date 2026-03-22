@@ -29,6 +29,8 @@ export const BaseCard = ({
 }: BaseCardProps) => {
   return (
     <View
+      accessible
+      accessibilityLabel={`Card: ${title}. Time: ${time}${room ? `, Room: ${room}` : ''}`}
       className="relative rounded-2xl overflow-hidden bg-gray-900 mb-4"
       style={{ width: width as any, aspectRatio: 1 }}
     >
@@ -38,9 +40,11 @@ export const BaseCard = ({
           style={StyleSheet.absoluteFill}
           resizeMode="cover"
           blurRadius={Platform.OS === 'ios' ? 70 : 50}
+          accessible={false}
         />
         <View className="absolute inset-0 " />
       </View>
+
       <MaskedView
         style={StyleSheet.absoluteFill}
         maskElement={
@@ -55,6 +59,7 @@ export const BaseCard = ({
           source={image}
           style={StyleSheet.absoluteFill}
           resizeMode="cover"
+          accessible={false}
         />
       </MaskedView>
 
@@ -64,8 +69,10 @@ export const BaseCard = ({
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
+
       <View className="absolute bottom-0 w-full p-4 z-30">
         <Text
+          maxFontSizeMultiplier={1.2}
           numberOfLines={2}
           className="text-white text-xl leading-tight mb-2"
           style={{
@@ -77,12 +84,11 @@ export const BaseCard = ({
 
         <View className="opacity-95">
           <View className="flex-row items-center mb-1">
-            <MaterialIcons name="access-time" size={16} color="white" />
+            <MaterialIcons name="access-time" size={16} color="white" accessible={false} />
             <Text
+              maxFontSizeMultiplier={1.2}
               className="text-white text-md ml-1.5"
-              style={{
-                fontFamily: 'Nunito_600SemiBold',
-              }}
+              style={{ fontFamily: 'Nunito_600SemiBold' }}
             >
               {time}
             </Text>
@@ -90,12 +96,11 @@ export const BaseCard = ({
 
           {room && (
             <View className="flex-row items-center">
-              <MaterialCommunityIcons name="door" size={18} color="white" />
+              <MaterialCommunityIcons name="door" size={18} color="white" accessible={false} />
               <Text
+                maxFontSizeMultiplier={1.2}
                 className="text-white text-md ml-1.5"
-                style={{
-                  fontFamily: 'Nunito_600SemiBold',
-                }}
+                style={{ fontFamily: 'Nunito_600SemiBold' }}
               >
                 {room}
               </Text>

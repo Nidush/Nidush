@@ -10,6 +10,7 @@ import { supabase, uploadImage } from '../utils/supabase';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -54,6 +55,10 @@ export default function NewActivityFlow() {
   const [activityName, setActivityName] = useState('');
   const [description, setDescription] = useState('');
   const [activityImage, setActivityImage] = useState<any>(null);
+
+  useEffect(() => {
+    AccessibilityInfo.announceForAccessibility(`Step ${step} of ${totalSteps}`);
+  }, [step]);
 
   useEffect(() => {
     const keyboardShowListener = Keyboard.addListener(
@@ -202,7 +207,16 @@ export default function NewActivityFlow() {
 
   return (
     <SafeAreaProvider>
-      <View style={{ flex: 1, backgroundColor: '#F9FAF7' }}>
+      <View
+        style={{ flex: 1, backgroundColor: '#F9FAF7' }}
+        accessibilityLanguage="en-US"
+      >
+        <Stack.Screen
+          options={{
+            title: `New Activity - Step ${step} of ${totalSteps}`,
+            headerShown: false,
+          }}
+        />
         <View style={{ height: insets.top, backgroundColor: '#F9FAF7' }} />
         <View className="px-5 pt-2">
           <FlowHeader
@@ -287,8 +301,14 @@ export default function NewActivityFlow() {
                 <TouchableOpacity
                   className="h-14 w-[210px] rounded-full justify-center items-center shadow-lg bg-[#548F53]"
                   onPress={step === 6 ? handleSave : nextStep}
+                  accessible={true}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    step === 6 ? 'Save activity' : 'Continue to next step'
+                  }
                 >
                   <Text
+                    maxFontSizeMultiplier={1.2}
                     className="text-white text-2xl"
                     style={{ fontFamily: 'Nunito_700Bold' }}
                   >

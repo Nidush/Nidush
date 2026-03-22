@@ -66,7 +66,9 @@ const VideoSlide = memo(({ videoSource, isActive, dims }: { videoSource: any; is
       player={player} 
       nativeControls={false} 
       contentFit="cover" 
-      style={{ width: dims.width, height: dims.height, position: 'absolute' }} 
+      style={{ width: dims.width, height: dims.height, position: 'absolute' }}
+      accessible={false}
+      importantForAccessibility="no-hide-descendants"
     />
   );
 });
@@ -85,7 +87,12 @@ const AnimatedIndicator = ({ index, currentIndex, duration, isPlaying }: any) =>
   }, [currentIndex, isPlaying, index, duration, widthAnim]); 
 
   return (
-    <View className="h-[5px] flex-1 mx-1 rounded-full bg-white/30 overflow-hidden">
+    <View
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={`Slide progress ${index + 1}`}
+      className="h-[5px] flex-1 mx-1 rounded-full bg-white/30 overflow-hidden"
+    >
       <Animated.View 
         className="h-full bg-[#78B478]" 
         style={{ width: widthAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }) }} 
@@ -164,37 +171,78 @@ export default function Onboarding() {
   if (!fontsLoaded) return null;
 
   const renderItem = ({ item, index }: any) => (
-    <View style={{ width: dims.width, height: dims.height }} className="bg-black relative overflow-hidden">
+    <View
+      accessible
+      accessibilityLabel={`Slide ${index + 1}. ${item.title}`}
+      style={{ width: dims.width, height: dims.height }}
+      className="bg-black relative overflow-hidden"
+    >
       {Math.abs(currentIndex - index) <= 1 && (
         <VideoSlide videoSource={item.video} isActive={currentIndex === index} dims={dims} />
       )}
       
       <View className="flex-1 bg-black/20">
-        <TouchableOpacity className="absolute left-0 top-0 bottom-0 w-1/4 z-10" onPress={goToPrev} activeOpacity={1} />
-        <TouchableOpacity className="absolute right-0 top-0 bottom-0 w-3/4 z-10" onPress={goToNext} activeOpacity={1} />
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Previous slide"
+          accessibilityHint="Navigates to the previous onboarding slide"
+          className="absolute left-0 top-0 bottom-0 w-1/4 z-10"
+          onPress={goToPrev}
+          activeOpacity={1}
+        />
+
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Next slide"
+          accessibilityHint="Navigates to the next onboarding slide"
+          className="absolute right-0 top-0 bottom-0 w-3/4 z-10"
+          onPress={goToNext}
+          activeOpacity={1}
+        />
         
         <SafeAreaView className="flex-1 z-20" edges={['top', 'bottom']} pointerEvents="box-none">
-          <View className="flex-1 w-full max-w-[1200px] mx-auto px-8 md:px-12" pointerEvents="box-none">
-            
-            <View className="flex-row justify-between items-center mt-6 md:mt-10 h-12" pointerEvents="box-none">
+          <View className="flex-1 w-full max-w-[1200px] mx-auto px-8 md:px-12">
+
+            <View className="flex-row justify-between items-center mt-6 md:mt-10 h-12">
+
               <Image 
                 source={require('../assets/images/Logo.png')} 
+                accessibilityLabel="Nidush logo"
+                accessible
                 style={{ width: dims.width > 768 ? 60 : 48, height: dims.width > 768 ? 60 : 48, tintColor: '#FFFFFF' }} 
                 resizeMode="contain" 
               />
-              <TouchableOpacity onPress={finishOnboarding} className="p-2">
-                <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-white text-lg md:text-xl opacity-80">Skip</Text>
+
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Skip onboarding"
+                accessibilityHint="Skips the introduction and goes to sign up"
+                onPress={finishOnboarding}
+                className="p-2"
+              >
+                <Text 
+                  maxFontSizeMultiplier={1.2}
+                  style={{ fontFamily: 'Nunito_600SemiBold' }} 
+                  className="text-white text-lg md:text-xl opacity-80"
+                >
+                  Skip
+                </Text>
               </TouchableOpacity>
             </View>
 
-            <View className="mt-auto mb-16 md:mb-24 self-start w-full max-w-[750px]" pointerEvents="none">
+            <View className="mt-auto mb-16 md:mb-24 self-start w-full max-w-[750px]">
               <Text 
+                maxFontSizeMultiplier={1.2}
+                accessibilityRole="header"
                 style={{ fontFamily: 'Nunito_700Bold' }} 
                 className="text-white text-[34px] md:text-7xl leading-[42px] md:leading-[80px] mb-6"
               >
                 {item.title}
               </Text>
+
               <Text 
+                maxFontSizeMultiplier={1.2}
+                accessibilityLabel={item.description}
                 style={{ fontFamily: 'Nunito_400Regular' }} 
                 className="text-white text-[18px] md:text-2xl leading-7 md:leading-9 opacity-90 pr-10"
               >
@@ -202,16 +250,26 @@ export default function Onboarding() {
               </Text>
             </View>
 
-            <View className={`${item.isLast ? 'h-32 md:h-48' : 'h-10'} justify-center items-center`} pointerEvents="box-none">
+            <View className={`${item.isLast ? 'h-32 md:h-48' : 'h-10'} justify-center items-center`}>
               {item.isLast && (
                 <TouchableOpacity 
+                  accessibilityRole="button"
+                  accessibilityLabel="Begin your journey"
+                  accessibilityHint="Finishes onboarding and goes to sign up"
                   onPress={finishOnboarding} 
                   className="bg-[#589158] px-14 py-5 rounded-full items-center mb-12 shadow-lg active:scale-95"
                 >
-                  <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-white text-xl md:text-2xl">Begin Journey</Text>
+                  <Text 
+                    maxFontSizeMultiplier={1.2}
+                    style={{ fontFamily: 'Nunito_700Bold' }} 
+                    className="text-white text-xl md:text-2xl"
+                  >
+                    Begin Journey
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
+
           </View>
         </SafeAreaView>
       </View>
@@ -223,33 +281,62 @@ export default function Onboarding() {
       <StatusBar style="light" />
       
       {showWelcome ? (
-        <View style={{ width: dims.width, height: dims.height }}>
+        <View style={{ width: dims.width, height: dims.height }} accessible accessibilityLabel="Welcome to Nidush">
           <VideoSlide videoSource={WELCOME_VIDEO} isActive={true} dims={dims} />
+
           <View className="flex-1 bg-black/10 justify-end items-center pb-24">
             <SafeAreaView className="items-center w-full px-6 max-w-[1000px]">
+
               <Image 
                 source={require('../assets/images/Logo.png')} 
-                style={{ 
-                  width: dims.width > 768 ? 280 : 220, 
-                  height: dims.width > 768 ? 280 : 220, 
-                  marginBottom: 30 
-                }} 
+                accessibilityLabel="Nidush logo"
+                accessible
+                style={{ width: dims.width > 768 ? 280 : 220, height: dims.width > 768 ? 280 : 220, marginBottom: 30 }} 
                 resizeMode="contain" 
               />
-              <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-5xl md:text-8xl text-white text-center">Welcome to Nidush</Text>
-              <Text style={{ fontFamily: 'Nunito_400Regular' }} className="text-xl md:text-3xl text-white mt-4 text-center opacity-80">Your safe space starts here.</Text>
+
+              <Text 
+                maxFontSizeMultiplier={1.2}
+                accessibilityRole="header" 
+                style={{ fontFamily: 'Nunito_700Bold' }} 
+                className="text-5xl md:text-8xl text-white text-center"
+              >
+                Welcome to Nidush
+              </Text>
+
+              <Text 
+                maxFontSizeMultiplier={1.2}
+                style={{ fontFamily: 'Nunito_400Regular' }} 
+                className="text-xl md:text-3xl text-white mt-4 text-center opacity-80"
+              >
+                Your safe space starts here.
+              </Text>
+
               <TouchableOpacity 
+                accessibilityRole="button"
+                accessibilityLabel="Discover Nidush"
+                accessibilityHint="Starts the onboarding slides"
                 className="bg-[#589158] px-16 py-5 rounded-full mt-16 shadow-md items-center active:scale-95" 
                 onPress={handleDiscover}
               >
-                <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-white text-xl md:text-2xl">Discover</Text>
+                <Text 
+                  maxFontSizeMultiplier={1.2}
+                  style={{ fontFamily: 'Nunito_700Bold' }} 
+                  className="text-white text-xl md:text-2xl"
+                >
+                  Discover
+                </Text>
               </TouchableOpacity>
+
             </SafeAreaView>
           </View>
         </View>
       ) : (
         <View className="flex-1">
+
           <FlatList
+            accessibilityRole="adjustable"
+            accessibilityLabel="Onboarding slides"
             key={`list-${dims.width}`} 
             ref={scrollRef}
             data={SLIDES}
@@ -260,6 +347,7 @@ export default function Onboarding() {
             showsHorizontalScrollIndicator={false}
             getItemLayout={(_, index) => ({ length: dims.width, offset: dims.width * index, index })}
           />
+
           <View className="absolute bottom-[8%] md:bottom-[6%] w-full z-50 pointer-events-none">
             <View className="flex-row w-full max-w-[1200px] mx-auto px-10 md:px-12">
               {SLIDES.map((_, index) => (
@@ -273,6 +361,7 @@ export default function Onboarding() {
               ))}
             </View>
           </View>
+
         </View>
       )}
     </Animated.View>

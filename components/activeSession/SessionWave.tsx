@@ -96,7 +96,11 @@ export const SessionWave = () => {
   const wavePathFront = getWavePath(25, 110);
 
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      importantForAccessibility="no-hide-descendants" // Diz ao Android (TalkBack) para ignorar os filhos
+      accessibilityElementsHidden={true}
+    >
       <View style={styles.waveContainer}>
         {/* Onda de trás */}
         <Animated.View style={[styles.waveWrapper, animatedStyle1]}>

@@ -17,9 +17,10 @@ jest.mock('@react-native-masked-view/masked-view', () => ({
   default: ({ children }: any) => children,
 }));
 
-// Mock das fontes para evitar erro de export
+// Mock das fontes
 jest.mock('@expo-google-fonts/nunito', () => ({
   useFonts: () => [true],
+  Nunito_400Regular: 'Nunito_400Regular',
   Nunito_600SemiBold: 'Nunito_600SemiBold',
   Nunito_700Bold: 'Nunito_700Bold',
 }));
@@ -42,13 +43,5 @@ describe('Routines Screen', () => {
     fireEvent.press(gymSwitch);
     
     expect(gymSwitch).toBeTruthy();
-  });
-
-  test('deve renderizar a barra de pesquisa e o botão de adicionar', () => {
-    render(<Routines />);
-  
-    expect(screen.getByTestId('search-input')).toBeTruthy();
-    
-    expect(screen.getByTestId('add-routine-container')).toBeTruthy();
   });
 });

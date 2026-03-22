@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, View } from 'react-native';
 import {
   useSharedValue,
   withRepeat,
@@ -170,6 +170,16 @@ export default function ActiveSession() {
   }, [currentStepIndex, sessionData, contentOpacity]);
 
   useEffect(() => {
+    if (sessionData && currentStepIndex > 0 && !isVideoSession) {
+      const currentInstruction =
+        sessionData.instructions[currentStepIndex].text;
+      AccessibilityInfo.announceForAccessibility(
+        `Next step: ${currentInstruction}`,
+      );
+    }
+  }, [currentStepIndex, sessionData, isVideoSession]);
+
+  useEffect(() => {
     if (isVideoSession) return;
     let interval: any = null;
     const currentStep = sessionData?.instructions[currentStepIndex];
@@ -224,7 +234,11 @@ export default function ActiveSession() {
   if (loading || !sessionData) {
     return (
       <View className="flex-1 justify-center items-center bg-[#F1F4EE]">
-        <ActivityIndicator size="large" color="#5E8C5D" />
+        <ActivityIndicator
+          size="large"
+          color="#5E8C5D"
+          accessibilityLabel="Loading session data"
+        />
       </View>
     );
   }
@@ -236,7 +250,13 @@ export default function ActiveSession() {
   const isLastStep = currentStepIndex === sessionData.instructions.length - 1;
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F1F4EE]">
+    <SafeAreaView className="flex-1 bg-[#F1F4EE]" accessibilityLanguage="en-US">
+      <Stack.Screen
+        options={{
+          title: `Active Session: ${sessionData.title}`,
+          headerShown: false,
+        }}
+      />
       <ExitModal
         visible={showExitModal}
         onResume={handleResume}
