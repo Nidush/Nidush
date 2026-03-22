@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '@/utils/supabase';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, View } from 'react-native';
@@ -71,6 +72,30 @@ export default function ActiveSession() {
       }
       if (!foundItem) foundItem = SCENARIOS.find((s) => s.id === id);
 
+      // Se não encontrou localmente, tentar no Supabase (atividades criadas pelo user)
+      if (!foundItem) {
+        const { data, error } = await supabase
+          .from('activity')
+          .select('*')
+          .eq('idactivity', id)
+          .single();
+
+        if (data && !error) {
+          foundItem = {
+            id: data.idactivity.toString(),
+            title: data.title,
+            description: data.description,
+            room: data.room,
+            image: data.image,
+            category: data.category,
+            type: data.type,
+            contentId: data.contentid,
+            scenarioId: data.scenarioid,
+            shortcuts: data.shortcuts === true || data.shortcuts === 'true',
+          } as Activity;
+        }
+      }
+
       if (!foundItem) {
         console.error('Item not found:', id);
         router.replace('/Activities');
@@ -82,14 +107,40 @@ export default function ActiveSession() {
       let contentType: 'audio' | 'video' | 'mixed' = 'audio';
       let videoUrl: string | undefined = undefined;
 
-      if ('contentId' in foundItem && foundItem.contentId) {
-        const content = CONTENTS[foundItem.contentId];
-        if (content) {
-          rawInstructions = content.instructions || [];
-          playlistName = content.title;
-          if (content.type === 'video') {
+      if (foundItem) {
+        console.log('Found Item:', foundItem);
+      }
+
+      if (foundItem && 'contentId' in foundItem && foundItem.contentId) {
+        console.log('Fetching content for ID:', foundItem.contentId);
+        // Fetch content from Supabase
+        const { data: contentRows, error: contentError } = await supabase
+          .from('content')
+          .select('*')
+          .eq('idcontent', foundItem.contentId)
+          .limit(1);
+
+        const contentData =
+          contentRows && contentRows.length > 0 ? contentRows[0] : null;
+        console.log('Content Data from DB:', contentData);
+
+        if (contentData && !contentError) {
+          rawInstructions = contentData.instructions || [];
+          playlistName = contentData.title;
+          if (contentData.type === 'video') {
             contentType = 'video';
-            videoUrl = (content as any).videoUrl;
+            videoUrl = contentData.video_url;
+          }
+        } else {
+          // Fallback to local CONTENTS
+          const content = CONTENTS[foundItem.contentId];
+          if (content) {
+            rawInstructions = content.instructions || [];
+            playlistName = content.title;
+            if (content.type === 'video') {
+              contentType = 'video';
+              videoUrl = content.videoUrl;
+            }
           }
         }
       }
@@ -110,13 +161,21 @@ export default function ActiveSession() {
         return step;
       });
 
+      if (formattedInstructions.length === 0) {
+        formattedInstructions.push({
+          text: foundItem.description || 'Enjoy your session',
+          duration: undefined,
+          description: undefined,
+        });
+      }
+
       setSessionData({
-        title: foundItem.title,
+        title: foundItem.title || 'Session',
         room: foundItem.room || 'Living Room',
         playlistName: playlistName,
         image: foundItem.image,
         instructions: formattedInstructions,
-        type: contentType,
+        type: contentType === 'video' ? 'mixed' : contentType, // Force 'mixed' to show visuals even for video types
         videoUrl: videoUrl,
       });
 
@@ -245,7 +304,7 @@ export default function ActiveSession() {
 
   const currentStep = sessionData.instructions[currentStepIndex];
 
-  if (!currentStep) return null;
+  if (!currentStep && !isVideoSession) return null;
 
   const isLastStep = currentStepIndex === sessionData.instructions.length - 1;
 

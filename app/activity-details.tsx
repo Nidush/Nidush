@@ -110,8 +110,31 @@ export default function ActivityDetails() {
           if (scen) setFocusEnabled(scen.focusMode);
         }
         if (foundActivity.contentId) {
-          const cont = CONTENTS[foundActivity.contentId];
-          setRelatedContent(cont || null);
+          const { data: contentRows, error: contentError } = await supabase
+            .from('content')
+            .select('*')
+            .eq('idcontent', foundActivity.contentId)
+            .limit(1);
+
+          if (contentRows && contentRows.length > 0 && !contentError) {
+            const contentData = contentRows[0];
+            setRelatedContent({
+              id: contentData.idcontent,
+              title: contentData.title,
+              type: contentData.type,
+              category: contentData.category,
+              description: contentData.description,
+              duration: contentData.duration,
+              image: contentData.image,
+              instructions: contentData.instructions,
+              ingredients: contentData.ingredients,
+              videoUrl: contentData.video_url,
+              author: contentData.author,
+            } as Content);
+          } else {
+            const cont = CONTENTS[foundActivity.contentId];
+            setRelatedContent(cont || null);
+          }
         }
       } else {
         const foundScenario = SCENARIOS.find((s) => s.id === id);

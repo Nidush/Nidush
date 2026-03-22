@@ -1,4 +1,4 @@
-import { CONTENTS, SCENARIOS } from '@/constants/data';
+import { Content, CONTENTS, SCENARIOS } from '@/constants/data';
 import { Activity } from '@/constants/data/types';
 import {
   Nunito_400Regular,
@@ -8,7 +8,7 @@ import {
 } from '@expo-google-fonts/nunito';
 import { supabase, uploadImage } from '../utils/supabase';
 import { router, Stack } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Keyboard,
@@ -55,6 +55,42 @@ export default function NewActivityFlow() {
   const [activityName, setActivityName] = useState('');
   const [description, setDescription] = useState('');
   const [activityImage, setActivityImage] = useState<any>(null);
+  const [dbContent, setDbContent] = useState<Content[]>([]);
+
+  useEffect(() => {
+    const fetchContent = async () => {
+      const { data, error } = await supabase
+        .from('content')
+        .select('*');
+      
+      if (data && !error) {
+        setDbContent(data.map((c: any) => ({
+          id: c.idcontent,
+          title: c.title,
+          type: c.type,
+          category: c.category,
+          description: c.description,
+          duration: c.duration,
+          image: c.image,
+          instructions: c.instructions,
+          ingredients: c.ingredients,
+          videoUrl: c.video_url,
+          author: c.author,
+        })));
+      }
+    };
+    fetchContent();
+  }, []);
+
+  const allContent = useMemo(() => {
+    const combined = [...dbContent];
+    Object.values(CONTENTS).forEach((local: Content) => {
+      if (!combined.find((db: Content) => db.id === local.id)) {
+        combined.push(local);
+      }
+    });
+    return combined;
+  }, [dbContent]);
 
   useEffect(() => {
     AccessibilityInfo.announceForAccessibility(`Step ${step} of ${totalSteps}`);
@@ -85,7 +121,7 @@ export default function NewActivityFlow() {
 
   const handleContentSelect = (id: string) => {
     setSelectedContentId(id);
-    const content = Object.values(CONTENTS).find((c) => c.id === id);
+    const content = allContent.find((c) => c.id === id);
     if (content) {
       setActivityName(content.title);
       setDescription(content.description || '');
@@ -122,7 +158,7 @@ export default function NewActivityFlow() {
   };
 
   const handleSave = async () => {
-    const contentObj = Object.values(CONTENTS).find(
+    const contentObj = allContent.find(
       (c) => c.id === selectedContentId,
     );
 
@@ -200,7 +236,7 @@ export default function NewActivityFlow() {
 
   if (!fontsLoaded) return null;
 
-  const reviewContent = Object.values(CONTENTS).find(
+  const reviewContent = allContent.find(
     (c) => c.id === selectedContentId,
   );
   const reviewScenario = SCENARIOS.find((s) => s.id === selectedScenarioId);
@@ -252,6 +288,7 @@ export default function NewActivityFlow() {
                   activityType={activityType}
                   selectedContentId={selectedContentId}
                   onSelect={handleContentSelect}
+                  contentList={allContent}
                 />
               )}
               {step === 3 && <Step3_Room selected={room} onSelect={setRoom} />}
