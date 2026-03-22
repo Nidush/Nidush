@@ -1,14 +1,21 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Image, Animated, Dimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Animated,
+  Dimensions,
+  Image,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
-  useFonts,
   Nunito_400Regular,
   Nunito_600SemiBold,
   Nunito_700Bold,
+  useFonts,
 } from '@expo-google-fonts/nunito';
 
 interface WelcomeUserProps {
@@ -20,14 +27,14 @@ const BACKGROUND_VIDEO = require('../../assets/videos/nidush_video7.mp4');
 
 const WelcomeUser: React.FC<WelcomeUserProps> = ({ userName, onFinish }) => {
   const [fontsLoaded] = useFonts({
-    'Nunito_400Regular': Nunito_400Regular,
-    'Nunito_600SemiBold': Nunito_600SemiBold,
-    'Nunito_700Bold': Nunito_700Bold,
+    Nunito_400Regular: Nunito_400Regular,
+    Nunito_600SemiBold: Nunito_600SemiBold,
+    Nunito_700Bold: Nunito_700Bold,
   });
 
-  const [dims, setDims] = useState(Dimensions.get('window'));
+  const [dims, setDims] = useState(Dimensions.get('screen'));
   const textFade = useRef(new Animated.Value(0)).current;
-  const screenFade = useRef(new Animated.Value(0)).current; 
+  const screenFade = useRef(new Animated.Value(0)).current;
   const [currentStep, setCurrentStep] = useState(0);
 
   const isWebPC = dims.width > 768;
@@ -39,13 +46,15 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ userName, onFinish }) => {
   ];
 
   useEffect(() => {
-    const sub = Dimensions.addEventListener('change', ({ window }) => setDims(window));
+    const sub = Dimensions.addEventListener('change', ({ screen }) =>
+      setDims(screen),
+    );
     return () => sub.remove();
   }, []);
 
   const player = useVideoPlayer(BACKGROUND_VIDEO, (p) => {
     p.loop = true;
-    p.muted = true; 
+    p.muted = true;
     p.playbackRate = 0.6;
   });
 
@@ -73,84 +82,102 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ userName, onFinish }) => {
         }).start(() => onFinish());
         return;
       }
-      
+
       setCurrentStep(step);
 
       Animated.sequence([
-        Animated.timing(textFade, { toValue: 1, duration: 1200, useNativeDriver: true }),
+        Animated.timing(textFade, {
+          toValue: 1,
+          duration: 1200,
+          useNativeDriver: true,
+        }),
         Animated.delay(1800),
-        Animated.timing(textFade, { toValue: 0, duration: 1000, useNativeDriver: true }),
+        Animated.timing(textFade, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
       ]).start(() => {
         animateText(step + 1);
       });
     };
 
     animateText(0);
-
-  }, [onFinish, screenFade, textFade, phrases.length, fontsLoaded]); 
+  }, [onFinish, screenFade, textFade, phrases.length, fontsLoaded]);
 
   if (!fontsLoaded) return null;
 
   return (
-    <Animated.View 
+    <Animated.View
       style={{ flex: 1, backgroundColor: 'black', opacity: screenFade }}
       accessible
       accessibilityLabel="Welcome screen"
     >
       <StatusBar style="light" />
-      
+
       {/* Vídeo de fundo */}
-      <View style={{ width: dims.width, height: dims.height, position: 'absolute' }} accessible={false} importantForAccessibility="no-hide-descendants">
+      <View
+        style={StyleSheet.absoluteFill}
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
+      >
         <VideoView
           player={player}
           nativeControls={false}
           contentFit="cover"
-          style={{ width: '100%', height: '100%' }}
+          style={StyleSheet.absoluteFill} // <- Usamos o absoluteFill também diretamente no vídeo!
         />
       </View>
-      
-      <View 
+
+      <View
         className="flex-1 bg-black/40 justify-center items-center px-10"
         style={{ zIndex: 2 }}
         accessible={true}
       >
-        <SafeAreaView className="items-center w-full flex-1 justify-center" edges={['top']}>
-          
+        <SafeAreaView
+          className="items-center w-full flex-1 justify-center"
+          edges={['top']}
+        >
           {/* Logo */}
-          <View 
-            style={{ position: 'absolute', top: isWebPC ? 60 : 40 }} 
+          <View
+            style={{ position: 'absolute', top: isWebPC ? 60 : 40 }}
             className="items-center w-full"
             accessible
             accessibilityLabel="Nidush logo"
           >
             <Image
               source={require('../../assets/images/Logo.png')}
-              style={{ 
-                width: isWebPC ? 80 : 50, 
-                height: isWebPC ? 80 : 50, 
-                tintColor: '#FFFFFF' 
+              style={{
+                width: isWebPC ? 80 : 50,
+                height: isWebPC ? 80 : 50,
+                tintColor: '#FFFFFF',
               }}
               resizeMode="contain"
             />
           </View>
 
           {/* Texto animado */}
-          <Animated.View 
-            style={{ 
-              opacity: textFade, 
+          <Animated.View
+            style={{
+              opacity: textFade,
               maxWidth: isWebPC ? 900 : 400,
-              transform: [{ 
-                scale: textFade.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] }) 
-              }] 
+              transform: [
+                {
+                  scale: textFade.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.95, 1],
+                  }),
+                },
+              ],
             }}
             accessible
             accessibilityRole="header"
             accessibilityLiveRegion="polite"
           >
-            <Text 
+            <Text
               maxFontSizeMultiplier={1.2}
-              style={{ 
-                fontFamily: 'Nunito_700Bold', 
+              style={{
+                fontFamily: 'Nunito_700Bold',
                 fontSize: isWebPC ? 80 : 40,
                 lineHeight: isWebPC ? 90 : 48,
                 color: '#FFFFFF',
@@ -160,7 +187,6 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ userName, onFinish }) => {
               {phrases[currentStep]}
             </Text>
           </Animated.View>
-          
         </SafeAreaView>
       </View>
     </Animated.View>

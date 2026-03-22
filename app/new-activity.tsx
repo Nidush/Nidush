@@ -289,7 +289,8 @@ export default function NewActivityFlow() {
               )}
             </ScrollView>
 
-            {!isKeyboardVisible && !isNextDisabled() && (
+            {/* Mantemos apenas a verificação do teclado para não o esconder */}
+            {!isKeyboardVisible && (
               <View
                 className="absolute left-0 right-0 items-center bg-transparent pointer-events-box-none"
                 style={{
@@ -299,12 +300,26 @@ export default function NewActivityFlow() {
                 }}
               >
                 <TouchableOpacity
-                  className="h-14 w-[210px] rounded-full justify-center items-center shadow-lg bg-[#548F53]"
+                  // Se estiver desativado, fica cinzento/translúcido e sem sombra
+                  className={`h-14 w-[210px] rounded-full justify-center items-center transition-all ${
+                    isNextDisabled()
+                      ? 'bg-gray-400 opacity-60 shadow-none'
+                      : 'bg-[#548F53] shadow-lg'
+                  }`}
                   onPress={step === 6 ? handleSave : nextStep}
+                  disabled={isNextDisabled()} // Impede o clique físico
                   accessible={true}
                   accessibilityRole="button"
+                  // Informa o leitor de ecrã (VoiceOver/TalkBack) que o botão está inativo
+                  accessibilityState={{ disabled: isNextDisabled() }}
                   accessibilityLabel={
                     step === 6 ? 'Save activity' : 'Continue to next step'
+                  }
+                  // Uma dica extra para utilizadores com leitores de ecrã saberem o que falta fazer
+                  accessibilityHint={
+                    isNextDisabled()
+                      ? 'Please complete all required fields on this step to enable this button.'
+                      : 'Double tap to proceed.'
                   }
                 >
                   <Text

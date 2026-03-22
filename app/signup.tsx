@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
@@ -32,9 +33,9 @@ import WelcomeUser from '../components/Onboarding/WelcomeUser';
 
 export default function SignUp() {
   const [fontsLoaded] = useFonts({
-    'Nunito_400Regular': Nunito_400Regular,
-    'Nunito_600SemiBold': Nunito_600SemiBold,
-    'Nunito_700Bold': Nunito_700Bold,
+    Nunito_400Regular: Nunito_400Regular,
+    Nunito_600SemiBold: Nunito_600SemiBold,
+    Nunito_700Bold: Nunito_700Bold,
   });
 
   const router = useRouter();
@@ -51,7 +52,9 @@ export default function SignUp() {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    const sub = Dimensions.addEventListener('change', ({ window }) => setDims(window));
+    const sub = Dimensions.addEventListener('change', ({ window }) =>
+      setDims(window),
+    );
     return () => sub.remove();
   }, []);
 
@@ -103,6 +106,45 @@ export default function SignUp() {
 
   const isWebPC = dims.width > 768;
 
+  // --- Navegação Onboarding ---
+  if (currentStep === 'welcome')
+    return <WelcomeUser onFinish={() => transitionTo('house')} />;
+  if (currentStep === 'house')
+    return (
+      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+        <HouseName onNext={() => transitionTo('wearable')} />
+      </Animated.View>
+    );
+  if (currentStep === 'wearable')
+    return (
+      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+        <WearableSync
+          onNext={() => transitionTo('activities')}
+          onSkip={() => transitionTo('activities')}
+        />
+      </Animated.View>
+    );
+  if (currentStep === 'activities')
+    return (
+      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+        <ActivitySelection onFinish={() => transitionTo('loading')} />
+      </Animated.View>
+    );
+  if (currentStep === 'loading')
+    return (
+      <FinalLoading
+        onComplete={async () => {
+          try {
+            // Gravamos aqui que o Onboarding (incluindo setup) foi concluído
+            await AsyncStorage.setItem('@viewedOnboarding', 'true');
+            router.replace('/(tabs)');
+          } catch (e) {
+            console.log('Error saving onboarding state', e);
+            router.replace('/(tabs)');
+          }
+        }}
+      />
+    );
   // --- Navegação ---
   if (currentStep === 'welcome') return <WelcomeUser userName={firstName} onFinish={() => transitionTo('house')} />;
   if (currentStep === 'house') return <Animated.View style={{ flex: 1, opacity: fadeAnim }}><HouseName onNext={() => transitionTo('wearable')} /></Animated.View>;
@@ -141,13 +183,17 @@ export default function SignUp() {
             keyboardShouldPersistTaps="handled"
           >
             <SafeAreaView className="flex-1">
-
               <View
                 style={{ maxWidth: 600, width: '100%', alignSelf: 'center' }}
                 className="px-[28px] flex-1"
               >
-
-                <View className={`items-center ${isWebPC ? 'mt-[30px] mb-[10px]' : 'mt-[15px]'} h-[60px] justify-center`}>
+                {/* Logo */}
+                <View
+                  className={`items-center ${isWebPC ? 'mt-[30px] mb-[10px]' : 'mt-[15px]'} h-[60px] justify-center`}
+                  accessible
+                  accessibilityRole="image"
+                  accessibilityLabel="Nidush logo"
+                >
                   <Image
                     source={require('../assets/images/Logo.png')}
                     style={{
@@ -159,7 +205,6 @@ export default function SignUp() {
                 </View>
 
                 <View className={isWebPC ? 'mt-[10px]' : 'mt-[25px]'}>
-
                   <Text
                     style={{ fontFamily: 'Nunito_700Bold' }}
                     className="text-[40px] text-[#3E545C]"
@@ -251,7 +296,6 @@ export default function SignUp() {
                       <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-[#5C8D58] text-[15px]">Login</Text>
                     </TouchableOpacity>
                   </View>
-
                 </View>
               </View>
             </SafeAreaView>

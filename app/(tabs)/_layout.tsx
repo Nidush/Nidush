@@ -1,12 +1,21 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Platform, Image, Text } from 'react-native';
-import { Icons } from '../../assets/assets';
+import { Image, Text } from 'react-native'; // <-- Já não precisas do Platform aqui
+import { useSafeAreaInsets } from 'react-native-safe-area-context'; // <-- 1. Importar o hook
 
+import { Icons } from '../../assets/assets';
 import LogoIcon from '../../assets/images/Logo.png';
 
 export default function TabLayout() {
-  const TabLabel = ({ children, color }: { children: string; color: string }) => (
+  const insets = useSafeAreaInsets(); // <-- 2. Obter as medidas de segurança do ecrã
+
+  const TabLabel = ({
+    children,
+    color,
+  }: {
+    children: string;
+    color: string;
+  }) => (
     <Text
       maxFontSizeMultiplier={1.2}
       style={{
@@ -29,9 +38,11 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: '#F0F2EB',
           borderTopWidth: 0,
-          height: 80, 
-          paddingBottom: Platform.OS === 'ios' ? 30 : 15,
-          paddingTop: 10, 
+          // 3. Altura dinâmica: 60px de base + o tamanho exato da barra de sistema
+          height: 60 + insets.bottom,
+          // 4. Padding dinâmico: 10px de base para o texto respirar + barra de sistema
+          paddingBottom: 10 + insets.bottom,
+          paddingTop: 10,
         },
       }}
     >
@@ -54,16 +65,24 @@ export default function TabLayout() {
       <Tabs.Screen
         name="Activities"
         options={{
-          tabBarLabel: ({ color }) => <TabLabel color={color}>Activities</TabLabel>,
-          tabBarIcon: ({ color }) => <Icons.SpaIcon width={26} height={26} fill={color} />,
+          tabBarLabel: ({ color }) => (
+            <TabLabel color={color}>Activities</TabLabel>
+          ),
+          tabBarIcon: ({ color }) => (
+            <Icons.SpaIcon width={26} height={26} fill={color} />
+          ),
         }}
       />
 
       <Tabs.Screen
         name="Routines"
         options={{
-          tabBarLabel: ({ color }) => <TabLabel color={color}>Routines</TabLabel>,
-          tabBarIcon: ({ color }) => <Icons.RoutineIcon width={26} height={26} fill={color} />,
+          tabBarLabel: ({ color }) => (
+            <TabLabel color={color}>Routines</TabLabel>
+          ),
+          tabBarIcon: ({ color }) => (
+            <Icons.RoutineIcon width={26} height={26} fill={color} />
+          ),
         }}
       />
 
@@ -71,7 +90,9 @@ export default function TabLayout() {
         name="Rooms"
         options={{
           tabBarLabel: ({ color }) => <TabLabel color={color}>Rooms</TabLabel>,
-          tabBarIcon: ({ color }) => <Icons.RoomsIcon width={26} height={26} fill={color} />,
+          tabBarIcon: ({ color }) => (
+            <Icons.RoomsIcon width={26} height={26} fill={color} />
+          ),
         }}
       />
     </Tabs>
