@@ -19,12 +19,13 @@ import {
 } from '@expo-google-fonts/nunito';
 
 interface WelcomeUserProps {
+  userName?: string;
   onFinish: () => void;
 }
 
 const BACKGROUND_VIDEO = require('../../assets/videos/nidush_video7.mp4');
 
-const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
+const WelcomeUser: React.FC<WelcomeUserProps> = ({ userName, onFinish }) => {
   const [fontsLoaded] = useFonts({
     Nunito_400Regular: Nunito_400Regular,
     Nunito_600SemiBold: Nunito_600SemiBold,
@@ -39,9 +40,9 @@ const WelcomeUser: React.FC<WelcomeUserProps> = ({ onFinish }) => {
   const isWebPC = dims.width > 768;
 
   const phrases = [
-    'Welcome home, Laura',
-    'Take a deep breath.',
-    "Let's continue your journey",
+    `Welcome home, ${userName || 'User'}`,
+    "Take a deep breath.",
+    "Let's continue your journey"
   ];
 
   useEffect(() => {

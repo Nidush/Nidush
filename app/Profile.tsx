@@ -1,8 +1,9 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { supabase } from '../utils/supabase';
 
 import {
   Nunito_400Regular,
@@ -13,6 +14,33 @@ import {
 
 export default function Profile() {
   const router = useRouter();
+  const [userName, setUserName] = useState('A carregar...');
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const first = user.user_metadata?.first_name || '';
+        const last = user.user_metadata?.last_name || '';
+        
+        if (first || last) {
+          setUserName(`${first} ${last}`.trim());
+        } else if (user.email) {
+          setUserName(user.email.split('@')[0]);
+        } else {
+          setUserName('Utilizador');
+        }
+      } else {
+        setUserName('Visitante');
+      }
+    };
+    fetchUser();
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.replace('/login');
+  };
 
   const [fontsLoaded] = useFonts({
     Nunito_400Regular,
@@ -71,7 +99,7 @@ export default function Profile() {
             style={{ fontFamily: 'Nunito_700Bold' }}
             accessibilityRole="header"
           >
-            Laura Rossi
+            {userName}
           </Text>
         </View>
 
@@ -204,7 +232,7 @@ export default function Profile() {
         <View className="items-center">
           <TouchableOpacity
             className="bg-[#5B8C51] px-12 py-3.5 rounded-full shadow-sm"
-            onPress={() => router.replace('/profile-selection')}
+            onPress={handleLogout}
             testID="logout-button"
             accessible
             accessibilityRole="button"

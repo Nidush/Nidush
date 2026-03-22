@@ -4,16 +4,9 @@ import {
   Nunito_700Bold,
   useFonts,
 } from '@expo-google-fonts/nunito';
-import { router, Stack } from 'expo-router';
-import React, { useMemo } from 'react';
-import {
-  Alert,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
+import { Stack, router, useFocusEffect } from 'expo-router';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import { Alert, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { UnifiedCard } from '@/components/activitiesScenarios/UnifiedCard';
@@ -21,10 +14,10 @@ import { CarouselSection } from '../../components/activitiesScenarios/CarouselSe
 import { HomeHeader } from '../../components/Homepage/HomeHeader';
 import { StateWidget } from '../../components/Homepage/StateWidget';
 
-// 1. IMPORTAR TUDO O QUE PRECISAS DOS DADOS
-import { ACTIVITIES, CONTENTS, SCENARIOS } from '@/constants/data';
+import { ACTIVITIES, CONTENTS, SCENARIOS, Activity } from '@/constants/data';
 import { useBiometrics } from '@/context/BiometricsContext';
 import { getDynamicRecommendations } from '@/utils/recommendationEngine';
+import { supabase } from '@/utils/supabase';
 
 export default function Index() {
   const [fontsLoaded] = useFonts({
@@ -34,6 +27,62 @@ export default function Index() {
   });
 
   const { currentState } = useBiometrics();
+  const [userName, setUserName] = useState('...');
+  const [myActivities, setMyActivities] = useState<Activity[]>([]);
+
+  // O userName deve ser atualizado quando ganhamos foco também
+  const fetchUserName = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'Utilizador');
+    } else {
+      setUserName('Visitante');
+    }
+  };
+
+  useEffect(() => {
+    fetchUserName();
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      const loadActivities = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setMyActivities([]); // Importante: Limpar se não houver user
+          setUserName('Visitante');
+          return;
+        }
+
+        // Atualizar o nome também por precaução
+        setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'Utilizador');
+        
+        const { data, error } = await supabase
+          .from('activity')
+          .select('*')
+          .eq('user_iduser', user.id);
+          
+        if (!error && data) {
+          const mapped = data.map(d => ({
+            id: d.idactivity,
+            title: d.title,
+            description: d.description,
+            room: d.room,
+            image: d.image,
+            category: d.category,
+            type: d.type,
+            contentId: d.contentid,
+            scenarioId: d.scenarioid,
+            shortcuts: d.shortcuts === true || d.shortcuts === 'true',
+          }));
+          setMyActivities(mapped as any);
+        } else {
+          setMyActivities([]);
+        }
+      };
+      loadActivities();
+    }, [])
+  );
 
   // --- LÓGICA DO CARROSSEL (Recomendações) ---
   const dynamicActivities = useMemo(() => {
@@ -61,8 +110,10 @@ export default function Index() {
 
   // --- NOVA LÓGICA DOS SHORTCUTS (USANDO 'shortcuts' NO PLURAL) ---
   const shortcuts = useMemo(() => {
+    const allActivities = [...ACTIVITIES, ...myActivities];
+
     // 1. Filtrar ATIVIDADES onde shortcuts === true
-    const favActivities = ACTIVITIES.filter(
+    const favActivities = allActivities.filter(
       (a: any) => a.shortcuts === true,
     ).map((item) => {
       // Tentar encontrar a duração no CONTENTS
@@ -98,7 +149,7 @@ export default function Index() {
 
     // 3. Juntar as duas listas
     return [...favActivities, ...favScenarios];
-  }, []); // Dependência vazia (calcula apenas ao montar o componente)
+  }, [myActivities]); // Agora depende das myActivities vindas no Supabase
 
   if (!fontsLoaded) return null;
 
@@ -120,7 +171,7 @@ export default function Index() {
         contentContainerStyle={{ paddingBottom: 40 }}
         style={{ paddingTop: Platform.OS === 'android' ? 20 : 0 }}
       >
-        <HomeHeader userName="Laura" />
+        <HomeHeader userName={userName} />
 
         <StateWidget />
 
