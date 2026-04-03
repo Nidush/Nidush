@@ -72,7 +72,7 @@ export default function ActiveSession() {
       }
       if (!foundItem) foundItem = SCENARIOS.find((s) => s.id === id);
 
-      // Se não encontrou localmente, tentar no Supabase (atividades criadas pelo user)
+       // Se não encontrou localmente, tentar no Supabase (atividades criadas pelo user)
       if (!foundItem) {
         const { data, error } = await supabase
           .from('activity')

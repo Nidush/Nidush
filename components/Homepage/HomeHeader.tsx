@@ -5,9 +5,10 @@ import { Image, Pressable, Text, View } from 'react-native';
 
 interface HomeHeaderProps {
   userName: string;
+  avatarUrl?: string | null;
 }
 
-export const HomeHeader = ({ userName }: HomeHeaderProps) => {
+export const HomeHeader = ({ userName, avatarUrl }: HomeHeaderProps) => {
   const getGreeting = () => {
     const currentHour = new Date().getHours();
 
@@ -66,7 +67,7 @@ export const HomeHeader = ({ userName }: HomeHeaderProps) => {
             accessibilityHint="Navigates to the user's profile page"
           >
             <Image
-              source={require('@/assets/avatars/profile.png')}
+              source={avatarUrl ? { uri: avatarUrl } : require('@/assets/avatars/profile.png')}
               className="rounded-full"
               style={{
                 width: 60,

@@ -28,6 +28,7 @@ export default function Index() {
 
   const { currentState } = useBiometrics();
   const [userName, setUserName] = useState('...');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [myActivities, setMyActivities] = useState<Activity[]>([]);
 
   // O userName deve ser atualizado quando ganhamos foco também
@@ -37,11 +38,13 @@ export default function Index() {
       const user = session?.user;
       
       if (user) {
+        setAvatarUrl(user.user_metadata?.avatar_url || null);
         setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'Utilizador');
       } else {
         // Tentar getUser() se session for null, às vezes ajuda na consistência
         const { data: { user: verifiedUser } } = await supabase.auth.getUser();
         if (verifiedUser) {
+          setAvatarUrl(verifiedUser.user_metadata?.avatar_url || null);
           setUserName(verifiedUser.user_metadata?.first_name || verifiedUser.email?.split('@')[0] || 'Utilizador');
         } else {
           setUserName('Visitante');
@@ -59,8 +62,10 @@ export default function Index() {
     // Listener para mudanças de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
+        setAvatarUrl(session.user.user_metadata?.avatar_url || null);
         setUserName(session.user.user_metadata?.first_name || session.user.email?.split('@')[0] || 'Utilizador');
       } else {
+        setAvatarUrl(null);
         setUserName('Visitante');
       }
     });
@@ -76,11 +81,13 @@ export default function Index() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           setMyActivities([]); // Importante: Limpar se não houver user
+          setAvatarUrl(null);
           setUserName('Visitante');
           return;
         }
 
         // Atualizar o nome também por precaução
+        setAvatarUrl(user.user_metadata?.avatar_url || null);
         setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'Utilizador');
         
         const { data, error } = await supabase
@@ -197,7 +204,7 @@ export default function Index() {
         contentContainerStyle={{ paddingBottom: 40 }}
         style={{ paddingTop: Platform.OS === 'android' ? 20 : 0 }}
       >
-        <HomeHeader userName={userName} />
+        <HomeHeader userName={userName} avatarUrl={avatarUrl} />
 
         <StateWidget />
 

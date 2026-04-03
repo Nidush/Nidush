@@ -3,7 +3,8 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { supabase } from '../utils/supabase';
+import { pickImage } from '../utils/imagePicker';
+import { supabase, uploadImage } from '../utils/supabase';
 
 import {
   Nunito_400Regular,
@@ -15,14 +16,17 @@ import {
 export default function Profile() {
   const router = useRouter();
   const [userName, setUserName] = useState('A carregar...');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        setAvatarUrl(user.user_metadata?.avatar_url || null);
         const first = user.user_metadata?.first_name || '';
         const last = user.user_metadata?.last_name || '';
-        
+
         if (first || last) {
           setUserName(`${first} ${last}`.trim());
         } else if (user.email) {
@@ -33,6 +37,7 @@ export default function Profile() {
       } else {
         setUserName('Visitante');
       }
+      setIsLoading(false);
     };
     fetchUser();
   }, []);
@@ -40,6 +45,35 @@ export default function Profile() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.replace('/login');
+  };
+
+  const handleImagePick = async () => {
+    const base64OrUri = await pickImage();
+    if (!base64OrUri) return;
+
+    setAvatarUrl(typeof base64OrUri === 'string' ? base64OrUri : null);
+
+    const publicUrl = await uploadImage(base64OrUri, 'avatars');
+    if (publicUrl) {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      await supabase.auth.updateUser({
+        data: { avatar_url: publicUrl }
+      });
+
+      if (user) {
+        const { error: dbError } = await supabase.from('users').update({ avatar_url: publicUrl }).eq('email', user.email);
+        if (dbError) {
+          console.error("Erro a atualizar tabela users:", dbError);
+          alert("A foto foi guardada no auth, mas falhou ao guardar na tabela publica users (erro RLS): " + dbError.message);
+        }
+      }
+
+      setAvatarUrl(publicUrl);
+      alert('Foto de perfil atualizada com sucesso!');
+    } else {
+      alert('Erro ao fazer upload da foto de perfil.');
+    }
   };
 
   const [fontsLoaded] = useFonts({
@@ -86,13 +120,22 @@ export default function Profile() {
         showsVerticalScrollIndicator={false}
       >
         <View className="items-center my-6">
-          <Image
-            source={require('@/assets/avatars/profile.png')}
-            className="w-32 h-32 rounded-full"
-            accessible
-            accessibilityRole="image"
-            accessibilityLabel="Profile picture of Laura Rossi"
-          />
+          <TouchableOpacity onPress={handleImagePick} activeOpacity={0.8} style={{ position: 'relative' }}>
+            {isLoading ? (
+              <View className="w-32 h-32 rounded-full bg-[#E8EDDF]" />
+            ) : (
+              <Image
+                source={avatarUrl ? { uri: avatarUrl } : require('@/assets/avatars/profile.png')}
+                className="w-32 h-32 rounded-full"
+                accessible
+                accessibilityRole="image"
+                accessibilityLabel={`Profile picture of ${userName}`}
+              />
+            )}
+            <View className="absolute bottom-0 right-0 bg-[#5B8C51] p-2 rounded-full border-2 border-[#F5F7F0]">
+              <MaterialIcons name="edit" size={20} color="white" />
+            </View>
+          </TouchableOpacity>
           <Text
             maxFontSizeMultiplier={1.2}
             className="text-3xl text-[#3A4D3F] mt-4"
@@ -225,6 +268,7 @@ export default function Profile() {
             label="Residents"
             border={false}
             testID="menu-residents"
+            onPress={() => router.push('/profile-selection')}
           />
         </View>
 
@@ -292,7 +336,7 @@ function DeviceItem({ name, status, connected, icon, testID }: any) {
   );
 }
 
-function MenuItem({ icon, label, border = true, testID }: any) {
+function MenuItem({ icon, label, border = true, testID, onPress }: any) {
   return (
     <TouchableOpacity
       testID={testID}
@@ -300,6 +344,7 @@ function MenuItem({ icon, label, border = true, testID }: any) {
       accessible
       accessibilityRole="button"
       accessibilityHint={`Opens ${label} section`}
+      onPress={onPress}
     >
       <View className="flex-row items-center">
         <MaterialIcons name={icon} size={28} color="#4A5D4E" />
