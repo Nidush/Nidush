@@ -30,6 +30,8 @@ export default function Index() {
   const [userName, setUserName] = useState('...');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [myActivities, setMyActivities] = useState<Activity[]>([]);
+  const [userHobbies, setUserHobbies] = useState<string[]>([]);
+
 
   // O userName deve ser atualizado quando ganhamos foco também
   const fetchUserName = useCallback(async () => {
@@ -40,16 +42,45 @@ export default function Index() {
       if (user) {
         setAvatarUrl(user.user_metadata?.avatar_url || null);
         setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'Utilizador');
+
+        // Buscar hobbies da tabela users
+        const { data: dbUser } = await supabase
+          .from('users')
+          .select('hobbies')
+          .eq('email', user.email)
+          .maybeSingle();
+
+        if (dbUser?.hobbies) {
+          const raw = Array.isArray(dbUser.hobbies) ? dbUser.hobbies.join(',') : String(dbUser.hobbies);
+          const hooks = raw.replace(/[\[\]"]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
+          setUserHobbies(Array.from(new Set(hooks)));
+        }
+
       } else {
-        // Tentar getUser() se session for null, às vezes ajuda na consistência
+        // Tentar getUser() se session for null
         const { data: { user: verifiedUser } } = await supabase.auth.getUser();
         if (verifiedUser) {
           setAvatarUrl(verifiedUser.user_metadata?.avatar_url || null);
           setUserName(verifiedUser.user_metadata?.first_name || verifiedUser.email?.split('@')[0] || 'Utilizador');
+          
+          const { data: dbUser } = await supabase
+            .from('users')
+            .select('hobbies')
+            .eq('email', verifiedUser.email)
+            .maybeSingle();
+            
+          if (dbUser?.hobbies) {
+            const raw = Array.isArray(dbUser.hobbies) ? dbUser.hobbies.join(',') : String(dbUser.hobbies);
+            const hooks = raw.replace(/[\[\]"]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
+            setUserHobbies(Array.from(new Set(hooks)));
+          }
+
+
         } else {
           setUserName('Visitante');
         }
       }
+
     } catch (e) {
       console.error('Error fetching user name:', e);
       setUserName('Visitante');
@@ -114,14 +145,26 @@ export default function Index() {
         }
       };
       loadActivities();
-    }, [])
+      fetchUserName();
+    }, [fetchUserName])
   );
 
   // --- LÓGICA DO CARROSSEL (Recomendações) ---
   const dynamicActivities = useMemo(() => {
-    const appActivities = ACTIVITIES.filter(
-      (item) => item.category !== 'My creations',
-    );
+    // 1. Aplicar filtro de Hobbies se o utilizador tiver algum selecionado
+    const appActivities = ACTIVITIES.filter((item) => {
+      // Ignorar as criações próprias no carrossel de recomendações
+      if (item.category === 'My creations') return false;
+      
+      // Se o user tiver hobbies, filtramos; se não tiver, mostramos todos
+      if (userHobbies.length > 0) {
+        // item.type (meditation, cooking, workout, audiobooks)
+        return userHobbies.some(h => h.toLowerCase() === item.type?.toLowerCase());
+      }
+      
+      return true;
+    });
+
     const sortedList = getDynamicRecommendations(
       appActivities,
       currentState,
@@ -137,7 +180,8 @@ export default function Index() {
       }
       return { ...item, time: duration };
     });
-  }, [currentState]);
+  }, [currentState, userHobbies]);
+
 
   const dynamicTitle = useMemo(() => 'Activities for you', []);
 

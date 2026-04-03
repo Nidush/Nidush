@@ -31,49 +31,77 @@ export default function ProfileSelection() {
     const fetchResidents = async () => {
       setIsLoading(true);
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { session } } = await supabase.auth.getSession();
+        const user = session?.user;
+
         if (!user) {
-          setIsLoading(false);
+          alert("Sessão não encontrada! Faz login novamente.");
           return;
         }
 
-        // 1. Obter a casa (home_idhome) do user atual e o seu nome (first_name) usando o email como segurança adicional para os que têm auth_uid a null
-        const { data: myUser, error: myError } = await supabase
+        console.log("-> Utilizador atual:", user.email);
+        
+        // 1. Obter a casa (home_idhome) do user atual
+        const cleanEmail = user.email ? user.email.trim() : '';
+        const { data: usersFound, error: myError } = await supabase
           .from('users')
           .select('home_idhome, first_name')
-          .eq('email', user.email)
-          .single();
+          .ilike('email', cleanEmail);
 
-        if (myError) console.error("Erro a focar o myUser", myError);
+        if (myError) console.error("--> Erro no myUser:", myError);
+        
+        let userRecord = usersFound && usersFound.length > 0 ? usersFound[0] : null;
 
-        if (myUser?.first_name) {
-          setHostName(myUser.first_name);
+        // Fallback: Tenta por auth_uid se não achou email
+        if (!userRecord) {
+           const { data: byAuthUid } = await supabase
+             .from('users')
+             .select('home_idhome, first_name')
+             .eq('auth_uid', user.id)
+             .maybeSingle();
+           if (byAuthUid) userRecord = byAuthUid;
         }
 
-        if (myUser?.home_idhome) {
-          // 2. Procurar todos os users que têm a mesma home_idhome
-          const { data: residents } = await supabase
-            .from('users')
-            .select('idusers, first_name, last_name, avatar_url')
-            .eq('home_idhome', myUser.home_idhome);
+        if (!userRecord) {
+          alert("Este utilizador (" + cleanEmail + ") não foi encontrado na tabela 'users'! Pode ser necessário recriar a conta ou preencher o perfil.");
+        } else {
+          if (userRecord.first_name) setHostName(userRecord.first_name);
+          
+          if (userRecord.home_idhome) {
+            console.log("-> À procura de residentes na casa ID:", userRecord.home_idhome);
+            const { data: residents, error: resError } = await supabase
+              .from('users')
+              .select('iduser, first_name, last_name, avatar_url')
+              .eq('home_idhome', userRecord.home_idhome);
 
-          if (residents) {
-            const mappedProfiles: Profile[] = residents.map((r) => ({
-              id: r.idusers,
-              name: [r.first_name, r.last_name].filter(Boolean).join(' ') || 'Utilizador',
-              avatarUrl: r.avatar_url,
-            }));
-            setProfiles(mappedProfiles);
+            if (resError) console.error("--> Erro residents:", resError);
+
+            if (residents && residents.length > 0) {
+              const mappedProfiles: Profile[] = residents.map((r) => ({
+                id: r.iduser,
+                name: [r.first_name, r.last_name].filter(Boolean).join(' ').trim() || 'Utilizador',
+                avatarUrl: r.avatar_url,
+              }));
+              setProfiles(mappedProfiles);
+            } else {
+              alert("Não foram encontrados outros residentes na casa com ID: " + userRecord.home_idhome);
+            }
+          } else {
+            alert("O teu utilizador não tem uma casa (home_idhome) associada!");
           }
         }
       } catch (error) {
-        console.error("Erro a ir buscar perfis:", error);
+        console.error("Erro fatal:", error);
+        alert("Erro fatal no carregamento: " + (error as any).message);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchResidents();
+
+    const timer = setTimeout(() => setIsLoading(false), 8000);
+    return () => clearTimeout(timer);
   }, []);
 
   return (
@@ -103,7 +131,7 @@ export default function ProfileSelection() {
         {isLoading ? (
           <ActivityIndicator size="large" color="#548F53" />
         ) : (
-          <View className="flex-row flex-wrap justify-center w-full px-5 gap-y-10 border-red-">
+          <View className="flex-row flex-wrap justify-center w-full px-5 gap-y-10">
             {profiles.map((profile) => (
               <TouchableOpacity
                 key={profile.id}

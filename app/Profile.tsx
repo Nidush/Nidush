@@ -5,6 +5,8 @@ import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { pickImage } from '../utils/imagePicker';
 import { supabase, uploadImage } from '../utils/supabase';
+import { Modal, Pressable } from 'react-native';
+
 
 import {
   Nunito_400Regular,
@@ -18,6 +20,11 @@ export default function Profile() {
   const [userName, setUserName] = useState('A carregar...');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedHobbies, setSelectedHobbies] = useState<string[]>([]);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+
+  const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
+
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -34,6 +41,33 @@ export default function Profile() {
         } else {
           setUserName('Utilizador');
         }
+
+        const userEmail = user.email || '';
+        const { data: usersFound } = await supabase
+          .from('users')
+          .select('hobbies')
+          .ilike('email', userEmail.trim());
+
+        
+        const userData = usersFound && usersFound.length > 0 ? usersFound[0] : null;
+      
+        if (!userData) {
+           const { data: byAuth } = await supabase.from('users').select('hobbies').eq('auth_uid', user.id).maybeSingle();
+           if (byAuth?.hobbies) {
+             const raw = Array.isArray(byAuth.hobbies) ? byAuth.hobbies.join(',') : String(byAuth.hobbies);
+             const cleanHobbies = raw.replace(/[\[\]"]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
+  
+             setSelectedHobbies(Array.from(new Set(cleanHobbies)));
+           }
+        } else if (userData?.hobbies) {
+          const raw = Array.isArray(userData.hobbies) ? userData.hobbies.join(',') : String(userData.hobbies);
+          const cleanHobbies = raw.replace(/[\[\]"]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
+          // Remover duplicados com Set
+          setSelectedHobbies(Array.from(new Set(cleanHobbies)));
+        }
+
+
+
       } else {
         setUserName('Visitante');
       }
@@ -41,6 +75,7 @@ export default function Profile() {
     };
     fetchUser();
   }, []);
+
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -75,6 +110,66 @@ export default function Profile() {
       alert('Erro ao fazer upload da foto de perfil.');
     }
   };
+
+  const toggleHobby = (hobby: string) => {
+    setSelectedHobbies(prev => 
+      prev.includes(hobby) ? prev.filter(h => h !== hobby) : [...prev, hobby]
+    );
+  };
+
+  const saveHobbies = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const userEmail = user.email || '';
+      const uniqueHobbies = Array.from(new Set(selectedHobbies)).join(',');
+      
+      const { error, count } = await supabase
+        .from('users')
+        .update({ hobbies: uniqueHobbies }, { count: 'exact' })
+        .ilike('email', userEmail.trim());
+
+      if (error) {
+        // Fallback para auth_uid se o email falhar
+        const { error: error2, count: count2 } = await supabase
+          .from('users')
+          .update({ hobbies: uniqueHobbies }, { count: 'exact' })
+          .eq('auth_uid', user.id);
+
+
+        
+        if (error2) {
+           console.error("Erro ao guardar hobbies:", error2);
+           alert("Erro ao gravar hobbies: " + error2.message);
+        } else if (count2 === 0) {
+           alert("Erro RLS: Zero linhas atualizadas por UID. Verifica se as permissões SQL permitem a edição.");
+        } else {
+           setIsModalVisible(false);
+           alert("Hobby preferences saved!");
+        }
+      } else if (count === 0) {
+        const uniqueHobbies = Array.from(new Set(selectedHobbies)).join(',');
+        const { error: errorFallback, count: countFallback } = await supabase
+          .from('users')
+          .update({ hobbies: uniqueHobbies }, { count: 'exact' })
+          .eq('auth_uid', user.id);
+
+
+
+        if (countFallback === 0) {
+          alert("Erro: O teu e-mail (" + userEmail + ") não foi encontrado ou está bloqueado pelo RLS. Garante que corres o SQL das permissões.");
+        } else {
+          setIsModalVisible(false);
+          alert("Hobby preferences saved!");
+        }
+      } else {
+        setIsModalVisible(false);
+        alert("Hobby preferences saved!");
+      }
+
+    }
+  };
+
+
 
   const [fontsLoaded] = useFonts({
     Nunito_400Regular,
@@ -162,6 +257,7 @@ export default function Profile() {
             </Text>
 
             <TouchableOpacity
+              onPress={() => setIsModalVisible(true)}
               testID="edit-hobbies-button"
               accessible
               accessibilityRole="button"
@@ -179,23 +275,28 @@ export default function Profile() {
           </View>
 
           <View className="flex-row flex-wrap gap-2">
-            {['Cooking', 'Workout', 'Meditation', 'Audiobooks'].map((hobby) => (
-              <View
-                key={hobby}
-                className="bg-[#C8E0C4] px-4 py-1.5 rounded-full"
-                accessible={false}
-              >
-                <Text
-                  maxFontSizeMultiplier={1.2}
-                  className="text-[#4A5D4E] text-sm"
-                  style={{ fontFamily: 'Nunito_600SemiBold' }}
+            {selectedHobbies.length > 0 ? (
+              selectedHobbies.map((hobby) => (
+                <View
+                  key={hobby}
+                  className="bg-[#C8E0C4] px-4 py-1.5 rounded-full"
+                  accessible={false}
                 >
-                  {hobby}
-                </Text>
-              </View>
-            ))}
+                  <Text
+                    maxFontSizeMultiplier={1.2}
+                    className="text-[#4A5D4E] text-sm"
+                    style={{ fontFamily: 'Nunito_600SemiBold' }}
+                  >
+                    {hobby}
+                  </Text>
+                </View>
+              ))
+            ) : (
+              <Text className="text-gray-400 italic">No hobbies selected</Text>
+            )}
           </View>
         </View>
+
 
         {/* Wearables */}
         <View className="bg-[#F5F7F0] rounded-[24px] p-5 mb-4 border border-[#D1D9C5]">
@@ -293,7 +394,68 @@ export default function Profile() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Hobbies Preference Modal */}
+      <Modal
+        visible={isModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsModalVisible(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black/50 px-6">
+          <View className="bg-white w-full rounded-[32px] p-8 shadow-xl">
+            <Text 
+              className="text-2xl text-[#3A4D3F] mb-6 text-center"
+              style={{ fontFamily: 'Nunito_700Bold' }}
+            >
+              Select your Hobbies
+            </Text>
+            
+            <View className="flex-row flex-wrap justify-between gap-y-4">
+              {HOBBIES_OPTIONS.map((hobby) => {
+                const isSelected = selectedHobbies.includes(hobby);
+                return (
+                  <TouchableOpacity
+                    key={hobby}
+                    onPress={() => toggleHobby(hobby)}
+                    className={`w-[48%] py-4 rounded-2xl border-2 items-center ${
+                      isSelected ? 'bg-[#5B8C51] border-[#5B8C51]' : 'bg-white border-[#D1D9C5]'
+                    }`}
+                  >
+                    <Text 
+                      className={`text-lg ${isSelected ? 'text-white' : 'text-[#4A5D4E]'}`}
+                      style={{ fontFamily: isSelected ? 'Nunito_700Bold' : 'Nunito_600SemiBold' }}
+                    >
+                      {hobby}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <TouchableOpacity
+              onPress={saveHobbies}
+              className="bg-[#5B8C51] mt-8 py-4 rounded-full items-center shadow-md"
+            >
+              <Text 
+                className="text-white text-xl"
+                style={{ fontFamily: 'Nunito_700Bold' }}
+              >
+                Save Preferences
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setIsModalVisible(false)}
+              className="mt-4 py-2 items-center"
+            >
+              <Text className="text-gray-400 text-lg">Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
+
   );
 }
 
