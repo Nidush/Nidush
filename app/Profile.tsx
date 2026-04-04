@@ -22,6 +22,9 @@ export default function Profile() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedHobbies, setSelectedHobbies] = useState<string[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isPrivacyModalVisible, setIsPrivacyModalVisible] = useState(false);
+  const [isAccountModalVisible, setIsAccountModalVisible] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
 
   const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
@@ -43,6 +46,7 @@ export default function Profile() {
         }
 
         const userEmail = user.email || '';
+        setUserEmail(userEmail);
         const { data: usersFound } = await supabase
           .from('users')
           .select('hobbies')
@@ -348,6 +352,7 @@ export default function Profile() {
             icon="account-circle"
             label="Account Information"
             testID="menu-account"
+            onPress={() => setIsAccountModalVisible(true)}
           />
           <MenuItem
             icon="notifications-none"
@@ -359,6 +364,7 @@ export default function Profile() {
             label="Privacy & Data"
             border={false}
             testID="menu-privacy"
+            onPress={() => setIsPrivacyModalVisible(true)}
           />
         </View>
 
@@ -454,6 +460,113 @@ export default function Profile() {
           </View>
         </View>
       </Modal>
+
+      {/* Privacy & Data Modal */}
+      <Modal
+        visible={isPrivacyModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsPrivacyModalVisible(false)}
+      >
+        <View className="flex-1 justify-end bg-black/50">
+          <View className="bg-white w-full rounded-t-[40px] p-8 shadow-2xl h-[80%]">
+            <View className="flex-row justify-between items-center mb-6">
+              <Text 
+                className="text-2xl text-[#3A4D3F]"
+                style={{ fontFamily: 'Nunito_700Bold' }}
+              >
+                Privacy & Data Policy
+              </Text>
+              <TouchableOpacity onPress={() => setIsPrivacyModalVisible(false)}>
+                <MaterialIcons name="close" size={28} color="#4A5D4E" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView showsVerticalScrollIndicator={false} className="mb-6">
+              <View className="gap-y-6">
+                <Section 
+                  title="Data We Collect" 
+                  content="We collect account information (name, email), profile details (hobbies, preferences), and health data from connected wearables (steps, activities) to provide a personalized experience."
+                />
+                <Section 
+                  title="How We Use Your Data" 
+                  content="Your data is used to generate personalized activity recommendations, track your progress, and improve our services. We do not sell your personal data to third parties."
+                />
+                <Section 
+                  title="Data Sharing" 
+                  content="Information may be shared with service providers (like Supabase for data storage) only as necessary to provide the Nidush services. All data is encrypted during transit and at rest."
+                />
+                <Section 
+                  title="Your Rights" 
+                  content="You have the right to access, correct, or delete your personal data at any time. You can also revoke wearable access through the Associated Wearables section in your profile."
+                />
+                <Section 
+                  title="Data Retention" 
+                  content="We retain your personal data as long as your account is active. If you delete your account, we will remove your personal information from our active databases within 30 days."
+                />
+                <Section 
+                  title="Contact Us" 
+                  content="If you have any questions regarding your privacy, please contact our support team at privacy@nidush.com."
+                />
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              onPress={() => setIsPrivacyModalVisible(false)}
+              className="bg-[#5B8C51] py-4 rounded-full items-center shadow-md mb-4"
+            >
+              <Text 
+                className="text-white text-xl"
+                style={{ fontFamily: 'Nunito_700Bold' }}
+              >
+                Understood
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Account Information Modal */}
+      <Modal
+        visible={isAccountModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsAccountModalVisible(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black/50 px-6">
+          <View className="bg-white w-full rounded-[32px] p-8 shadow-xl">
+            <Text 
+              className="text-2xl text-[#3A4D3F] mb-6 text-center"
+              style={{ fontFamily: 'Nunito_700Bold' }}
+            >
+              Account Information
+            </Text>
+            
+            <View className="gap-y-4">
+              <View>
+                <Text className="text-gray-400 text-sm mb-1" style={{ fontFamily: 'Nunito_600SemiBold' }}>Full Name</Text>
+                <Text className="text-lg text-[#4A5D4E]" style={{ fontFamily: 'Nunito_700Bold' }}>{userName}</Text>
+              </View>
+              <View>
+                <Text className="text-gray-400 text-sm mb-1" style={{ fontFamily: 'Nunito_600SemiBold' }}>Email Address</Text>
+                <Text className="text-lg text-[#4A5D4E]" style={{ fontFamily: 'Nunito_700Bold' }}>{userEmail}</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => setIsAccountModalVisible(false)}
+              className="bg-[#5B8C51] mt-8 py-4 rounded-full items-center shadow-md"
+            >
+              <Text 
+                className="text-white text-xl"
+                style={{ fontFamily: 'Nunito_700Bold' }}
+              >
+                Close
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
 
   );
@@ -520,5 +633,24 @@ function MenuItem({ icon, label, border = true, testID, onPress }: any) {
       </View>
       <MaterialIcons name="chevron-right" size={28} color="#4A5D4E" />
     </TouchableOpacity>
+  );
+}
+
+function Section({ title, content }: { title: string, content: string }) {
+  return (
+    <View>
+      <Text 
+        className="text-lg text-[#3A4D3F] mb-1"
+        style={{ fontFamily: 'Nunito_700Bold' }}
+      >
+        {title}
+      </Text>
+      <Text 
+        className="text-[#4A5D4E] leading-6"
+        style={{ fontFamily: 'Nunito_400Regular' }}
+      >
+        {content}
+      </Text>
+    </View>
   );
 }
