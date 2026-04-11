@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
@@ -24,13 +23,6 @@ import {
 } from '@expo-google-fonts/nunito';
 import { supabase } from '../utils/supabase';
 
-// Componentes de Onboarding
-import ActivitySelection from '../components/Onboarding/ActivitySelection';
-import FinalLoading from '../components/Onboarding/FinalLoading';
-import HouseName from '../components/Onboarding/HouseName';
-import WearableSync from '../components/Onboarding/WearableSync';
-import WelcomeUser from '../components/Onboarding/WelcomeUser';
-
 export default function SignUp() {
   const [fontsLoaded] = useFonts({
     Nunito_400Regular: Nunito_400Regular,
@@ -39,7 +31,6 @@ export default function SignUp() {
   });
 
   const router = useRouter();
-  const [currentStep, setCurrentStep] = useState('form');
   const [dims, setDims] = useState(Dimensions.get('window'));
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
@@ -48,7 +39,6 @@ export default function SignUp() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [houseName, setHouseName] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -58,21 +48,6 @@ export default function SignUp() {
     );
     return () => sub.remove();
   }, []);
-
-  const transitionTo = (nextStep: string) => {
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 500,
-      useNativeDriver: true,
-    }).start(() => {
-      setCurrentStep(nextStep);
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }).start();
-    });
-  };
 
   const handleSignUp = async () => {
     if (!email || !password || !firstName || !lastName) {
@@ -100,97 +75,13 @@ export default function SignUp() {
       return;
     }
 
-    transitionTo('welcome');
+    // Signup successful, redirect to login and pass the email to show the modal there
+    router.replace({ pathname: '/login', params: { registeredEmail: email } });
   };
 
   if (!fontsLoaded) return null;
 
   const isWebPC = dims.width > 768;
-
-  // --- Navegação Onboarding ---
-  if (currentStep === 'welcome') {
-    return <WelcomeUser userName={firstName} onFinish={() => transitionTo('house')} />;
-  }
-
-  if (currentStep === 'house') {
-    return (
-      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <HouseName 
-          houseName={houseName} 
-          setHouseName={setHouseName} 
-          onNext={() => transitionTo('wearable')} 
-        />
-      </Animated.View>
-    );
-  }
-
-  if (currentStep === 'wearable') {
-    return (
-      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <WearableSync
-          onNext={() => transitionTo('activities')}
-          onSkip={() => transitionTo('activities')}
-        />
-      </Animated.View>
-    );
-  }
-
-  if (currentStep === 'activities') {
-    return (
-      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <ActivitySelection onFinish={() => transitionTo('loading')} />
-      </Animated.View>
-    );
-  }
-
-  if (currentStep === 'loading') {
-    return (
-      <FinalLoading
-        onComplete={async () => {
-          try {
-            // Sincronização com as tabelas do public schema conforme fornecido no prompt
-            const { data: { user } } = await supabase.auth.getUser();
-            
-            if (user) {
-              // 1. Criar a Home
-              const { data: homeData, error: homeError } = await supabase
-                .from('home')
-                .insert({ name: houseName || 'Nidush Home' })
-                .select('idhome')
-                .single();
-
-              if (!homeError && homeData) {
-                // 2. Criar o User no public schema
-                const { error: userError } = await supabase
-                  .from('users')
-                  .insert({
-                    first_name: firstName,
-                    last_name: lastName,
-                    email: email,
-                    home_idhome: homeData.idhome,
-                    password: password, // Seguindo o esquema fornecido: password is NOT NULL
-                    auth_uid: user.id
-                  });
-
-                if (userError) {
-                  console.error('Erro ao sincronizar user no public schema:', userError);
-                }
-              } else {
-                console.error('Erro ao criar home no public schema:', homeError);
-              }
-            }
-
-            // Gravamos aqui que o Onboarding (incluindo setup) foi concluído
-            await AsyncStorage.setItem('@viewedOnboarding', 'true');
-            router.replace('/(tabs)');
-          } catch (e) {
-            console.log('Error saving onboarding state', e);
-            router.replace('/(tabs)');
-          }
-        }}
-      />
-    );
-  }
 
   return (
     <Animated.View style={{ flex: 1, opacity: fadeAnim }}>

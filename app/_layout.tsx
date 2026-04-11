@@ -5,6 +5,7 @@ import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { supabase } from '../utils/supabase';
 import './../global.css';
 
 // Mantém a Splash nativa ativa no arranque
@@ -34,7 +35,28 @@ export default function RootLayout() {
 
     const checkOnboarding = async () => {
       try {
+        // 1. Check local flag
         const viewed = await AsyncStorage.getItem('@viewedOnboarding');
+        
+        // 2. Check Supabase session and user status as a secondary check for existing users
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (user) {
+          // If logged in, check if they have a home
+          // Check by auth_uid OR email for robustness
+          const { data: userData } = await supabase
+            .from('users')
+            .select('home_idhome')
+            .or(`auth_uid.eq.${user.id},email.eq.${user.email}`)
+            .maybeSingle();
+            
+          if (userData?.home_idhome) {
+            await AsyncStorage.setItem('@viewedOnboarding', 'true');
+            router.replace('/(tabs)');
+            return;
+          }
+        }
+
         if (viewed === 'true') {
           router.replace('/(tabs)');
         } else {
@@ -99,6 +121,7 @@ export default function RootLayout() {
       <View style={{ flex: 1 }}>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="onboarding" />
+          <Stack.Screen name="setup-profile" />
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="profile-selection" />
           <Stack.Screen name="activity-details" />

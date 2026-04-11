@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState } from 'react';
 import {
   View,
@@ -10,8 +11,10 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+
+import VerificationModal from '../components/UI/VerificationModal';
 
 import {
   useFonts,
@@ -29,10 +32,15 @@ export default function Login() {
   });
 
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const params = useLocalSearchParams();
+  const registeredEmail = params.registeredEmail as string;
+
+  const [email, setEmail] = useState(registeredEmail || '');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  const [showModal, setShowModal] = useState(!!registeredEmail);
 
   const dims = Dimensions.get('window');
   const isWebPC = dims.width > 768;
@@ -45,20 +53,40 @@ export default function Login() {
     setLoading(true);
     setErrorMsg('');
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data: { user }, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    setLoading(false);
-
     if (error) {
+      setLoading(false);
       setErrorMsg('Erro: ' + error.message);
       return;
     }
 
-    // Sucesso - Ir para a página principal / Dashboard
-    router.replace('/(tabs)');
+    if (user) {
+      const { data: userData, error: userQueryError } = await supabase
+        .from('users')
+        .select('home_idhome')
+        .or(`auth_uid.eq.${user.id},email.eq.${user.email}`)
+        .maybeSingle();
+
+      setLoading(false);
+
+      if (userQueryError || !userData?.home_idhome) {
+        router.replace({
+          pathname: '/setup-profile',
+          params: { pwd: password }
+        });
+      } else {
+        // Sucesso - Ir para a página principal / Dashboard
+        await AsyncStorage.setItem('@viewedOnboarding', 'true');
+        router.replace('/(tabs)');
+      }
+    } else {
+      setLoading(false);
+      router.replace('/(tabs)');
+    }
   };
 
   if (!fontsLoaded) return null;
@@ -67,6 +95,14 @@ export default function Login() {
     <View className="flex-1 bg-[#F3F5EE]">
       <StatusBar style="dark" />
       
+      {/* Verification Modal */}
+      <VerificationModal 
+        visible={showModal}
+        email={email}
+        onCheckEmail={() => setShowModal(false)}
+        onResend={() => {/* Logic to resend email if needed */}}
+      />
+
       {/* WAVES (Fundo) */}
       <View 
         className="absolute bottom-0 left-0 right-0 overflow-hidden" 
