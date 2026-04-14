@@ -42,6 +42,8 @@ export default function SetupProfile() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [houseName, setHouseName] = useState('');
+  const [houseId, setHouseId] = useState('');
+  const [homeMode, setHomeMode] = useState<'create' | 'join'>('create');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -79,6 +81,8 @@ export default function SetupProfile() {
           const { step, data } = JSON.parse(savedProgress);
           setCurrentStep(step || 'welcome');
           if (data?.houseName) setHouseName(data.houseName);
+          if (data?.houseId) setHouseId(data.houseId);
+          if (data?.homeMode) setHomeMode(data.homeMode);
         }
       } else {
         // Not logged in, redirect to login
@@ -97,6 +101,8 @@ export default function SetupProfile() {
         step,
         data: {
           houseName,
+          houseId,
+          homeMode,
           ...extraData
         }
       };
@@ -136,6 +142,10 @@ export default function SetupProfile() {
         <HouseName 
           houseName={houseName} 
           setHouseName={setHouseName} 
+          houseId={houseId}
+          setHouseId={setHouseId}
+          homeMode={homeMode}
+          setHomeMode={setHomeMode}
           onNext={() => transitionTo('wearable')} 
         />
       </Animated.View>
@@ -167,43 +177,82 @@ export default function SetupProfile() {
         onComplete={async () => {
           try {
             const { data: { user } } = await supabase.auth.getUser();
-            
-            if (user) {
-              // 1. Create Home
-              const { data: homeData, error: homeError } = await supabase
-                .from('home')
-                .insert({ name: houseName || 'Nidush Home' })
-                .select('idhome')
-                .single();
+            let hasError = false;
 
-              if (!homeError && homeData) {
+            if (user) {
+              let finalHomeId: number | null = null;
+
+              if (homeMode === 'create') {
+                // 1. Create Home
+                // Gerar Join Code (6 carateres alfanuméricos maiúsculos)
+                const generatedCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+                
+                console.log('-> A criar nova casa:', houseName || 'Nidush Home', 'com o código', generatedCode);
+                const { data: homeData, error: homeError } = await supabase
+                  .from('home')
+                  .insert({ 
+                    name: houseName || 'Nidush Home',
+                    join_code: generatedCode 
+                  })
+                  .select('idhome')
+                  .single();
+
+                if (homeError) {
+                  console.error('Error creating home in public schema:', homeError);
+                  hasError = true;
+                } else if (homeData) {
+                  finalHomeId = homeData.idhome;
+                }
+              } else {
+                // Join existing home
+                const upperCode = houseId.toUpperCase().trim();
+                console.log('-> A procurar casa existente com Join Code:', upperCode);
+                const { data: homeData, error: homeError } = await supabase
+                  .from('home')
+                  .select('idhome')
+                  .eq('join_code', upperCode)
+                  .maybeSingle();
+                  
+                if (homeError || !homeData) {
+                  if (homeError) console.error('Error finding existing home:', homeError);
+                  alert('Join Code not found. Please verify the code and try again.'); // Falha gracefully.
+                  hasError = true;
+                } else {
+                  finalHomeId = homeData.idhome;
+                }
+              }
+
+              if (finalHomeId && !hasError) {
                 // 2. Create User in public schema
+                console.log('-> A associar utilizador à casa ID:', finalHomeId);
                 const { error: userError } = await supabase
                   .from('users')
                   .insert({
                     first_name: firstName,
                     last_name: lastName,
                     email: email,
-                    home_idhome: homeData.idhome,
+                    home_idhome: finalHomeId,
                     password: pwd, 
                     auth_uid: user.id
                   });
 
                 if (userError) {
                   console.error('Error syncing user in public schema:', userError);
+                  hasError = true;
                 }
-              } else {
-                console.error('Error creating home in public schema:', homeError);
               }
             }
 
-            // Mark onboarding as complete
-            await AsyncStorage.setItem('@viewedOnboarding', 'true');
-            await AsyncStorage.removeItem('@onboarding_progress');
-            router.replace('/(tabs)');
+            if (!hasError) {
+              await AsyncStorage.setItem('@viewedOnboarding', 'true');
+              await AsyncStorage.removeItem('@onboarding_progress');
+              router.replace('/(tabs)');
+            } else {
+              setCurrentStep('house');
+            }
           } catch (e) {
             console.log('Error completing onboarding', e);
-            router.replace('/(tabs)');
+            setCurrentStep('house');
           }
         }}
       />

@@ -1,11 +1,10 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Image, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { pickImage } from '../utils/imagePicker';
 import { supabase, uploadImage } from '../utils/supabase';
-import { Modal, Pressable } from 'react-native';
 
 
 import {
@@ -25,6 +24,8 @@ export default function Profile() {
   const [isPrivacyModalVisible, setIsPrivacyModalVisible] = useState(false);
   const [isAccountModalVisible, setIsAccountModalVisible] = useState(false);
   const [userEmail, setUserEmail] = useState('');
+  const [userHomeId, setUserHomeId] = useState<number | string | null>(null);
+  const [joinCode, setJoinCode] = useState<string | null>(null);
 
   const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
@@ -49,25 +50,44 @@ export default function Profile() {
         setUserEmail(userEmail);
         const { data: usersFound } = await supabase
           .from('users')
-          .select('hobbies')
+          .select('hobbies, home_idhome')
           .ilike('email', userEmail.trim());
 
-        
+
         const userData = usersFound && usersFound.length > 0 ? usersFound[0] : null;
-      
+        let finalHomeId = null;
+
         if (!userData) {
-           const { data: byAuth } = await supabase.from('users').select('hobbies').eq('auth_uid', user.id).maybeSingle();
-           if (byAuth?.hobbies) {
-             const raw = Array.isArray(byAuth.hobbies) ? byAuth.hobbies.join(',') : String(byAuth.hobbies);
-             const cleanHobbies = raw.replace(/[\[\]"]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
-  
-             setSelectedHobbies(Array.from(new Set(cleanHobbies)));
-           }
-        } else if (userData?.hobbies) {
-          const raw = Array.isArray(userData.hobbies) ? userData.hobbies.join(',') : String(userData.hobbies);
-          const cleanHobbies = raw.replace(/[\[\]"]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
-          // Remover duplicados com Set
-          setSelectedHobbies(Array.from(new Set(cleanHobbies)));
+          const { data: byAuth } = await supabase.from('users').select('hobbies, home_idhome').eq('auth_uid', user.id).maybeSingle();
+          if (byAuth?.hobbies) {
+            const raw = Array.isArray(byAuth.hobbies) ? byAuth.hobbies.join(',') : String(byAuth.hobbies);
+            const cleanHobbies = raw.replace(/[\[\]"]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
+
+            setSelectedHobbies(Array.from(new Set(cleanHobbies)));
+          }
+          if (byAuth?.home_idhome) {
+            setUserHomeId(byAuth.home_idhome);
+            finalHomeId = byAuth.home_idhome;
+          }
+        } else {
+          if (userData?.hobbies) {
+            const raw = Array.isArray(userData.hobbies) ? userData.hobbies.join(',') : String(userData.hobbies);
+            const cleanHobbies = raw.replace(/[\[\]"]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
+            // Remover duplicados com Set
+            setSelectedHobbies(Array.from(new Set(cleanHobbies)));
+          }
+          if (userData?.home_idhome) {
+            setUserHomeId(userData.home_idhome);
+            finalHomeId = userData.home_idhome;
+          }
+        }
+
+        // Fetch Join Code se tivermos o ID da casa
+        if (finalHomeId) {
+          const { data: homeData } = await supabase.from('home').select('join_code').eq('idhome', finalHomeId).maybeSingle();
+          if (homeData?.join_code) {
+            setJoinCode(homeData.join_code);
+          }
         }
 
 
@@ -116,7 +136,7 @@ export default function Profile() {
   };
 
   const toggleHobby = (hobby: string) => {
-    setSelectedHobbies(prev => 
+    setSelectedHobbies(prev =>
       prev.includes(hobby) ? prev.filter(h => h !== hobby) : [...prev, hobby]
     );
   };
@@ -126,7 +146,7 @@ export default function Profile() {
     if (user) {
       const userEmail = user.email || '';
       const uniqueHobbies = Array.from(new Set(selectedHobbies)).join(',');
-      
+
       const { error, count } = await supabase
         .from('users')
         .update({ hobbies: uniqueHobbies }, { count: 'exact' })
@@ -140,15 +160,15 @@ export default function Profile() {
           .eq('auth_uid', user.id);
 
 
-        
+
         if (error2) {
-           console.error("Erro ao guardar hobbies:", error2);
-           alert("Erro ao gravar hobbies: " + error2.message);
+          console.error("Erro ao guardar hobbies:", error2);
+          alert("Erro ao gravar hobbies: " + error2.message);
         } else if (count2 === 0) {
-           alert("Erro RLS: Zero linhas atualizadas por UID. Verifica se as permissões SQL permitem a edição.");
+          alert("Erro RLS: Zero linhas atualizadas por UID. Verifica se as permissões SQL permitem a edição.");
         } else {
-           setIsModalVisible(false);
-           alert("Hobby preferences saved!");
+          setIsModalVisible(false);
+          alert("Hobby preferences saved!");
         }
       } else if (count === 0) {
         const uniqueHobbies = Array.from(new Set(selectedHobbies)).join(',');
@@ -243,6 +263,16 @@ export default function Profile() {
           >
             {userName}
           </Text>
+          {joinCode && (
+            <View className="bg-[#E8EDDF] px-4 py-1.5 rounded-full mt-2 border border-[#C8D2C8]">
+              <Text
+                className="text-[#4A5D4E] text-sm"
+                style={{ fontFamily: 'Nunito_700Bold' }}
+              >
+                Join Code: <Text className="text-[#5B8C51] tracking-widest">{joinCode}</Text>
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Hobbies */}
@@ -410,13 +440,13 @@ export default function Profile() {
       >
         <View className="flex-1 justify-center items-center bg-black/50 px-6">
           <View className="bg-white w-full rounded-[32px] p-8 shadow-xl">
-            <Text 
+            <Text
               className="text-2xl text-[#3A4D3F] mb-6 text-center"
               style={{ fontFamily: 'Nunito_700Bold' }}
             >
               Select your Hobbies
             </Text>
-            
+
             <View className="flex-row flex-wrap justify-between gap-y-4">
               {HOBBIES_OPTIONS.map((hobby) => {
                 const isSelected = selectedHobbies.includes(hobby);
@@ -424,11 +454,10 @@ export default function Profile() {
                   <TouchableOpacity
                     key={hobby}
                     onPress={() => toggleHobby(hobby)}
-                    className={`w-[48%] py-4 rounded-2xl border-2 items-center ${
-                      isSelected ? 'bg-[#5B8C51] border-[#5B8C51]' : 'bg-white border-[#D1D9C5]'
-                    }`}
+                    className={`w-[48%] py-4 rounded-2xl border-2 items-center ${isSelected ? 'bg-[#5B8C51] border-[#5B8C51]' : 'bg-white border-[#D1D9C5]'
+                      }`}
                   >
-                    <Text 
+                    <Text
                       className={`text-lg ${isSelected ? 'text-white' : 'text-[#4A5D4E]'}`}
                       style={{ fontFamily: isSelected ? 'Nunito_700Bold' : 'Nunito_600SemiBold' }}
                     >
@@ -443,7 +472,7 @@ export default function Profile() {
               onPress={saveHobbies}
               className="bg-[#5B8C51] mt-8 py-4 rounded-full items-center shadow-md"
             >
-              <Text 
+              <Text
                 className="text-white text-xl"
                 style={{ fontFamily: 'Nunito_700Bold' }}
               >
@@ -471,7 +500,7 @@ export default function Profile() {
         <View className="flex-1 justify-end bg-black/50">
           <View className="bg-white w-full rounded-t-[40px] p-8 shadow-2xl h-[80%]">
             <View className="flex-row justify-between items-center mb-6">
-              <Text 
+              <Text
                 className="text-2xl text-[#3A4D3F]"
                 style={{ fontFamily: 'Nunito_700Bold' }}
               >
@@ -481,31 +510,31 @@ export default function Profile() {
                 <MaterialIcons name="close" size={28} color="#4A5D4E" />
               </TouchableOpacity>
             </View>
-            
+
             <ScrollView showsVerticalScrollIndicator={false} className="mb-6">
               <View className="gap-y-6">
-                <Section 
-                  title="Data We Collect" 
+                <Section
+                  title="Data We Collect"
                   content="We collect account information (name, email), profile details (hobbies, preferences), and health data from connected wearables (steps, activities) to provide a personalized experience."
                 />
-                <Section 
-                  title="How We Use Your Data" 
+                <Section
+                  title="How We Use Your Data"
                   content="Your data is used to generate personalized activity recommendations, track your progress, and improve our services. We do not sell your personal data to third parties."
                 />
-                <Section 
-                  title="Data Sharing" 
+                <Section
+                  title="Data Sharing"
                   content="Information may be shared with service providers (like Supabase for data storage) only as necessary to provide the Nidush services. All data is encrypted during transit and at rest."
                 />
-                <Section 
-                  title="Your Rights" 
+                <Section
+                  title="Your Rights"
                   content="You have the right to access, correct, or delete your personal data at any time. You can also revoke wearable access through the Associated Wearables section in your profile."
                 />
-                <Section 
-                  title="Data Retention" 
+                <Section
+                  title="Data Retention"
                   content="We retain your personal data as long as your account is active. If you delete your account, we will remove your personal information from our active databases within 30 days."
                 />
-                <Section 
-                  title="Contact Us" 
+                <Section
+                  title="Contact Us"
                   content="If you have any questions regarding your privacy, please contact our support team at privacy@nidush.com."
                 />
               </View>
@@ -515,7 +544,7 @@ export default function Profile() {
               onPress={() => setIsPrivacyModalVisible(false)}
               className="bg-[#5B8C51] py-4 rounded-full items-center shadow-md mb-4"
             >
-              <Text 
+              <Text
                 className="text-white text-xl"
                 style={{ fontFamily: 'Nunito_700Bold' }}
               >
@@ -535,13 +564,13 @@ export default function Profile() {
       >
         <View className="flex-1 justify-center items-center bg-black/50 px-6">
           <View className="bg-white w-full rounded-[32px] p-8 shadow-xl">
-            <Text 
+            <Text
               className="text-2xl text-[#3A4D3F] mb-6 text-center"
               style={{ fontFamily: 'Nunito_700Bold' }}
             >
               Account Information
             </Text>
-            
+
             <View className="gap-y-4">
               <View>
                 <Text className="text-gray-400 text-sm mb-1" style={{ fontFamily: 'Nunito_600SemiBold' }}>Full Name</Text>
@@ -557,7 +586,7 @@ export default function Profile() {
               onPress={() => setIsAccountModalVisible(false)}
               className="bg-[#5B8C51] mt-8 py-4 rounded-full items-center shadow-md"
             >
-              <Text 
+              <Text
                 className="text-white text-xl"
                 style={{ fontFamily: 'Nunito_700Bold' }}
               >
@@ -639,13 +668,13 @@ function MenuItem({ icon, label, border = true, testID, onPress }: any) {
 function Section({ title, content }: { title: string, content: string }) {
   return (
     <View>
-      <Text 
+      <Text
         className="text-lg text-[#3A4D3F] mb-1"
         style={{ fontFamily: 'Nunito_700Bold' }}
       >
         {title}
       </Text>
-      <Text 
+      <Text
         className="text-[#4A5D4E] leading-6"
         style={{ fontFamily: 'Nunito_400Regular' }}
       >
