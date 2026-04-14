@@ -1,4 +1,5 @@
 import { BiometricsProvider } from '@/context/BiometricsContext';
+import { NotificationsProvider } from '@/context/NotificationsContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAudioPlayer } from 'expo-audio';
 import { Stack, useRouter } from 'expo-router';
@@ -71,24 +72,20 @@ export default function RootLayout() {
     checkOnboarding();
   }, [isReady, router]);
 
-  // ANIMAÇÃO HBO MAX COM JINGLE NO INÍCIO
   useEffect(() => {
     if (isRoutingReady && isImageLoaded) {
       const startHandoffAnimation = async () => {
         try {
           await SplashScreen.hideAsync();
 
-          // B. COMEÇA O JINGLE IMEDIATAMENTE (Logo ainda está parado)
           if (player) {
             player.play();
           }
 
-          // C. Arranca a sequência de animação
           Animated.sequence([
-            Animated.delay(1000), // O logo fica parado por 1 segundo enquanto o som toca
+            Animated.delay(1000), 
 
             Animated.parallel([
-              // Início da expansão imersiva
               Animated.timing(opacityAnim, {
                 toValue: 0,
                 duration: 900,
@@ -96,7 +93,7 @@ export default function RootLayout() {
                 useNativeDriver: true,
               }),
               Animated.timing(scaleAnim, {
-                toValue: 12, // Expansão estilo HBO Max
+                toValue: 12, 
                 duration: 1000,
                 easing: Easing.bezier(0.4, 0, 0.2, 1),
                 useNativeDriver: true,
@@ -117,47 +114,50 @@ export default function RootLayout() {
   const splashBackgroundColor = '#F0F2EB';
 
   return (
-    <BiometricsProvider>
-      <View style={{ flex: 1 }}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="onboarding" />
-          <Stack.Screen name="setup-profile" />
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="profile-selection" />
-          <Stack.Screen name="activity-details" />
-        </Stack>
+    <NotificationsProvider>
+      <BiometricsProvider>
+        <View style={{ flex: 1 }}>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="onboarding" />
+            <Stack.Screen name="setup-profile" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="profile-selection" />
+            <Stack.Screen name="activity-details" />
+            <Stack.Screen name="notifications" options={{ presentation: 'modal' }} />
+          </Stack>
 
-        {/* Ecrã de Splash Falso para Animação */}
-        {!isAnimationComplete && (
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              StyleSheet.absoluteFill,
-              {
-                backgroundColor: splashBackgroundColor,
-                opacity: opacityAnim,
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 999,
-              },
-            ]}
-          >
-            <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-              <Animated.Image
-                source={require('../assets/images/Logo.png')}
-                style={{
-                  width: 200,
-                  height: 200,
-                }}
-                resizeMode="contain"
-                onLoadEnd={() => setIsImageLoaded(true)}
-                onError={() => setIsImageLoaded(true)}
-                fadeDuration={0}
-              />
+          {/* Ecrã de Splash Falso para Animação */}
+          {!isAnimationComplete && (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                StyleSheet.absoluteFill,
+                {
+                  backgroundColor: splashBackgroundColor,
+                  opacity: opacityAnim,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 999,
+                },
+              ]}
+            >
+              <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                <Animated.Image
+                  source={require('../assets/images/Logo.png')}
+                  style={{
+                    width: 200,
+                    height: 200,
+                  }}
+                  resizeMode="contain"
+                  onLoadEnd={() => setIsImageLoaded(true)}
+                  onError={() => setIsImageLoaded(true)}
+                  fadeDuration={0}
+                />
+              </Animated.View>
             </Animated.View>
-          </Animated.View>
-        )}
-      </View>
-    </BiometricsProvider>
+          )}
+        </View>
+      </BiometricsProvider>
+    </NotificationsProvider>
   );
 }

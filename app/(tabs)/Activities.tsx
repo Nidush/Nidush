@@ -12,7 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/utils/supabase';
 import { useFocusEffect } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -34,43 +34,64 @@ const UnifiedActivitiesScreen = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [myActivities, setMyActivities] = useState<Activity[]>([]);
+
+  // Debounce search query
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  const loadActivities = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setMyActivities([]);
+      return;
+    }
+
+    let query = supabase
+      .from('activity')
+      .select('*')
+      .eq('user_iduser', user.id);
+
+    if (debouncedSearchQuery) {
+      query = query.ilike('title', `%${debouncedSearchQuery}%`);
+    }
+
+    const { data, error } = await query;
+
+    if (!error && data) {
+      const mapped = data.map(d => ({
+        id: d.idactivity,
+        title: d.title,
+        description: d.description,
+        room: d.room,
+        image: d.image,
+        category: d.category,
+        type: d.type,
+        contentId: d.contentid,
+        scenarioId: d.scenarioid,
+        shortcuts: d.shortcuts === true || d.shortcuts === 'true',
+      }));
+      setMyActivities(mapped as any);
+    } else {
+      setMyActivities([]);
+    }
+  }, [debouncedSearchQuery]);
 
   useFocusEffect(
     useCallback(() => {
-      const loadActivities = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          setMyActivities([]); // Limpar se não houver user
-          return;
-        }
-        
-        const { data, error } = await supabase
-          .from('activity')
-          .select('*')
-          .eq('user_iduser', user.id);
-          
-        if (!error && data) {
-          const mapped = data.map(d => ({
-            id: d.idactivity,
-            title: d.title,
-            description: d.description,
-            room: d.room,
-            image: d.image,
-            category: d.category,
-            type: d.type,
-            contentId: d.contentid,
-            scenarioId: d.scenarioid,
-            shortcuts: d.shortcuts === true || d.shortcuts === 'true',
-          }));
-          setMyActivities(mapped as any);
-        } else {
-          setMyActivities([]);
-        }
-      };
       loadActivities();
-    }, []),
+    }, [loadActivities]),
   );
+
+  // Re-fetch when debounced search changes
+  useEffect(() => {
+    loadActivities();
+  }, [debouncedSearchQuery]);
 
   let [fontsLoaded] = useFonts({
     Nunito_700Bold,

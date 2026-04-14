@@ -9,6 +9,7 @@ import {
 import { supabase, uploadImage } from '../utils/supabase';
 import { router, Stack } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNotifications } from '@/context/NotificationsContext';
 import {
   AccessibilityInfo,
   Keyboard,
@@ -42,6 +43,7 @@ export default function NewActivityFlow() {
   });
 
   const [step, setStep] = useState(1);
+  const { addNotification } = useNotifications();
   const totalSteps = 6;
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
@@ -219,6 +221,13 @@ export default function NewActivityFlow() {
         alert('Erro ao guardar na Base de Dados: ' + error.message);
         return;
       }
+
+      // 3. Trigger Notification
+      addNotification(
+        'New Activity Created',
+        `Great job! "${activityName || 'Untitled Activity'}" has been added to your creations.`,
+        'creation'
+      );
 
       // Se tudo correu bem, avançar para os detalhes usando o ID gerado pelo Supabase
       router.push({

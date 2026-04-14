@@ -1,7 +1,8 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import React from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
+import { useNotifications } from '@/context/NotificationsContext';
 
 interface HomeHeaderProps {
   userName: string;
@@ -9,6 +10,8 @@ interface HomeHeaderProps {
 }
 
 export const HomeHeader = ({ userName, avatarUrl }: HomeHeaderProps) => {
+  const router = useRouter();
+  const { unreadCount } = useNotifications();
   const getGreeting = () => {
     const currentHour = new Date().getHours();
 
@@ -52,11 +55,20 @@ export const HomeHeader = ({ userName, avatarUrl }: HomeHeaderProps) => {
 
       <View className="flex-row items-center">
         <Pressable
-          className="mr-4"
+          className="mr-4 relative"
           accessibilityRole="button"
           accessibilityLabel="Notifications"
+          onPress={() => router.push('/notifications')}
         >
           <MaterialIcons name="notifications-none" size={36} color="#548F53" />
+          {unreadCount > 0 && (
+            <View 
+              style={{ position: 'absolute', right: -2, top: -2, backgroundColor: '#548F53', width: 18, height: 18, borderRadius: 9, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#F0F2EB' }} 
+              importantForAccessibility="no"
+            >
+              <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+            </View>
+          )}
         </Pressable>
 
         <Link href="/Profile" asChild>
