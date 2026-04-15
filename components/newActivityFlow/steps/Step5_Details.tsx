@@ -3,6 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import React from 'react';
 import { Image, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { StepWrapper } from '../StepWrapper';
+import { pickImage } from '../../../utils/imagePicker';
 
 interface Step5Props {
   name: string;
@@ -23,20 +24,11 @@ export const Step5_Details = ({
   setImage,
   defaultImage,
 }: Step5Props) => {
-  const pickImage = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      alert('Gallery permission is required');
-      return;
+  const handlePickImage = async () => {
+    const pickResult = await pickImage();
+    if (pickResult) {
+      setImage(pickResult);
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) setImage(result.assets[0].uri);
   };
 
   const handleResetImage = () => {
@@ -88,7 +80,7 @@ export const Step5_Details = ({
 
       <View className="mt-4 mb-6 flex-row justify-center items-center gap-3">
         <TouchableOpacity
-          onPress={pickImage}
+          onPress={handlePickImage}
           className="bg-[#E8F3E8] px-4 py-2.5 rounded-xl border border-[#C8E2C8] flex-row items-center"
           accessible={true}
           accessibilityRole="button"

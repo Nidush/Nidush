@@ -20,7 +20,23 @@ import {
   Nunito_700Bold,
 } from '@expo-google-fonts/nunito';
 
-export default function HouseName({ onNext }: { onNext: () => void }) {
+export default function HouseName({ 
+  onNext, 
+  houseName, 
+  setHouseName,
+  houseId,
+  setHouseId,
+  homeMode,
+  setHomeMode
+}: { 
+  onNext: () => void;
+  houseName: string;
+  setHouseName: (name: string) => void;
+  houseId: string;
+  setHouseId: (id: string) => void;
+  homeMode: 'create' | 'join';
+  setHomeMode: (mode: 'create' | 'join') => void;
+}) {
   const [fontsLoaded] = useFonts({
     'Nunito_400Regular': Nunito_400Regular,
     'Nunito_600SemiBold': Nunito_600SemiBold,
@@ -109,27 +125,79 @@ export default function HouseName({ onNext }: { onNext: () => void }) {
                   Giving it a name is the first step to making this space truly yours.
                 </Text>
 
-                {/* Input */}
-                <View className="w-full mb-[15px]">
-                  <Text 
-                    maxFontSizeMultiplier={1.2}
-                    style={{ fontFamily: 'Nunito_600SemiBold' }} 
-                    className="text-[14px] text-[#3E545C] mb-[6px]"
-                    accessibilityRole="header"
+                {/* Toggle Criar ou Juntar */}
+                <View className="flex-row bg-[#E8EDDF] rounded-full p-1 mb-6 mt-4">
+                  <TouchableOpacity
+                    className={`flex-1 py-3 rounded-full items-center ${homeMode === 'create' ? 'bg-[#5C8D58]' : 'bg-transparent'}`}
+                    onPress={() => setHomeMode('create')}
                   >
-                    How would you like to call your home?
-                  </Text>
-                  <TextInput 
-                    maxFontSizeMultiplier={1.2}
-                    placeholder="e.g. My Sanctuary"
-                    placeholderTextColor="#AAB4AA"
-                    className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB] text-[#3E545C]"
-                    style={{ fontFamily: 'Nunito_400Regular' }}
-                    accessible
-                    accessibilityLabel="Home name input"
-                    accessibilityHint="Enter the name you want to give to your home"
-                  />
+                    <Text 
+                      style={{ fontFamily: homeMode === 'create' ? 'Nunito_700Bold' : 'Nunito_600SemiBold' }}
+                      className={homeMode === 'create' ? 'text-white' : 'text-[#4A5D4E]'}
+                    >
+                      Create New Home
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    className={`flex-1 py-3 rounded-full items-center ${homeMode === 'join' ? 'bg-[#5C8D58]' : 'bg-transparent'}`}
+                    onPress={() => setHomeMode('join')}
+                  >
+                    <Text 
+                      style={{ fontFamily: homeMode === 'join' ? 'Nunito_700Bold' : 'Nunito_600SemiBold' }}
+                      className={homeMode === 'join' ? 'text-white' : 'text-[#4A5D4E]'}
+                    >
+                      Join Existing
+                    </Text>
+                  </TouchableOpacity>
                 </View>
+
+                {/* Input Dinâmico conforme Modo */}
+                {homeMode === 'create' ? (
+                  <View className="w-full mb-[15px]">
+                    <Text 
+                      maxFontSizeMultiplier={1.2}
+                      style={{ fontFamily: 'Nunito_600SemiBold' }} 
+                      className="text-[14px] text-[#3E545C] mb-[6px]"
+                      accessibilityRole="header"
+                    >
+                      How would you like to call your home?
+                    </Text>
+                    <TextInput 
+                      maxFontSizeMultiplier={1.2}
+                      placeholder="e.g. My Sanctuary"
+                      placeholderTextColor="#AAB4AA"
+                      value={houseName}
+                      onChangeText={setHouseName}
+                      className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]"
+                      accessible
+                      accessibilityLabel="Home name input"
+                      accessibilityHint="Enter the name you want to give to your home"
+                    />
+                  </View>
+                ) : (
+                  <View className="w-full mb-[15px]">
+                    <Text 
+                      maxFontSizeMultiplier={1.2}
+                      style={{ fontFamily: 'Nunito_600SemiBold' }} 
+                      className="text-[14px] text-[#3E545C] mb-[6px]"
+                      accessibilityRole="header"
+                    >
+                      Enter your Join Code
+                    </Text>
+                    <TextInput 
+                      maxFontSizeMultiplier={1.2}
+                      placeholder="e.g. A49DK2"
+                      placeholderTextColor="#AAB4AA"
+                      value={houseId}
+                      onChangeText={setHouseId}
+                      autoCapitalize="characters"
+                      className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]"
+                      accessible
+                      accessibilityLabel="Join Code input"
+                      accessibilityHint="Enter the 6-character secure code to join"
+                    />
+                  </View>
+                )}
 
                 {/* Botão */}
                 <TouchableOpacity 
@@ -146,7 +214,7 @@ export default function HouseName({ onNext }: { onNext: () => void }) {
                     style={{ fontFamily: 'Nunito_700Bold' }} 
                     className="text-white text-[20px]"
                   >
-                    Create my home
+                    {homeMode === 'create' ? 'Create my home' : 'Join home'}
                   </Text>
                 </TouchableOpacity>
               </View>

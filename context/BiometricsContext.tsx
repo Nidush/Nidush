@@ -8,6 +8,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { useNotifications } from './NotificationsContext';
 
 interface BiometricsContextType {
   data: WearableData | null;
@@ -25,9 +26,11 @@ export const BiometricsProvider = ({
 }) => {
   const [data, setData] = useState<WearableData | null>(null);
   const [currentState, setCurrentState] = useState<UserState>('RELAXED');
+  const { addNotification } = useNotifications();
 
   const stressLevelRef = useRef(10);
   const trendRef = useRef<'UP' | 'DOWN'>('UP');
+  const lastStateRef = useRef<UserState>('RELAXED');
   const segments = useSegments();
 
   useEffect(() => {
@@ -54,12 +57,21 @@ export const BiometricsProvider = ({
       const newData = generateBiometricsFromStress(stressLevelRef.current);
       const newState = newData.detectedState;
 
+      if (newState !== lastStateRef.current) {
+        addNotification(
+          'Mood Update',
+          `You're now feeling ${newState.toLowerCase()}`,
+          'state_change'
+        );
+        lastStateRef.current = newState;
+      }
+
       setCurrentState(newState);
       setData(newData);
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [segments]);
+  }, [segments, addNotification]);
 
   return (
     <BiometricsContext.Provider value={{ data, currentState }}>

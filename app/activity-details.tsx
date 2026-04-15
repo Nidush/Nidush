@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '@/utils/supabase';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -80,10 +80,25 @@ export default function ActivityDetails() {
       let foundActivity = ACTIVITIES.find((a) => a.id === id);
 
       if (!foundActivity) {
-        const stored = await AsyncStorage.getItem('@myActivities');
-        if (stored) {
-          const userActivities: Activity[] = JSON.parse(stored);
-          foundActivity = userActivities.find((a) => a.id === id);
+        const { data, error } = await supabase
+          .from('activity')
+          .select('*')
+          .eq('idactivity', id)
+          .single();
+          
+        if (data && !error) {
+          foundActivity = {
+            id: data.idactivity.toString(), // Converter int id ou UUID para string
+            title: data.title,
+            description: data.description,
+            room: data.room,
+            image: data.image,
+            category: data.category,
+            type: data.type,
+            contentId: data.contentid,
+            scenarioId: data.scenarioid,
+            shortcuts: data.shortcuts === true || data.shortcuts === 'true',
+          } as Activity;
         }
       }
 
@@ -95,8 +110,31 @@ export default function ActivityDetails() {
           if (scen) setFocusEnabled(scen.focusMode);
         }
         if (foundActivity.contentId) {
-          const cont = CONTENTS[foundActivity.contentId];
-          setRelatedContent(cont || null);
+          const { data: contentRows, error: contentError } = await supabase
+            .from('content')
+            .select('*')
+            .eq('idcontent', foundActivity.contentId)
+            .limit(1);
+
+          if (contentRows && contentRows.length > 0 && !contentError) {
+            const contentData = contentRows[0];
+            setRelatedContent({
+              id: contentData.idcontent,
+              title: contentData.title,
+              type: contentData.type,
+              category: contentData.category,
+              description: contentData.description,
+              duration: contentData.duration,
+              image: contentData.image,
+              instructions: contentData.instructions,
+              ingredients: contentData.ingredients,
+              videoUrl: contentData.video_url,
+              author: contentData.author,
+            } as Content);
+          } else {
+            const cont = CONTENTS[foundActivity.contentId];
+            setRelatedContent(cont || null);
+          }
         }
       } else {
         const foundScenario = SCENARIOS.find((s) => s.id === id);
@@ -187,16 +225,11 @@ export default function ActivityDetails() {
       isDestructive: true,
       onConfirm: async () => {
         try {
-          const stored = await AsyncStorage.getItem('@myActivities');
-          if (stored) {
-            const activities: Activity[] = JSON.parse(stored);
-            const updatedActivities = activities.filter((a) => a.id !== id);
-            await AsyncStorage.setItem(
-              '@myActivities',
-              JSON.stringify(updatedActivities),
-            );
-            router.navigate('/Activities');
-          }
+          // Deletar a atividade na nuvem do Supabase
+          const { error } = await supabase.from('activity').delete().eq('idactivity', id);
+          if (error) throw error;
+          
+          router.navigate('/Activities');
         } catch (e) {
           console.log('Error while trying to delete', e);
         }
@@ -222,10 +255,13 @@ export default function ActivityDetails() {
       </View>
     );
 
-  const imageSource =
-    typeof mainItem.image === 'string'
-      ? { uri: mainItem.image }
-      : mainItem.image;
+  const imgObj = mainItem.image;
+  const isNumeric = typeof imgObj === 'string' && /^\d+$/.test(imgObj);
+  const imageSource = isNumeric
+    ? { uri: `https://picsum.photos/seed/${imgObj}/400/600` }
+    : typeof imgObj === 'string'
+      ? { uri: imgObj }
+      : imgObj;
 
   const devicesToShow: ScenarioDeviceState[] =
     relatedScenario?.devices || (mainItem as Scenario).devices || [];

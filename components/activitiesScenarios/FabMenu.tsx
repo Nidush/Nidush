@@ -82,8 +82,6 @@ export const FabMenu = ({ isOpen, setIsOpen }: FabMenuProps) => {
               maxFontSizeMultiplier={1.2}
               className="bg-[#548F53] px-10 py-4 rounded-full text-xl text-white shadow-md overflow-hidden"
               style={{ fontFamily: 'Nunito_600SemiBold' }}
-              accessibilityRole="button"
-              accessibilityLabel="Create new activity"
             >
               Activity
             </Text>

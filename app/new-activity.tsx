@@ -1,4 +1,4 @@
-import { CONTENTS, SCENARIOS } from '@/constants/data';
+import { Content, CONTENTS, SCENARIOS } from '@/constants/data';
 import { Activity } from '@/constants/data/types';
 import {
   Nunito_400Regular,
@@ -6,9 +6,10 @@ import {
   Nunito_700Bold,
   useFonts,
 } from '@expo-google-fonts/nunito';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase, uploadImage } from '../utils/supabase';
 import { router, Stack } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNotifications } from '@/context/NotificationsContext';
 import {
   AccessibilityInfo,
   Keyboard,
@@ -42,6 +43,7 @@ export default function NewActivityFlow() {
   });
 
   const [step, setStep] = useState(1);
+  const { addNotification } = useNotifications();
   const totalSteps = 6;
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
@@ -55,6 +57,42 @@ export default function NewActivityFlow() {
   const [activityName, setActivityName] = useState('');
   const [description, setDescription] = useState('');
   const [activityImage, setActivityImage] = useState<any>(null);
+  const [dbContent, setDbContent] = useState<Content[]>([]);
+
+  useEffect(() => {
+    const fetchContent = async () => {
+      const { data, error } = await supabase
+        .from('content')
+        .select('*');
+      
+      if (data && !error) {
+        setDbContent(data.map((c: any) => ({
+          id: c.idcontent,
+          title: c.title,
+          type: c.type,
+          category: c.category,
+          description: c.description,
+          duration: c.duration,
+          image: c.image,
+          instructions: c.instructions,
+          ingredients: c.ingredients,
+          videoUrl: c.video_url,
+          author: c.author,
+        })));
+      }
+    };
+    fetchContent();
+  }, []);
+
+  const allContent = useMemo(() => {
+    const combined = [...dbContent];
+    Object.values(CONTENTS).forEach((local: Content) => {
+      if (!combined.find((db: Content) => db.id === local.id)) {
+        combined.push(local);
+      }
+    });
+    return combined;
+  }, [dbContent]);
 
   useEffect(() => {
     AccessibilityInfo.announceForAccessibility(`Step ${step} of ${totalSteps}`);
@@ -85,7 +123,7 @@ export default function NewActivityFlow() {
 
   const handleContentSelect = (id: string) => {
     setSelectedContentId(id);
-    const content = Object.values(CONTENTS).find((c) => c.id === id);
+    const content = allContent.find((c) => c.id === id);
     if (content) {
       setActivityName(content.title);
       setDescription(content.description || '');
@@ -122,7 +160,7 @@ export default function NewActivityFlow() {
   };
 
   const handleSave = async () => {
-    const contentObj = Object.values(CONTENTS).find(
+    const contentObj = allContent.find(
       (c) => c.id === selectedContentId,
     );
 
@@ -154,29 +192,60 @@ export default function NewActivityFlow() {
     };
 
     try {
-      const storedActivities = await AsyncStorage.getItem('@myActivities');
-      const parsedActivities = storedActivities
-        ? JSON.parse(storedActivities)
-        : [];
-      await AsyncStorage.setItem(
-        '@myActivities',
-        JSON.stringify([newActivity, ...parsedActivities]),
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Utilizador não autenticado!");
+
+      // 1. Upload da imagem para o Storage (se for uma nova imagem local)
+      let imageUrl = finalImage?.uri || finalImage;
+      if (typeof imageUrl === 'string' && (imageUrl.startsWith('data:') || imageUrl.startsWith('file:') || imageUrl.startsWith('blob:'))) {
+        const uploadedUrl = await uploadImage(imageUrl);
+        if (uploadedUrl) imageUrl = uploadedUrl;
+      }
+
+      // 2. Tentar inserir na DB
+      const { data, error } = await supabase.from('activity').insert({
+        title: activityName || 'Untitled Activity',
+        description,
+        room,
+        image: imageUrl,
+        category: 'My creations',
+        type: activityType,
+        contentid: selectedContentId || null,
+        scenarioid: selectedScenarioId || null,
+        shortcuts: false,
+        user_iduser: user.id
+      }).select('*, idactivity').single();
+
+      if (error) {
+        console.error('Erro no Supabase:', error);
+        alert('Erro ao guardar na Base de Dados: ' + error.message);
+        return;
+      }
+
+      // 3. Trigger Notification
+      addNotification(
+        'New Activity Created',
+        `Great job! "${activityName || 'Untitled Activity'}" has been added to your creations.`,
+        'creation'
       );
+
+      // Se tudo correu bem, avançar para os detalhes usando o ID gerado pelo Supabase
       router.push({
         pathname: '/activity-details',
         params: {
-          id: newActivity.id,
+          id: data.idactivity.toString(),
           isNew: 'true',
         },
       });
     } catch (e) {
-      console.log('Erro ao salvar', e);
+      console.error('Erro ao salvar:', e);
+      alert('Ocorreu um erro ao salvar a tua atividade.');
     }
   };
 
   if (!fontsLoaded) return null;
 
-  const reviewContent = Object.values(CONTENTS).find(
+  const reviewContent = allContent.find(
     (c) => c.id === selectedContentId,
   );
   const reviewScenario = SCENARIOS.find((s) => s.id === selectedScenarioId);
@@ -228,6 +297,7 @@ export default function NewActivityFlow() {
                   activityType={activityType}
                   selectedContentId={selectedContentId}
                   onSelect={handleContentSelect}
+                  contentList={allContent}
                 />
               )}
               {step === 3 && <Step3_Room selected={room} onSelect={setRoom} />}
@@ -265,7 +335,8 @@ export default function NewActivityFlow() {
               )}
             </ScrollView>
 
-            {!isKeyboardVisible && !isNextDisabled() && (
+            {/* Mantemos apenas a verificação do teclado para não o esconder */}
+            {!isKeyboardVisible && (
               <View
                 className="absolute left-0 right-0 items-center bg-transparent pointer-events-box-none"
                 style={{
@@ -275,12 +346,26 @@ export default function NewActivityFlow() {
                 }}
               >
                 <TouchableOpacity
-                  className="h-14 w-[210px] rounded-full justify-center items-center shadow-lg bg-[#548F53]"
+                  // Se estiver desativado, fica cinzento/translúcido e sem sombra
+                  className={`h-14 w-[210px] rounded-full justify-center items-center transition-all ${
+                    isNextDisabled()
+                      ? 'bg-gray-400 opacity-60 shadow-none'
+                      : 'bg-[#548F53] shadow-lg'
+                  }`}
                   onPress={step === 6 ? handleSave : nextStep}
+                  disabled={isNextDisabled()} // Impede o clique físico
                   accessible={true}
                   accessibilityRole="button"
+                  // Informa o leitor de ecrã (VoiceOver/TalkBack) que o botão está inativo
+                  accessibilityState={{ disabled: isNextDisabled() }}
                   accessibilityLabel={
                     step === 6 ? 'Save activity' : 'Continue to next step'
+                  }
+                  // Uma dica extra para utilizadores com leitores de ecrã saberem o que falta fazer
+                  accessibilityHint={
+                    isNextDisabled()
+                      ? 'Please complete all required fields on this step to enable this button.'
+                      : 'Double tap to proceed.'
                   }
                 >
                   <Text

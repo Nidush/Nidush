@@ -4,16 +4,9 @@ import {
   Nunito_700Bold,
   useFonts,
 } from '@expo-google-fonts/nunito';
-import { router, Stack } from 'expo-router';
-import React, { useMemo } from 'react';
-import {
-  Alert,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
+import { Stack, router, useFocusEffect } from 'expo-router';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import { Alert, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { UnifiedCard } from '@/components/activitiesScenarios/UnifiedCard';
@@ -21,10 +14,10 @@ import { CarouselSection } from '../../components/activitiesScenarios/CarouselSe
 import { HomeHeader } from '../../components/Homepage/HomeHeader';
 import { StateWidget } from '../../components/Homepage/StateWidget';
 
-// 1. IMPORTAR TUDO O QUE PRECISAS DOS DADOS
-import { ACTIVITIES, CONTENTS, SCENARIOS } from '@/constants/data';
+import { ACTIVITIES, CONTENTS, SCENARIOS, Activity } from '@/constants/data';
 import { useBiometrics } from '@/context/BiometricsContext';
 import { getDynamicRecommendations } from '@/utils/recommendationEngine';
+import { supabase } from '@/utils/supabase';
 
 export default function Index() {
   const [fontsLoaded] = useFonts({
@@ -34,12 +27,144 @@ export default function Index() {
   });
 
   const { currentState } = useBiometrics();
+  const [userName, setUserName] = useState('...');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [myActivities, setMyActivities] = useState<Activity[]>([]);
+  const [userHobbies, setUserHobbies] = useState<string[]>([]);
+
+
+  // O userName deve ser atualizado quando ganhamos foco também
+  const fetchUserName = useCallback(async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
+      
+      if (user) {
+        setAvatarUrl(user.user_metadata?.avatar_url || null);
+        setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'Utilizador');
+
+        // Buscar hobbies da tabela users
+        const { data: dbUser } = await supabase
+          .from('users')
+          .select('hobbies')
+          .eq('email', user.email)
+          .maybeSingle();
+
+        if (dbUser?.hobbies) {
+          const raw = Array.isArray(dbUser.hobbies) ? dbUser.hobbies.join(',') : String(dbUser.hobbies);
+          const hooks = raw.replace(/[\[\]"]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
+          setUserHobbies(Array.from(new Set(hooks)));
+        }
+
+      } else {
+        // Tentar getUser() se session for null
+        const { data: { user: verifiedUser } } = await supabase.auth.getUser();
+        if (verifiedUser) {
+          setAvatarUrl(verifiedUser.user_metadata?.avatar_url || null);
+          setUserName(verifiedUser.user_metadata?.first_name || verifiedUser.email?.split('@')[0] || 'Utilizador');
+          
+          const { data: dbUser } = await supabase
+            .from('users')
+            .select('hobbies')
+            .eq('email', verifiedUser.email)
+            .maybeSingle();
+            
+          if (dbUser?.hobbies) {
+            const raw = Array.isArray(dbUser.hobbies) ? dbUser.hobbies.join(',') : String(dbUser.hobbies);
+            const hooks = raw.replace(/[\[\]"]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
+            setUserHobbies(Array.from(new Set(hooks)));
+          }
+
+
+        } else {
+          setUserName('Visitante');
+        }
+      }
+
+    } catch (e) {
+      console.error('Error fetching user name:', e);
+      setUserName('Visitante');
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUserName();
+
+    // Listener para mudanças de autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setAvatarUrl(session.user.user_metadata?.avatar_url || null);
+        setUserName(session.user.user_metadata?.first_name || session.user.email?.split('@')[0] || 'Utilizador');
+      } else {
+        setAvatarUrl(null);
+        setUserName('Visitante');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [fetchUserName]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const loadActivities = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setMyActivities([]); // Importante: Limpar se não houver user
+          setAvatarUrl(null);
+          setUserName('Visitante');
+          return;
+        }
+
+        // Atualizar o nome também por precaução
+        setAvatarUrl(user.user_metadata?.avatar_url || null);
+        setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'Utilizador');
+        
+        const { data, error } = await supabase
+          .from('activity')
+          .select('*')
+          .eq('user_iduser', user.id);
+          
+        if (!error && data) {
+          const mapped = data.map(d => ({
+            id: d.idactivity,
+            title: d.title,
+            description: d.description,
+            room: d.room,
+            image: d.image,
+            category: d.category,
+            type: d.type,
+            contentId: d.contentid,
+            scenarioId: d.scenarioid,
+            shortcuts: d.shortcuts === true || d.shortcuts === 'true',
+          }));
+          setMyActivities(mapped as any);
+        } else {
+          setMyActivities([]);
+        }
+      };
+      loadActivities();
+      fetchUserName();
+    }, [fetchUserName])
+  );
 
   // --- LÓGICA DO CARROSSEL (Recomendações) ---
   const dynamicActivities = useMemo(() => {
-    const appActivities = ACTIVITIES.filter(
-      (item) => item.category !== 'My creations',
-    );
+    // 1. Aplicar filtro de Hobbies se o utilizador tiver algum selecionado
+    const appActivities = ACTIVITIES.filter((item) => {
+      // Ignorar as criações próprias no carrossel de recomendações
+      if (item.category === 'My creations') return false;
+      
+      // Se o user tiver hobbies, filtramos; se não tiver, mostramos todos
+      if (userHobbies.length > 0) {
+        // item.type (meditation, cooking, workout, audiobooks)
+        return userHobbies.some(h => h.toLowerCase() === item.type?.toLowerCase());
+      }
+      
+      return true;
+    });
+
     const sortedList = getDynamicRecommendations(
       appActivities,
       currentState,
@@ -55,14 +180,17 @@ export default function Index() {
       }
       return { ...item, time: duration };
     });
-  }, [currentState]);
+  }, [currentState, userHobbies]);
+
 
   const dynamicTitle = useMemo(() => 'Activities for you', []);
 
   // --- NOVA LÓGICA DOS SHORTCUTS (USANDO 'shortcuts' NO PLURAL) ---
   const shortcuts = useMemo(() => {
+    const allActivities = [...ACTIVITIES, ...myActivities];
+
     // 1. Filtrar ATIVIDADES onde shortcuts === true
-    const favActivities = ACTIVITIES.filter(
+    const favActivities = allActivities.filter(
       (a: any) => a.shortcuts === true,
     ).map((item) => {
       // Tentar encontrar a duração no CONTENTS
@@ -98,7 +226,7 @@ export default function Index() {
 
     // 3. Juntar as duas listas
     return [...favActivities, ...favScenarios];
-  }, []); // Dependência vazia (calcula apenas ao montar o componente)
+  }, [myActivities]); // Agora depende das myActivities vindas no Supabase
 
   if (!fontsLoaded) return null;
 
@@ -120,7 +248,7 @@ export default function Index() {
         contentContainerStyle={{ paddingBottom: 40 }}
         style={{ paddingTop: Platform.OS === 'android' ? 20 : 0 }}
       >
-        <HomeHeader userName="Laura" />
+        <HomeHeader userName={userName} avatarUrl={avatarUrl} />
 
         <StateWidget />
 

@@ -1,5 +1,4 @@
-import { CONTENTS } from '@/constants/data';
-import { Activity } from '@/constants/data/types';
+import { Activity, Content } from '@/constants/data/types';
 import React, { useMemo } from 'react';
 import { FlatList, Text, View } from 'react-native';
 import { ContentCard } from '../ContentCard';
@@ -9,12 +8,14 @@ interface Step2Props {
   selectedContentId: string;
   onSelect: (id: string) => void;
   activityType: Activity['type'];
+  contentList: Content[];
 }
 
 export const Step2_Content = ({
   selectedContentId,
   onSelect,
   activityType,
+  contentList,
 }: Step2Props) => {
   const filteredContent = useMemo(() => {
     const categoryMap: Record<string, string> = {
@@ -25,14 +26,14 @@ export const Step2_Content = ({
       general: 'general',
     };
 
-    if (activityType === 'general') return Object.values(CONTENTS);
+    if (activityType === 'general') return contentList;
 
     const targetCategory = categoryMap[activityType] || activityType;
 
-    return Object.values(CONTENTS).filter(
+    return contentList.filter(
       (content) => content.category === targetCategory,
     );
-  }, [activityType]);
+  }, [activityType, contentList]);
 
   const recipes = filteredContent.filter((c) => c.type === 'recipe');
   const videos = filteredContent.filter(

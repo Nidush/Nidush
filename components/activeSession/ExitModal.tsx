@@ -54,7 +54,6 @@ export const ExitModal = ({ visible, onResume, onEnd }: ExitModalProps) => {
             className="flex-1 justify-center items-center px-8"
             onPress={onResume}
             accessible={true}
-            accessibilityRole="button"
             accessibilityLabel="Resume session"
             accessibilityHint="Double tap anywhere on the background to return to your session"
           >
