@@ -50,24 +50,31 @@ export default function Profile() {
         setUserEmail(userEmail);
         const { data: usersFound } = await supabase
           .from('users')
-          .select('hobbies, home_idhome')
+          .select('hobbies')
           .ilike('email', userEmail.trim());
-
 
         const userData = usersFound && usersFound.length > 0 ? usersFound[0] : null;
         let finalHomeId = null;
 
+        // Fetch user's home from user_homes table
+        const { data: homeAssociation } = await supabase
+          .from('user_homes')
+          .select('home_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (homeAssociation) {
+          finalHomeId = homeAssociation.home_id;
+          setUserHomeId(finalHomeId);
+        }
+
         if (!userData) {
-          const { data: byAuth } = await supabase.from('users').select('hobbies, home_idhome').eq('auth_uid', user.id).maybeSingle();
+          const { data: byAuth } = await supabase.from('users').select('hobbies').eq('auth_uid', user.id).maybeSingle();
           if (byAuth?.hobbies) {
             const raw = Array.isArray(byAuth.hobbies) ? byAuth.hobbies.join(',') : String(byAuth.hobbies);
             const cleanHobbies = raw.replace(/[\[\]"]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
 
             setSelectedHobbies(Array.from(new Set(cleanHobbies)));
-          }
-          if (byAuth?.home_idhome) {
-            setUserHomeId(byAuth.home_idhome);
-            finalHomeId = byAuth.home_idhome;
           }
         } else {
           if (userData?.hobbies) {
@@ -76,15 +83,11 @@ export default function Profile() {
             // Remover duplicados com Set
             setSelectedHobbies(Array.from(new Set(cleanHobbies)));
           }
-          if (userData?.home_idhome) {
-            setUserHomeId(userData.home_idhome);
-            finalHomeId = userData.home_idhome;
-          }
         }
 
         // Fetch Join Code se tivermos o ID da casa
         if (finalHomeId) {
-          const { data: homeData } = await supabase.from('home').select('join_code').eq('idhome', finalHomeId).maybeSingle();
+          const { data: homeData } = await supabase.from('homes').select('join_code').eq('id', finalHomeId).maybeSingle();
           if (homeData?.join_code) {
             setJoinCode(homeData.join_code);
           }

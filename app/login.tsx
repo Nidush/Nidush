@@ -65,15 +65,15 @@ export default function Login() {
     }
 
     if (user) {
-      const { data: userData, error: userQueryError } = await supabase
-        .from('users')
-        .select('home_idhome')
-        .or(`auth_uid.eq.${user.id},email.eq.${user.email}`)
+      const { data: homeAssoc, error: userQueryError } = await supabase
+        .from('user_homes')
+        .select('home_id')
+        .eq('user_id', user.id)
         .maybeSingle();
 
       setLoading(false);
 
-      if (userQueryError || !userData?.home_idhome) {
+      if (userQueryError || !homeAssoc?.home_id) {
         router.replace({
           pathname: '/setup-profile',
           params: { pwd: password }

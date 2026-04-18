@@ -41,53 +41,46 @@ export default function ProfileSelection() {
 
         console.log("-> Utilizador atual:", user.email);
         
-        // 1. Obter a casa (home_idhome) do user atual
-        const cleanEmail = user.email ? user.email.trim() : '';
-        const { data: usersFound, error: myError } = await supabase
-          .from('users')
-          .select('home_idhome, first_name')
-          .ilike('email', cleanEmail);
+        // 1. Obter a casa do utilizador atual usando a tabela intermédia user_homes
+        const { data: homeAssocs, error: assocError } = await supabase
+          .from('user_homes')
+          .select('home_id')
+          .eq('user_id', user.id);
 
-        if (myError) console.error("--> Erro no myUser:", myError);
-        
-        let userRecord = usersFound && usersFound.length > 0 ? usersFound[0] : null;
+        if (assocError) throw assocError;
 
-        // Fallback: Tenta por auth_uid se não achou email
-        if (!userRecord) {
-           const { data: byAuthUid } = await supabase
-             .from('users')
-             .select('home_idhome, first_name')
-             .eq('auth_uid', user.id)
-             .maybeSingle();
-           if (byAuthUid) userRecord = byAuthUid;
-        }
-
-        if (!userRecord) {
-          alert("Este utilizador (" + cleanEmail + ") não foi encontrado na tabela 'users'! Pode ser necessário recriar a conta ou preencher o perfil.");
+        if (!homeAssocs || homeAssocs.length === 0) {
+          alert("O teu utilizador não tem uma casa associada!");
         } else {
-          if (userRecord.first_name) setHostName(userRecord.first_name);
+          const activeHomeId = homeAssocs[0].home_id;
+          if (user.user_metadata?.first_name) setHostName(user.user_metadata.first_name);
+
+          console.log("-> À procura de residentes na casa ID:", activeHomeId);
           
-          if (userRecord.home_idhome) {
-            console.log("-> À procura de residentes na casa ID:", userRecord.home_idhome);
-            const { data: residents, error: resError } = await supabase
-              .from('users')
-              .select('iduser, first_name, last_name, avatar_url')
-              .eq('home_idhome', userRecord.home_idhome);
+          // 2. Obter todos os residentes dessa casa (incluindo o próprio)
+          const { data: residents, error: resError } = await supabase
+            .from('user_homes')
+            .select(`
+              users (
+                id,
+                first_name,
+                last_name,
+                avatar_url
+              )
+            `)
+            .eq('home_id', activeHomeId);
 
-            if (resError) console.error("--> Erro residents:", resError);
+          if (resError) console.error("--> Erro residents:", resError);
 
-            if (residents && residents.length > 0) {
-              const mappedProfiles: Profile[] = residents.map((r) => ({
-                id: r.iduser,
-                name: [r.first_name, r.last_name].filter(Boolean).join(' ').trim() || 'Utilizador',
-                avatarUrl: r.avatar_url,
-              }));
-              setProfiles(mappedProfiles);
-            } else {
-              alert("Não foram encontrados outros residentes na casa com ID: " + userRecord.home_idhome);
-            }
+          if (residents && residents.length > 0) {
+            const mappedProfiles: Profile[] = residents.map((r: any) => ({
+              id: r.users.id,
+              name: [r.users.first_name, r.users.last_name].filter(Boolean).join(' ').trim() || 'Utilizador',
+              avatarUrl: r.users.avatar_url,
+            }));
+            setProfiles(mappedProfiles);
           } else {
-            alert("O teu utilizador não tem uma casa (home_idhome) associada!");
+            alert("Não foram encontrados residentes na casa com ID: " + activeHomeId);
           }
         }
       } catch (error) {

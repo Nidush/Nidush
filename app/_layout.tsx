@@ -9,14 +9,12 @@ import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { supabase } from '../utils/supabase';
 import './../global.css';
 
-// Mantém a Splash nativa ativa no arranque
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
   const router = useRouter();
 
-  // 1. Configura o player de áudio (certifica-te que o ficheiro existe em assets/audio/jingle.mp3)
   const player = useAudioPlayer(require('../assets/audio/intro.mp3'));
 
   const [isRoutingReady, setIsRoutingReady] = useState(false);
@@ -26,7 +24,6 @@ export default function RootLayout() {
   const opacityAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  // Lógica de Redirecionamento (Onboarding vs Tabs)
   useEffect(() => {
     setIsReady(true);
   }, []);
@@ -36,22 +33,18 @@ export default function RootLayout() {
 
     const checkOnboarding = async () => {
       try {
-        // 1. Check local flag
         const viewed = await AsyncStorage.getItem('@viewedOnboarding');
         
-        // 2. Check Supabase session and user status as a secondary check for existing users
         const { data: { user } } = await supabase.auth.getUser();
         
         if (user) {
-          // If logged in, check if they have a home
-          // Check by auth_uid OR email for robustness
-          const { data: userData } = await supabase
-            .from('users')
-            .select('home_idhome')
-            .or(`auth_uid.eq.${user.id},email.eq.${user.email}`)
+          const { data: homeAssoc } = await supabase
+            .from('user_homes')
+            .select('home_id')
+            .eq('user_id', user.id)
             .maybeSingle();
             
-          if (userData?.home_idhome) {
+          if (homeAssoc?.home_id) {
             await AsyncStorage.setItem('@viewedOnboarding', 'true');
             router.replace('/(tabs)');
             return;
@@ -126,7 +119,6 @@ export default function RootLayout() {
             <Stack.Screen name="notifications" options={{ presentation: 'modal' }} />
           </Stack>
 
-          {/* Ecrã de Splash Falso para Animação */}
           {!isAnimationComplete && (
             <Animated.View
               pointerEvents="none"

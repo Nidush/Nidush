@@ -75,22 +75,22 @@ export default function ActiveSession() {
        // Se não encontrou localmente, tentar no Supabase (atividades criadas pelo user)
       if (!foundItem) {
         const { data, error } = await supabase
-          .from('activity')
+          .from('activities')
           .select('*')
-          .eq('idactivity', id)
+          .eq('id', id)
           .single();
 
         if (data && !error) {
           foundItem = {
-            id: data.idactivity.toString(),
+            id: data.id.toString(),
             title: data.title,
             description: data.description,
-            room: data.room,
+            room_id: data.room_id,
             image: data.image,
             category: data.category,
             type: data.type,
-            contentId: data.contentid,
-            scenarioId: data.scenarioid,
+            content_id: data.content_id,
+            scenario_id: data.scenario_id,
             shortcuts: data.shortcuts === true || data.shortcuts === 'true',
           } as Activity;
         }
@@ -111,13 +111,13 @@ export default function ActiveSession() {
         console.log('Found Item:', foundItem);
       }
 
-      if (foundItem && 'contentId' in foundItem && foundItem.contentId) {
-        console.log('Fetching content for ID:', foundItem.contentId);
+      if (foundItem && (foundItem as any).content_id) {
+        console.log('Fetching content for ID:', (foundItem as any).content_id);
         // Fetch content from Supabase
         const { data: contentRows, error: contentError } = await supabase
-          .from('content')
+          .from('contents')
           .select('*')
-          .eq('idcontent', foundItem.contentId)
+          .eq('id', (foundItem as any).content_id)
           .limit(1);
 
         const contentData =
@@ -133,7 +133,8 @@ export default function ActiveSession() {
           }
         } else {
           // Fallback to local CONTENTS
-          const content = CONTENTS[foundItem.contentId];
+          const cId = (foundItem as any).content_id;
+          const content = cId ? CONTENTS[cId] : null;
           if (content) {
             rawInstructions = content.instructions || [];
             playlistName = content.title;
@@ -146,12 +147,8 @@ export default function ActiveSession() {
       }
 
       if (contentType !== 'video') {
-        const relatedScenario =
-          'scenarioId' in foundItem
-            ? SCENARIOS.find((s) => s.id === foundItem.scenarioId)
-            : !('type' in foundItem)
-              ? foundItem
-              : undefined;
+        const sId = (foundItem as any).scenario_id;
+        const relatedScenario = sId ? SCENARIOS.find((s) => s.id === sId) : null;
         if (relatedScenario?.playlist) playlistName = relatedScenario.playlist;
       }
 
@@ -171,7 +168,7 @@ export default function ActiveSession() {
 
       setSessionData({
         title: foundItem.title || 'Session',
-        room: foundItem.room || 'Living Room',
+        room: (foundItem as any).room_id || (foundItem as any).room || 'Living Room',
         playlistName: playlistName,
         image: foundItem.image,
         instructions: formattedInstructions,

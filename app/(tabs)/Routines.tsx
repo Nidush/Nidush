@@ -46,16 +46,16 @@ export default function Routines() {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('routine')
+        .from('routines')
         .select(`
-          idroutine,
+          id,
           name,
           execution_time,
           days_of_week,
           is_active,
-          scenario:scenario_idscenario (
-            idscenario,
-            rooms:rooms_idrooms (
+          scenario:scenarios (
+            id,
+            rooms:rooms (
               name
             )
           )
@@ -65,7 +65,7 @@ export default function Routines() {
 
       if (data) {
         const mappedRoutines: Routine[] = data.map((item: any) => ({
-          id: item.idroutine,
+          id: item.id,
           title: item.name,
           days: item.days_of_week || 'N/A',
           time: formatTime(item.execution_time),
@@ -101,9 +101,9 @@ export default function Routines() {
 
     try {
       const { error } = await supabase
-        .from('routine')
+        .from('routines')
         .update({ is_active: newStatus })
-        .eq('idroutine', id);
+        .eq('id', id);
 
       if (error) throw error;
     } catch (err) {

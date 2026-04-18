@@ -122,21 +122,21 @@ export default function Index() {
         setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'Utilizador');
         
         const { data, error } = await supabase
-          .from('activity')
+          .from('activities')
           .select('*')
-          .eq('user_iduser', user.id);
+          .eq('user_id', user.id);
           
         if (!error && data) {
           const mapped = data.map(d => ({
-            id: d.idactivity,
+            id: d.id,
             title: d.title,
             description: d.description,
-            room: d.room,
+            room_id: d.room_id,
             image: d.image,
             category: d.category,
             type: d.type,
-            contentId: d.contentid,
-            scenarioId: d.scenarioid,
+            content_id: d.content_id,
+            scenario_id: d.scenario_id,
             shortcuts: d.shortcuts === true || d.shortcuts === 'true',
           }));
           setMyActivities(mapped as any);
@@ -172,8 +172,8 @@ export default function Index() {
 
     return sortedList.map((item) => {
       let duration: string | undefined = undefined;
-      if ('contentId' in item && item.contentId) {
-        const contentData = (CONTENTS as any)[item.contentId];
+      if ('content_id' in item && item.content_id) {
+        const contentData = (CONTENTS as any)[item.content_id];
         if (contentData) {
           duration = contentData.duration;
         }
@@ -195,14 +195,14 @@ export default function Index() {
     ).map((item) => {
       // Tentar encontrar a duração no CONTENTS
       let duration = undefined;
-      if (item.contentId && (CONTENTS as any)[item.contentId]) {
-        duration = (CONTENTS as any)[item.contentId].duration;
+      if (item.content_id && (CONTENTS as any)[item.content_id]) {
+        duration = (CONTENTS as any)[item.content_id].duration;
       }
 
       return {
         id: item.id,
         title: item.title,
-        room: item.room,
+        room_id: item.room_id,
         image: item.image,
         time: duration,
         // Adicionamos type activity para ajudar na lógica se precisares
@@ -216,7 +216,7 @@ export default function Index() {
         return {
           id: item.id,
           title: item.title,
-          room: item.room,
+          room_id: item.room_id,
           image: item.image,
           time: undefined, // Cenários não costumam ter duração definida nos cards
           type: 'scenario',
@@ -298,7 +298,7 @@ export default function Index() {
                   title={item.title}
                   image={item.image}
                   time={item.time}
-                  room={item.room}
+                  room={item.room_id}
                   width="100%"
                   aspectRatio={0.95}
                   onPress={() =>

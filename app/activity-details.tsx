@@ -81,22 +81,22 @@ export default function ActivityDetails() {
 
       if (!foundActivity) {
         const { data, error } = await supabase
-          .from('activity')
+          .from('activities')
           .select('*')
-          .eq('idactivity', id)
+          .eq('id', id)
           .single();
           
         if (data && !error) {
           foundActivity = {
-            id: data.idactivity.toString(), // Converter int id ou UUID para string
+            id: data.id.toString(),
             title: data.title,
             description: data.description,
-            room: data.room,
+            room_id: data.room_id,
             image: data.image,
             category: data.category,
             type: data.type,
-            contentId: data.contentid,
-            scenarioId: data.scenarioid,
+            content_id: data.content_id,
+            scenario_id: data.scenario_id,
             shortcuts: data.shortcuts === true || data.shortcuts === 'true',
           } as Activity;
         }
@@ -104,22 +104,22 @@ export default function ActivityDetails() {
 
       if (foundActivity) {
         setMainItem(foundActivity);
-        if (foundActivity.scenarioId) {
-          const scen = SCENARIOS.find((s) => s.id === foundActivity.scenarioId);
+        if (foundActivity.scenario_id) {
+          const scen = SCENARIOS.find((s) => s.id === foundActivity.scenario_id);
           setRelatedScenario(scen || null);
           if (scen) setFocusEnabled(scen.focusMode);
         }
-        if (foundActivity.contentId) {
+        if (foundActivity.content_id) {
           const { data: contentRows, error: contentError } = await supabase
-            .from('content')
+            .from('contents')
             .select('*')
-            .eq('idcontent', foundActivity.contentId)
+            .eq('id', foundActivity.content_id)
             .limit(1);
 
           if (contentRows && contentRows.length > 0 && !contentError) {
             const contentData = contentRows[0];
             setRelatedContent({
-              id: contentData.idcontent,
+              id: contentData.id,
               title: contentData.title,
               type: contentData.type,
               category: contentData.category,
@@ -132,7 +132,7 @@ export default function ActivityDetails() {
               author: contentData.author,
             } as Content);
           } else {
-            const cont = CONTENTS[foundActivity.contentId];
+            const cont = CONTENTS[foundActivity.content_id as any];
             setRelatedContent(cont || null);
           }
         }
@@ -226,7 +226,7 @@ export default function ActivityDetails() {
       onConfirm: async () => {
         try {
           // Deletar a atividade na nuvem do Supabase
-          const { error } = await supabase.from('activity').delete().eq('idactivity', id);
+          const { error } = await supabase.from('activities').delete().eq('id', id);
           if (error) throw error;
           
           router.navigate('/Activities');
@@ -303,7 +303,7 @@ export default function ActivityDetails() {
           imageSource={imageSource}
           type={isActivity ? (mainItem as Activity).type : 'Scenario'}
           title={mainItem.title}
-          room={mainItem.room}
+          room={(mainItem as any).room_id || (mainItem as any).room}
           duration={displayTime}
           isActivity={isActivity}
           onBack={handleCustomBack}

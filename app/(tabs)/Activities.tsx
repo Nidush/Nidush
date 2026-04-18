@@ -53,9 +53,9 @@ const UnifiedActivitiesScreen = () => {
     }
 
     let query = supabase
-      .from('activity')
+      .from('activities')
       .select('*')
-      .eq('user_iduser', user.id);
+      .eq('user_id', user.id);
 
     if (debouncedSearchQuery) {
       query = query.ilike('title', `%${debouncedSearchQuery}%`);
@@ -65,15 +65,15 @@ const UnifiedActivitiesScreen = () => {
 
     if (!error && data) {
       const mapped = data.map(d => ({
-        id: d.idactivity,
+        id: d.id,
         title: d.title,
         description: d.description,
-        room: d.room,
+        room_id: d.room_id,
         image: d.image,
         category: d.category,
         type: d.type,
-        contentId: d.contentid,
-        scenarioId: d.scenarioid,
+        content_id: d.content_id,
+        scenario_id: d.scenario_id,
         shortcuts: d.shortcuts === true || d.shortcuts === 'true',
       }));
       setMyActivities(mapped as any);
@@ -109,8 +109,8 @@ const UnifiedActivitiesScreen = () => {
   };
 
   const getActivityTime = (activity: Activity) => {
-    if (activity.contentId && CONTENTS[activity.contentId]) {
-      return CONTENTS[activity.contentId].duration;
+    if (activity.content_id && CONTENTS[activity.content_id]) {
+      return CONTENTS[activity.content_id].duration;
     }
     return undefined;
   };
@@ -129,7 +129,7 @@ const UnifiedActivitiesScreen = () => {
       if (viewMode === 'activities' && isActivity(item)) {
         matchesFilter = item.type?.toLowerCase() === activeFilter.toLowerCase();
       } else {
-        matchesFilter = item.room === activeFilter;
+        matchesFilter = item.room_id === activeFilter;
       }
       return matchesFilter && matchesSearch;
     });

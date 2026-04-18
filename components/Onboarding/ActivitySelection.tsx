@@ -21,15 +21,15 @@ type MaterialIconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
 const ACTIVITIES = [
   { id: 'Meditation', icon: 'self-improvement' as MaterialIconName },
-  { id: 'Deep Breathing', icon: 'air' as MaterialIconName },
   { id: 'Workout', icon: 'fitness-center' as MaterialIconName },
   { id: 'Audiobooks', icon: 'menu-book' as MaterialIconName },
+  { id: 'Cooking', icon: 'restaurant' as MaterialIconName },
 ];
 
 export default function ActivitySelection({
   onFinish,
 }: {
-  onFinish: () => void;
+  onFinish: (selectedActivities: string[]) => void;
 }) {
   const [fontsLoaded] = useFonts({
     Nunito_400Regular: Nunito_400Regular,
@@ -160,7 +160,7 @@ export default function ActivitySelection({
                 accessibilityLabel="Enter my safe space"
                 accessibilityHint="Finishes the activity selection"
                 accessibilityState={{ disabled: selected.length === 0 }}
-                onPress={onFinish}
+                onPress={onFinish.bind(null, selected)}
                 disabled={selected.length === 0}
                 className={`h-[60px] rounded-full justify-center items-center bg-[#548F53] mt-8 mb-10
                  ${selected.length > 0 ? 'opacity-100' : 'opacity-40'}`}
@@ -184,7 +184,7 @@ export default function ActivitySelection({
                 accessibilityLabel="Enter my safe space"
                 accessibilityHint="Finishes the activity selection"
                 accessibilityState={{ disabled: selected.length === 0 }}
-                onPress={onFinish}
+                onPress={onFinish.bind(null, selected)}
                 disabled={selected.length === 0}
                 className={`h-[60px] rounded-full justify-center items-center bg-[#548F53] 
                   ${selected.length > 0 ? 'opacity-100' : 'opacity-40'}`}
