@@ -31,7 +31,7 @@ async function runOnboardingTest() {
 
         await driver.sleep(2000); 
         // 2. Clicar em Skip
-        console.log('🔍 A procurar botão Skip...');
+        console.log('A procurar botão Skip...');
         let skipBtn = await driver.findElement(By.css('[data-testid="skip-button"]'));
         await driver.executeScript("arguments[0].click();", skipBtn);
         console.log('Skip clicado!');

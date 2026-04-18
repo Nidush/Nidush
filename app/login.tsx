@@ -22,7 +22,9 @@ import {
   Nunito_600SemiBold,
   Nunito_700Bold,
 } from '@expo-google-fonts/nunito';
-import { supabase } from '../utils/supabase';
+import { supabase, apiLog } from '../utils/supabase';
+import { getFriendlyErrorMessage } from '../utils/errorHandlers';
+
 
 export default function Login() {
   const [fontsLoaded] = useFonts({
@@ -53,16 +55,19 @@ export default function Login() {
     setLoading(true);
     setErrorMsg('');
 
+    apiLog('POST', 'auth/signInWithPassword', { email });
     const { data: { user }, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
+
     if (error) {
       setLoading(false);
-      setErrorMsg('Erro: ' + error.message);
+      setErrorMsg(getFriendlyErrorMessage(error));
       return;
     }
+
 
     if (user) {
       const { data: homeAssoc, error: userQueryError } = await supabase
@@ -169,10 +174,13 @@ export default function Login() {
               </View>
 
               {errorMsg ? (
-                <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-red-500 text-[14px] mb-[10px] text-center">
-                  {errorMsg}
-                </Text>
+                <View className="bg-red-50 border border-red-200 p-3 rounded-xl mb-4 w-full">
+                  <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-red-600 text-[14px] text-center">
+                    {errorMsg}
+                  </Text>
+                </View>
               ) : null}
+
 
               <TouchableOpacity
                 testID="login-button"

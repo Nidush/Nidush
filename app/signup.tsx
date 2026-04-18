@@ -21,7 +21,10 @@ import {
   Nunito_700Bold,
   useFonts,
 } from '@expo-google-fonts/nunito';
-import { supabase } from '../utils/supabase';
+import { supabase, apiLog } from '../utils/supabase';
+
+import { getFriendlyErrorMessage } from '../utils/errorHandlers';
+
 
 export default function SignUp() {
   const [fontsLoaded] = useFonts({
@@ -57,7 +60,9 @@ export default function SignUp() {
     setLoading(true);
     setErrorMsg('');
 
+    apiLog('POST', 'auth/signUp', { email });
     const { data, error } = await supabase.auth.signUp({
+
       email,
       password,
       options: {
@@ -71,9 +76,10 @@ export default function SignUp() {
     setLoading(false);
 
     if (error) {
-      setErrorMsg('Erro: ' + error.message);
+      setErrorMsg(getFriendlyErrorMessage(error));
       return;
     }
+
 
     // Signup successful, redirect to login and pass the email to show the modal there
     router.replace({ pathname: '/login', params: { registeredEmail: email } });
@@ -202,11 +208,14 @@ export default function SignUp() {
                     />
                   </View>
 
-                  {errorMsg ? (
-                    <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-red-500 text-[14px] mb-[10px] text-center">
-                      {errorMsg}
-                    </Text>
+                   {errorMsg ? (
+                    <View className="bg-red-50 border border-red-200 p-3 rounded-xl mb-4">
+                      <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-red-600 text-[14px] text-center">
+                        {errorMsg}
+                      </Text>
+                    </View>
                   ) : null}
+
 
                   <TouchableOpacity
                     activeOpacity={0.8}

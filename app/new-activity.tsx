@@ -6,7 +6,8 @@ import {
   Nunito_700Bold,
   useFonts,
 } from '@expo-google-fonts/nunito';
-import { supabase, uploadImage } from '../utils/supabase';
+import { supabase, uploadImage, apiLog } from '../utils/supabase';
+
 import { router, Stack } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNotifications } from '@/context/NotificationsContext';
@@ -203,7 +204,7 @@ export default function NewActivityFlow() {
       }
 
       // 2. Tentar inserir na DB
-      const { data, error } = await supabase.from('activities').insert({
+      const insertData = {
         title: activityName || 'Untitled Activity',
         description,
         image: imageUrl,
@@ -213,7 +214,11 @@ export default function NewActivityFlow() {
         scenario_id: selectedScenarioId ? parseInt(selectedScenarioId) : null,
         shortcuts: false,
         user_id: user.id
-      }).select('*, id').single();
+      };
+
+      apiLog('INSERT', 'activities', insertData);
+      const { data, error } = await supabase.from('activities').insert(insertData).select('*, id').single();
+
 
       if (error) {
         console.error('Erro no Supabase:', error);

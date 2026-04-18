@@ -6,25 +6,31 @@ import { Platform } from 'react-native';
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL as string;
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string;
 
-// Adaptador de Storage seguro para Web e Local (resolve o erro "window is not defined" no Expo Web SSR)
+const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const url = input instanceof Request ? input.url : input.toString();
+  const method = init?.method || (input instanceof Request ? input.method : 'GET');
+  
+  console.log(`%c[SUPABASE REQUEST] %c${method} %c${url}`, 
+    'color: #5C8D58; font-weight: bold', 
+    'color: #3E545C; font-weight: bold', 
+    'color: #888'
+  );
+
+  const response = await fetch(input, init);
+
+  console.log(`%c[SUPABASE RESPONSE] %c${response.status} ${response.statusText}`, 
+    'color: #5C8D58; font-weight: bold', 
+    response.ok ? 'color: #2e7d32' : 'color: #d32f2f'
+  );
+
+  return response;
+};
+
 const customStorage = Platform.OS === 'web' 
   ? {
-      getItem: (key: string) => {
-        if (typeof window !== 'undefined') {
-          return window.localStorage.getItem(key);
-        }
-        return null;
-      },
-      setItem: (key: string, value: string) => {
-        if (typeof window !== 'undefined') {
-          window.localStorage.setItem(key, value);
-        }
-      },
-      removeItem: (key: string) => {
-        if (typeof window !== 'undefined') {
-          window.localStorage.removeItem(key);
-        }
-      },
+      getItem: (key: string) => typeof window !== 'undefined' ? window.localStorage.getItem(key) : null,
+      setItem: (key: string, value: string) => { if (typeof window !== 'undefined') window.localStorage.setItem(key, value); },
+      removeItem: (key: string) => { if (typeof window !== 'undefined') window.localStorage.removeItem(key); },
     }
   : AsyncStorage;
 
@@ -35,7 +41,14 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     persistSession: true,
     detectSessionInUrl: false,
   },
+  global: {
+    fetch: customFetch as typeof fetch,
+  }
 });
+
+export const apiLog = (method: string, table: string, data?: any) => {
+  console.log(`%c[DEBUG] %c${method} on ${table}`, 'color: #5C8D58; font-weight: bold', 'color: #3E545C', data || '');
+};
 
 const decodeBase64ToArrayBuffer = (base64: string): ArrayBuffer => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -74,10 +87,6 @@ const decodeBase64ToArrayBuffer = (base64: string): ArrayBuffer => {
   return arraybuffer;
 };
 
-/**
- * Uploads an image to Supabase Storage and returns the public URL.
- * Supports both Base64 (Web) and Local URI (Mobile).
- */
 export const uploadImage = async (base64OrUri: string, bucketName: string = 'activities'): Promise<string | null> => {
   if (!base64OrUri || base64OrUri.startsWith('http')) return base64OrUri;
 
@@ -93,7 +102,6 @@ export const uploadImage = async (base64OrUri: string, bucketName: string = 'act
       contentType = parts[0].split(':')[1].split(';')[0];
       uploadData = decodeBase64ToArrayBuffer(parts[1]);
     } else {
-      // Para local URIs (Mobile file://)
       const response = await fetch(base64OrUri);
       uploadData = await response.blob();
     }
@@ -106,7 +114,7 @@ export const uploadImage = async (base64OrUri: string, bucketName: string = 'act
       });
 
     if (error) {
-      console.error('Storage Upload Error:', error);
+      apiLog('UPLOAD ERROR', bucketName, error);
       return null;
     }
 
@@ -114,7 +122,7 @@ export const uploadImage = async (base64OrUri: string, bucketName: string = 'act
       .from(bucketName)
       .getPublicUrl(filePath);
 
-    console.log('Image uploaded successfully. Public URL:', publicUrl);
+    apiLog('UPLOAD SUCCESS', bucketName, { publicUrl });
     return publicUrl;
   } catch (error) {
     console.error('Error in uploadImage utility:', error);

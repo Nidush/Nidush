@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '@/utils/supabase';
+import { supabase, apiLog } from '@/utils/supabase';
+
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -80,11 +81,13 @@ export default function ActivityDetails() {
       let foundActivity = ACTIVITIES.find((a) => a.id === id);
 
       if (!foundActivity) {
+        apiLog('SELECT', 'activities', { id });
         const { data, error } = await supabase
           .from('activities')
           .select('*')
           .eq('id', id)
           .single();
+
           
         if (data && !error) {
           foundActivity = {
@@ -226,7 +229,11 @@ export default function ActivityDetails() {
       onConfirm: async () => {
         try {
           // Deletar a atividade na nuvem do Supabase
+          apiLog('DELETE', 'activities', { id });
           const { error } = await supabase.from('activities').delete().eq('id', id);
+
+
+
           if (error) throw error;
           
           router.navigate('/Activities');

@@ -21,7 +21,7 @@ export const Step4_Environment = ({
 
     const targetRoom = roomName.toLowerCase().trim();
 
-    return SCENARIOS.filter((s) => s.room.toLowerCase().trim() === targetRoom);
+    return SCENARIOS.filter((s) => s.room?.toLowerCase().trim() === targetRoom);
   }, [roomName]);
 
   return (
