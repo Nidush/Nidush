@@ -1,8 +1,11 @@
 name: Supabase Preview Environment
 
 on:
+  push:
+    branches: ["main", "feature/**"]
   pull_request:
     types: [opened, synchronize, reopened, closed]
+  workflow_dispatch: 
 
 jobs:
   manage-supabase-branch:
