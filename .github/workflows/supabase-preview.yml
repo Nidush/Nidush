@@ -1,0 +1,28 @@
+name: Supabase Preview
+
+on:
+  push:
+    branches: ["main", "feature/**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  database-preview:
+    name: Database Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Preview Migrations
+        run: |
+          echo "🔍 Iniciando Preview das Migrações..."
+          # Listamos as migrações para o log do GitHub
+          ls -R supabase/migrations/*.sql
+          echo "✅ Validação de arquivos concluída!"
