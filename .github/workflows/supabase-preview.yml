@@ -25,13 +25,13 @@ jobs:
 
       - name: Apply Migrations
         run: |
-          echo "🔍 Aplicando migrations localmente..."
+          echo "Aplicando migrations localmente..."
           supabase db reset
-          echo "✅ Migrations aplicadas com sucesso!"
+          echo "Migrations aplicadas com sucesso!"
 
       - name: Lint SQL (opcional mas recomendado)
         run: |
-          echo "🔍 Validando SQL..."
+          echo "Validando SQL..."
           for file in supabase/migrations/*.sql; do
             echo "Checking $file"
             # aqui podes integrar sqlfluff ou outro linter

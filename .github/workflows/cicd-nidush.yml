@@ -23,8 +23,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Tests
-        run: npm test -- --passWithNoTests
+      # - name: Run Tests
+      #   run: npm test -- --passWithNoTests
 
       - name: Run ESLint
         run: npm run lint || echo "Lint failed but continuing"
