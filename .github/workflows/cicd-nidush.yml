@@ -41,6 +41,33 @@ jobs:
           name: dist-files
           path: dist/
 
+  selenium-tests:
+    name: Selenium E2E Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start Web App in Background
+        run: npm run web &
+        env:
+          NODE_ENV: production
+
+      - name: Wait for App to be ready
+        run: npx wait-on http://localhost:8081 --timeout 120000
+
+      - name: Run Selenium Tests
+        run: npm run test:e2e
+
   deploy:
     name: Deploy to Netlify
     runs-on: ubuntu-latest

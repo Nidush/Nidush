@@ -146,6 +146,7 @@ export default function Login() {
               <View className="w-full mb-[15px]">
                 <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">Email</Text>
                 <TextInput 
+                  testID="email-input"
                   style={{ fontFamily: 'Nunito_400Regular' }}
                   className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]" 
                   keyboardType="email-address" 
@@ -158,6 +159,7 @@ export default function Login() {
               <View className="w-full mb-[15px]">
                 <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">Password</Text>
                 <TextInput 
+                  testID="password-input"
                   style={{ fontFamily: 'Nunito_400Regular' }}
                   className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]" 
                   secureTextEntry 
@@ -173,6 +175,7 @@ export default function Login() {
               ) : null}
 
               <TouchableOpacity
+                testID="login-button"
                 activeOpacity={0.8}
                 className="bg-[#5C8D58] w-[230px] h-[54px] rounded-full justify-center items-center self-center mt-[15px] shadow-sm"
                 onPress={handleLogin}

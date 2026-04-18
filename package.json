@@ -11,6 +11,7 @@
     "lint": "expo lint",
     "format": "prettier --write .",
     "test": "jest",
+    "test:e2e": "node selenium/onboarding.spec.js",
     "build": "expo export --platform web",
     "backend": "node server.js"
   },
@@ -80,6 +81,7 @@
     "prettier": "^3.7.4",
     "react-native-svg-transformer": "^1.5.2",
     "react-test-renderer": "19.1.0",
+    "selenium-webdriver": "^4.43.0",
     "ts-jest": "^29.4.6",
     "typescript": "~5.9.2"
   },

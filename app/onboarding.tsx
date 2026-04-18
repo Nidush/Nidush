@@ -418,6 +418,7 @@ export default function Onboarding() {
               />
 
               <TouchableOpacity
+                testID="skip-button"
                 accessibilityRole="button"
                 accessibilityLabel="Skip onboarding"
                 accessibilityHint="Skips the introduction and goes to sign up"
@@ -463,6 +464,7 @@ export default function Onboarding() {
             >
               {item.isLast && (
                 <TouchableOpacity
+                  testID="begin-journey-button"
                   accessibilityRole="button"
                   accessibilityLabel="Begin your journey"
                   accessibilityHint="Finishes onboarding and goes to sign up"
@@ -531,6 +533,7 @@ export default function Onboarding() {
               </Text>
 
               <TouchableOpacity
+                testID="discover-button"
                 accessibilityRole="button"
                 accessibilityLabel="Discover Nidush"
                 accessibilityHint="Starts the onboarding slides"
