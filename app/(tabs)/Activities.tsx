@@ -3,6 +3,7 @@ import { FabMenu } from '@/components/activitiesScenarios/FabMenu';
 import { FilterBar } from '@/components/activitiesScenarios/FilterBar';
 import { HeaderSection } from '@/components/activitiesScenarios/HeaderSection';
 import { useBiometrics } from '@/context/BiometricsContext';
+import { supabase } from '@/utils/supabase';
 import {
   Nunito_400Regular,
   Nunito_600SemiBold,
@@ -10,9 +11,8 @@ import {
   useFonts,
 } from '@expo-google-fonts/nunito';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '@/utils/supabase';
 import { useFocusEffect } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -36,6 +36,11 @@ const UnifiedActivitiesScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [myActivities, setMyActivities] = useState<Activity[]>([]);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+
+  const isLoadingRef = useRef(false);
+  const PAGE_SIZE = 10;
 
   // Debounce search query
   useEffect(() => {
@@ -45,23 +50,33 @@ const UnifiedActivitiesScreen = () => {
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
-  const loadActivities = useCallback(async () => {
+  const loadActivities = useCallback(async (isNextPage = false) => {
+    if (isLoadingRef.current) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       setMyActivities([]);
       return;
     }
 
+    isLoadingRef.current = true;
+    const currentPage = isNextPage ? page + 1 : 0;
+    const start = currentPage * PAGE_SIZE;
+    const end = start + PAGE_SIZE - 1;
+
+    console.log(`[API] Página ${currentPage}: A pedir do item ${start} ao ${end}...`);
+
     let query = supabase
       .from('activities')
-      .select('*')
-      .eq('user_id', user.id);
+      .select('*', { count: 'exact' })
+      .eq('user_id', user.id)
+      .range(start, end);
+
 
     if (debouncedSearchQuery) {
       query = query.ilike('title', `%${debouncedSearchQuery}%`);
     }
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
 
     if (!error && data) {
       const mapped = data.map(d => ({
@@ -76,22 +91,28 @@ const UnifiedActivitiesScreen = () => {
         scenario_id: d.scenario_id,
         shortcuts: d.shortcuts === true || d.shortcuts === 'true',
       }));
-      setMyActivities(mapped as any);
+
+      if (isNextPage) {
+        setMyActivities(prev => [...prev, ...mapped as any]);
+      } else {
+        setMyActivities(mapped as any);
+      }
+
+      setPage(currentPage);
+      if (count !== null) {
+        setHasMore(start + mapped.length < count);
+      }
     } else {
-      setMyActivities([]);
+      if (!isNextPage) setMyActivities([]);
     }
-  }, [debouncedSearchQuery]);
+    isLoadingRef.current = false;
+  }, [debouncedSearchQuery, page]);
 
   useFocusEffect(
     useCallback(() => {
       loadActivities();
-    }, [loadActivities]),
+    }, [debouncedSearchQuery]) // Only fetch again if search changes
   );
-
-  // Re-fetch when debounced search changes
-  useEffect(() => {
-    loadActivities();
-  }, [debouncedSearchQuery]);
 
   let [fontsLoaded] = useFonts({
     Nunito_700Bold,
@@ -170,6 +191,7 @@ const UnifiedActivitiesScreen = () => {
       accessibilityLanguage="en-US"
     >
       <ScrollView
+        scrollEventThrottle={16}
         importantForAccessibility={isMenuOpen ? 'no-hide-descendants' : 'auto'}
         contentContainerStyle={{
           paddingTop: Platform.OS === 'ios' ? 20 : 10,
@@ -221,6 +243,12 @@ const UnifiedActivitiesScreen = () => {
                   time: isActivity(item) ? getActivityTime(item) : undefined,
                 }))}
                 showTime={viewMode === 'activities'}
+                onEndReached={() => {
+                  if (viewMode === 'activities' && hasMore && !isLoadingRef.current) {
+                    loadActivities(true);
+                  }
+                }}
+
               />
             )}
 

@@ -17,13 +17,24 @@ interface NotificationsContextType {
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   clearAll: () => void;
+  loadMore: () => void;
+  refreshNotifications: () => Promise<void>;
+  hasMore: boolean;
+  isLoading: boolean;
 }
+
+
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
 
 export const NotificationsProvider = ({ children }: { children: React.ReactNode }) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const PAGE_SIZE = 10;
+
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -53,16 +64,31 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
     };
   }, []);
 
-  const loadNotifications = async (uid: string) => {
+  const loadNotifications = async (uid: string, isNextPage = false) => {
+    if (isLoading) return;
+    setIsLoading(true);
+
     try {
-      const { data, error } = await supabase
+      const currentPage = isNextPage ? page + 1 : 0;
+      const start = currentPage * PAGE_SIZE;
+      const end = start + PAGE_SIZE - 1;
+
+      console.log(`[API] Notificações - Página ${currentPage}: A pedir itens ${start} a ${end}...`);
+      
+      // Adicionar um pequeno atraso para a animação ser visível no vídeo de entrega
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      const { data, error, count } = await supabase
         .from('notifications')
-        .select('*')
+        .select('*', { count: 'exact' })
+
         .eq('user_id', uid)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(start, end);
 
       if (error) {
         console.error('Failed to load notifications from Supabase:', error);
+        setIsLoading(false);
         return;
       }
       
@@ -74,11 +100,37 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
         timestamp: new Date(n.created_at).getTime(),
         read: n.read,
       }));
-      setNotifications(mapped);
+
+      if (isNextPage) {
+        setNotifications((prev) => [...prev, ...mapped]);
+      } else {
+        setNotifications(mapped);
+      }
+
+      setPage(currentPage);
+      if (count !== null) {
+        setHasMore(start + mapped.length < count);
+      }
     } catch (e) {
       console.error('Error fetching notifications:', e);
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  const loadMore = () => {
+    if (userId && hasMore && !isLoading) {
+      loadNotifications(userId, true);
+    }
+  };
+
+  const refreshNotifications = async () => {
+    if (userId) {
+      await loadNotifications(userId, false);
+    }
+  };
+
+
 
   const addNotification = async (title: string, message: string, type: AppNotification['type']) => {
     if (!userId) return;
@@ -169,7 +221,13 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
         markAsRead,
         markAllAsRead,
         clearAll,
+        loadMore,
+        refreshNotifications,
+        hasMore,
+        isLoading,
       }}
+
+
     >
       {children}
     </NotificationsContext.Provider>

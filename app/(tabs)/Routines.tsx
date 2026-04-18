@@ -18,7 +18,6 @@ interface Routine {
   image: any;
 }
 
-// Mapeamento de imagens para as rotinas padrão
 const ROUTINE_IMAGES: Record<string, any> = {
   'Sunrise Awakening': require('../../assets/Scenarios/routines/sunrise_awakening.png'),
   'Gym Hour': require('../../assets/Scenarios/routines/gym_hour.png'),
@@ -40,12 +39,26 @@ const formatTime = (timeStr: string) => {
 export default function Routines() {
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const PAGE_SIZE = 10;
   const [searchQuery, setSearchQuery] = useState('');
 
-  const loadRoutines = useCallback(async () => {
+  const loadRoutines = useCallback(async (isNextPage = false) => {
     try {
-      setLoading(true);
-      const { data, error } = await supabase
+      if (isNextPage) {
+        if (loadingMore || !hasMore) return;
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
+
+      const currentPage = isNextPage ? page + 1 : 0;
+      const start = currentPage * PAGE_SIZE;
+      const end = start + PAGE_SIZE - 1;
+
+      const { data, error, count } = await supabase
         .from('routines')
         .select(`
           id,
@@ -59,7 +72,8 @@ export default function Routines() {
               name
             )
           )
-        `);
+        `, { count: 'exact' })
+        .range(start, end);
 
       if (error) throw error;
 
@@ -73,14 +87,25 @@ export default function Routines() {
           active: item.is_active,
           image: ROUTINE_IMAGES[item.name] || DEFAULT_IMAGE,
         }));
-        setRoutines(mappedRoutines);
+
+        if (isNextPage) {
+          setRoutines(current => [...current, ...mappedRoutines]);
+        } else {
+          setRoutines(mappedRoutines);
+        }
+
+        setPage(currentPage);
+        if (count !== null) {
+          setHasMore(start + mappedRoutines.length < count);
+        }
       }
     } catch (err) {
       console.error('Error loading routines:', err);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
-  }, []);
+  }, [page, hasMore, loadingMore]);
 
   useFocusEffect(
     useCallback(() => {
@@ -94,7 +119,6 @@ export default function Routines() {
 
     const newStatus = !routineToToggle.active;
 
-    // Atualização otimista
     setRoutines(current =>
       current.map(r => (r.id === id ? { ...r, active: newStatus } : r))
     );
@@ -108,7 +132,6 @@ export default function Routines() {
       if (error) throw error;
     } catch (err) {
       console.error('Error toggling routine:', err);
-      // Reverter em caso de erro
       setRoutines(current =>
         current.map(r => (r.id === id ? { ...r, active: !newStatus } : r))
       );
@@ -119,6 +142,16 @@ export default function Routines() {
     const searchLower = searchQuery.toLowerCase();
     return routines.filter((r) => r.title.toLowerCase().includes(searchLower) || r.room.toLowerCase().includes(searchLower));
   }, [routines, searchQuery]);
+
+  const handleScroll = (event: any) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const paddingToBottom = 20;
+    if (layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom) {
+      if (hasMore && !loadingMore && !loading) {
+        loadRoutines(true);
+      }
+    }
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-[#F1F3EA]" edges={['top']}>
@@ -152,12 +185,14 @@ export default function Routines() {
         </View>
       </View>
 
-      {loading ? (
+      {loading && !loadingMore ? (
         <View className="flex-1 justify-center items-center">
           <ActivityIndicator size="large" color="#548F53" />
         </View>
       ) : (
         <ScrollView 
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
           testID="routines-scrollview" 
           contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 130 }} 
           showsVerticalScrollIndicator={false}
@@ -175,15 +210,19 @@ export default function Routines() {
               onToggle={() => toggleRoutine(item.id)}
             />
           ))}
-          {filteredRoutines.length === 0 && (
+          {filteredRoutines.length === 0 && !loading && (
             <Text className="text-center text-[#7A8C85] mt-10" style={{ fontFamily: 'Nunito_600SemiBold' }}>
               No routines found.
             </Text>
           )}
+          {loadingMore && (
+            <View className="py-4 items-center">
+              <ActivityIndicator color="#548F53" />
+            </View>
+          )}
         </ScrollView>
       )}
 
-      {/* Botão para adicionar (estático neste exemplo) */}
       <View testID="add-routine-container">
         <AddRoomDevice actions={[]} isStatic={true} />
       </View>
