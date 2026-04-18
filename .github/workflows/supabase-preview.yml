@@ -32,8 +32,9 @@ jobs:
             exit 1
           fi
           
-          echo "Buscando status das migrações no projeto: $SUPABASE_PROJECT_ID"
+          echo "Linkando ao projeto: $SUPABASE_PROJECT_ID"
+          supabase link --project-ref $SUPABASE_PROJECT_ID --password ${{ secrets.SUPABASE_DB_PASSWORD }}
           
-          # Mostra a versão e o status das migrações (remotas vs locais)
-          # Isso gera um "log" real do Supabase dentro do GitHub
-          supabase migration list --project-ref $SUPABASE_PROJECT_ID
+          echo "Status das Migrações:"
+          supabase migration list
+
