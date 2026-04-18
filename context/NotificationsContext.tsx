@@ -31,9 +31,26 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
       if (user) {
         setUserId(user.id);
         loadNotifications(user.id);
+      } else {
+        setUserId(null);
+        setNotifications([]);
       }
     };
     fetchUser();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        setUserId(session.user.id);
+        loadNotifications(session.user.id);
+      } else {
+        setUserId(null);
+        setNotifications([]);
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   const loadNotifications = async (uid: string) => {

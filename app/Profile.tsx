@@ -48,12 +48,18 @@ export default function Profile() {
 
         const userEmail = user.email || '';
         setUserEmail(userEmail);
-        const { data: usersFound } = await supabase
+        const { data: userData } = await supabase
           .from('users')
           .select('hobbies')
-          .ilike('email', userEmail.trim());
+          .eq('auth_uid', user.id)
+          .maybeSingle();
 
-        const userData = usersFound && usersFound.length > 0 ? usersFound[0] : null;
+        if (userData?.hobbies) {
+          const raw = Array.isArray(userData.hobbies) ? userData.hobbies.join(',') : String(userData.hobbies);
+          const cleanHobbies = raw.replace(/[\[\]"]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
+          setSelectedHobbies(Array.from(new Set(cleanHobbies)));
+        }
+
         let finalHomeId = null;
 
         // Fetch user's home from user_homes table
@@ -66,23 +72,6 @@ export default function Profile() {
         if (homeAssociation) {
           finalHomeId = homeAssociation.home_id;
           setUserHomeId(finalHomeId);
-        }
-
-        if (!userData) {
-          const { data: byAuth } = await supabase.from('users').select('hobbies').eq('auth_uid', user.id).maybeSingle();
-          if (byAuth?.hobbies) {
-            const raw = Array.isArray(byAuth.hobbies) ? byAuth.hobbies.join(',') : String(byAuth.hobbies);
-            const cleanHobbies = raw.replace(/[\[\]"]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
-
-            setSelectedHobbies(Array.from(new Set(cleanHobbies)));
-          }
-        } else {
-          if (userData?.hobbies) {
-            const raw = Array.isArray(userData.hobbies) ? userData.hobbies.join(',') : String(userData.hobbies);
-            const cleanHobbies = raw.replace(/[\[\]"]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
-            // Remover duplicados com Set
-            setSelectedHobbies(Array.from(new Set(cleanHobbies)));
-          }
         }
 
         // Fetch Join Code se tivermos o ID da casa
@@ -153,41 +142,13 @@ export default function Profile() {
       const { error, count } = await supabase
         .from('users')
         .update({ hobbies: uniqueHobbies }, { count: 'exact' })
-        .ilike('email', userEmail.trim());
+        .eq('auth_uid', user.id);
 
       if (error) {
-        // Fallback para auth_uid se o email falhar
-        const { error: error2, count: count2 } = await supabase
-          .from('users')
-          .update({ hobbies: uniqueHobbies }, { count: 'exact' })
-          .eq('auth_uid', user.id);
-
-
-
-        if (error2) {
-          console.error("Erro ao guardar hobbies:", error2);
-          alert("Erro ao gravar hobbies: " + error2.message);
-        } else if (count2 === 0) {
-          alert("Erro RLS: Zero linhas atualizadas por UID. Verifica se as permissões SQL permitem a edição.");
-        } else {
-          setIsModalVisible(false);
-          alert("Hobby preferences saved!");
-        }
+        console.error("Erro ao guardar hobbies:", error);
+        alert("Erro ao gravar hobbies: " + error.message);
       } else if (count === 0) {
-        const uniqueHobbies = Array.from(new Set(selectedHobbies)).join(',');
-        const { error: errorFallback, count: countFallback } = await supabase
-          .from('users')
-          .update({ hobbies: uniqueHobbies }, { count: 'exact' })
-          .eq('auth_uid', user.id);
-
-
-
-        if (countFallback === 0) {
-          alert("Erro: O teu e-mail (" + userEmail + ") não foi encontrado ou está bloqueado pelo RLS. Garante que corres o SQL das permissões.");
-        } else {
-          setIsModalVisible(false);
-          alert("Hobby preferences saved!");
-        }
+        alert("Erro RLS/UID: Zero linhas atualizadas por UID.");
       } else {
         setIsModalVisible(false);
         alert("Hobby preferences saved!");

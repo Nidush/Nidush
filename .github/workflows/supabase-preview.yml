@@ -1,0 +1,50 @@
+name: Supabase Preview Environment
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+jobs:
+  manage-supabase-branch:
+    name: Manage DB Preview
+    runs-on: ubuntu-latest
+    
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # ------------------------------------------------------------------------------------------
+      - name: Create or Update Database Preview Branch
+        if: github.event.action != 'closed'
+        run: |
+          # Usaremos o mesmo nome da branch do Git para identificar a branch no DB db
+          BRANCH_NAME="${{ github.head_ref }}"
+          
+          echo "Criando o ambiente de banco de dados para a branch: $BRANCH_NAME..."
+          # Tenta criar a branch no Supabase. O '|| true' garante que a action não falhe se ela já existir.
+          supabase branches create "$BRANCH_NAME" --project-ref $SUPABASE_PROJECT_ID || echo "Branch de banco de dados já encontrada. Prosseguindo..."
+          
+          # A CLI envia automaticamente as migrations (pasta supabase/migrations) pra branch atual detectada
+          echo "Aplicando as atualizações (migrations)..."
+          supabase db push --project-ref $SUPABASE_PROJECT_ID
+
+      # ------------------------------------------------------------------------------------------
+      # QUANDO O PR É FECHADO OU MERGEADO
+      # ------------------------------------------------------------------------------------------
+      - name: Delete Preview Branch on PR Close
+        if: github.event.action == 'closed'
+        run: |
+          BRANCH_NAME="${{ github.head_ref }}"
+          
+          echo "Deletando o ambiente de banco de preview da branch: $BRANCH_NAME..."
+          supabase branches delete "$BRANCH_NAME" --project-ref $SUPABASE_PROJECT_ID
+
