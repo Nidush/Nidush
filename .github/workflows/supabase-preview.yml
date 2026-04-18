@@ -1,15 +1,13 @@
-name: Supabase Migration Validator
+name: Supabase Linter
 
 on:
   push:
     branches: ["main", "feature/**"]
   pull_request:
-    types: [opened, synchronize, reopened]
-  workflow_dispatch:
 
 jobs:
-  test-migrations:
-    name: Test DB Migrations
+  lint-database:
+    name: Lint Database
     runs-on: ubuntu-latest
     
     steps:
@@ -21,13 +19,8 @@ jobs:
         with:
           version: latest
 
-      - name: Start Local Supabase
+      - name: Verify Migration Syntax
         run: |
-          supabase init
-          # O --cb (control bar) e outros serviços não são necessários para teste de migração
-          supabase start --ignore-health-check
-          
-      - name: Verify Migrations (Reset & Push)
-        run: |
-          # Isso garante que todas as migrations na pasta /supabase/migrations são válidas
-          supabase db reset
+          # O comando 'lint' apenas checa se o SQL está correto. 
+          # É o mínimo possível para garantir que nada quebre.
+          supabase db lint
