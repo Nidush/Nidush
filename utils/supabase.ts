@@ -129,3 +129,19 @@ export const uploadImage = async (base64OrUri: string, bucketName: string = 'act
     return null;
   }
 };
+
+export const invokeFunction = async (functionName: string, body: any) => {
+  apiLog('FUNCTION CALL', functionName, body);
+  const { data, error } = await supabase.functions.invoke(functionName, {
+    body: body,
+  });
+
+  if (error) {
+    apiLog('FUNCTION ERROR', functionName, error);
+    throw error;
+  }
+
+  apiLog('FUNCTION SUCCESS', functionName, data);
+  return data;
+};
+

@@ -21,7 +21,8 @@ import {
   Nunito_700Bold,
   useFonts,
 } from '@expo-google-fonts/nunito';
-import { supabase, apiLog } from '../utils/supabase';
+import { supabase, apiLog, invokeFunction } from '../utils/supabase';
+
 
 import { getFriendlyErrorMessage } from '../utils/errorHandlers';
 
@@ -81,8 +82,18 @@ export default function SignUp() {
     }
 
 
-    // Signup successful, redirect to login and pass the email to show the modal there
+    try {
+      await invokeFunction('welcome-user', { 
+        name: firstName, 
+        email: email 
+      });
+    } catch (fnError) {
+      console.log('Erro ao enviar email de boas-vindas:', fnError);
+    }
+
+    // Signup bem sucedido, redirecionar para o login
     router.replace({ pathname: '/login', params: { registeredEmail: email } });
+
   };
 
   if (!fontsLoaded) return null;
