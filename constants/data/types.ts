@@ -35,7 +35,8 @@ export interface Scenario {
   id: string;
   title: string;
   description: string;
-  room_id: string;
+  room_id?: string;
+  room?: string;
   image: ImageSourcePropType;
   category?: 'My creations' | string;
   devices: ScenarioDeviceState[];
@@ -49,12 +50,15 @@ export interface Activity {
   id: string;
   title: string;
   description: string;
-  room_id: string;
+  room_id?: string;
+  room?: string;
   image: ImageSourcePropType;
   category?: 'My creations' | 'Simple recipes' | 'For the morning' | string;
   type: 'cooking' | 'meditation' | 'workout' | 'audiobooks' | 'general';
   scenario_id?: string;
+  scenarioId?: string;
   content_id?: string;
+  contentId?: string;
   shortcuts: boolean;
   keywords?: string[];
   created_at?: string;
