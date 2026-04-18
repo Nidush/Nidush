@@ -28,5 +28,6 @@ jobs:
 
       - name: Verify Migration Syntax
         run: |
-          # Valida o SQL contra o banco temporário
-          supabase db lint --db-url postgresql://postgres:postgres@localhost:54322/postgres
+          # Valida o SQL contra o banco temporário (desativando SSL para o banco local)
+          supabase db lint --db-url "postgresql://postgres:postgres@127.0.0.1:54322/postgres?sslmode=disable"
+
