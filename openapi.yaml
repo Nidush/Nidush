@@ -1,0 +1,131 @@
+openapi: 3.0.0
+info:
+  title: Nidush API - Full CRUD Specification
+  description: |
+    Complete CRUD specification for the Nidush Hub. 
+    Includes **GET** (Read), **POST** (Create), **PATCH** (Update), and **DELETE** for all tables.
+  version: 1.5.0
+servers:
+  - url: https://{project_ref}.supabase.co/rest/v1
+    description: Supabase PostgREST API
+    variables:
+      project_ref: { default: your-project-id }
+
+components:
+  securitySchemes:
+    supabaseKey: { type: apiKey, in: header, name: apikey }
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+
+  parameters:
+    select: { name: select, in: query, schema: { type: string, default: "*" } }
+    order: { name: order, in: query, schema: { type: string } }
+    limit: { name: limit, in: query, schema: { type: integer } }
+    offset: { name: offset, in: query, schema: { type: integer } }
+    prefer: { name: Prefer, in: header, schema: { type: string, enum: [ "return=representation", "return=minimal" ] } }
+    id_query: { name: id, in: query, required: true, description: "Filter by ID (e.g. eq.1)", schema: { type: string } }
+
+security:
+  - supabaseKey: []
+  - bearerAuth: []
+
+paths:
+  # --- ACTIVITIES ---
+  /activities:
+    get:
+      summary: List Activities
+      parameters: [ { $ref: '#/components/parameters/select' }, { $ref: '#/components/parameters/order' }, { $ref: '#/components/parameters/limit' } ]
+      responses: { '200': { description: Success } }
+    post:
+      summary: Create Activity
+      parameters: [ { $ref: '#/components/parameters/prefer' } ]
+      responses: { '201': { description: Created } }
+    patch:
+      summary: Update Activity
+      parameters: [ { $ref: '#/components/parameters/id_query' }, { $ref: '#/components/parameters/prefer' } ]
+      responses: { '204': { description: Updated } }
+    delete:
+      summary: Delete Activity
+      parameters: [ { $ref: '#/components/parameters/id_query' } ]
+      responses: { '204': { description: Deleted } }
+
+  # --- DEVICES ---
+  /devices:
+    get:
+      summary: List Devices
+      parameters: [ { $ref: '#/components/parameters/select' } ]
+      responses: { '200': { description: Success } }
+    post:
+      summary: Register Device
+      responses: { '201': { description: Created } }
+    patch:
+      summary: Update Device
+      parameters: [ { $ref: '#/components/parameters/id_query' } ]
+      responses: { '204': { description: Updated } }
+    delete:
+      summary: Remove Device
+      parameters: [ { $ref: '#/components/parameters/id_query' } ]
+      responses: { '204': { description: Deleted } }
+
+  # --- ROUTINES ---
+  /routines:
+    get:
+      summary: List Routines
+      parameters: [ { $ref: '#/components/parameters/select' } ]
+      responses: { '200': { description: Success } }
+    post:
+      summary: Create Routine
+      responses: { '201': { description: Created } }
+    patch:
+      summary: Update Routine
+      parameters: [ { $ref: '#/components/parameters/id_query' } ]
+      responses: { '204': { description: Updated } }
+    delete:
+      summary: Delete Routine
+      parameters: [ { $ref: '#/components/parameters/id_query' } ]
+      responses: { '204': { description: Deleted } }
+
+  # --- ROOMS ---
+  /rooms:
+    get:
+      summary: List Rooms
+      parameters: [ { $ref: '#/components/parameters/select' } ]
+      responses: { '200': { description: Success } }
+    post:
+      summary: Create Room
+      responses: { '201': { description: Created } }
+    patch:
+      summary: Update Room
+      parameters: [ { $ref: '#/components/parameters/id_query' } ]
+      responses: { '204': { description: Updated } }
+
+  # --- NOTIFICATIONS ---
+  /notifications:
+    get:
+      summary: List Notifications
+      parameters: [ { $ref: '#/components/parameters/select' } ]
+      responses: { '200': { description: Success } }
+    patch:
+      summary: Mark as Read (Update)
+      parameters: [ { $ref: '#/components/parameters/id_query' } ]
+      responses: { '204': { description: Updated } }
+    delete:
+      summary: Clear Notifications
+      parameters: [ { $ref: '#/components/parameters/id_query' } ]
+      responses: { '204': { description: Deleted } }
+
+  # --- USERS ---
+  /users:
+    get:
+      summary: User Profiles
+      parameters: [ { $ref: '#/components/parameters/select' } ]
+      responses: { '200': { description: Success } }
+    patch:
+      summary: Update Profile
+      parameters: [ { name: auth_uid, in: query, required: true, schema: { type: string } } ]
+      responses: { '204': { description: Updated } }
+
+  # --- ACTIVE SESSIONS ---
+  /active_session:
+    get: { summary: List Sessions, responses: { '200': { description: Success } } }
+    post: { summary: Start Session, responses: { '201': { description: Created } } }
+    delete: { summary: End Session, parameters: [ { $ref: '#/components/parameters/id_query' } ], responses: { '204': { description: Deleted } } }

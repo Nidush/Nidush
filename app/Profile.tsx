@@ -147,11 +147,8 @@ export default function Profile() {
       if (error) {
         console.error("Erro ao guardar hobbies:", error);
         alert("Erro ao gravar hobbies: " + error.message);
-      } else if (count === 0) {
-        alert("Erro RLS/UID: Zero linhas atualizadas por UID.");
       } else {
         setIsModalVisible(false);
-        alert("Hobby preferences saved!");
       }
 
     }
