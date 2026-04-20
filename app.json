@@ -7,7 +7,6 @@
     "icon": "./assets/images/Icon-Padded.png",
     "scheme": "nidush",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
     },
