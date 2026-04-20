@@ -1,13 +1,12 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Image, Text } from 'react-native'; // <-- Já não precisas do Platform aqui
-import { useSafeAreaInsets } from 'react-native-safe-area-context'; // <-- 1. Importar o hook
-
+import { Image, Text } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icons } from '../../assets/assets';
 import LogoIcon from '../../assets/images/Logo.png';
 
 export default function TabLayout() {
-  const insets = useSafeAreaInsets(); // <-- 2. Obter as medidas de segurança do ecrã
+  const insets = useSafeAreaInsets();
 
   const TabLabel = ({
     children,
@@ -42,7 +41,7 @@ export default function TabLayout() {
           height: 60 + insets.bottom,
           // 4. Padding dinâmico: 10px de base para o texto respirar + barra de sistema
           paddingBottom: 10 + insets.bottom,
-          paddingTop: 10,
+          paddingTop: 6,
         },
       }}
     >

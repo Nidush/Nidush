@@ -20,7 +20,9 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.health.READ_HEART_RATE",
+        "android.permission.health.READ_STEPS"
       ],
       "package": "com.nidush.app"
     },
@@ -43,10 +45,21 @@
           }
         }
       ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35,
+            "minSdkVersion": 26
+          }
+        }
+      ],
       "expo-font",
       "expo-audio",
       "expo-video",
-      "expo-asset"
+      "expo-asset",
+      "react-native-health-connect"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -55,8 +68,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "d78fca08-0c16-4d89-b260-5c196eb5670b"
+        "projectId": "0567dae8-f9ea-4c47-ac84-6cd11caa4580"
       }
-    }
+    },
+    "owner": "pedro2004"
   }
 }
