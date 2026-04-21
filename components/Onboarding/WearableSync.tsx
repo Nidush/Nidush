@@ -186,9 +186,6 @@ export default function WearableSync({
       const grantedPermissions = await requestPermission([
         { accessType: 'read', recordType: 'Steps' },
         { accessType: 'read', recordType: 'HeartRate' },
-        { accessType: 'read', recordType: 'SleepSession' },
-        { accessType: 'read', recordType: 'ActiveCaloriesBurned' },
-        { accessType: 'read', recordType: 'HeartRateVariabilityRmssd' },
       ]);
 
       if (!grantedPermissions || grantedPermissions.length === 0) {
