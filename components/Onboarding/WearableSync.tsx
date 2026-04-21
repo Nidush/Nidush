@@ -30,7 +30,6 @@ import {
   SdkAvailabilityStatus,
 } from 'react-native-health-connect';
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
 type SyncStatus =
   | 'idle'
   | 'requesting'
