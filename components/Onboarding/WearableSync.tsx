@@ -21,7 +21,6 @@ import {
   useFonts,
 } from '@expo-google-fonts/nunito';
 
-// Repara: Já não importamos o "Permission" daqui para evitar erros de TS
 import {
   getSdkStatus,
   initialize,
@@ -39,6 +38,9 @@ type SyncStatus =
   | 'partial'
   | 'denied'
   | 'unavailable';
+
+// ─── Permissões ───────────────────────────────────────────────────────────────
+const RECORDS_NEEDED: RecordType[] = ['Steps', 'HeartRate'];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<
@@ -182,30 +184,20 @@ export default function WearableSync({
         return;
       }
 
-      // 1. Array passado diretamente para evitar erros de TS
-      const grantedPermissions = await requestPermission([
-        { accessType: 'read', recordType: 'Steps' },
-        { accessType: 'read', recordType: 'HeartRate' },
-      ]);
+      const grantedPermissions = await requestPermission(
+        RECORDS_NEEDED.map((recordType) => ({
+          accessType: 'read' as const,
+          recordType,
+        })),
+      );
 
       if (!grantedPermissions || grantedPermissions.length === 0) {
         transitionStatus('denied');
         return;
       }
 
-      // 2. Verificação atualizada
-      const recordsWeNeed: RecordType[] = [
-        'Steps',
-        'HeartRate',
-        'SleepSession',
-        'ActiveCaloriesBurned',
-        'HeartRateVariabilityRmssd',
-      ];
       const grantedTypes = new Set(grantedPermissions.map((p) => p.recordType));
-      const allGranted = recordsWeNeed.every((record) =>
-        grantedTypes.has(record),
-      );
-
+      const allGranted = RECORDS_NEEDED.every((r) => grantedTypes.has(r));
       transitionStatus(allGranted ? 'granted' : 'partial');
     } catch (error) {
       console.error('[HealthConnect] Erro:', error);
