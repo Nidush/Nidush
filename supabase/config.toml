@@ -6,3 +6,6 @@ schemas = ["public", "graphql_public"]
 port = 54322
 shadow_port = 54320
 major_version = 17
+
+[functions.welcome-user]
+verify_jwt = false

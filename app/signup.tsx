@@ -24,6 +24,7 @@ import {
 import { supabase, apiLog, invokeFunction } from '../utils/supabase';
 
 
+
 import { getFriendlyErrorMessage } from '../utils/errorHandlers';
 
 
@@ -95,6 +96,8 @@ export default function SignUp() {
     router.replace({ pathname: '/login', params: { registeredEmail: email } });
 
   };
+
+
 
   if (!fontsLoaded) return null;
 
@@ -239,6 +242,8 @@ export default function SignUp() {
                       {loading ? 'Joining...' : 'Join Nidush'}
                     </Text>
                   </TouchableOpacity>
+
+
 
                   {/* Footer Login */}
                   <View className="flex-row justify-center mt-[20px] mb-20">

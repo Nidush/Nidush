@@ -52,7 +52,9 @@
       "expo-font",
       "expo-audio",
       "expo-video",
-      "expo-asset"
+      "expo-asset",
+      "react-native-health-connect",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

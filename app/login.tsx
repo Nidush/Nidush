@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
 import React, { useState } from 'react';
 import {
   View,
@@ -93,6 +94,8 @@ export default function Login() {
       router.replace('/(tabs)');
     }
   };
+
+
 
   if (!fontsLoaded) return null;
 
@@ -194,6 +197,8 @@ export default function Login() {
                   {loading ? 'Logging in...' : 'Login'}
                 </Text>
               </TouchableOpacity>
+
+
 
               <View className="flex-row justify-center mt-[20px] mb-20">
                 <Text style={{ fontFamily: 'Nunito_400Regular' }} className="text-[#3E545C] text-[15px]">Don't have an account? </Text>
