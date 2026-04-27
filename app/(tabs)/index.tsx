@@ -172,13 +172,15 @@ export default function Index() {
 
     return sortedList.map((item) => {
       let duration: string | undefined = undefined;
-      if ('content_id' in item && item.content_id) {
-        const contentData = (CONTENTS as any)[item.content_id];
+      const activity = item as Activity;
+      const cId = activity.content_id || activity.contentId;
+      if (cId && (CONTENTS as any)[cId]) {
+        const contentData = (CONTENTS as any)[cId];
         if (contentData) {
           duration = contentData.duration;
         }
       }
-      return { ...item, time: duration };
+      return { ...item, time: duration, room: item.room || (item as any).room_id };
     });
   }, [currentState, userHobbies]);
 
@@ -195,14 +197,15 @@ export default function Index() {
     ).map((item) => {
       // Tentar encontrar a duração no CONTENTS
       let duration = undefined;
-      if (item.content_id && (CONTENTS as any)[item.content_id]) {
-        duration = (CONTENTS as any)[item.content_id].duration;
+      const cId = item.content_id || item.contentId;
+      if (cId && (CONTENTS as any)[cId]) {
+        duration = (CONTENTS as any)[cId].duration;
       }
 
       return {
         id: item.id,
         title: item.title,
-        room_id: item.room_id,
+        room: item.room || item.room_id,
         image: item.image,
         time: duration,
         // Adicionamos type activity para ajudar na lógica se precisares
@@ -216,7 +219,7 @@ export default function Index() {
         return {
           id: item.id,
           title: item.title,
-          room_id: item.room_id,
+          room: item.room || item.room_id,
           image: item.image,
           time: undefined, // Cenários não costumam ter duração definida nos cards
           type: 'scenario',
@@ -298,7 +301,7 @@ export default function Index() {
                   title={item.title}
                   image={item.image}
                   time={item.time}
-                  room={item.room_id}
+                  room={item.room}
                   width="100%"
                   aspectRatio={0.95}
                   onPress={() =>

@@ -130,8 +130,9 @@ const UnifiedActivitiesScreen = () => {
   };
 
   const getActivityTime = (activity: Activity) => {
-    if (activity.content_id && CONTENTS[activity.content_id]) {
-      return CONTENTS[activity.content_id].duration;
+    const cId = activity.content_id || activity.contentId;
+    if (cId && CONTENTS[cId]) {
+      return CONTENTS[cId].duration;
     }
     return undefined;
   };
@@ -241,6 +242,7 @@ const UnifiedActivitiesScreen = () => {
                 data={processedData.myCreations.map((item) => ({
                   ...item,
                   time: isActivity(item) ? getActivityTime(item) : undefined,
+                  room: item.room || (item as any).room_id,
                 }))}
                 showTime={viewMode === 'activities'}
                 onEndReached={() => {
@@ -258,6 +260,7 @@ const UnifiedActivitiesScreen = () => {
                 data={processedData.recommended.slice(0, 5).map((item) => ({
                   ...item,
                   time: isActivity(item) ? getActivityTime(item) : undefined,
+                  room: item.room || (item as any).room_id,
                 }))}
                 showTime={viewMode === 'activities'}
               />
@@ -271,6 +274,7 @@ const UnifiedActivitiesScreen = () => {
                   data={processedData.simpleRecipes.map((item) => ({
                     ...item,
                     time: isActivity(item) ? getActivityTime(item) : undefined,
+                    room: item.room || (item as any).room_id,
                   }))}
                   showTime={true}
                 />
