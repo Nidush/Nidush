@@ -1,4 +1,4 @@
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Image, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
@@ -13,9 +13,11 @@ import {
   Nunito_700Bold,
   useFonts,
 } from '@expo-google-fonts/nunito';
+import { useSpotify } from '../context/SpotifyContext';
 
 export default function Profile() {
   const router = useRouter();
+  const { isAuthenticated, login, logout, userProfile } = useSpotify();
   const [userName, setUserName] = useState('A carregar...');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -357,6 +359,40 @@ export default function Profile() {
             testID="menu-privacy"
             onPress={() => setIsPrivacyModalVisible(true)}
           />
+        </View>
+
+        {/* Spotify Connection */}
+        <View className="bg-[#F5F7F0] rounded-[24px] px-2 mb-4 border border-[#D1D9C5]">
+          <TouchableOpacity
+            className="flex-row justify-between items-center py-5 px-4"
+            onPress={isAuthenticated ? logout : login}
+          >
+            <View className="flex-row items-center">
+              <MaterialCommunityIcons name="spotify" size={28} color={isAuthenticated ? "#1DB954" : "#4A5D4E"} />
+              <View className="ml-4">
+                <Text
+                  maxFontSizeMultiplier={1.2}
+                  className="text-lg text-[#4A5D4E]"
+                  style={{ fontFamily: 'Nunito_600SemiBold' }}
+                >
+                  Spotify
+                </Text>
+                <Text className={`text-xs ${isAuthenticated ? (userProfile ? 'text-[#1DB954]' : 'text-orange-500') : 'text-gray-400'}`}>
+                  {isLoading 
+                    ? 'Checking connection...' 
+                    : isAuthenticated 
+                      ? (userProfile ? `Connected as ${userProfile?.display_name}` : 'Login expired or incomplete')
+                      : 'Not connected'}
+                </Text>
+              </View>
+            </View>
+            <Text
+              className={`text-sm ${isAuthenticated ? (userProfile ? 'text-red-500' : 'text-blue-500') : 'text-[#5B8C51]'}`}
+              style={{ fontFamily: 'Nunito_700Bold' }}
+            >
+              {isLoading ? '' : isAuthenticated ? (userProfile ? 'Disconnect' : 'Connect Now') : 'Connect'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Menu Secundário */}

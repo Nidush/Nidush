@@ -203,15 +203,28 @@ export default function NewActivityFlow() {
         if (uploadedUrl) imageUrl = uploadedUrl;
       }
 
+      // Formatar o tipo para bater com a constraint da base de dados ('Cooking', 'Audiobooks', etc)
+      const typeMapping: Record<string, string> = {
+        cooking: 'Cooking',
+        audiobooks: 'Audiobooks',
+        meditation: 'Meditation',
+        workout: 'Workout',
+        reading: 'Reading',
+        yoga: 'Yoga',
+        other: 'other',
+        general: 'other'
+      };
+      const formattedType = typeMapping[activityType] || 'other';
+
       // 2. Tentar inserir na DB
       const insertData = {
         title: activityName || 'Untitled Activity',
         description,
         image: imageUrl,
         category: 'My creations',
-        type: activityType,
+        type: formattedType,
         content_id: selectedContentId || null,
-        scenario_id: selectedScenarioId ? parseInt(selectedScenarioId) : null,
+        scenario_id: selectedScenarioId ? parseInt(selectedScenarioId.toString().replace(/\D/g, '')) : 1,
         shortcuts: false,
         user_id: user.id
       };

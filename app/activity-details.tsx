@@ -18,6 +18,7 @@ import { DeviceSection } from '@/components/activityDetails/DeviceSection';
 import { FocusSection } from '@/components/activityDetails/FocusSection';
 import { MediaSection } from '@/components/activityDetails/MediaSection';
 import { CustomAlert } from '@/components/CustomAlert';
+import { useSpotify } from '@/context/SpotifyContext';
 
 import {
   ACTIVITIES,
@@ -108,7 +109,31 @@ export default function ActivityDetails() {
       if (foundActivity) {
         setMainItem(foundActivity);
         if (foundActivity.scenario_id) {
-          const scen = SCENARIOS.find((s) => s.id === foundActivity.scenario_id);
+          let scen = SCENARIOS.find((s) => s.id === foundActivity.scenario_id);
+          
+          if (!scen) {
+            console.log('[ActivityDetails] Fetching scenario from DB:', foundActivity.scenario_id);
+            const { data: scenData } = await supabase
+              .from('scenarios')
+              .select('*')
+              .eq('id', foundActivity.scenario_id)
+              .maybeSingle();
+            
+            if (scenData) {
+              scen = {
+                id: scenData.id.toString(),
+                title: scenData.name,
+                description: scenData.description || '',
+                playlist: scenData.playlist_id ? 'Spotify Music' : (scenData.playlist_name || 'No music'),
+                playlist_id: scenData.playlist_id,
+                focusMode: false, // Default fallback
+                shortcuts: false,
+                devices: [], // Fallback
+                image: { uri: 'https://picsum.photos/200' } // Fallback
+              } as Scenario;
+            }
+          }
+
           setRelatedScenario(scen || null);
           if (scen) setFocusEnabled(scen.focusMode);
         }
@@ -166,25 +191,23 @@ export default function ActivityDetails() {
   const handleStartPress = () => {
     if (!mainItem) return;
 
-    const isMeditation =
-      isActivity && (mainItem as Activity).type === 'meditation';
-
-    if (isMeditation) {
+    // Permitir todas as atividades e cenários avançarem para o ecrã de execução
+    if (mainItem) {
+      // 🎵 Removido daqui para tocar apenas no ecrã de exercício (como pedido)
       router.push({
         pathname: '/LoadingActivity',
         params: {
           id: mainItem.id,
           title: mainItem.title,
-          type: 'activity',
+          type: isActivity ? 'activity' : 'scenario',
           focusMode: focusEnabled.toString(),
         },
       });
     } else {
       setAlertConfig({
         visible: true,
-        title: 'Coming Soon',
-        message:
-          'This feature will be available soon for this type of activity or scenario.',
+        title: 'Error',
+        message: 'Could not load item details. Please try again.',
         confirmText: 'OK',
         cancelText: '',
         isDestructive: false,
@@ -342,9 +365,13 @@ export default function ActivityDetails() {
           <FocusSection enabled={focusEnabled} onToggle={setFocusEnabled} />
           <MediaSection
             isVisible={
-              !!(relatedScenario?.playlist || relatedContent?.videoUrl)
+              !!(relatedScenario?.playlist || relatedContent?.videoUrl || ['workout', 'cooking', 'meditation'].includes((mainItem as any).type?.toLowerCase()))
             }
-            title={relatedScenario?.playlist || relatedContent?.title}
+            title={relatedScenario?.playlist || relatedContent?.title || (
+              (mainItem as any).type?.toLowerCase() === 'workout' ? 'Workout Beats' :
+              (mainItem as any).type?.toLowerCase() === 'cooking' ? 'Cooking Vibes' :
+              (mainItem as any).type?.toLowerCase() === 'meditation' ? 'Nature Sounds' : 'Recommended Music'
+            )}
             subtitle={audioStatusText}
           />
           <ContentSection

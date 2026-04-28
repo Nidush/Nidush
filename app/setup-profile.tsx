@@ -23,6 +23,7 @@ import FinalLoading from '../components/Onboarding/FinalLoading';
 import HouseName from '../components/Onboarding/HouseName';
 import WearableSync from '../components/Onboarding/WearableSync';
 import WelcomeUser from '../components/Onboarding/WelcomeUser';
+import SpotifyConnect from '../components/Onboarding/SpotifyConnect';
 
 export default function SetupProfile() {
   const [fontsLoaded] = useFonts({
@@ -167,6 +168,17 @@ export default function SetupProfile() {
     return (
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
         <WearableSync
+          onNext={() => transitionTo('spotify')}
+          onSkip={() => transitionTo('spotify')}
+        />
+      </Animated.View>
+    );
+  }
+
+  if (currentStep === 'spotify') {
+    return (
+      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+        <SpotifyConnect
           onNext={() => transitionTo('activities')}
           onSkip={() => transitionTo('activities')}
         />

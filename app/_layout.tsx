@@ -1,5 +1,6 @@
 import { BiometricsProvider } from '@/context/BiometricsContext';
 import { NotificationsProvider } from '@/context/NotificationsContext';
+import { SpotifyProvider } from '@/context/SpotifyContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAudioPlayer } from 'expo-audio';
 import { Stack, useRouter } from 'expo-router';
@@ -7,7 +8,10 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { supabase } from '../utils/supabase';
+import * as WebBrowser from 'expo-web-browser';
 import './../global.css';
+
+WebBrowser.maybeCompleteAuthSession();
 
 SplashScreen.preventAutoHideAsync();
 
@@ -109,46 +113,48 @@ export default function RootLayout() {
   return (
     <NotificationsProvider>
       <BiometricsProvider>
-        <View style={{ flex: 1 }}>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="onboarding" />
-            <Stack.Screen name="setup-profile" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="profile-selection" />
-            <Stack.Screen name="activity-details" />
-            <Stack.Screen name="notifications" options={{ presentation: 'modal' }} />
-          </Stack>
+        <SpotifyProvider>
+          <View style={{ flex: 1 }}>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="onboarding" />
+              <Stack.Screen name="setup-profile" />
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="profile-selection" />
+              <Stack.Screen name="activity-details" />
+              <Stack.Screen name="notifications" options={{ presentation: 'modal' }} />
+            </Stack>
 
-          {!isAnimationComplete && (
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                StyleSheet.absoluteFill,
-                {
-                  backgroundColor: splashBackgroundColor,
-                  opacity: opacityAnim,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 999,
-                },
-              ]}
-            >
-              <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                <Animated.Image
-                  source={require('../assets/images/Logo.png')}
-                  style={{
-                    width: 200,
-                    height: 200,
-                  }}
-                  resizeMode="contain"
-                  onLoadEnd={() => setIsImageLoaded(true)}
-                  onError={() => setIsImageLoaded(true)}
-                  fadeDuration={0}
-                />
+            {!isAnimationComplete && (
+              <Animated.View
+                pointerEvents="none"
+                style={[
+                  StyleSheet.absoluteFill,
+                  {
+                    backgroundColor: splashBackgroundColor,
+                    opacity: opacityAnim,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 999,
+                  },
+                ]}
+              >
+                <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                  <Animated.Image
+                    source={require('../assets/images/Logo.png')}
+                    style={{
+                      width: 200,
+                      height: 200,
+                    }}
+                    resizeMode="contain"
+                    onLoadEnd={() => setIsImageLoaded(true)}
+                    onError={() => setIsImageLoaded(true)}
+                    fadeDuration={0}
+                  />
+                </Animated.View>
               </Animated.View>
-            </Animated.View>
-          )}
-        </View>
+            )}
+          </View>
+        </SpotifyProvider>
       </BiometricsProvider>
     </NotificationsProvider>
   );

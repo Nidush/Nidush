@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
@@ -92,7 +93,12 @@ export default function SignUp() {
       console.log('Erro ao enviar email de boas-vindas:', fnError);
     }
 
-    // Signup bem sucedido, redirecionar para o login
+    // Signup bem sucedido, limpar progresso anterior se existir e redirecionar para o login
+    try {
+      await AsyncStorage.removeItem('@onboarding_progress');
+    } catch (e) {
+      console.log('Erro ao limpar progresso:', e);
+    }
     router.replace({ pathname: '/login', params: { registeredEmail: email } });
 
   };

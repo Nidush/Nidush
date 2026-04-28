@@ -80,6 +80,7 @@ export default function Login() {
       setLoading(false);
 
       if (userQueryError || !homeAssoc?.home_id) {
+        await AsyncStorage.removeItem('@onboarding_progress');
         router.replace({
           pathname: '/setup-profile',
           params: { pwd: password }

@@ -41,6 +41,7 @@ export interface Scenario {
   category?: 'My creations' | string;
   devices: ScenarioDeviceState[];
   playlist?: string;
+  playlist_id?: string;
   focusMode: boolean;
   shortcuts: boolean;
   keywords?: string[];
@@ -54,7 +55,7 @@ export interface Activity {
   room?: string;    
   image: ImageSourcePropType;
   category?: 'My creations' | 'Simple recipes' | 'For the morning' | string;
-  type: 'cooking' | 'meditation' | 'workout' | 'audiobooks' | 'general';
+  type: 'cooking' | 'meditation' | 'workout' | 'audiobooks' | 'general' | 'reading' | 'yoga' | 'other';
   scenario_id?: string;
   scenarioId?: string; 
   content_id?: string;

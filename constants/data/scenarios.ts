@@ -10,6 +10,7 @@ export const SCENARIOS: Scenario[] = [
     image: require('@/assets/Scenarios/desert_heat.png'),
     category: 'My creations',
     playlist: 'Lo-Fi Beats',
+    playlist_id: '37i9dQZF1DWWQRvui9Df7X',
     focusMode: false,
     shortcuts: false,
     devices: [
@@ -43,6 +44,7 @@ export const SCENARIOS: Scenario[] = [
     image: require('@/assets/Scenarios/deep_focus.png'),
     category: 'My creations',
     playlist: 'Focus Playlist',
+    playlist_id: '37i9dQZF1DWZEkaY9Z2dbR',
     focusMode: true,
     shortcuts: false,
     devices: [
@@ -77,6 +79,7 @@ export const SCENARIOS: Scenario[] = [
     focusMode: false,
     shortcuts: false,
     playlist: 'Spotify Nature Sounds',
+    playlist_id: '37i9dQZF1DWZ0XmS6AnY9s',
     devices: [
       {
         deviceId: 'dev_light_bed',
@@ -210,6 +213,7 @@ export const SCENARIOS: Scenario[] = [
     focusMode: true,
     shortcuts: false,
     playlist: 'Smooth Jazz Essentials',
+    playlist_id: '37i9dQZF1DX4wH9On9uOAs',
     devices: [
       {
         deviceId: 'dev_light_kitchen',
@@ -357,6 +361,7 @@ export const SCENARIOS: Scenario[] = [
     focusMode: false,
     shortcuts: false,
     playlist: 'Coffee Shop Acoustic',
+    playlist_id: '37i9dQZF1DX6ziVCXmYhuz',
     devices: [
       {
         deviceId: 'dev_light_kitchen',
