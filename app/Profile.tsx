@@ -1,4 +1,4 @@
-import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Image, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
@@ -28,10 +28,31 @@ export default function Profile() {
   const [userEmail, setUserEmail] = useState('');
   const [userHomeId, setUserHomeId] = useState<number | string | null>(null);
   const [joinCode, setJoinCode] = useState<string | null>(null);
+  const [healthConnectStatus, setHealthConnectStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
 
   const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
+const [discoveredDevices, setDiscoveredDevices] = useState<{name: string, type: string}[]>([]);
+const [isScanning, setIsScanning] = useState(false);
 
+// Função para simular a descoberta ou usar uma lib de ZeroConf
+const scanForDevices = async () => {
+  setIsScanning(true);
+  // Aqui entraria a lógica de 'react-native-zeroconf'
+  // Exemplo de como os dados aparecem:
+  setTimeout(() => {
+    setDiscoveredDevices([
+      { name: "Samsung Smart TV", type: "tv" },
+      { name: "Google Nest Speaker", type: "speaker" },
+      { name: "HP-ENVY-Laptop", type: "computer" }
+    ]);
+    setIsScanning(false);
+  }, 2000);
+};
+
+useEffect(() => {
+    scanForDevices();
+}, []);
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -91,7 +112,23 @@ export default function Profile() {
       }
       setIsLoading(false);
     };
+    const checkHealthConnect = async () => {
+      try {
+        const { getSdkStatus, SdkAvailabilityStatus } = require('react-native-health-connect');
+        const status = await getSdkStatus();
+        if (status === SdkAvailabilityStatus.SDK_AVAILABLE) {
+          // Apenas verificamos se está disponível, a inicialização já foi feita no _layout
+          setHealthConnectStatus('connected');
+        } else {
+          setHealthConnectStatus('disconnected');
+        }
+      } catch (e) {
+        setHealthConnectStatus('disconnected');
+      }
+    };
+
     fetchUser();
+    checkHealthConnect();
   }, []);
 
 
@@ -293,7 +330,51 @@ export default function Profile() {
             )}
           </View>
         </View>
+{/* Smart Home & Hardware Devices */}
+<View className="bg-[#F5F7F0] rounded-[24px] p-5 mb-4 border border-[#D1D9C5]">
+  <View className="flex-row justify-between items-center mb-4">
+    <Text
+      maxFontSizeMultiplier={1.2}
+      className="text-lg text-[#4A5D4E]"
+      style={{ fontFamily: 'Nunito_600SemiBold' }}
+    >
+      Connected Hardware
+    </Text>
+    {isScanning && <Text className="text-[#5B8C51] text-xs animate-pulse">Scanning...</Text>}
+  </View>
 
+  <View className="gap-y-3">
+    {discoveredDevices.length > 0 ? (
+      discoveredDevices.map((device, index) => (
+        <View key={index} className="flex-row items-center bg-white/50 p-3 rounded-2xl border border-[#E8EDDF]">
+          <View className="bg-[#5B8C51] p-2 rounded-full">
+            <MaterialIcons 
+              name={device.type === 'tv' ? 'tv' : device.type === 'speaker' ? 'speaker' : 'computer'} 
+              size={20} 
+              color="white" 
+            />
+          </View>
+          <View className="ml-3">
+            <Text className="text-[#4A5D4E] font-bold">{device.name}</Text>
+            <Text className="text-gray-500 text-xs">Local Network</Text>
+          </View>
+          <View className="ml-auto">
+            <View className="w-2 h-2 rounded-full bg-green-500" />
+          </View>
+        </View>
+      ))
+    ) : (
+      <Text className="text-gray-400 italic text-center">No hardware devices found.</Text>
+    )}
+  </View>
+
+  <TouchableOpacity
+    onPress={scanForDevices}
+    className="mt-4 py-2 items-center"
+  >
+    <Text className="text-[#5B8C51] font-bold">Refresh Devices</Text>
+  </TouchableOpacity>
+</View>
 
         {/* Wearables */}
         <View className="bg-[#F5F7F0] rounded-[24px] p-5 mb-4 border border-[#D1D9C5]">
@@ -307,18 +388,11 @@ export default function Profile() {
           </Text>
 
           <DeviceItem
-            name="Apple Watch"
-            status="Connected"
-            connected
-            icon="watch"
-            testID="device-apple-watch"
-          />
-          <DeviceItem
-            name="Mi Band"
-            status="Disconnected"
-            connected={false}
-            icon="watch"
-            testID="device-mi-band"
+            name="Health Connect"
+            status={healthConnectStatus === 'checking' ? 'Checking...' : healthConnectStatus === 'connected' ? 'Connected' : 'Not Connected'}
+            connected={healthConnectStatus === 'connected'}
+            icon="favorite"
+            testID="device-health-connect"
           />
 
           <TouchableOpacity
@@ -328,13 +402,21 @@ export default function Profile() {
             accessibilityRole="button"
             accessibilityLabel="Add new device"
             accessibilityHint="Starts the process to connect a new wearable device"
+            onPress={async () => {
+              try {
+                const { openHealthConnectSettings } = require('react-native-health-connect');
+                openHealthConnectSettings();
+              } catch (e) {
+                alert('Could not open Health Connect settings.');
+              }
+            }}
           >
             <Text
               maxFontSizeMultiplier={1.2}
               className="text-white text-xl"
               style={{ fontFamily: 'Nunito_700Bold' }}
             >
-              Add New Device
+              {healthConnectStatus === 'connected' ? 'Update Permissions' : 'Connect Health Connect'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -378,9 +460,9 @@ export default function Profile() {
                   Spotify
                 </Text>
                 <Text className={`text-xs ${isAuthenticated ? (userProfile ? 'text-[#1DB954]' : 'text-orange-500') : 'text-gray-400'}`}>
-                  {isLoading 
-                    ? 'Checking connection...' 
-                    : isAuthenticated 
+                  {isLoading
+                    ? 'Checking connection...'
+                    : isAuthenticated
                       ? (userProfile ? `Connected as ${userProfile?.display_name}` : 'Login expired or incomplete')
                       : 'Not connected'}
                 </Text>

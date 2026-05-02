@@ -6,7 +6,7 @@ import { useAudioPlayer } from 'expo-audio';
 import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { Animated, Easing, StyleSheet, View, Platform } from 'react-native';
 import { supabase } from '../utils/supabase';
 import * as WebBrowser from 'expo-web-browser';
 import './../global.css';
@@ -36,9 +36,23 @@ export default function RootLayout() {
     if (!isReady) return;
 
     const checkOnboarding = async () => {
+      // 0. Inicializar Health Connect IMEDIATAMENTE (Nativo)
+      if (Platform.OS === 'android') {
+        try {
+          const { initialize, getSdkStatus, SdkAvailabilityStatus } = require('react-native-health-connect');
+          const status = await getSdkStatus();
+          if (status === SdkAvailabilityStatus.SDK_AVAILABLE) {
+            await initialize();
+            console.log('Health Connect Pre-initialized');
+          }
+        } catch (e) {
+          console.log('HC Pre-init failed', e);
+        }
+      }
+
       try {
         const viewed = await AsyncStorage.getItem('@viewedOnboarding');
-        
+
         const { data: { user } } = await supabase.auth.getUser();
         
         if (user) {
@@ -52,11 +66,20 @@ export default function RootLayout() {
             await AsyncStorage.setItem('@viewedOnboarding', 'true');
             router.replace('/(tabs)');
             return;
+          } else {
+            // Logged in but no home? Go to setup-profile
+            router.replace('/setup-profile');
+            return;
           }
         }
 
+        // If not logged in, even if they viewed onboarding, 
+        // we should probably send them to onboarding/login to authenticate.
         if (viewed === 'true') {
-          router.replace('/(tabs)');
+          // If they already viewed it, they can go to login or see onboarding again.
+          // For a better UX, if they already saw onboarding but are not logged in,
+          // we send them to login or onboarding. Let's send to onboarding as it has the 'Skip' to signup/login.
+          router.replace('/onboarding');
         } else {
           router.replace('/onboarding');
         }

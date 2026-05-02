@@ -1,3 +1,4 @@
+import { supabase } from '@/utils/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   makeRedirectUri,
@@ -6,8 +7,7 @@ import {
 } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Alert, Linking, Platform } from 'react-native';
-import { supabase } from '@/utils/supabase';
+import { Alert, Linking, Platform, Share } from 'react-native';
 import { SPOTIFY_CONFIG } from '../constants/spotify-config';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -20,7 +20,10 @@ const discovery = {
 
 const REDIRECT_URI = makeRedirectUri({
   scheme: SPOTIFY_CONFIG.scheme,
+  path: 'spotify-auth',
 });
+
+console.log('[Spotify] COPIA ISTO PARA O DASHBOARD:', REDIRECT_URI);
 
 interface SpotifyContextType {
   token: string | null;
@@ -82,7 +85,7 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const response = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       // Spotify retorna 204 quando não há nada a tocar. .json() daria erro aqui.
       if (response.status === 204) {
         setCurrentTrack(null);
@@ -156,7 +159,7 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
             .select('spotify_token')
             .eq('auth_uid', user.id)
             .maybeSingle();
-          
+
           if (dbUser?.spotify_token) {
             console.log('[Spotify] Token found in Supabase, restoring locally...');
             const tokenFromDb: string = dbUser.spotify_token;
@@ -182,16 +185,16 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const saveToken = async (newToken: string) => {
     await AsyncStorage.setItem('@spotify_token', newToken);
     setToken(newToken);
-    
+
     // Sincronizar com o Supabase
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         await supabase
           .from('users')
-          .update({ 
-            spotify_token: newToken, 
-            spotify_connected: true 
+          .update({
+            spotify_token: newToken,
+            spotify_connected: true
           })
           .eq('auth_uid', user.id);
         console.log('[Spotify] Token sincronizado com o Supabase com sucesso.');
@@ -206,7 +209,7 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const res = await fetch('https://api.spotify.com/v1/me', {
         headers: { Authorization: `Bearer ${authToken}` },
       });
-      
+
       if (res.status === 401) {
         console.warn('[Spotify] Token invalid or expired. Logging out...');
         logout();
@@ -223,23 +226,42 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const login = async () => {
     console.log('[Spotify] Redirect URI a configurar no Dashboard:', REDIRECT_URI);
-    
-    // Alerta de debug para facilitar a configuração no telemóvel
+
     if (Platform.OS !== 'web') {
-      alert('Copia este URL para o Spotify Dashboard:\n' + REDIRECT_URI);
-    }
-    
-    // Limpar possíveis estados corrompidos antes de iniciar (ajuda com erro de Cross-Site)
-    try {
-      await AsyncStorage.removeItem('expo-auth-session-state');
-    } catch (e) {}
+      Alert.alert(
+        'Configura o Spotify Dashboard',
+        `A tua URI atual é:\n\n${REDIRECT_URI}\n\nUsa o botão de copiar abaixo para facilitar!`,
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Copiar Link',
+            onPress: async () => {
+              try {
+                await Share.share({ message: REDIRECT_URI });
+              } catch (e) {
+                console.error(e);
+              }
+            }
+          },
+          { 
+            text: 'Iniciar Login', 
+            onPress: async () => {
+              try {
+                await AsyncStorage.removeItem('expo-auth-session-state');
+              } catch (e) { }
 
-    if (!SPOTIFY_CONFIG.clientId) {
-      console.warn('Spotify Client ID not found in environment variables.');
+              await promptAsync();
+            } 
+          }
+        ]
+      );
+    } else {
+      try {
+        await AsyncStorage.removeItem('expo-auth-session-state');
+      } catch (e) { }
+      
+      await promptAsync({ windowName: '_self' });
     }
-
-    // No Web, o modo 'self' (redirecionar a página toda) é mais fiável que o popup
-    await promptAsync(Platform.OS === 'web' ? { windowName: '_self' } : {});
   };
 
   const logout = async () => {
@@ -269,8 +291,8 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return;
     }
     try {
-      const context_uri = playlistId.startsWith('spotify:') 
-        ? playlistId 
+      const context_uri = playlistId.startsWith('spotify:')
+        ? playlistId
         : `spotify:playlist:${playlistId}`;
 
       const doPlay = async (deviceId?: string) => {
@@ -287,10 +309,10 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
           });
         }
 
-        const url = deviceId 
+        const url = deviceId
           ? `https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`
           : 'https://api.spotify.com/v1/me/player/play';
-          
+
         const response = await fetch(url, {
           method: 'PUT',
           headers: {
@@ -299,14 +321,14 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
           },
           body: JSON.stringify({ context_uri }),
         });
-        
+
         console.log(`[Spotify] Player API result:`, response.status);
 
         if (response.status === 204 || response.status === 200) {
           fetch('https://api.spotify.com/v1/me/player/volume?volume_percent=70', {
             method: 'PUT',
             headers: { Authorization: `Bearer ${token}` }
-          }).catch(() => {});
+          }).catch(() => { });
         }
 
         return response;
@@ -329,11 +351,11 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
           headers: { Authorization: `Bearer ${token}` },
         });
         const devicesData = await devicesRes.json();
-        
+
         if (devicesData.devices && devicesData.devices.length > 0) {
           const target = devicesData.devices.find((d: any) => d.type === 'Smartphone') || devicesData.devices[0];
           console.log(`[Spotify] Forçando ativação em: ${target.name}`);
-          
+
           await fetch('https://api.spotify.com/v1/me/player', {
             method: 'PUT',
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -345,7 +367,7 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
           const forcePlayback = async () => {
             if (attempt < 3) {
               const res = await doPlay(target.id);
-              
+
               if (res.status === 204 || res.status === 200) {
                 console.log('[Spotify] Sucesso! A sincronizar UI...');
                 // Forçar atualização da interface após 2 segundos
@@ -402,7 +424,7 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
         });
         const devicesData = await devicesRes.json();
         const target = devicesData.devices?.find((d: any) => d.type === 'Smartphone') || devicesData.devices?.[0];
-        
+
         if (target) {
           await fetch('https://api.spotify.com/v1/me/player', {
             method: 'PUT',

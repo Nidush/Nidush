@@ -548,6 +548,18 @@ export default function Onboarding() {
                   Discover
                 </Text>
               </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => router.replace('/login')}
+                className="mt-6"
+              >
+                <Text
+                  style={{ fontFamily: 'Nunito_600SemiBold' }}
+                  className="text-white text-lg opacity-80 underline"
+                >
+                  I already have an account
+                </Text>
+              </TouchableOpacity>
             </SafeAreaView>
           </View>
         </View>
