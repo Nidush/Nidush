@@ -60,6 +60,8 @@ export default function RootLayout() {
             .from('user_homes')
             .select('home_id')
             .eq('user_id', user.id)
+            .order('created_at', { ascending: true })
+            .limit(1)
             .maybeSingle();
             
           if (homeAssoc?.home_id) {

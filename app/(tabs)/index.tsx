@@ -14,10 +14,15 @@ import { CarouselSection } from '../../components/activitiesScenarios/CarouselSe
 import { HomeHeader } from '../../components/Homepage/HomeHeader';
 import { StateWidget } from '../../components/Homepage/StateWidget';
 
-import { ACTIVITIES, CONTENTS, SCENARIOS, Activity } from '@/constants/data';
+import { CONTENTS, Activity, Scenario } from '@/constants/data';
 import { useBiometrics } from '@/context/BiometricsContext';
 import { getDynamicRecommendations } from '@/utils/recommendationEngine';
 import { supabase } from '@/utils/supabase';
+import {
+  fetchActivityTemplates,
+  fetchScenarioTemplates,
+  mapUserActivity,
+} from '@/utils/catalogTemplates';
 
 export default function Index() {
   const [fontsLoaded] = useFonts({
@@ -30,6 +35,8 @@ export default function Index() {
   const [userName, setUserName] = useState('...');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [myActivities, setMyActivities] = useState<Activity[]>([]);
+  const [activityTemplates, setActivityTemplates] = useState<Activity[]>([]);
+  const [scenarioTemplates, setScenarioTemplates] = useState<Scenario[]>([]);
   const [userHobbies, setUserHobbies] = useState<string[]>([]);
 
 
@@ -127,23 +134,26 @@ export default function Index() {
           .eq('user_id', user.id);
           
         if (!error && data) {
-          const mapped = data.map(d => ({
-            id: d.id,
-            title: d.title,
-            description: d.description,
-            room_id: d.room_id,
-            image: d.image,
-            category: d.category,
-            type: d.type,
-            content_id: d.content_id,
-            scenario_id: d.scenario_id,
-            shortcuts: d.shortcuts === true || d.shortcuts === 'true',
-          }));
-          setMyActivities(mapped as any);
+          setMyActivities(data.map(mapUserActivity));
         } else {
           setMyActivities([]);
         }
       };
+      const loadTemplates = async () => {
+        try {
+          const [activities, scenarios] = await Promise.all([
+            fetchActivityTemplates(),
+            fetchScenarioTemplates(),
+          ]);
+          setActivityTemplates(activities);
+          setScenarioTemplates(scenarios);
+        } catch (error) {
+          console.error('Failed to load home catalog templates:', error);
+          setActivityTemplates([]);
+          setScenarioTemplates([]);
+        }
+      };
+      loadTemplates();
       loadActivities();
       fetchUserName();
     }, [fetchUserName])
@@ -152,7 +162,7 @@ export default function Index() {
   // --- LÓGICA DO CARROSSEL (Recomendações) ---
   const dynamicActivities = useMemo(() => {
     // 1. Aplicar filtro de Hobbies se o utilizador tiver algum selecionado
-    const appActivities = ACTIVITIES.filter((item) => {
+    const appActivities = activityTemplates.filter((item) => {
       // Ignorar as criações próprias no carrossel de recomendações
       if (item.category === 'My creations') return false;
       
@@ -182,14 +192,14 @@ export default function Index() {
       }
       return { ...item, time: duration, room: item.room || (item as any).room_id };
     });
-  }, [currentState, userHobbies]);
+  }, [activityTemplates, currentState, userHobbies]);
 
 
   const dynamicTitle = useMemo(() => 'Activities for you', []);
 
   // --- NOVA LÓGICA DOS SHORTCUTS (USANDO 'shortcuts' NO PLURAL) ---
   const shortcuts = useMemo(() => {
-    const allActivities = [...ACTIVITIES, ...myActivities];
+    const allActivities = [...activityTemplates, ...myActivities];
 
     // 1. Filtrar ATIVIDADES onde shortcuts === true
     const favActivities = allActivities.filter(
@@ -214,7 +224,7 @@ export default function Index() {
     });
 
     // 2. Filtrar CENÁRIOS onde shortcuts === true
-    const favScenarios = SCENARIOS.filter((s: any) => s.shortcuts === true).map(
+    const favScenarios = scenarioTemplates.filter((s: any) => s.shortcuts === true).map(
       (item) => {
         return {
           id: item.id,
@@ -229,7 +239,7 @@ export default function Index() {
 
     // 3. Juntar as duas listas
     return [...favActivities, ...favScenarios];
-  }, [myActivities]); // Agora depende das myActivities vindas no Supabase
+  }, [activityTemplates, myActivities, scenarioTemplates]); // Agora depende das myActivities vindas no Supabase
 
   if (!fontsLoaded) return null;
 

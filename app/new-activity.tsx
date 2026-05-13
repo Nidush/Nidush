@@ -1,5 +1,5 @@
-import { Content, CONTENTS, SCENARIOS } from '@/constants/data';
-import { Activity } from '@/constants/data/types';
+import { Content, CONTENTS } from '@/constants/data';
+import { Activity, Scenario } from '@/constants/data/types';
 import {
   Nunito_400Regular,
   Nunito_600SemiBold,
@@ -11,6 +11,7 @@ import { supabase, uploadImage, apiLog } from '../utils/supabase';
 import { router, Stack } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNotifications } from '@/context/NotificationsContext';
+import { fetchScenarioTemplates } from '@/utils/catalogTemplates';
 import {
   AccessibilityInfo,
   Keyboard,
@@ -59,6 +60,7 @@ export default function NewActivityFlow() {
   const [description, setDescription] = useState('');
   const [activityImage, setActivityImage] = useState<any>(null);
   const [dbContent, setDbContent] = useState<Content[]>([]);
+  const [scenarioTemplates, setScenarioTemplates] = useState<Scenario[]>([]);
 
   useEffect(() => {
     const fetchContent = async () => {
@@ -83,6 +85,19 @@ export default function NewActivityFlow() {
       }
     };
     fetchContent();
+  }, []);
+
+  useEffect(() => {
+    const fetchScenarios = async () => {
+      try {
+        setScenarioTemplates(await fetchScenarioTemplates());
+      } catch (error) {
+        console.error('Failed to load scenario templates:', error);
+        setScenarioTemplates([]);
+      }
+    };
+
+    fetchScenarios();
   }, []);
 
   const allContent = useMemo(() => {
@@ -265,7 +280,7 @@ export default function NewActivityFlow() {
   const reviewContent = allContent.find(
     (c) => c.id === selectedContentId,
   );
-  const reviewScenario = SCENARIOS.find((s) => s.id === selectedScenarioId);
+  const reviewScenario = scenarioTemplates.find((s) => s.id === selectedScenarioId);
 
   return (
     <SafeAreaProvider>
@@ -323,6 +338,7 @@ export default function NewActivityFlow() {
                   roomName={room_id}
                   selected={selectedScenarioId}
                   onSelect={setSelectedScenarioId}
+                  scenarios={scenarioTemplates}
                 />
               )}
               {step === 5 && (

@@ -62,8 +62,8 @@ export const CarouselSection = ({
         scrollEventThrottle={16}
         contentContainerStyle={{ paddingLeft: 16, paddingRight: 8 }}
       >
-        {data.map((item) => (
-          <View key={item.id} className="mr-4">
+        {data.map((item, index) => (
+          <View key={`${item.id}_${index}`} className="mr-4">
             <UnifiedCard
               id={item.id}
               title={item.title}

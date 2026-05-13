@@ -13,7 +13,7 @@ export type InstructionStep = {
 export interface Content {
   id: string;
   title: string;
-  type: 'video' | 'recipe' | 'audio' | 'workout';
+  type: 'video' | 'recipe' | 'audio' | 'workout' | 'exercise' | string;
   category: 'meditation' | 'audiobook' | 'cooking' | 'workout' | string;
   description: string;
   duration: string;

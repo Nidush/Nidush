@@ -62,6 +62,8 @@ export default function SetupProfile() {
           .from('user_homes')
           .select('home_id')
           .eq('user_id', user.id)
+          .order('created_at', { ascending: true })
+          .limit(1)
           .maybeSingle();
 
         if (homeAssociation?.home_id) {

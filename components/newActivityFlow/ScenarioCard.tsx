@@ -1,4 +1,4 @@
-import { Scenario } from '@/constants/data';
+import { Scenario } from '@/constants/data/types';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';

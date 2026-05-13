@@ -75,6 +75,8 @@ export default function Login() {
         .from('user_homes')
         .select('home_id')
         .eq('user_id', user.id)
+        .order('created_at', { ascending: true })
+        .limit(1)
         .maybeSingle();
 
       setLoading(false);
@@ -202,7 +204,7 @@ export default function Login() {
 
 
               <View className="flex-row justify-center mt-[20px] mb-20">
-                <Text style={{ fontFamily: 'Nunito_400Regular' }} className="text-[#3E545C] text-[15px]">Don't have an account? </Text>
+                <Text style={{ fontFamily: 'Nunito_400Regular' }} className="text-[#3E545C] text-[15px]">Don&apos;t have an account? </Text>
                 <TouchableOpacity onPress={() => router.push('/signup')}>
                   <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-[#5C8D58] text-[15px]">Sign Up</Text>
                 </TouchableOpacity>

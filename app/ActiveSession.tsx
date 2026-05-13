@@ -20,12 +20,16 @@ import { SessionWave } from '@/components/activeSession/SessionWave';
 import { useSpotify } from '@/context/SpotifyContext';
 
 import {
-  ACTIVITIES,
   Activity,
   CONTENTS,
   Scenario,
-  SCENARIOS,
 } from '@/constants/data';
+import {
+  fetchActivityTemplateById,
+  fetchScenarioTemplateById,
+  mapUserActivity,
+  normalizeScenarioTemplateId,
+} from '@/utils/catalogTemplates';
 
 type FormattedInstruction = {
   text: string;
@@ -64,15 +68,14 @@ export default function ActiveSession() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      let foundItem: Activity | Scenario | undefined = ACTIVITIES.find(
-        (a) => a.id === id,
-      );
+      let foundItem: Activity | Scenario | null | undefined =
+        await fetchActivityTemplateById(id);
       if (!foundItem) {
         const stored = await AsyncStorage.getItem('@myActivities');
         if (stored)
           foundItem = JSON.parse(stored).find((a: any) => a.id === id);
       }
-      if (!foundItem) foundItem = SCENARIOS.find((s) => s.id === id);
+      if (!foundItem) foundItem = await fetchScenarioTemplateById(id);
 
        // Se não encontrou localmente, tentar no Supabase (atividades criadas pelo user)
       if (!foundItem) {
@@ -83,18 +86,7 @@ export default function ActiveSession() {
           .single();
 
         if (data && !error) {
-          foundItem = {
-            id: data.id.toString(),
-            title: data.title,
-            description: data.description,
-            room_id: data.room_id,
-            image: data.image,
-            category: data.category,
-            type: data.type,
-            content_id: data.content_id,
-            scenario_id: data.scenario_id,
-            shortcuts: data.shortcuts === true || data.shortcuts === 'true',
-          } as Activity;
+          foundItem = mapUserActivity(data);
         }
       }
 
@@ -104,30 +96,36 @@ export default function ActiveSession() {
         return;
       }
 
-      let rawInstructions: any[] = [];
       let playlistName = 'Relaxing Music';
       let contentType: 'audio' | 'video' | 'mixed' = 'audio';
       let videoUrl: string | undefined = undefined;
+      let contentData: any = null;
 
-      if (foundItem) {
-        console.log('Found Item:', foundItem);
-      }
+      // Helper: parse JSON safely
+      const safeParse = (value: any): any[] => {
+        if (!value) return [];
+        if (typeof value === 'string') {
+          try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed : [parsed];
+          } catch {
+            return [value];
+          }
+        }
+        return Array.isArray(value) ? value : [value];
+      };
 
       if (foundItem && (foundItem as any).content_id) {
-        console.log('Fetching content for ID:', (foundItem as any).content_id);
         // Fetch content from Supabase
-        const { data: contentRows, error: contentError } = await supabase
+        const { data: contentRows } = await supabase
           .from('contents')
           .select('*')
           .eq('id', (foundItem as any).content_id)
           .limit(1);
 
-        const contentData =
-          contentRows && contentRows.length > 0 ? contentRows[0] : null;
-        console.log('Content Data from DB:', contentData);
+        contentData = contentRows && contentRows.length > 0 ? contentRows[0] : null;
 
-        if (contentData && !contentError) {
-          rawInstructions = contentData.instructions || [];
+        if (contentData) {
           playlistName = contentData.title;
           if (contentData.type === 'video') {
             contentType = 'video';
@@ -136,13 +134,12 @@ export default function ActiveSession() {
         } else {
           // Fallback to local CONTENTS
           const cId = (foundItem as any).content_id;
-          const content = cId ? CONTENTS[cId] : null;
+          const content = cId ? CONTENTS[cId as any] : null;
           if (content) {
-            rawInstructions = content.instructions || [];
             playlistName = content.title;
             if (content.type === 'video') {
               contentType = 'video';
-              videoUrl = content.videoUrl;
+              videoUrl = (content as any).videoUrl;
             }
           }
         }
@@ -150,9 +147,15 @@ export default function ActiveSession() {
 
       if (contentType !== 'video') {
         const sId = (foundItem as any).scenario_id;
-        const relatedScenario = sId ? SCENARIOS.find((s) => s.id === sId) : null;
+        const relatedScenario = sId ? await fetchScenarioTemplateById(sId) : null;
         if (relatedScenario?.playlist) playlistName = relatedScenario.playlist;
       }
+
+      const rawInstructions = safeParse(
+        contentData?.instructions ||
+        (foundItem && (foundItem as any).content_id ? CONTENTS[(foundItem as any).content_id as any]?.instructions : []) ||
+        []
+      );
 
       const formattedInstructions = rawInstructions.map((step) => {
         if (typeof step === 'string')
@@ -168,14 +171,13 @@ export default function ActiveSession() {
         });
       }
 
-
       setSessionData({
         title: foundItem.title || 'Session',
         room: (foundItem as any).room_id || (foundItem as any).room || 'Living Room',
         playlistName: playlistName,
         image: foundItem.image,
         instructions: formattedInstructions,
-        type: contentType === 'video' ? 'mixed' : contentType, // Force 'mixed' to show visuals even for video types
+        type: contentType === 'video' ? 'mixed' : contentType,
         videoUrl: videoUrl,
       });
 
@@ -197,19 +199,21 @@ export default function ActiveSession() {
 
           console.log(`[Spotify] Traduzindo tipo "${type}" para cenário: ${sId}`);
           
-          // 1. Tentar DB
+          // 1. Tentar catálogo de cenários
+          const templateScenarioId = normalizeScenarioTemplateId(sId);
+          const templateScenario = templateScenarioId
+            ? await fetchScenarioTemplateById(templateScenarioId)
+            : null;
+          pId = templateScenario?.playlist_id;
+
+          // 2. Tentar DB legacy
+          const numericScenarioId = String(sId).replace(/\D/g, '');
           const { data: scenData } = await supabase
             .from('scenarios')
             .select('playlist_id')
-            .eq('id', sId)
+            .eq('id', numericScenarioId || sId)
             .maybeSingle();
-          pId = scenData?.playlist_id;
-
-          // 2. Tentar Local
-          if (!pId) {
-            const localScen = SCENARIOS.find(s => s.id === sId.toString());
-            pId = localScen?.playlist_id;
-          }
+          if (!pId) pId = scenData?.playlist_id;
 
           // 3. Fallback Final (Workout)
           if (!pId) pId = '37i9dQZF1DX76W9kuv1Z0g';

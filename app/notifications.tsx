@@ -80,6 +80,7 @@ export default function NotificationsScreen() {
         renderItem={renderItem}
         contentContainerStyle={{ padding: 20 }}
         onEndReached={() => {
+          if (!hasMore || isLoading) return;
           console.log('[UI] Chegou ao fundo da lista. A carregar mais...');
           loadMore();
         }}

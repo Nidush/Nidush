@@ -17,12 +17,15 @@ import { Platform, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
-  ACTIVITIES,
   Activity,
   CONTENTS,
   Scenario,
-  SCENARIOS,
 } from '@/constants/data';
+import {
+  fetchActivityTemplates,
+  fetchScenarioTemplates,
+  mapUserActivity,
+} from '@/utils/catalogTemplates';
 import { getDynamicRecommendations } from '@/utils/recommendationEngine';
 
 const UnifiedActivitiesScreen = () => {
@@ -36,6 +39,8 @@ const UnifiedActivitiesScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [myActivities, setMyActivities] = useState<Activity[]>([]);
+  const [activityTemplates, setActivityTemplates] = useState<Activity[]>([]);
+  const [scenarioTemplates, setScenarioTemplates] = useState<Scenario[]>([]);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
 
@@ -49,6 +54,21 @@ const UnifiedActivitiesScreen = () => {
     }, 500);
     return () => clearTimeout(handler);
   }, [searchQuery]);
+
+  const loadTemplates = useCallback(async () => {
+    try {
+      const [activities, scenarios] = await Promise.all([
+        fetchActivityTemplates(),
+        fetchScenarioTemplates(),
+      ]);
+      setActivityTemplates(activities);
+      setScenarioTemplates(scenarios);
+    } catch (error) {
+      console.error('Failed to load activity/scenario templates:', error);
+      setActivityTemplates([]);
+      setScenarioTemplates([]);
+    }
+  }, []);
 
   const loadActivities = useCallback(async (isNextPage = false) => {
     if (isLoadingRef.current) return;
@@ -79,23 +99,12 @@ const UnifiedActivitiesScreen = () => {
     const { data, error, count } = await query;
 
     if (!error && data) {
-      const mapped = data.map(d => ({
-        id: d.id,
-        title: d.title,
-        description: d.description,
-        room_id: d.room_id,
-        image: d.image,
-        category: d.category,
-        type: d.type,
-        content_id: d.content_id,
-        scenario_id: d.scenario_id,
-        shortcuts: d.shortcuts === true || d.shortcuts === 'true',
-      }));
+      const mapped = data.map(mapUserActivity);
 
       if (isNextPage) {
-        setMyActivities(prev => [...prev, ...mapped as any]);
+        setMyActivities(prev => [...prev, ...mapped]);
       } else {
-        setMyActivities(mapped as any);
+        setMyActivities(mapped);
       }
 
       setPage(currentPage);
@@ -110,8 +119,9 @@ const UnifiedActivitiesScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
+      loadTemplates();
       loadActivities();
-    }, [debouncedSearchQuery]) // Only fetch again if search changes
+    }, [debouncedSearchQuery, loadTemplates])
   );
 
   let [fontsLoaded] = useFonts({
@@ -138,8 +148,17 @@ const UnifiedActivitiesScreen = () => {
   };
 
   const processedData = useMemo(() => {
-    const baseData =
-      viewMode === 'activities' ? [...myActivities, ...ACTIVITIES] : SCENARIOS;
+    const rawData =
+      viewMode === 'activities' ? [...myActivities, ...activityTemplates] : scenarioTemplates;
+
+    // Deduplicar por ID para evitar React key warnings (ex: diferentes seeds/migrations)
+    const seen = new Set<string | number>();
+    const baseData = rawData.filter((item) => {
+      const key = String(item.id);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
     const filteredBase = baseData.filter((item) => {
       const matchesSearch = item.title
@@ -151,7 +170,7 @@ const UnifiedActivitiesScreen = () => {
       if (viewMode === 'activities' && isActivity(item)) {
         matchesFilter = item.type?.toLowerCase() === activeFilter.toLowerCase();
       } else {
-        matchesFilter = item.room_id === activeFilter;
+        matchesFilter = ((item as Scenario).room || item.room_id)?.toLowerCase() === activeFilter.toLowerCase();
       }
       return matchesFilter && matchesSearch;
     });
@@ -175,7 +194,7 @@ const UnifiedActivitiesScreen = () => {
       simpleRecipes: simpleRecipesList,
       isEmpty: filteredBase.length === 0,
     };
-  }, [viewMode, activeFilter, searchQuery, myActivities, currentState]);
+  }, [viewMode, activeFilter, searchQuery, myActivities, activityTemplates, scenarioTemplates, currentState]);
 
   const handleViewModeChange = (mode: 'activities' | 'scenarios') => {
     setViewMode(mode);

@@ -4,11 +4,13 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Max-Age': '86400',
 }
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { status: 204, headers: corsHeaders })
   }
 
   try {
@@ -19,7 +21,7 @@ serve(async (req: Request) => {
 
     // Sem domínio verificado no Resend, só é possível enviar para o email da conta.
     // Quando tiveres domínio próprio, muda TEST_MODE para false.
-    const TEST_MODE = true
+    const TEST_MODE = false
     const VERIFIED_EMAIL = 'nidush7@gmail.com'
     const recipient = TEST_MODE ? VERIFIED_EMAIL : email
 
@@ -36,7 +38,7 @@ serve(async (req: Request) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Nidush <onboarding@resend.dev>',
+        from: 'Nidush <nidush.pt>',
         to: [recipient],
         subject: 'Bem-vindo ao Nidush! ',
         html: `
