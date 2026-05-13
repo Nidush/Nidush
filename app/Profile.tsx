@@ -32,27 +32,144 @@ export default function Profile() {
 
   const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
-const [discoveredDevices, setDiscoveredDevices] = useState<{name: string, type: string}[]>([]);
-const [isScanning, setIsScanning] = useState(false);
+  type ConnectedDevice = {
+    id?: number;
+    name: string;
+    type: string | null;
+    source?: string | null;
+    status?: string | null;
+    external_id?: string | null;
+    last_seen?: string | null;
+    home_id?: number | string | null;
+  };
 
-// Função para simular a descoberta ou usar uma lib de ZeroConf
-const scanForDevices = async () => {
-  setIsScanning(true);
-  // Aqui entraria a lógica de 'react-native-zeroconf'
-  // Exemplo de como os dados aparecem:
-  setTimeout(() => {
-    setDiscoveredDevices([
-      { name: "Samsung Smart TV", type: "tv" },
-      { name: "Google Nest Speaker", type: "speaker" },
-      { name: "HP-ENVY-Laptop", type: "computer" }
-    ]);
-    setIsScanning(false);
-  }, 2000);
-};
+  const [discoveredDevices, setDiscoveredDevices] = useState<ConnectedDevice[]>([]);
+  const [isScanning, setIsScanning] = useState(false);
+  const [hardwareError, setHardwareError] = useState<string | null>(null);
 
-useEffect(() => {
-    scanForDevices();
-}, []);
+  const getCurrentUserHomeId = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('user_homes')
+      .select('home_id')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Erro a obter casa do utilizador para devices:', error);
+      return null;
+    }
+
+    return data?.home_id ?? null;
+  };
+
+  const buildExternalId = (name: string, source: string) => {
+    const slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+
+    return `${source}:${slug || 'device'}`;
+  };
+
+  const loadNetworkDevices = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('devices')
+      .select('id, name, type, source, status, external_id, last_seen, home_id')
+      .eq('user_id', userId)
+      .eq('source', 'network')
+      .order('last_seen', { ascending: false });
+
+    if (error) {
+      console.error('Erro a carregar devices da BD:', error);
+      setHardwareError('Could not load hardware devices.');
+      return [];
+    }
+
+    const devices = data ?? [];
+    setDiscoveredDevices(devices);
+    return devices;
+  };
+
+  // Função para sincronizar dispositivos com o Supabase
+  const syncDeviceToDB = async (name: string, type: string, source: string, externalId?: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Sessão não encontrada.');
+
+    const now = new Date().toISOString();
+    const normalizedExternalId = externalId || buildExternalId(name, source);
+    const homeId = await getCurrentUserHomeId(user.id);
+    const payload = {
+      name,
+      type,
+      source,
+      status: 'connected',
+      user_id: user.id,
+      home_id: homeId,
+      external_id: normalizedExternalId,
+      last_seen: now,
+    };
+
+    const { data: existing, error: existingError } = await supabase
+      .from('devices')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('source', source)
+      .eq('external_id', normalizedExternalId)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+
+    const request = existing
+      ? supabase
+          .from('devices')
+          .update(payload)
+          .eq('id', existing.id)
+          .select('id, name, type, source, status, external_id, last_seen, home_id')
+          .single()
+      : supabase
+          .from('devices')
+          .insert(payload)
+          .select('id, name, type, source, status, external_id, last_seen, home_id')
+          .single();
+
+    const { data, error } = await request;
+    if (error) throw error;
+    return data;
+  };
+
+  // Simula descoberta local; quando houver ZeroConf/Bluetooth real, basta trocar esta lista pela descoberta real.
+  const scanForDevices = async () => {
+    if (isScanning) return;
+
+    setIsScanning(true);
+    setHardwareError(null);
+
+    try {
+      const mockDevices = [
+        { name: 'Samsung Smart TV', type: 'tv', externalId: 'network:samsung-smart-tv' },
+        { name: 'Google Nest Speaker', type: 'speaker', externalId: 'network:google-nest-speaker' },
+        { name: 'HP-ENVY-Laptop', type: 'computer', externalId: 'network:hp-envy-laptop' },
+      ];
+
+      for (const dev of mockDevices) {
+        await syncDeviceToDB(dev.name, dev.type, 'network', dev.externalId);
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) await loadNetworkDevices(user.id);
+    } catch (error) {
+      console.error('Erro a guardar hardware devices:', error);
+      setHardwareError('Could not save hardware devices.');
+      alert('Erro ao guardar dispositivos na base de dados: ' + (error as any).message);
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -90,6 +207,8 @@ useEffect(() => {
           .from('user_homes')
           .select('home_id')
           .eq('user_id', user.id)
+          .order('created_at', { ascending: true })
+          .limit(1)
           .maybeSingle();
 
         if (homeAssociation) {
@@ -105,20 +224,23 @@ useEffect(() => {
           }
         }
 
-
+        // --- CARREGAR DISPOSITIVOS GUARDADOS NA BD ---
+        await loadNetworkDevices(user.id);
 
       } else {
         setUserName('Visitante');
       }
       setIsLoading(false);
     };
+
     const checkHealthConnect = async () => {
       try {
         const { getSdkStatus, SdkAvailabilityStatus } = require('react-native-health-connect');
         const status = await getSdkStatus();
         if (status === SdkAvailabilityStatus.SDK_AVAILABLE) {
-          // Apenas verificamos se está disponível, a inicialização já foi feita no _layout
           setHealthConnectStatus('connected');
+          // Salvar o estado da Health Connect na BD como um dispositivo/serviço
+          await syncDeviceToDB('Health Connect', 'heart', 'health_connect', 'android_hc');
         } else {
           setHealthConnectStatus('disconnected');
         }
@@ -343,10 +465,14 @@ useEffect(() => {
     {isScanning && <Text className="text-[#5B8C51] text-xs animate-pulse">Scanning...</Text>}
   </View>
 
+  {hardwareError && (
+    <Text className="text-red-500 text-xs mb-3">{hardwareError}</Text>
+  )}
+
   <View className="gap-y-3">
     {discoveredDevices.length > 0 ? (
       discoveredDevices.map((device, index) => (
-        <View key={index} className="flex-row items-center bg-white/50 p-3 rounded-2xl border border-[#E8EDDF]">
+        <View key={device.id ?? device.external_id ?? index} className="flex-row items-center bg-white/50 p-3 rounded-2xl border border-[#E8EDDF]">
           <View className="bg-[#5B8C51] p-2 rounded-full">
             <MaterialIcons 
               name={device.type === 'tv' ? 'tv' : device.type === 'speaker' ? 'speaker' : 'computer'} 
@@ -356,7 +482,9 @@ useEffect(() => {
           </View>
           <View className="ml-3">
             <Text className="text-[#4A5D4E] font-bold">{device.name}</Text>
-            <Text className="text-gray-500 text-xs">Local Network</Text>
+            <Text className="text-gray-500 text-xs">
+              {device.status === 'connected' ? 'Saved to local network' : 'Local Network'}
+            </Text>
           </View>
           <View className="ml-auto">
             <View className="w-2 h-2 rounded-full bg-green-500" />
@@ -370,9 +498,12 @@ useEffect(() => {
 
   <TouchableOpacity
     onPress={scanForDevices}
-    className="mt-4 py-2 items-center"
+    disabled={isScanning}
+    className={`mt-4 py-2 items-center ${isScanning ? 'opacity-50' : ''}`}
   >
-    <Text className="text-[#5B8C51] font-bold">Refresh Devices</Text>
+    <Text className="text-[#5B8C51] font-bold">
+      {isScanning ? 'Saving Devices...' : discoveredDevices.length > 0 ? 'Refresh Devices' : 'Scan & Save Devices'}
+    </Text>
   </TouchableOpacity>
 </View>
 
