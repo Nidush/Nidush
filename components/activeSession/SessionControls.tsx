@@ -19,6 +19,7 @@ interface SessionControlsProps {
   onToggleSession: () => void;
   onToggleMusic: () => void;
   onNextStep: () => void;
+  currentTrack?: { title: string; artist: string } | null;
 }
 
 export const SessionControls = ({
@@ -32,6 +33,7 @@ export const SessionControls = ({
   onToggleSession,
   onToggleMusic,
   onNextStep,
+  currentTrack,
 }: SessionControlsProps) => {
   const animatedProgressStyle = useAnimatedStyle(() => ({
     width: `${progress.value}%`,
@@ -120,9 +122,9 @@ export const SessionControls = ({
             maxFontSizeMultiplier={1.2}
             className="text-[#354F52]"
             style={{ fontFamily: 'Nunito_700Bold' }}
-            importantForAccessibility="no-hide-descendants" // Esconde os Textos filhos
+            importantForAccessibility="no-hide-descendants"
           >
-            Music
+            {currentTrack?.title || 'Music'}
           </Text>
           <Text
             maxFontSizeMultiplier={1.2}
@@ -130,7 +132,7 @@ export const SessionControls = ({
             style={{ fontFamily: 'Nunito_600SemiBold' }}
             importantForAccessibility="no-hide-descendants"
           >
-            Artist
+            {currentTrack?.artist || 'Artist'}
           </Text>
         </View>
         <TouchableOpacity

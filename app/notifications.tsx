@@ -2,8 +2,10 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   Pressable,
+  RefreshControl,
   Text,
   TouchableOpacity,
   View,
@@ -12,7 +14,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppNotification, useNotifications } from '@/context/NotificationsContext';
 
 export default function NotificationsScreen() {
-  const { notifications, markAsRead, markAllAsRead, clearAll } = useNotifications();
+  const { notifications, markAsRead, markAllAsRead, clearAll, loadMore, hasMore, isLoading, refreshNotifications } = useNotifications();
+  const [refreshing, setRefreshing] = React.useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refreshNotifications();
+    setRefreshing(false);
+  };
 
   React.useEffect(() => {
     return () => markAllAsRead();
@@ -70,6 +79,22 @@ export default function NotificationsScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={{ padding: 20 }}
+        onEndReached={() => {
+          if (!hasMore || isLoading) return;
+          console.log('[UI] Chegou ao fundo da lista. A carregar mais...');
+          loadMore();
+        }}
+        onEndReachedThreshold={0.1}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#548F53']} tintColor="#548F53" />
+        }
+        ListFooterComponent={
+          isLoading && hasMore ? (
+            <View className="py-4">
+              <ActivityIndicator color="#548F53" />
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           <View className="flex-1 justify-center items-center mt-20">
             <MaterialIcons name="notifications-off" size={64} color="#D1D1D1" />
@@ -79,4 +104,4 @@ export default function NotificationsScreen() {
       />
     </SafeAreaView>
   );
-}
+} 

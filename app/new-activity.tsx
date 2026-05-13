@@ -1,15 +1,17 @@
-import { Content, CONTENTS, SCENARIOS } from '@/constants/data';
-import { Activity } from '@/constants/data/types';
+import { Content, CONTENTS } from '@/constants/data';
+import { Activity, Scenario } from '@/constants/data/types';
 import {
   Nunito_400Regular,
   Nunito_600SemiBold,
   Nunito_700Bold,
   useFonts,
 } from '@expo-google-fonts/nunito';
-import { supabase, uploadImage } from '../utils/supabase';
+import { supabase, uploadImage, apiLog } from '../utils/supabase';
+
 import { router, Stack } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNotifications } from '@/context/NotificationsContext';
+import { fetchScenarioTemplates } from '@/utils/catalogTemplates';
 import {
   AccessibilityInfo,
   Keyboard,
@@ -52,22 +54,23 @@ export default function NewActivityFlow() {
 
   const [activityType, setActivityType] = useState<Activity['type']>('' as any);
   const [selectedContentId, setSelectedContentId] = useState('');
-  const [room, setRoom] = useState('');
+  const [room_id, setRoomId] = useState('');
   const [selectedScenarioId, setSelectedScenarioId] = useState('');
   const [activityName, setActivityName] = useState('');
   const [description, setDescription] = useState('');
   const [activityImage, setActivityImage] = useState<any>(null);
   const [dbContent, setDbContent] = useState<Content[]>([]);
+  const [scenarioTemplates, setScenarioTemplates] = useState<Scenario[]>([]);
 
   useEffect(() => {
     const fetchContent = async () => {
       const { data, error } = await supabase
-        .from('content')
+        .from('contents')
         .select('*');
       
       if (data && !error) {
         setDbContent(data.map((c: any) => ({
-          id: c.idcontent,
+          id: c.id,
           title: c.title,
           type: c.type,
           category: c.category,
@@ -82,6 +85,19 @@ export default function NewActivityFlow() {
       }
     };
     fetchContent();
+  }, []);
+
+  useEffect(() => {
+    const fetchScenarios = async () => {
+      try {
+        setScenarioTemplates(await fetchScenarioTemplates());
+      } catch (error) {
+        console.error('Failed to load scenario templates:', error);
+        setScenarioTemplates([]);
+      }
+    };
+
+    fetchScenarios();
   }, []);
 
   const allContent = useMemo(() => {
@@ -144,7 +160,7 @@ export default function NewActivityFlow() {
 
     if (step === 2 && !selectedContentId) return true;
 
-    if (step === 3 && !room) return true;
+    if (step === 3 && !room_id) return true;
 
     if (step === 4 && !selectedScenarioId) return true;
 
@@ -181,14 +197,14 @@ export default function NewActivityFlow() {
       id: Date.now().toString(),
       title: activityName || 'Untitled Activity',
       description,
-      room,
+      room_id,
       image: finalImage,
       category: 'My creations',
       type: activityType,
-      contentId: selectedContentId,
-      scenarioId: selectedScenarioId,
+      content_id: selectedContentId,
+      scenario_id: selectedScenarioId,
       shortcuts: false,
-      keywords: [activityType, room, 'custom'],
+      keywords: [activityType, room_id, 'custom'],
     };
 
     try {
@@ -202,19 +218,35 @@ export default function NewActivityFlow() {
         if (uploadedUrl) imageUrl = uploadedUrl;
       }
 
+      // Formatar o tipo para bater com a constraint da base de dados ('Cooking', 'Audiobooks', etc)
+      const typeMapping: Record<string, string> = {
+        cooking: 'Cooking',
+        audiobooks: 'Audiobooks',
+        meditation: 'Meditation',
+        workout: 'Workout',
+        reading: 'Reading',
+        yoga: 'Yoga',
+        other: 'other',
+        general: 'other'
+      };
+      const formattedType = typeMapping[activityType] || 'other';
+
       // 2. Tentar inserir na DB
-      const { data, error } = await supabase.from('activity').insert({
+      const insertData = {
         title: activityName || 'Untitled Activity',
         description,
-        room,
         image: imageUrl,
         category: 'My creations',
-        type: activityType,
-        contentid: selectedContentId || null,
-        scenarioid: selectedScenarioId || null,
+        type: formattedType,
+        content_id: selectedContentId || null,
+        scenario_id: selectedScenarioId ? parseInt(selectedScenarioId.toString().replace(/\D/g, '')) : 1,
         shortcuts: false,
-        user_iduser: user.id
-      }).select('*, idactivity').single();
+        user_id: user.id
+      };
+
+      apiLog('INSERT', 'activities', insertData);
+      const { data, error } = await supabase.from('activities').insert(insertData).select('*, id').single();
+
 
       if (error) {
         console.error('Erro no Supabase:', error);
@@ -233,7 +265,7 @@ export default function NewActivityFlow() {
       router.push({
         pathname: '/activity-details',
         params: {
-          id: data.idactivity.toString(),
+          id: data.id.toString(),
           isNew: 'true',
         },
       });
@@ -248,7 +280,7 @@ export default function NewActivityFlow() {
   const reviewContent = allContent.find(
     (c) => c.id === selectedContentId,
   );
-  const reviewScenario = SCENARIOS.find((s) => s.id === selectedScenarioId);
+  const reviewScenario = scenarioTemplates.find((s) => s.id === selectedScenarioId);
 
   return (
     <SafeAreaProvider>
@@ -300,12 +332,13 @@ export default function NewActivityFlow() {
                   contentList={allContent}
                 />
               )}
-              {step === 3 && <Step3_Room selected={room} onSelect={setRoom} />}
+              {step === 3 && <Step3_Room selected={room_id} onSelect={setRoomId} />}
               {step === 4 && (
                 <Step4_Environment
-                  roomName={room}
+                  roomName={room_id}
                   selected={selectedScenarioId}
                   onSelect={setSelectedScenarioId}
+                  scenarios={scenarioTemplates}
                 />
               )}
               {step === 5 && (
@@ -324,7 +357,7 @@ export default function NewActivityFlow() {
                   data={{
                     activityType,
                     content: reviewContent || null,
-                    room,
+                    room: room_id,
                     environment: reviewScenario || null,
                     activityName,
                     description,

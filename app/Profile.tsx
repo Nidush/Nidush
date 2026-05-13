@@ -1,4 +1,4 @@
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Image, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
@@ -13,9 +13,11 @@ import {
   Nunito_700Bold,
   useFonts,
 } from '@expo-google-fonts/nunito';
+import { useSpotify } from '../context/SpotifyContext';
 
 export default function Profile() {
   const router = useRouter();
+  const { isAuthenticated, login, logout, userProfile } = useSpotify();
   const [userName, setUserName] = useState('A carregar...');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -26,9 +28,147 @@ export default function Profile() {
   const [userEmail, setUserEmail] = useState('');
   const [userHomeId, setUserHomeId] = useState<number | string | null>(null);
   const [joinCode, setJoinCode] = useState<string | null>(null);
+  const [healthConnectStatus, setHealthConnectStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
 
   const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
+  type ConnectedDevice = {
+    id?: number;
+    name: string;
+    type: string | null;
+    source?: string | null;
+    status?: string | null;
+    external_id?: string | null;
+    last_seen?: string | null;
+    home_id?: number | string | null;
+  };
+
+  const [discoveredDevices, setDiscoveredDevices] = useState<ConnectedDevice[]>([]);
+  const [isScanning, setIsScanning] = useState(false);
+  const [hardwareError, setHardwareError] = useState<string | null>(null);
+
+  const getCurrentUserHomeId = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('user_homes')
+      .select('home_id')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Erro a obter casa do utilizador para devices:', error);
+      return null;
+    }
+
+    return data?.home_id ?? null;
+  };
+
+  const buildExternalId = (name: string, source: string) => {
+    const slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+
+    return `${source}:${slug || 'device'}`;
+  };
+
+  const loadNetworkDevices = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('devices')
+      .select('id, name, type, source, status, external_id, last_seen, home_id')
+      .eq('user_id', userId)
+      .eq('source', 'network')
+      .order('last_seen', { ascending: false });
+
+    if (error) {
+      console.error('Erro a carregar devices da BD:', error);
+      setHardwareError('Could not load hardware devices.');
+      return [];
+    }
+
+    const devices = data ?? [];
+    setDiscoveredDevices(devices);
+    return devices;
+  };
+
+  // Função para sincronizar dispositivos com o Supabase
+  const syncDeviceToDB = async (name: string, type: string, source: string, externalId?: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Sessão não encontrada.');
+
+    const now = new Date().toISOString();
+    const normalizedExternalId = externalId || buildExternalId(name, source);
+    const homeId = await getCurrentUserHomeId(user.id);
+    const payload = {
+      name,
+      type,
+      source,
+      status: 'connected',
+      user_id: user.id,
+      home_id: homeId,
+      external_id: normalizedExternalId,
+      last_seen: now,
+    };
+
+    const { data: existing, error: existingError } = await supabase
+      .from('devices')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('source', source)
+      .eq('external_id', normalizedExternalId)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+
+    const request = existing
+      ? supabase
+          .from('devices')
+          .update(payload)
+          .eq('id', existing.id)
+          .select('id, name, type, source, status, external_id, last_seen, home_id')
+          .single()
+      : supabase
+          .from('devices')
+          .insert(payload)
+          .select('id, name, type, source, status, external_id, last_seen, home_id')
+          .single();
+
+    const { data, error } = await request;
+    if (error) throw error;
+    return data;
+  };
+
+  // Simula descoberta local; quando houver ZeroConf/Bluetooth real, basta trocar esta lista pela descoberta real.
+  const scanForDevices = async () => {
+    if (isScanning) return;
+
+    setIsScanning(true);
+    setHardwareError(null);
+
+    try {
+      const mockDevices = [
+        { name: 'Samsung Smart TV', type: 'tv', externalId: 'network:samsung-smart-tv' },
+        { name: 'Google Nest Speaker', type: 'speaker', externalId: 'network:google-nest-speaker' },
+        { name: 'HP-ENVY-Laptop', type: 'computer', externalId: 'network:hp-envy-laptop' },
+      ];
+
+      for (const dev of mockDevices) {
+        await syncDeviceToDB(dev.name, dev.type, 'network', dev.externalId);
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) await loadNetworkDevices(user.id);
+    } catch (error) {
+      console.error('Erro a guardar hardware devices:', error);
+      setHardwareError('Could not save hardware devices.');
+      alert('Erro ao guardar dispositivos na base de dados: ' + (error as any).message);
+    } finally {
+      setIsScanning(false);
+    }
+  };
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -48,56 +188,69 @@ export default function Profile() {
 
         const userEmail = user.email || '';
         setUserEmail(userEmail);
-        const { data: usersFound } = await supabase
+        const { data: userData } = await supabase
           .from('users')
-          .select('hobbies, home_idhome')
-          .ilike('email', userEmail.trim());
+          .select('hobbies')
+          .eq('auth_uid', user.id)
+          .maybeSingle();
 
+        if (userData?.hobbies) {
+          const raw = Array.isArray(userData.hobbies) ? userData.hobbies.join(',') : String(userData.hobbies);
+          const cleanHobbies = raw.replace(/[\[\]"]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
+          setSelectedHobbies(Array.from(new Set(cleanHobbies)));
+        }
 
-        const userData = usersFound && usersFound.length > 0 ? usersFound[0] : null;
         let finalHomeId = null;
 
-        if (!userData) {
-          const { data: byAuth } = await supabase.from('users').select('hobbies, home_idhome').eq('auth_uid', user.id).maybeSingle();
-          if (byAuth?.hobbies) {
-            const raw = Array.isArray(byAuth.hobbies) ? byAuth.hobbies.join(',') : String(byAuth.hobbies);
-            const cleanHobbies = raw.replace(/[\[\]"]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
+        // Fetch user's home from user_homes table
+        const { data: homeAssociation } = await supabase
+          .from('user_homes')
+          .select('home_id')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
 
-            setSelectedHobbies(Array.from(new Set(cleanHobbies)));
-          }
-          if (byAuth?.home_idhome) {
-            setUserHomeId(byAuth.home_idhome);
-            finalHomeId = byAuth.home_idhome;
-          }
-        } else {
-          if (userData?.hobbies) {
-            const raw = Array.isArray(userData.hobbies) ? userData.hobbies.join(',') : String(userData.hobbies);
-            const cleanHobbies = raw.replace(/[\[\]"]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
-            // Remover duplicados com Set
-            setSelectedHobbies(Array.from(new Set(cleanHobbies)));
-          }
-          if (userData?.home_idhome) {
-            setUserHomeId(userData.home_idhome);
-            finalHomeId = userData.home_idhome;
-          }
+        if (homeAssociation) {
+          finalHomeId = homeAssociation.home_id;
+          setUserHomeId(finalHomeId);
         }
 
         // Fetch Join Code se tivermos o ID da casa
         if (finalHomeId) {
-          const { data: homeData } = await supabase.from('home').select('join_code').eq('idhome', finalHomeId).maybeSingle();
+          const { data: homeData } = await supabase.from('homes').select('join_code').eq('id', finalHomeId).maybeSingle();
           if (homeData?.join_code) {
             setJoinCode(homeData.join_code);
           }
         }
 
-
+        // --- CARREGAR DISPOSITIVOS GUARDADOS NA BD ---
+        await loadNetworkDevices(user.id);
 
       } else {
         setUserName('Visitante');
       }
       setIsLoading(false);
     };
+
+    const checkHealthConnect = async () => {
+      try {
+        const { getSdkStatus, SdkAvailabilityStatus } = require('react-native-health-connect');
+        const status = await getSdkStatus();
+        if (status === SdkAvailabilityStatus.SDK_AVAILABLE) {
+          setHealthConnectStatus('connected');
+          // Salvar o estado da Health Connect na BD como um dispositivo/serviço
+          await syncDeviceToDB('Health Connect', 'heart', 'health_connect', 'android_hc');
+        } else {
+          setHealthConnectStatus('disconnected');
+        }
+      } catch (e) {
+        setHealthConnectStatus('disconnected');
+      }
+    };
+
     fetchUser();
+    checkHealthConnect();
   }, []);
 
 
@@ -150,44 +303,13 @@ export default function Profile() {
       const { error, count } = await supabase
         .from('users')
         .update({ hobbies: uniqueHobbies }, { count: 'exact' })
-        .ilike('email', userEmail.trim());
+        .eq('auth_uid', user.id);
 
       if (error) {
-        // Fallback para auth_uid se o email falhar
-        const { error: error2, count: count2 } = await supabase
-          .from('users')
-          .update({ hobbies: uniqueHobbies }, { count: 'exact' })
-          .eq('auth_uid', user.id);
-
-
-
-        if (error2) {
-          console.error("Erro ao guardar hobbies:", error2);
-          alert("Erro ao gravar hobbies: " + error2.message);
-        } else if (count2 === 0) {
-          alert("Erro RLS: Zero linhas atualizadas por UID. Verifica se as permissões SQL permitem a edição.");
-        } else {
-          setIsModalVisible(false);
-          alert("Hobby preferences saved!");
-        }
-      } else if (count === 0) {
-        const uniqueHobbies = Array.from(new Set(selectedHobbies)).join(',');
-        const { error: errorFallback, count: countFallback } = await supabase
-          .from('users')
-          .update({ hobbies: uniqueHobbies }, { count: 'exact' })
-          .eq('auth_uid', user.id);
-
-
-
-        if (countFallback === 0) {
-          alert("Erro: O teu e-mail (" + userEmail + ") não foi encontrado ou está bloqueado pelo RLS. Garante que corres o SQL das permissões.");
-        } else {
-          setIsModalVisible(false);
-          alert("Hobby preferences saved!");
-        }
+        console.error("Erro ao guardar hobbies:", error);
+        alert("Erro ao gravar hobbies: " + error.message);
       } else {
         setIsModalVisible(false);
-        alert("Hobby preferences saved!");
       }
 
     }
@@ -330,7 +452,60 @@ export default function Profile() {
             )}
           </View>
         </View>
+{/* Smart Home & Hardware Devices */}
+<View className="bg-[#F5F7F0] rounded-[24px] p-5 mb-4 border border-[#D1D9C5]">
+  <View className="flex-row justify-between items-center mb-4">
+    <Text
+      maxFontSizeMultiplier={1.2}
+      className="text-lg text-[#4A5D4E]"
+      style={{ fontFamily: 'Nunito_600SemiBold' }}
+    >
+      Connected Hardware
+    </Text>
+    {isScanning && <Text className="text-[#5B8C51] text-xs animate-pulse">Scanning...</Text>}
+  </View>
 
+  {hardwareError && (
+    <Text className="text-red-500 text-xs mb-3">{hardwareError}</Text>
+  )}
+
+  <View className="gap-y-3">
+    {discoveredDevices.length > 0 ? (
+      discoveredDevices.map((device, index) => (
+        <View key={device.id ?? device.external_id ?? index} className="flex-row items-center bg-white/50 p-3 rounded-2xl border border-[#E8EDDF]">
+          <View className="bg-[#5B8C51] p-2 rounded-full">
+            <MaterialIcons 
+              name={device.type === 'tv' ? 'tv' : device.type === 'speaker' ? 'speaker' : 'computer'} 
+              size={20} 
+              color="white" 
+            />
+          </View>
+          <View className="ml-3">
+            <Text className="text-[#4A5D4E] font-bold">{device.name}</Text>
+            <Text className="text-gray-500 text-xs">
+              {device.status === 'connected' ? 'Saved to local network' : 'Local Network'}
+            </Text>
+          </View>
+          <View className="ml-auto">
+            <View className="w-2 h-2 rounded-full bg-green-500" />
+          </View>
+        </View>
+      ))
+    ) : (
+      <Text className="text-gray-400 italic text-center">No hardware devices found.</Text>
+    )}
+  </View>
+
+  <TouchableOpacity
+    onPress={scanForDevices}
+    disabled={isScanning}
+    className={`mt-4 py-2 items-center ${isScanning ? 'opacity-50' : ''}`}
+  >
+    <Text className="text-[#5B8C51] font-bold">
+      {isScanning ? 'Saving Devices...' : discoveredDevices.length > 0 ? 'Refresh Devices' : 'Scan & Save Devices'}
+    </Text>
+  </TouchableOpacity>
+</View>
 
         {/* Wearables */}
         <View className="bg-[#F5F7F0] rounded-[24px] p-5 mb-4 border border-[#D1D9C5]">
@@ -344,18 +519,11 @@ export default function Profile() {
           </Text>
 
           <DeviceItem
-            name="Apple Watch"
-            status="Connected"
-            connected
-            icon="watch"
-            testID="device-apple-watch"
-          />
-          <DeviceItem
-            name="Mi Band"
-            status="Disconnected"
-            connected={false}
-            icon="watch"
-            testID="device-mi-band"
+            name="Health Connect"
+            status={healthConnectStatus === 'checking' ? 'Checking...' : healthConnectStatus === 'connected' ? 'Connected' : 'Not Connected'}
+            connected={healthConnectStatus === 'connected'}
+            icon="favorite"
+            testID="device-health-connect"
           />
 
           <TouchableOpacity
@@ -365,13 +533,21 @@ export default function Profile() {
             accessibilityRole="button"
             accessibilityLabel="Add new device"
             accessibilityHint="Starts the process to connect a new wearable device"
+            onPress={async () => {
+              try {
+                const { openHealthConnectSettings } = require('react-native-health-connect');
+                openHealthConnectSettings();
+              } catch (e) {
+                alert('Could not open Health Connect settings.');
+              }
+            }}
           >
             <Text
               maxFontSizeMultiplier={1.2}
               className="text-white text-xl"
               style={{ fontFamily: 'Nunito_700Bold' }}
             >
-              Add New Device
+              {healthConnectStatus === 'connected' ? 'Update Permissions' : 'Connect Health Connect'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -396,6 +572,40 @@ export default function Profile() {
             testID="menu-privacy"
             onPress={() => setIsPrivacyModalVisible(true)}
           />
+        </View>
+
+        {/* Spotify Connection */}
+        <View className="bg-[#F5F7F0] rounded-[24px] px-2 mb-4 border border-[#D1D9C5]">
+          <TouchableOpacity
+            className="flex-row justify-between items-center py-5 px-4"
+            onPress={isAuthenticated ? logout : login}
+          >
+            <View className="flex-row items-center">
+              <MaterialCommunityIcons name="spotify" size={28} color={isAuthenticated ? "#1DB954" : "#4A5D4E"} />
+              <View className="ml-4">
+                <Text
+                  maxFontSizeMultiplier={1.2}
+                  className="text-lg text-[#4A5D4E]"
+                  style={{ fontFamily: 'Nunito_600SemiBold' }}
+                >
+                  Spotify
+                </Text>
+                <Text className={`text-xs ${isAuthenticated ? (userProfile ? 'text-[#1DB954]' : 'text-orange-500') : 'text-gray-400'}`}>
+                  {isLoading
+                    ? 'Checking connection...'
+                    : isAuthenticated
+                      ? (userProfile ? `Connected as ${userProfile?.display_name}` : 'Login expired or incomplete')
+                      : 'Not connected'}
+                </Text>
+              </View>
+            </View>
+            <Text
+              className={`text-sm ${isAuthenticated ? (userProfile ? 'text-red-500' : 'text-blue-500') : 'text-[#5B8C51]'}`}
+              style={{ fontFamily: 'Nunito_700Bold' }}
+            >
+              {isLoading ? '' : isAuthenticated ? (userProfile ? 'Disconnect' : 'Connect Now') : 'Connect'}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Menu Secundário */}

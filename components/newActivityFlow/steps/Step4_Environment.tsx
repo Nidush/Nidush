@@ -1,4 +1,4 @@
-import { SCENARIOS } from '@/constants/data';
+import { Scenario } from '@/constants/data/types';
 import { MaterialIcons } from '@expo/vector-icons';
 import React, { useMemo } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
@@ -9,20 +9,22 @@ interface Step4Props {
   selected: string;
   onSelect: (id: string) => void;
   roomName: string;
+  scenarios: Scenario[];
 }
 
 export const Step4_Environment = ({
   selected,
   onSelect,
   roomName,
+  scenarios,
 }: Step4Props) => {
   const filteredScenarios = useMemo(() => {
     if (!roomName) return [];
 
     const targetRoom = roomName.toLowerCase().trim();
 
-    return SCENARIOS.filter((s) => s.room.toLowerCase().trim() === targetRoom);
-  }, [roomName]);
+    return scenarios.filter((s) => s.room?.toLowerCase().trim() === targetRoom);
+  }, [roomName, scenarios]);
 
   return (
     <StepWrapper

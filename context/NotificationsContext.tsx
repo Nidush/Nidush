@@ -1,5 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { supabase } from '../utils/supabase';
 
 export interface AppNotification {
   id: string;
@@ -17,72 +17,264 @@ interface NotificationsContextType {
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   clearAll: () => void;
+  loadMore: () => void;
+  refreshNotifications: () => Promise<void>;
+  hasMore: boolean;
+  isLoading: boolean;
 }
+
+
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
 
-const NOTIFICATIONS_STORAGE_KEY = '@nidush_notifications';
-
 export const NotificationsProvider = ({ children }: { children: React.ReactNode }) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const isLoadingRef = useRef(false);
+  const hasMoreRef = useRef(false);
+  const pageRef = useRef(0);
+  const PAGE_SIZE = 10;
+
+  const setPageState = (nextPage: number) => {
+    pageRef.current = nextPage;
+    setPage(nextPage);
+  };
+
+  const setHasMoreState = (nextHasMore: boolean) => {
+    hasMoreRef.current = nextHasMore;
+    setHasMore(nextHasMore);
+  };
+
 
   useEffect(() => {
-    const loadNotifications = async () => {
-      try {
-        const storedValue = await AsyncStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
-        if (storedValue) {
-          setNotifications(JSON.parse(storedValue));
-        }
-      } catch (e) {
-        console.error('Failed to load notifications from storage', e);
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+        setHasMoreState(false);
+        setPageState(0);
+        loadNotifications(user.id);
+      } else {
+        setUserId(null);
+        setNotifications([]);
+        setHasMoreState(false);
+        setPageState(0);
       }
     };
-    loadNotifications();
+    fetchUser();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        setUserId(session.user.id);
+        setHasMoreState(false);
+        setPageState(0);
+        loadNotifications(session.user.id);
+      } else {
+        setUserId(null);
+        setNotifications([]);
+        setHasMoreState(false);
+        setPageState(0);
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
-  const saveNotifications = async (newNotifications: AppNotification[]) => {
+  const loadNotifications = async (uid: string, isNextPage = false) => {
+    if (isLoadingRef.current || (isNextPage && !hasMoreRef.current)) return;
+    isLoadingRef.current = true;
+    setIsLoading(true);
+
     try {
-      await AsyncStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(newNotifications));
+      const currentPage = isNextPage ? pageRef.current + 1 : 0;
+      const start = currentPage * PAGE_SIZE;
+      const end = start + PAGE_SIZE;
+
+      console.log(`[API] Notificações - Página ${currentPage}: A pedir itens ${start} a ${end - 1}...`);
+      
+      // Adicionar um pequeno atraso para a animação ser visível no vídeo de entrega
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      const { data, error, count } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact' })
+
+        .eq('user_id', uid)
+        .order('created_at', { ascending: false })
+        .range(start, end);
+
+      if (error) {
+        const message = String((error as any).message || '').toLowerCase();
+        const isRangeExhausted =
+          (error as any).status === 416 ||
+          error.code === 'PGRST103' ||
+          message.includes('range') ||
+          message.includes('satisfiable');
+
+        if (isNextPage && isRangeExhausted) {
+          setHasMoreState(false);
+        } else {
+          console.error('Failed to load notifications from Supabase:', error);
+        }
+        return;
+      }
+      
+      const pageData = (data ?? []).slice(0, PAGE_SIZE);
+      const mapped: AppNotification[] = pageData.map((n: any) => ({
+        id: n.id,
+        title: n.title,
+        message: n.message,
+        type: n.type,
+        timestamp: new Date(n.created_at).getTime(),
+        read: n.read,
+      }));
+
+      if (isNextPage) {
+        setNotifications((prev) => [...prev, ...mapped]);
+      } else {
+        setNotifications(mapped);
+      }
+
+      setPageState(currentPage);
+      if (count !== null) {
+        setHasMoreState(start + mapped.length < count);
+      } else {
+        setHasMoreState((data ?? []).length > PAGE_SIZE);
+      }
     } catch (e) {
-      console.error('Failed to save notifications to storage', e);
+      console.error('Error fetching notifications:', e);
+    } finally {
+      isLoadingRef.current = false;
+      setIsLoading(false);
     }
   };
 
-  const addNotification = (title: string, message: string, type: AppNotification['type']) => {
+  const loadMore = () => {
+    if (userId && hasMoreRef.current && !isLoadingRef.current) {
+      loadNotifications(userId, true);
+    }
+  };
+
+  const refreshNotifications = async () => {
+    if (userId) {
+      setHasMoreState(false);
+      setPageState(0);
+      await loadNotifications(userId, false);
+    }
+  };
+
+  const ensurePublicUser = async (uid: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+
+    const { error } = await supabase
+      .from('users')
+      .upsert({
+        auth_uid: uid,
+        email: user.email || '',
+        first_name: user.user_metadata?.first_name || '',
+        last_name: user.user_metadata?.last_name || '',
+      }, { onConflict: 'auth_uid' });
+
+    if (error) {
+      console.error('Error ensuring public user before notification:', error);
+      return false;
+    }
+
+    return true;
+  };
+
+
+
+  const addNotification = async (title: string, message: string, type: AppNotification['type']) => {
+    if (!userId) return;
+
+    // We can optimistically add it locally based on a temporary ID, or just insert and reload.
+    // Optimistic UI update:
+    const tempId = Date.now().toString();
     const newNotification: AppNotification = {
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      id: tempId,
       title,
       message,
       type,
       timestamp: Date.now(),
       read: false,
     };
-    setNotifications((prev) => {
-      const updated = [newNotification, ...prev];
-      saveNotifications(updated);
-      return updated;
-    });
+
+    setNotifications((prev) => [newNotification, ...prev]);
+
+    const hasPublicUser = await ensurePublicUser(userId);
+    if (!hasPublicUser) {
+      setNotifications((prev) => prev.filter(n => n.id !== tempId));
+      return;
+    }
+
+    const { error, data } = await supabase
+      .from('notifications')
+      .insert({
+        user_id: userId,
+        title,
+        message,
+        type,
+        read: false
+      })
+      .select('id, created_at')
+      .single();
+
+    if (error) {
+      console.error('Error adding notification to Supabase:', error);
+      // Revert if error
+      setNotifications((prev) => prev.filter(n => n.id !== tempId));
+    } else if (data) {
+      // Fix temporary ID with actual DB UUID
+      setNotifications((prev) => 
+        prev.map(n => n.id === tempId ? { ...n, id: data.id, timestamp: new Date(data.created_at).getTime() } : n)
+      );
+    }
   };
 
-  const markAsRead = (id: string) => {
-    setNotifications((prev) => {
-      const updated = prev.map((n) => (n.id === id ? { ...n, read: true } : n));
-      saveNotifications(updated);
-      return updated;
-    });
+  const markAsRead = async (id: string) => {
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    if (!userId) return;
+
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('id', id);
+
+    if (error) console.error('Error marking notification as read in Supabase:', error);
   };
 
-  const markAllAsRead = () => {
-    setNotifications((prev) => {
-      const updated = prev.map((n) => ({ ...n, read: true }));
-      saveNotifications(updated);
-      return updated;
-    });
+  const markAllAsRead = async () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    if (!userId) return;
+
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('user_id', userId)
+      .eq('read', false);
+
+    if (error) console.error('Error marking all notifications as read in Supabase:', error);
   };
 
-  const clearAll = () => {
+  const clearAll = async () => {
     setNotifications([]);
-    saveNotifications([]);
+    setHasMoreState(false);
+    setPageState(0);
+    if (!userId) return;
+
+    const { error } = await supabase
+      .from('notifications')
+      .delete()
+      .eq('user_id', userId);
+
+    if (error) console.error('Error clearing notifications from Supabase:', error);
   };
 
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -96,7 +288,13 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
         markAsRead,
         markAllAsRead,
         clearAll,
+        loadMore,
+        refreshNotifications,
+        hasMore,
+        isLoading,
       }}
+
+
     >
       {children}
     </NotificationsContext.Provider>

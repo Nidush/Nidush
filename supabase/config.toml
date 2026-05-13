@@ -1,0 +1,14 @@
+[api]
+port = 54321
+schemas = ["public", "graphql_public"]
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[functions.welcome-user]
+verify_jwt = false
+
+[functions.manage-home]
+verify_jwt = false

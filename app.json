@@ -3,31 +3,50 @@
     "name": "Nidush",
     "slug": "Nidush",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "icon": "./assets/images/Icon-Padded.png",
     "scheme": "nidush",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nidush.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSHealthShareUsageDescription": "Nidush needs access to your health data to monitor heart rate and activity levels."
+      }
     },
     "android": {
+      "package": "com.nidush.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/Icon-Padded.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.health.READ_HEART_RATE",
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_TOTAL_CALORIES_BURNED"
       ],
-      "package": "com.nidush.app"
-    },
-    "web": {
-      "output": "static",
-      "favicon": "./assets/images/Logo.png",
-      "bundler": "metro"
+      "intentFilters": [
+        {
+          "action": "androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE",
+          "category": [
+            "android.intent.category.DEFAULT"
+          ]
+        },
+        {
+          "action": "android.intent.action.VIEW_PERMISSION_USAGE",
+          "category": [
+            "android.intent.category.HEALTH_PERMISSIONS"
+          ]
+        }
+      ]
     },
     "plugins": [
       "expo-router",
@@ -37,25 +56,48 @@
           "image": "./assets/images/Logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#F0F2EB",
-          "dark": {
-            "backgroundColor": "#000000"
-          }
+          "backgroundColor": "#F0F2EB"
         }
       ],
       "expo-font",
       "expo-audio",
       "expo-video",
-      "expo-asset"
+      "expo-asset",
+      [
+        "react-native-health-connect",
+        {
+          "privacyPolicyUrl": "https://nidush.app/privacy",
+          "permissions": [
+            {
+              "accessType": "read",
+              "recordType": "HeartRate"
+            },
+            {
+              "accessType": "read",
+              "recordType": "Steps"
+            },
+            {
+              "accessType": "read",
+              "recordType": "TotalCaloriesBurned"
+            }
+          ]
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26,
+            "compileSdkVersion": 35,
+            "targetSdkVersion": 35
+          }
+        }
+      ],
+      "expo-web-browser"
     ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    },
     "extra": {
-      "router": {},
       "eas": {
-        "projectId": "d78fca08-0c16-4d89-b260-5c196eb5670b"
+        "projectId": "c61332b1-8bad-4bc9-9b37-fcb56e693716"
       }
     }
   }

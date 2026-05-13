@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '@/utils/supabase';
+import { supabase, apiLog } from '@/utils/supabase';
+
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -17,17 +18,21 @@ import { DeviceSection } from '@/components/activityDetails/DeviceSection';
 import { FocusSection } from '@/components/activityDetails/FocusSection';
 import { MediaSection } from '@/components/activityDetails/MediaSection';
 import { CustomAlert } from '@/components/CustomAlert';
+import { useSpotify } from '@/context/SpotifyContext';
 
 import {
-  ACTIVITIES,
   Activity,
   Content,
   CONTENTS,
   Scenario,
   ScenarioDeviceState,
-  SCENARIOS,
 } from '@/constants/data';
 import { SMART_HOME_DEVICES } from '@/constants/devices';
+import {
+  fetchActivityTemplateById,
+  fetchScenarioTemplateById,
+  mapUserActivity,
+} from '@/utils/catalogTemplates';
 
 type AlertConfigState = {
   visible: boolean;
@@ -77,49 +82,64 @@ export default function ActivityDetails() {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      let foundActivity = ACTIVITIES.find((a) => a.id === id);
+      let foundActivity = await fetchActivityTemplateById(id);
 
       if (!foundActivity) {
+        apiLog('SELECT', 'activities', { id });
         const { data, error } = await supabase
-          .from('activity')
+          .from('activities')
           .select('*')
-          .eq('idactivity', id)
+          .eq('id', id)
           .single();
+
           
         if (data && !error) {
-          foundActivity = {
-            id: data.idactivity.toString(), // Converter int id ou UUID para string
-            title: data.title,
-            description: data.description,
-            room: data.room,
-            image: data.image,
-            category: data.category,
-            type: data.type,
-            contentId: data.contentid,
-            scenarioId: data.scenarioid,
-            shortcuts: data.shortcuts === true || data.shortcuts === 'true',
-          } as Activity;
+          foundActivity = mapUserActivity(data);
         }
       }
 
       if (foundActivity) {
         setMainItem(foundActivity);
-        if (foundActivity.scenarioId) {
-          const scen = SCENARIOS.find((s) => s.id === foundActivity.scenarioId);
+        if (foundActivity.scenario_id) {
+          let scen = await fetchScenarioTemplateById(foundActivity.scenario_id);
+          
+          if (!scen) {
+            console.log('[ActivityDetails] Fetching scenario from DB:', foundActivity.scenario_id);
+            const { data: scenData } = await supabase
+              .from('scenarios')
+              .select('*')
+              .eq('id', foundActivity.scenario_id)
+              .maybeSingle();
+            
+            if (scenData) {
+              scen = {
+                id: scenData.id.toString(),
+                title: scenData.name,
+                description: scenData.description || '',
+                playlist: scenData.playlist_id ? 'Spotify Music' : (scenData.playlist_name || 'No music'),
+                playlist_id: scenData.playlist_id,
+                focusMode: false, // Default fallback
+                shortcuts: false,
+                devices: [], // Fallback
+                image: { uri: 'https://picsum.photos/200' } // Fallback
+              } as Scenario;
+            }
+          }
+
           setRelatedScenario(scen || null);
           if (scen) setFocusEnabled(scen.focusMode);
         }
-        if (foundActivity.contentId) {
+        if (foundActivity.content_id) {
           const { data: contentRows, error: contentError } = await supabase
-            .from('content')
+            .from('contents')
             .select('*')
-            .eq('idcontent', foundActivity.contentId)
+            .eq('id', foundActivity.content_id)
             .limit(1);
 
           if (contentRows && contentRows.length > 0 && !contentError) {
             const contentData = contentRows[0];
             setRelatedContent({
-              id: contentData.idcontent,
+              id: contentData.id,
               title: contentData.title,
               type: contentData.type,
               category: contentData.category,
@@ -132,12 +152,12 @@ export default function ActivityDetails() {
               author: contentData.author,
             } as Content);
           } else {
-            const cont = CONTENTS[foundActivity.contentId];
+            const cont = CONTENTS[foundActivity.content_id as any];
             setRelatedContent(cont || null);
           }
         }
       } else {
-        const foundScenario = SCENARIOS.find((s) => s.id === id);
+        const foundScenario = await fetchScenarioTemplateById(id);
         if (foundScenario) {
           setMainItem(foundScenario);
           setRelatedScenario(foundScenario);
@@ -163,25 +183,23 @@ export default function ActivityDetails() {
   const handleStartPress = () => {
     if (!mainItem) return;
 
-    const isMeditation =
-      isActivity && (mainItem as Activity).type === 'meditation';
-
-    if (isMeditation) {
+    // Permitir todas as atividades e cenários avançarem para o ecrã de execução
+    if (mainItem) {
+      // 🎵 Removido daqui para tocar apenas no ecrã de exercício (como pedido)
       router.push({
         pathname: '/LoadingActivity',
         params: {
           id: mainItem.id,
           title: mainItem.title,
-          type: 'activity',
+          type: isActivity ? 'activity' : 'scenario',
           focusMode: focusEnabled.toString(),
         },
       });
     } else {
       setAlertConfig({
         visible: true,
-        title: 'Coming Soon',
-        message:
-          'This feature will be available soon for this type of activity or scenario.',
+        title: 'Error',
+        message: 'Could not load item details. Please try again.',
         confirmText: 'OK',
         cancelText: '',
         isDestructive: false,
@@ -226,7 +244,11 @@ export default function ActivityDetails() {
       onConfirm: async () => {
         try {
           // Deletar a atividade na nuvem do Supabase
-          const { error } = await supabase.from('activity').delete().eq('idactivity', id);
+          apiLog('DELETE', 'activities', { id });
+          const { error } = await supabase.from('activities').delete().eq('id', id);
+
+
+
           if (error) throw error;
           
           router.navigate('/Activities');
@@ -255,13 +277,13 @@ export default function ActivityDetails() {
       </View>
     );
 
-  const imgObj = mainItem.image;
+  const imgObj = mainItem.image || relatedContent?.image;
   const isNumeric = typeof imgObj === 'string' && /^\d+$/.test(imgObj);
   const imageSource = isNumeric
     ? { uri: `https://picsum.photos/seed/${imgObj}/400/600` }
     : typeof imgObj === 'string'
       ? { uri: imgObj }
-      : imgObj;
+      : imgObj || { uri: 'https://picsum.photos/400/600' };
 
   const devicesToShow: ScenarioDeviceState[] =
     relatedScenario?.devices || (mainItem as Scenario).devices || [];
@@ -275,11 +297,36 @@ export default function ActivityDetails() {
     ? `Playlist will be played on ${SMART_HOME_DEVICES[activeSpeakerConfig.deviceId].name}`
     : 'Playlist will be played';
 
-  const instructions = relatedContent?.instructions || [];
-  const ingredients =
-    relatedContent?.type === 'recipe' ? relatedContent.ingredients : [];
+  // Helper: parse JSON safely (handles strings, arrays, objects)
+  const safeParse = (value: any): any => {
+    if (!value) return [];
+    if (typeof value === 'string') {
+      try { return JSON.parse(value); } catch { return []; }
+    }
+    return value;
+  };
+
+  // Instructions: can be JSON string (from API), array of strings, or array of {text, duration}
+  const rawInstructions = safeParse(relatedContent?.instructions);
+  const instructions: any[] = Array.isArray(rawInstructions)
+    ? rawInstructions.map((s: any) => typeof s === 'string' ? s : s?.text || '')
+    : [];
+
+  // Ingredients: API format is ["400g Pasta", "100g Bacon"], ContentSection expects [{item, amount}]
+  const rawIngredients = safeParse(relatedContent?.ingredients);
+  const ingredients = relatedContent?.type === 'recipe' && Array.isArray(rawIngredients)
+    ? rawIngredients.map((s: any) => {
+        if (typeof s === 'object' && s?.item) return s; // Already {item, amount} format
+        // API format: "400g Pasta" → split on first space
+        const str = String(s);
+        const spaceIdx = str.indexOf(' ');
+        if (spaceIdx === -1) return { item: str, amount: '' };
+        return { amount: str.slice(0, spaceIdx), item: str.slice(spaceIdx + 1) };
+      })
+    : [];
+
   const displayTime = isActivity
-    ? relatedContent?.duration || 'Duration N/A'
+    ? relatedContent?.duration || null
     : null;
 
   return (
@@ -303,7 +350,7 @@ export default function ActivityDetails() {
           imageSource={imageSource}
           type={isActivity ? (mainItem as Activity).type : 'Scenario'}
           title={mainItem.title}
-          room={mainItem.room}
+          room={(mainItem as any).room_id || (mainItem as any).room}
           duration={displayTime}
           isActivity={isActivity}
           onBack={handleCustomBack}
@@ -335,9 +382,13 @@ export default function ActivityDetails() {
           <FocusSection enabled={focusEnabled} onToggle={setFocusEnabled} />
           <MediaSection
             isVisible={
-              !!(relatedScenario?.playlist || relatedContent?.videoUrl)
+              !!(relatedScenario?.playlist || relatedContent?.videoUrl || ['workout', 'cooking', 'meditation'].includes((mainItem as any).type?.toLowerCase()))
             }
-            title={relatedScenario?.playlist || relatedContent?.title}
+            title={relatedScenario?.playlist || relatedContent?.title || (
+              (mainItem as any).type?.toLowerCase() === 'workout' ? 'Workout Beats' :
+              (mainItem as any).type?.toLowerCase() === 'cooking' ? 'Cooking Vibes' :
+              (mainItem as any).type?.toLowerCase() === 'meditation' ? 'Nature Sounds' : 'Recommended Music'
+            )}
             subtitle={audioStatusText}
           />
           <ContentSection

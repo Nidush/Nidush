@@ -3,14 +3,16 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@/*": ["./*"]
+      "@/*": [
+        "./*"
+      ]
     }
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
-    ".expo/types/**/*.ts",
-    "expo-env.d.ts",
-    "nativewind-env.d.ts"
-, "__tests__/SignUp.test.js", "app/profile-selection.jsx"  ]
+    "nativewind-env.d.ts",
+    "__tests__/SignUp.test.js",
+    "app/profile-selection.jsx"
+  ]
 }

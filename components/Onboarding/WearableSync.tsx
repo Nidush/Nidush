@@ -3,6 +3,9 @@ import { View, Text, TouchableOpacity, Image, Dimensions, Animated, Easing, Scro
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icons } from '../../assets/assets'; 
 
+// Import types for TS if needed, otherwise use require for logic
+import type { Permission } from 'react-native-health-connect';
+
 import {
   useFonts,
   Nunito_400Regular,
@@ -151,7 +154,28 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
               {/* Botões */}
               <View className="mt-12 w-full items-center">
                 <TouchableOpacity 
-                  onPress={onNext}
+                  onPress={async () => {
+                    try {
+                      const { getSdkStatus, SdkAvailabilityStatus, openHealthConnectSettings } = require('react-native-health-connect');
+                      const status = await getSdkStatus();
+                      if (status !== SdkAvailabilityStatus.SDK_AVAILABLE) {
+                        alert('Health Connect is not available or needs to be installed.');
+                        onNext();
+                        return;
+                      }
+
+                      // Em vez de pedir permissão interna (que está a dar o crash nativo), 
+                      // abrimos as definições para o utilizador ativar lá. É 100% seguro contra crashes.
+                      openHealthConnectSettings();
+                      
+                      // Damos um pequeno aviso e avançamos
+                      alert('Please enable Nidush permissions in the Health Connect app that just opened.');
+                      onNext();
+                    } catch (error) {
+                      console.error('Health Connect error:', error);
+                      onNext();
+                    }
+                  }}
                   activeOpacity={0.8}
                   className={`${isWebPC ? 'w-[300px] h-[64px]' : 'w-[260px] h-[60px]'} bg-[#5C8D58] rounded-full justify-center items-center shadow-lg mb-6 active:scale-95`}
                   accessible
@@ -164,7 +188,7 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
                     style={{ fontFamily: 'Nunito_700Bold', fontSize: isWebPC ? 20 : 18 }} 
                     className="text-white"
                   >
-                    Start Scanning
+                    Connect Health Connect
                   </Text>
                 </TouchableOpacity>
 

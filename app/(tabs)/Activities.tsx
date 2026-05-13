@@ -3,6 +3,7 @@ import { FabMenu } from '@/components/activitiesScenarios/FabMenu';
 import { FilterBar } from '@/components/activitiesScenarios/FilterBar';
 import { HeaderSection } from '@/components/activitiesScenarios/HeaderSection';
 import { useBiometrics } from '@/context/BiometricsContext';
+import { supabase } from '@/utils/supabase';
 import {
   Nunito_400Regular,
   Nunito_600SemiBold,
@@ -10,19 +11,21 @@ import {
   useFonts,
 } from '@expo-google-fonts/nunito';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '@/utils/supabase';
 import { useFocusEffect } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
-  ACTIVITIES,
   Activity,
   CONTENTS,
   Scenario,
-  SCENARIOS,
 } from '@/constants/data';
+import {
+  fetchActivityTemplates,
+  fetchScenarioTemplates,
+  mapUserActivity,
+} from '@/utils/catalogTemplates';
 import { getDynamicRecommendations } from '@/utils/recommendationEngine';
 
 const UnifiedActivitiesScreen = () => {
@@ -36,6 +39,13 @@ const UnifiedActivitiesScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [myActivities, setMyActivities] = useState<Activity[]>([]);
+  const [activityTemplates, setActivityTemplates] = useState<Activity[]>([]);
+  const [scenarioTemplates, setScenarioTemplates] = useState<Scenario[]>([]);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+
+  const isLoadingRef = useRef(false);
+  const PAGE_SIZE = 10;
 
   // Debounce search query
   useEffect(() => {
@@ -45,53 +55,74 @@ const UnifiedActivitiesScreen = () => {
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
-  const loadActivities = useCallback(async () => {
+  const loadTemplates = useCallback(async () => {
+    try {
+      const [activities, scenarios] = await Promise.all([
+        fetchActivityTemplates(),
+        fetchScenarioTemplates(),
+      ]);
+      setActivityTemplates(activities);
+      setScenarioTemplates(scenarios);
+    } catch (error) {
+      console.error('Failed to load activity/scenario templates:', error);
+      setActivityTemplates([]);
+      setScenarioTemplates([]);
+    }
+  }, []);
+
+  const loadActivities = useCallback(async (isNextPage = false) => {
+    if (isLoadingRef.current) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       setMyActivities([]);
       return;
     }
 
+    isLoadingRef.current = true;
+    const currentPage = isNextPage ? page + 1 : 0;
+    const start = currentPage * PAGE_SIZE;
+    const end = start + PAGE_SIZE - 1;
+
+    console.log(`[API] Página ${currentPage}: A pedir do item ${start} ao ${end}...`);
+
     let query = supabase
-      .from('activity')
-      .select('*')
-      .eq('user_iduser', user.id);
+      .from('activities')
+      .select('*', { count: 'exact' })
+      .eq('user_id', user.id)
+      .range(start, end);
+
 
     if (debouncedSearchQuery) {
       query = query.ilike('title', `%${debouncedSearchQuery}%`);
     }
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
 
     if (!error && data) {
-      const mapped = data.map(d => ({
-        id: d.idactivity,
-        title: d.title,
-        description: d.description,
-        room: d.room,
-        image: d.image,
-        category: d.category,
-        type: d.type,
-        contentId: d.contentid,
-        scenarioId: d.scenarioid,
-        shortcuts: d.shortcuts === true || d.shortcuts === 'true',
-      }));
-      setMyActivities(mapped as any);
+      const mapped = data.map(mapUserActivity);
+
+      if (isNextPage) {
+        setMyActivities(prev => [...prev, ...mapped]);
+      } else {
+        setMyActivities(mapped);
+      }
+
+      setPage(currentPage);
+      if (count !== null) {
+        setHasMore(start + mapped.length < count);
+      }
     } else {
-      setMyActivities([]);
+      if (!isNextPage) setMyActivities([]);
     }
-  }, [debouncedSearchQuery]);
+    isLoadingRef.current = false;
+  }, [debouncedSearchQuery, page]);
 
   useFocusEffect(
     useCallback(() => {
+      loadTemplates();
       loadActivities();
-    }, [loadActivities]),
+    }, [debouncedSearchQuery, loadTemplates])
   );
-
-  // Re-fetch when debounced search changes
-  useEffect(() => {
-    loadActivities();
-  }, [debouncedSearchQuery]);
 
   let [fontsLoaded] = useFonts({
     Nunito_700Bold,
@@ -109,15 +140,25 @@ const UnifiedActivitiesScreen = () => {
   };
 
   const getActivityTime = (activity: Activity) => {
-    if (activity.contentId && CONTENTS[activity.contentId]) {
-      return CONTENTS[activity.contentId].duration;
+    const cId = activity.content_id || activity.contentId;
+    if (cId && CONTENTS[cId]) {
+      return CONTENTS[cId].duration;
     }
     return undefined;
   };
 
   const processedData = useMemo(() => {
-    const baseData =
-      viewMode === 'activities' ? [...myActivities, ...ACTIVITIES] : SCENARIOS;
+    const rawData =
+      viewMode === 'activities' ? [...myActivities, ...activityTemplates] : scenarioTemplates;
+
+    // Deduplicar por ID para evitar React key warnings (ex: diferentes seeds/migrations)
+    const seen = new Set<string | number>();
+    const baseData = rawData.filter((item) => {
+      const key = String(item.id);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
     const filteredBase = baseData.filter((item) => {
       const matchesSearch = item.title
@@ -129,7 +170,7 @@ const UnifiedActivitiesScreen = () => {
       if (viewMode === 'activities' && isActivity(item)) {
         matchesFilter = item.type?.toLowerCase() === activeFilter.toLowerCase();
       } else {
-        matchesFilter = item.room === activeFilter;
+        matchesFilter = ((item as Scenario).room || item.room_id)?.toLowerCase() === activeFilter.toLowerCase();
       }
       return matchesFilter && matchesSearch;
     });
@@ -153,7 +194,7 @@ const UnifiedActivitiesScreen = () => {
       simpleRecipes: simpleRecipesList,
       isEmpty: filteredBase.length === 0,
     };
-  }, [viewMode, activeFilter, searchQuery, myActivities, currentState]);
+  }, [viewMode, activeFilter, searchQuery, myActivities, activityTemplates, scenarioTemplates, currentState]);
 
   const handleViewModeChange = (mode: 'activities' | 'scenarios') => {
     setViewMode(mode);
@@ -170,6 +211,7 @@ const UnifiedActivitiesScreen = () => {
       accessibilityLanguage="en-US"
     >
       <ScrollView
+        scrollEventThrottle={16}
         importantForAccessibility={isMenuOpen ? 'no-hide-descendants' : 'auto'}
         contentContainerStyle={{
           paddingTop: Platform.OS === 'ios' ? 20 : 10,
@@ -219,8 +261,15 @@ const UnifiedActivitiesScreen = () => {
                 data={processedData.myCreations.map((item) => ({
                   ...item,
                   time: isActivity(item) ? getActivityTime(item) : undefined,
+                  room: item.room || (item as any).room_id,
                 }))}
                 showTime={viewMode === 'activities'}
+                onEndReached={() => {
+                  if (viewMode === 'activities' && hasMore && !isLoadingRef.current) {
+                    loadActivities(true);
+                  }
+                }}
+
               />
             )}
 
@@ -230,6 +279,7 @@ const UnifiedActivitiesScreen = () => {
                 data={processedData.recommended.slice(0, 5).map((item) => ({
                   ...item,
                   time: isActivity(item) ? getActivityTime(item) : undefined,
+                  room: item.room || (item as any).room_id,
                 }))}
                 showTime={viewMode === 'activities'}
               />
@@ -243,6 +293,7 @@ const UnifiedActivitiesScreen = () => {
                   data={processedData.simpleRecipes.map((item) => ({
                     ...item,
                     time: isActivity(item) ? getActivityTime(item) : undefined,
+                    room: item.room || (item as any).room_id,
                   }))}
                   showTime={true}
                 />

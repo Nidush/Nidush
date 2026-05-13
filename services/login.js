@@ -7,11 +7,11 @@ const dashboardButtons = document.getElementById("dashboardButtons");
 
 // Configuração das tabelas do Supabase que queremos mostrar
 const tabelas = {
-  btnAtividades: { tableName: "activity", divId: "atividades", titulo: "ATIVIDADES" },
-  btnRoutines: { tableName: "routine", divId: "routines", titulo: "ROTINAS" },
-  btnScenarios: { tableName: "scenario", divId: "scenarios", titulo: "CENÁRIOS" },
-  btnShortcuts: { tableName: "shortcut", divId: "shortcuts", titulo: "SHORTCUTS" },
-  btnWearables: { tableName: "wearable", divId: "wearables", titulo: "WEARABLES" }
+  btnAtividades: { tableName: "activities", divId: "atividades", titulo: "ATIVIDADES" },
+  btnRoutines: { tableName: "routines", divId: "routines", titulo: "ROTINAS" },
+  btnScenarios: { tableName: "scenarios", divId: "scenarios", titulo: "CENÁRIOS" },
+  btnShortcuts: { tableName: "shortcuts", divId: "shortcuts", titulo: "SHORTCUTS" },
+  btnWearables: { tableName: "wearables", divId: "wearables", titulo: "WEARABLES" }
 };
 
 // Associar as funções aos respetivos botões
@@ -135,7 +135,7 @@ async function mostrarDados(userId, tableName, divId, titulo) {
   const { data, error } = await supabase
     .from(tableName)
     .select("*")
-    .eq("user_iduser", userId); 
+    .eq("user_id", userId); 
 
   if (error) {
     container.innerHTML = `<h3>${titulo}:</h3><p>Erro ao buscar dados: ${error.message}</p>`;

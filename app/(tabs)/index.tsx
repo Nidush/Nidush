@@ -14,10 +14,15 @@ import { CarouselSection } from '../../components/activitiesScenarios/CarouselSe
 import { HomeHeader } from '../../components/Homepage/HomeHeader';
 import { StateWidget } from '../../components/Homepage/StateWidget';
 
-import { ACTIVITIES, CONTENTS, SCENARIOS, Activity } from '@/constants/data';
+import { CONTENTS, Activity, Scenario } from '@/constants/data';
 import { useBiometrics } from '@/context/BiometricsContext';
 import { getDynamicRecommendations } from '@/utils/recommendationEngine';
 import { supabase } from '@/utils/supabase';
+import {
+  fetchActivityTemplates,
+  fetchScenarioTemplates,
+  mapUserActivity,
+} from '@/utils/catalogTemplates';
 
 export default function Index() {
   const [fontsLoaded] = useFonts({
@@ -30,6 +35,8 @@ export default function Index() {
   const [userName, setUserName] = useState('...');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [myActivities, setMyActivities] = useState<Activity[]>([]);
+  const [activityTemplates, setActivityTemplates] = useState<Activity[]>([]);
+  const [scenarioTemplates, setScenarioTemplates] = useState<Scenario[]>([]);
   const [userHobbies, setUserHobbies] = useState<string[]>([]);
 
 
@@ -122,28 +129,31 @@ export default function Index() {
         setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'Utilizador');
         
         const { data, error } = await supabase
-          .from('activity')
+          .from('activities')
           .select('*')
-          .eq('user_iduser', user.id);
+          .eq('user_id', user.id);
           
         if (!error && data) {
-          const mapped = data.map(d => ({
-            id: d.idactivity,
-            title: d.title,
-            description: d.description,
-            room: d.room,
-            image: d.image,
-            category: d.category,
-            type: d.type,
-            contentId: d.contentid,
-            scenarioId: d.scenarioid,
-            shortcuts: d.shortcuts === true || d.shortcuts === 'true',
-          }));
-          setMyActivities(mapped as any);
+          setMyActivities(data.map(mapUserActivity));
         } else {
           setMyActivities([]);
         }
       };
+      const loadTemplates = async () => {
+        try {
+          const [activities, scenarios] = await Promise.all([
+            fetchActivityTemplates(),
+            fetchScenarioTemplates(),
+          ]);
+          setActivityTemplates(activities);
+          setScenarioTemplates(scenarios);
+        } catch (error) {
+          console.error('Failed to load home catalog templates:', error);
+          setActivityTemplates([]);
+          setScenarioTemplates([]);
+        }
+      };
+      loadTemplates();
       loadActivities();
       fetchUserName();
     }, [fetchUserName])
@@ -152,7 +162,7 @@ export default function Index() {
   // --- LÓGICA DO CARROSSEL (Recomendações) ---
   const dynamicActivities = useMemo(() => {
     // 1. Aplicar filtro de Hobbies se o utilizador tiver algum selecionado
-    const appActivities = ACTIVITIES.filter((item) => {
+    const appActivities = activityTemplates.filter((item) => {
       // Ignorar as criações próprias no carrossel de recomendações
       if (item.category === 'My creations') return false;
       
@@ -172,22 +182,24 @@ export default function Index() {
 
     return sortedList.map((item) => {
       let duration: string | undefined = undefined;
-      if ('contentId' in item && item.contentId) {
-        const contentData = (CONTENTS as any)[item.contentId];
+      const activity = item as Activity;
+      const cId = activity.content_id || activity.contentId;
+      if (cId && (CONTENTS as any)[cId]) {
+        const contentData = (CONTENTS as any)[cId];
         if (contentData) {
           duration = contentData.duration;
         }
       }
-      return { ...item, time: duration };
+      return { ...item, time: duration, room: item.room || (item as any).room_id };
     });
-  }, [currentState, userHobbies]);
+  }, [activityTemplates, currentState, userHobbies]);
 
 
   const dynamicTitle = useMemo(() => 'Activities for you', []);
 
   // --- NOVA LÓGICA DOS SHORTCUTS (USANDO 'shortcuts' NO PLURAL) ---
   const shortcuts = useMemo(() => {
-    const allActivities = [...ACTIVITIES, ...myActivities];
+    const allActivities = [...activityTemplates, ...myActivities];
 
     // 1. Filtrar ATIVIDADES onde shortcuts === true
     const favActivities = allActivities.filter(
@@ -195,14 +207,15 @@ export default function Index() {
     ).map((item) => {
       // Tentar encontrar a duração no CONTENTS
       let duration = undefined;
-      if (item.contentId && (CONTENTS as any)[item.contentId]) {
-        duration = (CONTENTS as any)[item.contentId].duration;
+      const cId = item.content_id || item.contentId;
+      if (cId && (CONTENTS as any)[cId]) {
+        duration = (CONTENTS as any)[cId].duration;
       }
 
       return {
         id: item.id,
         title: item.title,
-        room: item.room,
+        room: item.room || item.room_id,
         image: item.image,
         time: duration,
         // Adicionamos type activity para ajudar na lógica se precisares
@@ -211,12 +224,12 @@ export default function Index() {
     });
 
     // 2. Filtrar CENÁRIOS onde shortcuts === true
-    const favScenarios = SCENARIOS.filter((s: any) => s.shortcuts === true).map(
+    const favScenarios = scenarioTemplates.filter((s: any) => s.shortcuts === true).map(
       (item) => {
         return {
           id: item.id,
           title: item.title,
-          room: item.room,
+          room: item.room || item.room_id,
           image: item.image,
           time: undefined, // Cenários não costumam ter duração definida nos cards
           type: 'scenario',
@@ -226,7 +239,7 @@ export default function Index() {
 
     // 3. Juntar as duas listas
     return [...favActivities, ...favScenarios];
-  }, [myActivities]); // Agora depende das myActivities vindas no Supabase
+  }, [activityTemplates, myActivities, scenarioTemplates]); // Agora depende das myActivities vindas no Supabase
 
   if (!fontsLoaded) return null;
 
