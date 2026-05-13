@@ -46,5 +46,8 @@ app-example
 # Local Netlify folder
 .netlify
 
+# Supabase local CLI state
+supabase/.branches/
+
 # Test coverage
 coverage/

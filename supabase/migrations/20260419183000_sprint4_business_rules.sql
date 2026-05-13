@@ -61,11 +61,25 @@ CREATE POLICY "Rooms members access" ON public.rooms
 FOR SELECT TO authenticated
 USING (public.is_member(home_id));
 
-ALTER TABLE public.devices ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Devices members access" ON public.devices;
-CREATE POLICY "Devices members access" ON public.devices
-FOR ALL TO authenticated
-USING (room_id IN (SELECT id FROM public.rooms WHERE public.is_member(home_id)));
+DO $$
+BEGIN
+  IF to_regclass('public.devices') IS NOT NULL THEN
+    ALTER TABLE public.devices ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS "Devices members access" ON public.devices;
+
+    IF EXISTS (
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'devices'
+        AND column_name = 'room_id'
+    ) THEN
+      CREATE POLICY "Devices members access" ON public.devices
+      FOR ALL TO authenticated
+      USING (room_id IN (SELECT id FROM public.rooms WHERE public.is_member(home_id)));
+    END IF;
+  END IF;
+END $$;
 
 -- 3. AUTOMATIC VALIDATION TRIGGERS
 
