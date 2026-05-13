@@ -130,6 +130,27 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
     }
   };
 
+  const ensurePublicUser = async (uid: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+
+    const { error } = await supabase
+      .from('users')
+      .upsert({
+        auth_uid: uid,
+        email: user.email || '',
+        first_name: user.user_metadata?.first_name || '',
+        last_name: user.user_metadata?.last_name || '',
+      }, { onConflict: 'auth_uid' });
+
+    if (error) {
+      console.error('Error ensuring public user before notification:', error);
+      return false;
+    }
+
+    return true;
+  };
+
 
 
   const addNotification = async (title: string, message: string, type: AppNotification['type']) => {
@@ -148,6 +169,12 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
     };
 
     setNotifications((prev) => [newNotification, ...prev]);
+
+    const hasPublicUser = await ensurePublicUser(userId);
+    if (!hasPublicUser) {
+      setNotifications((prev) => prev.filter(n => n.id !== tempId));
+      return;
+    }
 
     const { error, data } = await supabase
       .from('notifications')

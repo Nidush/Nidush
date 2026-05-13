@@ -1,14 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
-  Dimensions,
-  Image,
-  View,
+  Dimensions
 } from 'react-native';
-import { supabase } from '../utils/supabase';
+import { invokeFunction, supabase } from '../utils/supabase';
 
 import {
   Nunito_400Regular,
@@ -21,9 +18,9 @@ import {
 import ActivitySelection from '../components/Onboarding/ActivitySelection';
 import FinalLoading from '../components/Onboarding/FinalLoading';
 import HouseName from '../components/Onboarding/HouseName';
+import SpotifyConnect from '../components/Onboarding/SpotifyConnect';
 import WearableSync from '../components/Onboarding/WearableSync';
 import WelcomeUser from '../components/Onboarding/WelcomeUser';
-import SpotifyConnect from '../components/Onboarding/SpotifyConnect';
 
 export default function SetupProfile() {
   const [fontsLoaded] = useFonts({
@@ -210,15 +207,19 @@ export default function SetupProfile() {
             if (user) {
               // Read homeMode and selectedActivities from AsyncStorage to avoid React state race conditions
               let effectiveHomeMode = homeMode;
+              let effectiveHouseName = houseName;
+              let effectiveHouseId = houseId;
               let effectiveActivities = selectedActivities;
               try {
                 const saved = await AsyncStorage.getItem('@onboarding_progress');
                 if (saved) {
                   const parsed = JSON.parse(saved);
                   if (parsed?.data?.homeMode) effectiveHomeMode = parsed.data.homeMode;
+                  if (parsed?.data?.houseName) effectiveHouseName = parsed.data.houseName;
+                  if (parsed?.data?.houseId) effectiveHouseId = parsed.data.houseId;
                   if (parsed?.data?.selectedActivities) effectiveActivities = parsed.data.selectedActivities;
                 }
-              } catch (_) { /* use state fallback */ }
+              } catch { /* use state fallback */ }
 
               console.log('[Onboarding] homeMode (effective):', effectiveHomeMode);
               let finalHomeId: number | null = null;
@@ -228,11 +229,11 @@ export default function SetupProfile() {
                 // Gerar Join Code (6 carateres alfanuméricos maiúsculos)
                 const generatedCode = Math.random().toString(36).substring(2, 8).toUpperCase();
                 
-                console.log('-> A criar nova casa:', houseName || 'Nidush Home', 'com o código', generatedCode);
+                console.log('-> A criar nova casa:', effectiveHouseName || 'Nidush Home', 'com o código', generatedCode);
                 const { data: homeData, error: homeError } = await supabase
                   .from('homes')
                   .insert({ 
-                    name: houseName || 'Nidush Home',
+                    name: effectiveHouseName || 'Nidush Home',
                     join_code: generatedCode 
                   })
                   .select('id')
@@ -246,20 +247,48 @@ export default function SetupProfile() {
                 }
               } else {
                 // Join existing home
-                const upperCode = houseId.toUpperCase().trim();
-                console.log('-> A procurar casa existente com Join Code:', upperCode);
-                const { data: homeData, error: homeError } = await supabase
-                  .from('homes')
-                  .select('id')
-                  .eq('join_code', upperCode)
-                  .maybeSingle();
-                  
-                if (homeError || !homeData) {
-                  if (homeError) console.error('Error finding existing home:', homeError);
-                  alert('Join Code not found. Please verify the code and try again.'); // Falha gracefully.
+                const upperCode = effectiveHouseId.toUpperCase().trim();
+                if (!upperCode) {
+                  alert('Please enter a Join Code.');
                   hasError = true;
                 } else {
-                  finalHomeId = homeData.id;
+                  console.log('-> A procurar casa existente com Join Code:', upperCode);
+                  let { data: joinedHomeId, error: homeError } = await supabase
+                    .rpc('join_home_by_code', { p_join_code: upperCode });
+
+                  const homeErrorAny = homeError as any;
+                  const rpcMissing = homeError && (
+                    homeError.code === 'PGRST202' ||
+                    homeErrorAny.status === 404 ||
+                    String(homeError.message).toLowerCase().includes('schema cache') ||
+                    String(homeError.message).toLowerCase().includes('function public.join_home_by_code')
+                  );
+
+                  if (rpcMissing) {
+                    console.warn('RPC join_home_by_code not found or unavailable. Trying manage-home Edge Function fallback.', homeError);
+                    try {
+                      const fallbackResult = await invokeFunction('manage-home', {
+                        action: 'join-home',
+                        joinCode: upperCode,
+                      });
+                      joinedHomeId = fallbackResult?.home?.id ?? null;
+                      homeError = null;
+                    } catch (fallbackError) {
+                      homeError = fallbackError as any;
+                    }
+                  }
+
+                  if (homeError || !joinedHomeId) {
+                    if (homeError) console.error('Error finding existing home:', homeError);
+                    if (rpcMissing) {
+                      alert('O sistema de entrar numa casa ainda não está configurado na base de dados. Aplica a migration do join code no Supabase e tenta novamente.');
+                    } else {
+                      alert('Join Code not found. Please verify the code and try again.');
+                    }
+                    hasError = true;
+                  } else {
+                    finalHomeId = Number(joinedHomeId);
+                  }
                 }
               }
 
@@ -283,21 +312,24 @@ export default function SetupProfile() {
                 }
 
                 if (!hasError) {
-                  // 3. Associate user with home in user_homes
-                  // Admin if they created the home, resident if they joined with a code
-                  const assignedRole = effectiveHomeMode === 'create' ? 'admin' : 'resident';
-                  console.log('[Onboarding] Assigning role:', assignedRole, 'to home:', finalHomeId);
-                  const { error: assocError } = await supabase
-                    .from('user_homes')
-                    .upsert({
-                      user_id: user.id,
-                      home_id: finalHomeId,
-                      role: assignedRole
-                    }, { onConflict: 'user_id,home_id' });
-                  
-                  if (assocError) {
-                    console.error('Error associating user with home:', assocError);
-                    hasError = true;
+                  if (effectiveHomeMode === 'create') {
+                    // 3. Associate creator with home as admin.
+                    console.log('[Onboarding] Assigning role: admin to home:', finalHomeId);
+                    const { error: assocError } = await supabase
+                      .from('user_homes')
+                      .upsert({
+                        user_id: user.id,
+                        home_id: finalHomeId,
+                        role: 'admin'
+                      }, { onConflict: 'user_id,home_id' });
+
+                    if (assocError) {
+                      console.error('Error associating user with home:', assocError);
+                      hasError = true;
+                    }
+                  } else {
+                    // The RPC/Edge Function already associates residents with existing homes.
+                    console.log('[Onboarding] User joined home as resident:', finalHomeId);
                   }
                 }
               }

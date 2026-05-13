@@ -9,3 +9,6 @@ major_version = 17
 
 [functions.welcome-user]
 verify_jwt = false
+
+[functions.manage-home]
+verify_jwt = false

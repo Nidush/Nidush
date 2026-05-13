@@ -98,7 +98,7 @@ export default function RootLayout() {
         try {
           await SplashScreen.hideAsync();
 
-          if (player) {
+          if (player && Platform.OS !== 'web') {
             player.play();
           }
 
@@ -110,13 +110,13 @@ export default function RootLayout() {
                 toValue: 0,
                 duration: 900,
                 easing: Easing.bezier(0.4, 0, 0.2, 1),
-                useNativeDriver: true,
+                useNativeDriver: Platform.OS !== 'web',
               }),
               Animated.timing(scaleAnim, {
                 toValue: 12, 
                 duration: 1000,
                 easing: Easing.bezier(0.4, 0, 0.2, 1),
-                useNativeDriver: true,
+                useNativeDriver: Platform.OS !== 'web',
               }),
             ]),
           ]).start(() => {
