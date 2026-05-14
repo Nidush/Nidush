@@ -8,10 +8,10 @@ import { supabase, uploadImage } from '../utils/supabase';
 
 
 import {
-  Nunito_400Regular,
-  Nunito_600SemiBold,
-  Nunito_700Bold,
-  useFonts,
+    Nunito_400Regular,
+    Nunito_600SemiBold,
+    Nunito_700Bold,
+    useFonts,
 } from '@expo-google-fonts/nunito';
 import { useSpotify } from '../context/SpotifyContext';
 
@@ -714,51 +714,99 @@ export default function Profile() {
                 className="text-2xl text-[#3A4D3F]"
                 style={{ fontFamily: 'Nunito_700Bold' }}
               >
-                Privacy & Data Policy
+                Privacy & Terms
               </Text>
               <TouchableOpacity onPress={() => setIsPrivacyModalVisible(false)}>
                 <MaterialIcons name="close" size={28} color="#4A5D4E" />
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} className="mb-6">
+            <ScrollView showsVerticalScrollIndicator={false} className="mb-4">
               <View className="gap-y-6">
                 <Section
-                  title="Data We Collect"
-                  content="We collect account information (name, email), profile details (hobbies, preferences), and health data from connected wearables (steps, activities) to provide a personalized experience."
+                  title="Privacy Policy"
+                  content={'Welcome to Nidush ("we," "our," or "us"). We are committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application (the "App").'}
                 />
                 <Section
-                  title="How We Use Your Data"
-                  content="Your data is used to generate personalized activity recommendations, track your progress, and improve our services. We do not sell your personal data to third parties."
+                  title="Information We Collect"
+                  content="Account information (name, email) when you sign up; profile information and preferences; activity data and routines you create."
                 />
                 <Section
-                  title="Data Sharing"
-                  content="Information may be shared with service providers (like Supabase for data storage) only as necessary to provide the Nidush services. All data is encrypted during transit and at rest."
+                  title="Third-Party Data"
+                  content="Spotify Integration: when you connect Spotify, we access your Spotify profile information, current playback state, playlists and music preferences, and recently played tracks."
+                />
+                <Section
+                  title="Automatic Data"
+                  content="Device information (device type, operating system); app usage data and analytics; network information for device discovery."
+                />
+                <Section
+                  title="How We Use Your Information"
+                  content="We use the information we collect to provide and maintain our services, personalize your experience with music integration, connect and control smart home devices, improve the app, and communicate with you about updates and support."
+                />
+                <Section
+                  title="Information Sharing"
+                  content="We do not sell, trade, or otherwise transfer your personal information to third parties except with your explicit consent, to comply with legal obligations, to protect our rights and safety, or with service providers who help us operate the app under strict confidentiality agreements."
+                />
+                <Section
+                  title="Spotify Integration"
+                  content="Our app integrates with Spotify to enhance your experience. We only access the minimum data necessary for functionality. You can disconnect Spotify at any time. We do not store access tokens permanently. All Spotify data is handled according to Spotify's Developer Terms."
                 />
                 <Section
                   title="Your Rights"
-                  content="You have the right to access, correct, or delete your personal data at any time. You can also revoke wearable access through the Associated Wearables section in your profile."
+                  content="You have the right to access your personal information, correct inaccurate information, delete your account and data, withdraw consent for data processing, and data portability."
                 />
                 <Section
                   title="Data Retention"
-                  content="We retain your personal data as long as your account is active. If you delete your account, we will remove your personal information from our active databases within 30 days."
+                  content="We retain your information for as long as necessary to provide our services and comply with legal obligations. If you delete your account, we remove your information from active systems within 30 days."
                 />
                 <Section
-                  title="Contact Us"
-                  content="If you have any questions regarding your privacy, please contact our support team at privacy@nidush.com."
+                  title="Terms of Service"
+                  content="By downloading, installing, or using Nidush, you agree to be bound by these Terms of Service. If you do not agree, please do not use the App. Nidush is a smart home and lifestyle management application that integrates with music streaming services and smart home devices."
+                />
+                <Section
+                  title="User Accounts"
+                  content="You must provide accurate and complete information when creating an account. You are responsible for maintaining the confidentiality of your credentials. You must be at least 13 years old to use this service. You may delete your account at any time. We may terminate accounts that violate these Terms."
+                />
+                <Section
+                  title="Third-Party Integrations"
+                  content="Spotify integration uses the Spotify Web API; you are responsible for complying with Spotify's Terms of Service. Smart home device integration is provided 'as is'; we are not responsible for device compatibility or functionality, and use is at your own risk."
+                />
+                <Section
+                  title="User Conduct"
+                  content="You agree not to use the app for illegal or unauthorized purposes, interfere with or disrupt the app, attempt unauthorized access to our systems, share account credentials, or upload malicious content."
+                />
+                <Section
+                  title="Intellectual Property"
+                  content="The App and its content are owned by us or our licensors. You may not copy, modify, or distribute our intellectual property. You retain ownership of content you create within the app."
+                />
+                <Section
+                  title="Disclaimers"
+                  content="THE APP IS PROVIDED 'AS IS' WITHOUT WARRANTIES OF ANY KIND. WE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE."
+                />
+                <Section
+                  title="Limitation of Liability"
+                  content="TO THE MAXIMUM EXTENT PERMITTED BY LAW, WE SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES."
+                />
+                <Section
+                  title="Indemnification"
+                  content="You agree to indemnify and hold us harmless from any claims arising from your use of the App or violation of these Terms."
+                />
+                <Section
+                  title="Contact"
+                  content="If you have questions, contact privacy@nidush.com or support@nidush.com."
                 />
               </View>
             </ScrollView>
 
             <TouchableOpacity
               onPress={() => setIsPrivacyModalVisible(false)}
-              className="bg-[#5B8C51] py-4 rounded-full items-center shadow-md mb-4"
+              className="bg-[#5B8C51] py-4 rounded-full items-center shadow-md"
             >
               <Text
                 className="text-white text-xl"
                 style={{ fontFamily: 'Nunito_700Bold' }}
               >
-                Understood
+                Close
               </Text>
             </TouchableOpacity>
           </View>

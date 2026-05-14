@@ -22,9 +22,7 @@ import {
   Nunito_700Bold,
   useFonts,
 } from '@expo-google-fonts/nunito';
-import { supabase, apiLog, invokeFunction } from '../utils/supabase';
-
-
+import { apiLog, invokeFunction, supabase } from '../utils/supabase';
 
 import { getFriendlyErrorMessage } from '../utils/errorHandlers';
 
