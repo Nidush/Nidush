@@ -1,4 +1,3 @@
-import { serve } from "@std/http/server"
 import { createClient } from '@supabase/supabase-js'
 
 const corsHeaders = {
@@ -8,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Max-Age': '86400',
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders })
 
   try {
