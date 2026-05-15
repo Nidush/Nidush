@@ -31,6 +31,21 @@ type ShortcutRow = {
   user_id: string | null;
 };
 
+const parseHobbies = (value: unknown) => {
+  if (!value) return [];
+
+  const raw = Array.isArray(value) ? value.join(',') : String(value);
+  return Array.from(
+    new Set(
+      raw
+        .replace(/[\[\]"]/g, '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  );
+};
+
 export default function Index() {
   const [fontsLoaded] = useFonts({
     Nunito_700Bold,
@@ -123,9 +138,18 @@ export default function Index() {
   useFocusEffect(
     useCallback(() => {
       const loadActivities = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { session } } = await supabase.auth.getSession();
+        let user = session?.user ?? null;
+
+        if (!user) {
+          const { data: { user: verifiedUser } } = await supabase.auth.getUser();
+          user = verifiedUser ?? null;
+        }
+
         if (!user) {
           setMyActivities([]); // Importante: Limpar se não houver user
+          setShortcutRows([]);
+          setUserHobbies([]);
           setAvatarUrl(null);
           setUserName('Visitante');
           return;
@@ -135,29 +159,49 @@ export default function Index() {
         setAvatarUrl(user.user_metadata?.avatar_url || null);
         setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'Utilizador');
         
-        const { data, error } = await supabase
-          .from('activities')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
+        let [
+          activitiesResult,
+          shortcutsResult,
+          userResult,
+        ] = await Promise.all([
+          supabase
+            .from('activities')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('shortcuts')
+            .select('id, displayorder, activity_idactivity, scenario_idscenario, user_id')
+            .eq('user_id', user.id)
+            .order('displayorder', { ascending: true }),
+          supabase
+            .from('users')
+            .select('hobbies')
+            .eq('auth_uid', user.id)
+            .maybeSingle(),
+        ]);
 
-        const { data: shortcutsData, error: shortcutsError } = await supabase
-          .from('shortcuts')
-          .select('id, displayorder, activity_idactivity, scenario_idscenario, user_id')
-          .eq('user_id', user.id)
-          .order('displayorder', { ascending: true });
+        if ((!userResult.data || userResult.error) && user.email) {
+          userResult = await supabase
+            .from('users')
+            .select('hobbies')
+            .eq('email', user.email)
+            .maybeSingle();
+        }
           
-        if (!error && data) {
-          setMyActivities(data.map(mapUserActivity));
+        if (!activitiesResult.error && activitiesResult.data) {
+          setMyActivities(activitiesResult.data.map(mapUserActivity));
         } else {
           setMyActivities([]);
         }
 
-        if (!shortcutsError && shortcutsData) {
-          setShortcutRows(shortcutsData);
+        if (!shortcutsResult.error && shortcutsResult.data) {
+          setShortcutRows(shortcutsResult.data);
         } else {
           setShortcutRows([]);
         }
+
+        setUserHobbies(parseHobbies(userResult.data?.hobbies));
       };
       const loadTemplates = async () => {
         try {
@@ -170,8 +214,7 @@ export default function Index() {
       };
       loadTemplates();
       loadActivities();
-      fetchUserName();
-    }, [fetchUserName])
+    }, [])
   );
 
   // --- LÓGICA DO CARROSSEL (Recomendações) ---

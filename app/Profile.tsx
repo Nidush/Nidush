@@ -233,11 +233,26 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
         const userEmail = user.email || '';
         setUserEmail(userEmail);
-        let { data: userData, error: userDataError } = await supabase
-          .from('users')
-          .select('hobbies, created_at')
-          .eq('auth_uid', user.id)
-          .maybeSingle();
+        let [
+          userDataResult,
+          homeAssociationResult,
+        ] = await Promise.all([
+          supabase
+            .from('users')
+            .select('hobbies, created_at')
+            .eq('auth_uid', user.id)
+            .maybeSingle(),
+          supabase
+            .from('user_homes')
+            .select('home_id, role, created_at')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle(),
+        ]);
+
+        let userData = userDataResult.data;
+        let userDataError = userDataResult.error;
 
         if ((!userData || userDataError) && userEmail) {
           const fallback = await supabase
@@ -257,36 +272,22 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
         setSelectedHobbies(parseHobbies(userData?.hobbies));
 
         let finalHomeId = null;
-
-        // Fetch user's home from user_homes table
-        const { data: homeAssociation } = await supabase
-          .from('user_homes')
-          .select('home_id, role, created_at')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: true })
-          .limit(1)
-          .maybeSingle();
+        const homeAssociation = homeAssociationResult.data;
 
         if (homeAssociation) {
           finalHomeId = homeAssociation.home_id;
           setUserHomeId(finalHomeId);
         }
 
-        // Fetch Join Code se tivermos o ID da casa
-        let homeName = 'Not connected';
-        let resolvedJoinCode: string | null = null;
-        if (finalHomeId) {
-          const { data: homeData } = await supabase.from('homes').select('name, join_code').eq('id', finalHomeId).maybeSingle();
-          if (homeData?.name) {
-            homeName = homeData.name;
-          }
-          if (homeData?.join_code) {
-            resolvedJoinCode = homeData.join_code;
-            setJoinCode(homeData.join_code);
-          }
-        }
-
-        const [{ count: activitiesCount }, { count: shortcutsCount }] = await Promise.all([
+        const [
+          homeDataResult,
+          activitiesCountResult,
+          shortcutsCountResult,
+          networkDevices,
+        ] = await Promise.all([
+          finalHomeId
+            ? supabase.from('homes').select('name, join_code').eq('id', finalHomeId).maybeSingle()
+            : Promise.resolve({ data: null }),
           supabase
             .from('activities')
             .select('id', { count: 'exact', head: true })
@@ -295,22 +296,29 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
             .from('shortcuts')
             .select('id', { count: 'exact', head: true })
             .eq('user_id', user.id),
+          loadNetworkDevices(user.id),
         ]);
+
+        const homeData = homeDataResult.data;
+        const homeName = homeData?.name || 'Not connected';
+        const resolvedJoinCode = homeData?.join_code || null;
+        if (resolvedJoinCode) {
+          setJoinCode(resolvedJoinCode);
+        }
 
         setAccountDetails({
           homeName,
           role: homeAssociation?.role || 'Resident',
           memberSince: formatProfileDate(user.created_at || userData?.created_at),
           accountCode: user.id.slice(0, 8).toUpperCase(),
-          activitiesCount: activitiesCount ?? 0,
-          shortcutsCount: shortcutsCount ?? 0,
+          activitiesCount: activitiesCountResult.count ?? 0,
+          shortcutsCount: shortcutsCountResult.count ?? 0,
         });
         if (!resolvedJoinCode) {
           setJoinCode(null);
         }
 
-        // --- CARREGAR DISPOSITIVOS GUARDADOS NA BD ---
-        await loadNetworkDevices(user.id);
+        setDiscoveredDevices(networkDevices);
 
       } else {
         setUserName('Visitante');

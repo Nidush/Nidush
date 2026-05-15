@@ -21,7 +21,6 @@ const discovery = {
 const REDIRECT_URI = makeRedirectUri({
   scheme: SPOTIFY_CONFIG.scheme,
   path: 'spotify-auth',
-  useProxy: false,
 });
 
 console.log('[Spotify] COPIA ISTO PARA O DASHBOARD:', REDIRECT_URI);

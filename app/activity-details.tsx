@@ -108,7 +108,11 @@ export default function ActivityDetails() {
       }
 
       if (foundActivity) {
-        if (!String(foundActivity.id).startsWith('template:')) {
+        const shortcutPromise = (async () => {
+          if (String(foundActivity.id).startsWith('template:')) {
+            return foundActivity.shortcuts;
+          }
+
           const { data: { user } } = await supabase.auth.getUser();
           const activityId = Number(foundActivity.id);
 
@@ -121,71 +125,85 @@ export default function ActivityDetails() {
               .maybeSingle();
 
             if (!shortcutError) {
-              foundActivity = {
-                ...foundActivity,
-                shortcuts: Boolean(shortcutData),
-              };
-            }
-          }
-        }
-
-        setMainItem(foundActivity);
-        if (foundActivity.scenario_id) {
-          let scen = await fetchScenarioTemplateById(foundActivity.scenario_id);
-          
-          if (!scen) {
-            console.log('[ActivityDetails] Fetching scenario from DB:', foundActivity.scenario_id);
-            const { data: scenData } = await supabase
-              .from('scenarios')
-              .select('*')
-              .eq('id', foundActivity.scenario_id)
-              .maybeSingle();
-            
-            if (scenData) {
-              scen = {
-                id: scenData.id.toString(),
-                title: scenData.name,
-                description: scenData.description || '',
-                playlist: scenData.playlist_id ? 'Spotify Music' : (scenData.playlist_name || 'No music'),
-                playlist_id: scenData.playlist_id,
-                focusMode: false, // Default fallback
-                shortcuts: false,
-                devices: [], // Fallback
-                image: { uri: 'https://picsum.photos/200' } // Fallback
-              } as Scenario;
+              return Boolean(shortcutData);
             }
           }
 
-          setRelatedScenario(scen || null);
-          if (scen) setFocusEnabled(scen.focusMode);
-        }
-        if (foundActivity.content_id) {
-          const { data: contentRows, error: contentError } = await supabase
-            .from('contents')
-            .select('*')
-            .eq('id', foundActivity.content_id)
-            .limit(1);
+          return foundActivity.shortcuts;
+        })();
 
-          if (contentRows && contentRows.length > 0 && !contentError) {
-            const contentData = contentRows[0];
-            setRelatedContent({
-              id: contentData.id,
-              title: contentData.title,
-              type: contentData.type,
-              category: contentData.category,
-              description: contentData.description,
-              duration: contentData.duration,
-              image: contentData.image,
-              instructions: contentData.instructions,
-              ingredients: contentData.ingredients,
-              videoUrl: contentData.video_url,
-              author: contentData.author,
-            } as Content);
-          } else {
-            const cont = CONTENTS[foundActivity.content_id as any];
-            setRelatedContent(cont || null);
-          }
-        }
+        const scenarioPromise = foundActivity.scenario_id
+          ? (async () => {
+              let scen = await fetchScenarioTemplateById(foundActivity.scenario_id!);
+
+              if (!scen) {
+                console.log('[ActivityDetails] Fetching scenario from DB:', foundActivity.scenario_id);
+                const { data: scenData } = await supabase
+                  .from('scenarios')
+                  .select('*')
+                  .eq('id', foundActivity.scenario_id)
+                  .maybeSingle();
+
+                if (scenData) {
+                  scen = {
+                    id: scenData.id.toString(),
+                    title: scenData.name,
+                    description: scenData.description || '',
+                    playlist: scenData.playlist_id ? 'Spotify Music' : (scenData.playlist_name || 'No music'),
+                    playlist_id: scenData.playlist_id,
+                    focusMode: false, // Default fallback
+                    shortcuts: false,
+                    devices: [], // Fallback
+                    image: { uri: 'https://picsum.photos/200' } // Fallback
+                  } as Scenario;
+                }
+              }
+
+              return scen || null;
+            })()
+          : Promise.resolve(null);
+
+        const contentPromise = foundActivity.content_id
+          ? (async () => {
+              const { data: contentRows, error: contentError } = await supabase
+                .from('contents')
+                .select('*')
+                .eq('id', foundActivity.content_id)
+                .limit(1);
+
+              if (contentRows && contentRows.length > 0 && !contentError) {
+                const contentData = contentRows[0];
+                return {
+                  id: contentData.id,
+                  title: contentData.title,
+                  type: contentData.type,
+                  category: contentData.category,
+                  description: contentData.description,
+                  duration: contentData.duration,
+                  image: contentData.image,
+                  instructions: contentData.instructions,
+                  ingredients: contentData.ingredients,
+                  videoUrl: contentData.video_url,
+                  author: contentData.author,
+                } as Content;
+              }
+
+              const cont = CONTENTS[foundActivity.content_id as any];
+              return cont || null;
+            })()
+          : Promise.resolve(null);
+
+        const [shortcutValue, scen, content] = await Promise.all([
+          shortcutPromise,
+          scenarioPromise,
+          contentPromise,
+        ]);
+        const activityWithShortcut = { ...foundActivity, shortcuts: shortcutValue };
+
+        setMainItem(activityWithShortcut);
+        setRelatedScenario(scen);
+        setRelatedContent(content);
+        if (scen) setFocusEnabled(scen.focusMode);
       } else {
         const foundScenario = await fetchScenarioTemplateById(id);
         if (foundScenario) {

@@ -125,9 +125,6 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
 
       console.log(`[API] Notificações - Página ${currentPage}: A pedir itens ${start} a ${end - 1}...`);
       
-      // Adicionar um pequeno atraso para a animação ser visível no vídeo de entrega
-      await new Promise(resolve => setTimeout(resolve, 800));
-
       const { data, error, count } = await supabase
         .from('notifications')
         .select('*', { count: 'exact' })
