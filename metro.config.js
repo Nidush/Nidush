@@ -25,6 +25,7 @@ import { withNativeWind } from "nativewind/dist/metro/index.js";
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
+const exclusionList = require("@expo/metro/metro-config/defaults/exclusionList").default;
 
 const config = getDefaultConfig(process.cwd());
 
@@ -39,6 +40,10 @@ config.resolver = {
   ...resolver,
   assetExts: resolver.assetExts.filter(ext => ext !== "svg"),
   sourceExts: [...resolver.sourceExts, "svg"],
+  blockList: exclusionList([
+    /android\/.*\/build\/.*/,
+    /ios\/build\/.*/,
+  ]),
 };
 
 export default withNativeWind(config, { input: "./global.css" });

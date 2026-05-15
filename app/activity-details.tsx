@@ -61,6 +61,7 @@ export default function ActivityDetails() {
   const [focusEnabled, setFocusEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
   const [isUpdatingShortcut, setIsUpdatingShortcut] = useState(false);
 
   const isActivity = mainItem ? 'type' in mainItem : false;
@@ -77,9 +78,10 @@ export default function ActivityDetails() {
 
   useEffect(() => {
     if (isNew === 'true') {
+      setToastMessage('Atividade criada com sucesso!');
       setShowToast(true);
       AccessibilityInfo.announceForAccessibility(
-        'Activity created successfully!',
+        'Atividade criada com sucesso!',
       );
       const timer = setTimeout(() => {
         setShowToast(false);
@@ -364,10 +366,15 @@ export default function ActivityDetails() {
       }
 
       setShowToast(true);
+      setToastMessage(
+        nextShortcutValue
+          ? 'Atividade adicionada aos shortcuts.'
+          : 'Atividade removida dos shortcuts.',
+      );
       AccessibilityInfo.announceForAccessibility(
         nextShortcutValue
-          ? 'Activity added to shortcuts.'
-          : 'Activity removed from shortcuts.',
+          ? 'Atividade adicionada aos shortcuts.'
+          : 'Atividade removida dos shortcuts.',
       );
 
       if (nextShortcutValue) {
@@ -634,7 +641,7 @@ export default function ActivityDetails() {
               className="text-[#2F4F4F] text-lg"
               style={{ fontFamily: 'Nunito_700Bold' }}
             >
-              Activity created successfully!
+              {toastMessage}
             </Text>
           </View>
         </View>

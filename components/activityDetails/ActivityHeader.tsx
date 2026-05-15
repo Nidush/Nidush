@@ -196,10 +196,10 @@ export const ActivityHeader = ({
                     icon="bookmark-border"
                     label={
                       isUpdatingShortcut
-                        ? 'Saving shortcut...'
+                        ? 'A guardar shortcut...'
                         : isShortcut
-                          ? 'Remove from shortcuts'
-                          : 'Add to shortcuts'
+                          ? 'Remover dos shortcuts'
+                          : 'Adicionar aos shortcuts'
                     }
                     onPress={onAddToShortcuts}
                   />

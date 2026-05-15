@@ -31,6 +31,19 @@ interface NotificationsContextType {
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
 const NOTIFICATIONS_ENABLED_KEY = 'nidush.notifications.enabled';
 
+const mergeUniqueNotifications = (
+  current: AppNotification[],
+  incoming: AppNotification[],
+) => {
+  const byId = new Map<string, AppNotification>();
+
+  [...current, ...incoming].forEach((notification) => {
+    byId.set(notification.id, notification);
+  });
+
+  return Array.from(byId.values()).sort((a, b) => b.timestamp - a.timestamp);
+};
+
 export const NotificationsProvider = ({ children }: { children: React.ReactNode }) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
@@ -121,9 +134,9 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
     try {
       const currentPage = isNextPage ? pageRef.current + 1 : 0;
       const start = currentPage * PAGE_SIZE;
-      const end = start + PAGE_SIZE;
+      const end = start + PAGE_SIZE - 1;
 
-      console.log(`[API] Notificações - Página ${currentPage}: A pedir itens ${start} a ${end - 1}...`);
+      console.log(`[API] Notificações - Página ${currentPage}: A pedir itens ${start} a ${end}...`);
       
       const { data, error, count } = await supabase
         .from('notifications')
@@ -160,9 +173,9 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
       }));
 
       if (isNextPage) {
-        setNotifications((prev) => [...prev, ...mapped]);
+        setNotifications((prev) => mergeUniqueNotifications(prev, mapped));
       } else {
-        setNotifications(mapped);
+        setNotifications(mergeUniqueNotifications([], mapped));
       }
 
       setPageState(currentPage);
