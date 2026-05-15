@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "@std/http/server": "jsr:@std/http@1/server",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2"
+  }
+}
