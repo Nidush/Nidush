@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { Image, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Image, Modal, ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { pickImage } from '../utils/imagePicker';
 import { supabase, uploadImage } from '../utils/supabase';
@@ -14,10 +14,20 @@ import {
     useFonts,
 } from '@expo-google-fonts/nunito';
 import { useSpotify } from '../context/SpotifyContext';
+import { useNotifications } from '../context/NotificationsContext';
 
 export default function Profile() {
   const router = useRouter();
   const { isAuthenticated, login, logout, userProfile } = useSpotify();
+  const {
+    notifications,
+    unreadCount,
+    markAllAsRead,
+    clearAll,
+    refreshNotifications,
+    notificationsEnabled,
+    setNotificationsEnabled,
+  } = useNotifications();
   const [userName, setUserName] = useState('A carregar...');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -25,12 +35,47 @@ export default function Profile() {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isPrivacyModalVisible, setIsPrivacyModalVisible] = useState(false);
   const [isAccountModalVisible, setIsAccountModalVisible] = useState(false);
+  const [isNotificationsModalVisible, setIsNotificationsModalVisible] = useState(false);
   const [userEmail, setUserEmail] = useState('');
   const [userHomeId, setUserHomeId] = useState<number | string | null>(null);
   const [joinCode, setJoinCode] = useState<string | null>(null);
+  const [accountDetails, setAccountDetails] = useState({
+    homeName: 'Not connected',
+    role: 'Resident',
+    memberSince: 'Unknown',
+    accountCode: '',
+    activitiesCount: 0,
+    shortcutsCount: 0,
+  });
   const [healthConnectStatus, setHealthConnectStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
 
-  const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
+const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
+  const notificationStats = useMemo(() => {
+    const importantCount = notifications.filter((item) => !item.read && item.type !== 'system').length;
+    const latest = notifications[0];
+
+    return {
+      total: notifications.length,
+      unread: unreadCount,
+      important: importantCount,
+      latest,
+    };
+  }, [notifications, unreadCount]);
+
+  const parseHobbies = (value: unknown) => {
+    if (!value) return [];
+
+    const raw = Array.isArray(value) ? value.join(',') : String(value);
+    return Array.from(
+      new Set(
+        raw
+          .replace(/[\[\]"]/g, '')
+          .split(',')
+          .map((s: string) => s.trim())
+          .filter(Boolean),
+      ),
+    );
+  };
 
   type ConnectedDevice = {
     id?: number;
@@ -188,24 +233,35 @@ export default function Profile() {
 
         const userEmail = user.email || '';
         setUserEmail(userEmail);
-        const { data: userData } = await supabase
+        let { data: userData, error: userDataError } = await supabase
           .from('users')
-          .select('hobbies')
+          .select('hobbies, created_at')
           .eq('auth_uid', user.id)
           .maybeSingle();
 
-        if (userData?.hobbies) {
-          const raw = Array.isArray(userData.hobbies) ? userData.hobbies.join(',') : String(userData.hobbies);
-          const cleanHobbies = raw.replace(/[\[\]"]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
-          setSelectedHobbies(Array.from(new Set(cleanHobbies)));
+        if ((!userData || userDataError) && userEmail) {
+          const fallback = await supabase
+            .from('users')
+            .select('hobbies, created_at')
+            .eq('email', userEmail)
+            .maybeSingle();
+
+          userData = fallback.data;
+          userDataError = fallback.error;
         }
+
+        if (userDataError) {
+          console.error('Erro a carregar hobbies:', userDataError);
+        }
+
+        setSelectedHobbies(parseHobbies(userData?.hobbies));
 
         let finalHomeId = null;
 
         // Fetch user's home from user_homes table
         const { data: homeAssociation } = await supabase
           .from('user_homes')
-          .select('home_id')
+          .select('home_id, role, created_at')
           .eq('user_id', user.id)
           .order('created_at', { ascending: true })
           .limit(1)
@@ -217,11 +273,40 @@ export default function Profile() {
         }
 
         // Fetch Join Code se tivermos o ID da casa
+        let homeName = 'Not connected';
+        let resolvedJoinCode: string | null = null;
         if (finalHomeId) {
-          const { data: homeData } = await supabase.from('homes').select('join_code').eq('id', finalHomeId).maybeSingle();
+          const { data: homeData } = await supabase.from('homes').select('name, join_code').eq('id', finalHomeId).maybeSingle();
+          if (homeData?.name) {
+            homeName = homeData.name;
+          }
           if (homeData?.join_code) {
+            resolvedJoinCode = homeData.join_code;
             setJoinCode(homeData.join_code);
           }
+        }
+
+        const [{ count: activitiesCount }, { count: shortcutsCount }] = await Promise.all([
+          supabase
+            .from('activities')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id),
+          supabase
+            .from('shortcuts')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', user.id),
+        ]);
+
+        setAccountDetails({
+          homeName,
+          role: homeAssociation?.role || 'Resident',
+          memberSince: formatProfileDate(user.created_at || userData?.created_at),
+          accountCode: user.id.slice(0, 8).toUpperCase(),
+          activitiesCount: activitiesCount ?? 0,
+          shortcutsCount: shortcutsCount ?? 0,
+        });
+        if (!resolvedJoinCode) {
+          setJoinCode(null);
         }
 
         // --- CARREGAR DISPOSITIVOS GUARDADOS NA BD ---
@@ -297,18 +382,28 @@ export default function Profile() {
   const saveHobbies = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const userEmail = user.email || '';
       const uniqueHobbies = Array.from(new Set(selectedHobbies)).join(',');
 
-      const { error, count } = await supabase
+      const { data, error } = await supabase
         .from('users')
-        .update({ hobbies: uniqueHobbies }, { count: 'exact' })
-        .eq('auth_uid', user.id);
+        .upsert(
+          {
+            auth_uid: user.id,
+            email: user.email || '',
+            first_name: user.user_metadata?.first_name || '',
+            last_name: user.user_metadata?.last_name || '',
+            hobbies: uniqueHobbies,
+          },
+          { onConflict: 'auth_uid' },
+        )
+        .select('hobbies')
+        .single();
 
       if (error) {
         console.error("Erro ao guardar hobbies:", error);
         alert("Erro ao gravar hobbies: " + error.message);
       } else {
+        setSelectedHobbies(parseHobbies(data?.hobbies));
         setIsModalVisible(false);
       }
 
@@ -564,6 +659,8 @@ export default function Profile() {
             icon="notifications-none"
             label="Notifications"
             testID="menu-notifications"
+            badge={unreadCount}
+            onPress={() => setIsNotificationsModalVisible(true)}
           />
           <MenuItem
             icon="admin-panel-settings"
@@ -700,6 +797,160 @@ export default function Profile() {
         </View>
       </Modal>
 
+      {/* Notifications Control Modal */}
+      <Modal
+        visible={isNotificationsModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsNotificationsModalVisible(false)}
+      >
+        <View className="flex-1 justify-end bg-black/50">
+          <View className="bg-white w-full rounded-t-[40px] p-8 shadow-2xl">
+            <View className="flex-row justify-between items-center mb-6">
+              <View>
+                <Text
+                  className="text-2xl text-[#3A4D3F]"
+                  style={{ fontFamily: 'Nunito_700Bold' }}
+                >
+                  Notifications
+                </Text>
+                <Text
+                  className="text-[#71806F] mt-1"
+                  style={{ fontFamily: 'Nunito_400Regular' }}
+                >
+                  Control what appears in Nidush.
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIsNotificationsModalVisible(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Close notifications settings"
+              >
+                <MaterialIcons name="close" size={28} color="#4A5D4E" />
+              </TouchableOpacity>
+            </View>
+
+            <View className="flex-row justify-between mb-5">
+              <NotificationStat label="Unread" value={notificationStats.unread} />
+              <NotificationStat label="Important" value={notificationStats.important} />
+              <NotificationStat label="Total" value={notificationStats.total} />
+            </View>
+
+            <View className="bg-[#F5F7F0] rounded-3xl p-4 mb-4 border border-[#D1D9C5]">
+              <View className="flex-row justify-between items-center">
+                <View className="flex-1 pr-4">
+                  <Text
+                    className="text-lg text-[#4A5D4E]"
+                    style={{ fontFamily: 'Nunito_700Bold' }}
+                  >
+                    In-app alerts
+                  </Text>
+                  <Text
+                    className="text-[#71806F] mt-1"
+                    style={{ fontFamily: 'Nunito_400Regular' }}
+                  >
+                    {notificationsEnabled
+                      ? 'Activity, state and system alerts are being saved.'
+                      : 'New alerts are paused on this device.'}
+                  </Text>
+                </View>
+                <Switch
+                  value={notificationsEnabled}
+                  onValueChange={setNotificationsEnabled}
+                  thumbColor={notificationsEnabled ? '#5B8C51' : '#F4F4F4'}
+                  trackColor={{ false: '#D1D9C5', true: '#BFD9B9' }}
+                  accessibilityLabel="Toggle in-app notifications"
+                />
+              </View>
+            </View>
+
+            <View className="bg-[#F5F7F0] rounded-3xl p-4 mb-5 border border-[#D1D9C5]">
+              <Text
+                className="text-sm text-[#71806F] mb-2"
+                style={{ fontFamily: 'Nunito_600SemiBold' }}
+              >
+                Latest
+              </Text>
+              {notificationStats.latest ? (
+                <>
+                  <Text
+                    className="text-lg text-[#4A5D4E]"
+                    style={{ fontFamily: 'Nunito_700Bold' }}
+                  >
+                    {notificationStats.latest.title}
+                  </Text>
+                  <Text
+                    className="text-[#4A5D4E] mt-1 leading-5"
+                    style={{ fontFamily: 'Nunito_400Regular' }}
+                  >
+                    {notificationStats.latest.message}
+                  </Text>
+                </>
+              ) : (
+                <Text
+                  className="text-[#71806F]"
+                  style={{ fontFamily: 'Nunito_400Regular' }}
+                >
+                  Nothing yet. Nidush will show useful activity and system updates here.
+                </Text>
+              )}
+            </View>
+
+            <View className="gap-y-3 mb-8">
+              <TouchableOpacity
+                onPress={() => {
+                  setIsNotificationsModalVisible(false);
+                  router.push('/notifications');
+                }}
+                className="bg-[#5B8C51] py-4 rounded-full items-center shadow-md"
+                accessibilityRole="button"
+                accessibilityLabel="Open notification center"
+              >
+                <Text
+                  className="text-white text-lg"
+                  style={{ fontFamily: 'Nunito_700Bold' }}
+                >
+                  Open notification center
+                </Text>
+              </TouchableOpacity>
+
+              <View className="flex-row gap-3">
+                <TouchableOpacity
+                  onPress={async () => {
+                    await markAllAsRead();
+                    await refreshNotifications();
+                  }}
+                  className="flex-1 bg-[#E8EDDF] py-3 rounded-full items-center"
+                  accessibilityRole="button"
+                  accessibilityLabel="Mark all notifications as read"
+                >
+                  <Text
+                    className="text-[#4A5D4E]"
+                    style={{ fontFamily: 'Nunito_700Bold' }}
+                  >
+                    Mark read
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={clearAll}
+                  className="flex-1 bg-[#FFE9E9] py-3 rounded-full items-center"
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear all notifications"
+                >
+                  <Text
+                    className="text-[#C75656]"
+                    style={{ fontFamily: 'Nunito_700Bold' }}
+                  >
+                    Clear all
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Privacy & Data Modal */}
       <Modal
         visible={isPrivacyModalVisible}
@@ -817,32 +1068,85 @@ export default function Profile() {
       <Modal
         visible={isAccountModalVisible}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setIsAccountModalVisible(false)}
       >
-        <View className="flex-1 justify-center items-center bg-black/50 px-6">
-          <View className="bg-white w-full rounded-[32px] p-8 shadow-xl">
-            <Text
-              className="text-2xl text-[#3A4D3F] mb-6 text-center"
-              style={{ fontFamily: 'Nunito_700Bold' }}
-            >
-              Account Information
-            </Text>
-
-            <View className="gap-y-4">
+        <View className="flex-1 justify-end bg-black/50">
+          <View className="bg-white w-full rounded-t-[40px] p-8 shadow-2xl h-[82%]">
+            <View className="flex-row justify-between items-center mb-6">
               <View>
-                <Text className="text-gray-400 text-sm mb-1" style={{ fontFamily: 'Nunito_600SemiBold' }}>Full Name</Text>
-                <Text className="text-lg text-[#4A5D4E]" style={{ fontFamily: 'Nunito_700Bold' }}>{userName}</Text>
+                <Text
+                  className="text-2xl text-[#3A4D3F]"
+                  style={{ fontFamily: 'Nunito_700Bold' }}
+                >
+                  Account Information
+                </Text>
+                <Text
+                  className="text-[#71806F] mt-1"
+                  style={{ fontFamily: 'Nunito_400Regular' }}
+                >
+                  Your profile, home and activity summary.
+                </Text>
               </View>
-              <View>
-                <Text className="text-gray-400 text-sm mb-1" style={{ fontFamily: 'Nunito_600SemiBold' }}>Email Address</Text>
-                <Text className="text-lg text-[#4A5D4E]" style={{ fontFamily: 'Nunito_700Bold' }}>{userEmail}</Text>
-              </View>
+              <TouchableOpacity
+                onPress={() => setIsAccountModalVisible(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Close account information"
+              >
+                <MaterialIcons name="close" size={28} color="#4A5D4E" />
+              </TouchableOpacity>
             </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} className="mb-5">
+              <View className="flex-row justify-between mb-5">
+                <AccountStat label="Activities" value={accountDetails.activitiesCount} />
+                <AccountStat label="Shortcuts" value={accountDetails.shortcutsCount} />
+                <AccountStat label="Devices" value={discoveredDevices.length} />
+              </View>
+
+              <View className="bg-[#F5F7F0] rounded-3xl p-4 mb-4 border border-[#D1D9C5]">
+                <AccountInfoRow label="Full name" value={userName} />
+                <AccountInfoRow label="Email address" value={userEmail || 'Not available'} />
+                <AccountInfoRow label="Member since" value={accountDetails.memberSince} />
+                <AccountInfoRow label="Account code" value={accountDetails.accountCode || 'Not available'} isLast />
+              </View>
+
+              <View className="bg-[#F5F7F0] rounded-3xl p-4 mb-4 border border-[#D1D9C5]">
+                <AccountInfoRow label="Home" value={accountDetails.homeName} />
+                <AccountInfoRow label="Join code" value={joinCode || 'Not available'} />
+                <AccountInfoRow label="Role" value={accountDetails.role} isLast />
+              </View>
+
+              <View className="bg-[#F5F7F0] rounded-3xl p-4 mb-4 border border-[#D1D9C5]">
+                <AccountInfoRow
+                  label="Hobbies"
+                  value={selectedHobbies.length > 0 ? selectedHobbies.join(', ') : 'Not selected'}
+                />
+                <AccountInfoRow
+                  label="Spotify"
+                  value={isAuthenticated ? 'Connected' : 'Not connected'}
+                />
+                <AccountInfoRow
+                  label="Health Connect"
+                  value={
+                    healthConnectStatus === 'checking'
+                      ? 'Checking...'
+                      : healthConnectStatus === 'connected'
+                        ? 'Connected'
+                        : 'Not connected'
+                  }
+                />
+                <AccountInfoRow
+                  label="Notifications"
+                  value={notificationsEnabled ? 'Enabled' : 'Paused'}
+                  isLast
+                />
+              </View>
+            </ScrollView>
 
             <TouchableOpacity
               onPress={() => setIsAccountModalVisible(false)}
-              className="bg-[#5B8C51] mt-8 py-4 rounded-full items-center shadow-md"
+              className="bg-[#5B8C51] py-4 rounded-full items-center shadow-md"
             >
               <Text
                 className="text-white text-xl"
@@ -856,6 +1160,65 @@ export default function Profile() {
       </Modal>
     </SafeAreaView>
 
+  );
+}
+
+function formatProfileDate(value?: string | null) {
+  if (!value) return 'Unknown';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Unknown';
+
+  return date.toLocaleDateString([], {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function AccountStat({ label, value }: { label: string; value: number }) {
+  return (
+    <View className="flex-1 bg-[#F5F7F0] rounded-2xl py-4 mx-1 items-center border border-[#D1D9C5]">
+      <Text
+        className="text-2xl text-[#4A5D4E]"
+        style={{ fontFamily: 'Nunito_700Bold' }}
+      >
+        {value}
+      </Text>
+      <Text
+        className="text-xs text-[#71806F] mt-1"
+        style={{ fontFamily: 'Nunito_600SemiBold' }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function AccountInfoRow({
+  label,
+  value,
+  isLast = false,
+}: {
+  label: string;
+  value: string;
+  isLast?: boolean;
+}) {
+  return (
+    <View className={`py-3 ${isLast ? '' : 'border-b border-[#D1D9C5]'}`}>
+      <Text
+        className="text-sm text-[#71806F] mb-1"
+        style={{ fontFamily: 'Nunito_600SemiBold' }}
+      >
+        {label}
+      </Text>
+      <Text
+        className="text-lg text-[#4A5D4E]"
+        style={{ fontFamily: 'Nunito_700Bold' }}
+      >
+        {value}
+      </Text>
+    </View>
   );
 }
 
@@ -898,7 +1261,28 @@ function DeviceItem({ name, status, connected, icon, testID }: any) {
   );
 }
 
-function MenuItem({ icon, label, border = true, testID, onPress }: any) {
+function NotificationStat({ label, value }: { label: string; value: number }) {
+  return (
+    <View className="flex-1 bg-[#F5F7F0] rounded-2xl py-4 mx-1 items-center border border-[#D1D9C5]">
+      <Text
+        className="text-2xl text-[#4A5D4E]"
+        style={{ fontFamily: 'Nunito_700Bold' }}
+      >
+        {value}
+      </Text>
+      <Text
+        className="text-xs text-[#71806F] mt-1"
+        style={{ fontFamily: 'Nunito_600SemiBold' }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function MenuItem({ icon, label, border = true, testID, onPress, badge }: any) {
+  const hasBadge = typeof badge === 'number' && badge > 0;
+
   return (
     <TouchableOpacity
       testID={testID}
@@ -906,6 +1290,9 @@ function MenuItem({ icon, label, border = true, testID, onPress }: any) {
       accessible
       accessibilityRole="button"
       accessibilityHint={`Opens ${label} section`}
+      accessibilityLabel={
+        hasBadge ? `${label}, ${badge} unread notifications` : label
+      }
       onPress={onPress}
     >
       <View className="flex-row items-center">
@@ -918,7 +1305,20 @@ function MenuItem({ icon, label, border = true, testID, onPress }: any) {
           {label}
         </Text>
       </View>
-      <MaterialIcons name="chevron-right" size={28} color="#4A5D4E" />
+      <View className="flex-row items-center">
+        {hasBadge && (
+          <View className="min-w-6 h-6 px-2 rounded-full bg-[#5B8C51] items-center justify-center mr-2">
+            <Text
+              maxFontSizeMultiplier={1.1}
+              className="text-white text-xs"
+              style={{ fontFamily: 'Nunito_700Bold' }}
+            >
+              {badge > 99 ? '99+' : badge}
+            </Text>
+          </View>
+        )}
+        <MaterialIcons name="chevron-right" size={28} color="#4A5D4E" />
+      </View>
     </TouchableOpacity>
   );
 }

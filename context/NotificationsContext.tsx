@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../utils/supabase';
 
 export interface AppNotification {
@@ -19,6 +20,8 @@ interface NotificationsContextType {
   clearAll: () => void;
   loadMore: () => void;
   refreshNotifications: () => Promise<void>;
+  notificationsEnabled: boolean;
+  setNotificationsEnabled: (enabled: boolean) => Promise<void>;
   hasMore: boolean;
   isLoading: boolean;
 }
@@ -26,10 +29,12 @@ interface NotificationsContextType {
 
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
+const NOTIFICATIONS_ENABLED_KEY = 'nidush.notifications.enabled';
 
 export const NotificationsProvider = ({ children }: { children: React.ReactNode }) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
+  const [notificationsEnabled, setNotificationsEnabledState] = useState(true);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -48,6 +53,29 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
     setHasMore(nextHasMore);
   };
 
+  useEffect(() => {
+    const loadNotificationSetting = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(NOTIFICATIONS_ENABLED_KEY);
+        if (stored !== null) {
+          setNotificationsEnabledState(stored === 'true');
+        }
+      } catch (error) {
+        console.error('Error loading notifications preference:', error);
+      }
+    };
+
+    loadNotificationSetting();
+  }, []);
+
+  const setNotificationsEnabled = async (enabled: boolean) => {
+    setNotificationsEnabledState(enabled);
+    try {
+      await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, String(enabled));
+    } catch (error) {
+      console.error('Error saving notifications preference:', error);
+    }
+  };
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -192,6 +220,7 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
 
 
   const addNotification = async (title: string, message: string, type: AppNotification['type']) => {
+    if (!notificationsEnabled) return;
     if (!userId) return;
 
     // We can optimistically add it locally based on a temporary ID, or just insert and reload.
@@ -290,6 +319,8 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
         clearAll,
         loadMore,
         refreshNotifications,
+        notificationsEnabled,
+        setNotificationsEnabled,
         hasMore,
         isLoading,
       }}

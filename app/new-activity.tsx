@@ -1,5 +1,6 @@
 import { Content, CONTENTS } from '@/constants/data';
 import { Activity, Scenario } from '@/constants/data/types';
+import { resolveCatalogImage } from '@/constants/data/catalogAssets';
 import {
   Nunito_400Regular,
   Nunito_600SemiBold,
@@ -8,7 +9,7 @@ import {
 } from '@expo-google-fonts/nunito';
 import { supabase, uploadImage, apiLog } from '../utils/supabase';
 
-import { router, Stack } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNotifications } from '@/context/NotificationsContext';
 import { fetchScenarioTemplates } from '@/utils/catalogTemplates';
@@ -37,6 +38,32 @@ import {
   Step6_Review,
 } from '@/components/newActivityFlow';
 
+const dbTypeToActivityType = (type: string | null | undefined): Activity['type'] => {
+  const normalized = String(type ?? 'other').toLowerCase();
+  if (normalized === 'audiobook') return 'audiobooks';
+  if (
+    [
+      'cooking',
+      'meditation',
+      'workout',
+      'audiobooks',
+      'general',
+      'reading',
+      'yoga',
+      'other',
+    ].includes(normalized)
+  ) {
+    return normalized as Activity['type'];
+  }
+  return 'other';
+};
+
+const scenarioIdToTemplateId = (value: unknown) => {
+  if (value === null || value === undefined || value === '') return '';
+  const raw = String(value);
+  return raw.startsWith('s') ? raw : `s${raw}`;
+};
+
 export default function NewActivityFlow() {
   let [fontsLoaded] = useFonts({
     Nunito_700Bold,
@@ -44,6 +71,8 @@ export default function NewActivityFlow() {
     Nunito_400Regular,
   });
 
+  const { editId } = useLocalSearchParams<{ editId?: string }>();
+  const isEditMode = Boolean(editId);
   const [step, setStep] = useState(1);
   const { addNotification } = useNotifications();
   const totalSteps = 6;
@@ -61,6 +90,37 @@ export default function NewActivityFlow() {
   const [activityImage, setActivityImage] = useState<any>(null);
   const [dbContent, setDbContent] = useState<Content[]>([]);
   const [scenarioTemplates, setScenarioTemplates] = useState<Scenario[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (!editId) return;
+
+    const fetchActivityForEdit = async () => {
+      apiLog('SELECT', 'activities', { id: editId });
+      const { data, error } = await supabase
+        .from('activities')
+        .select('*')
+        .eq('id', editId)
+        .single();
+
+      if (error || !data) {
+        console.error('Failed to load activity for edit:', error);
+        alert('Não foi possível carregar a atividade para edição.');
+        router.back();
+        return;
+      }
+
+      setActivityType(dbTypeToActivityType(data.type));
+      setSelectedContentId(data.content_id || '');
+      setRoomId(data.room_id || '');
+      setSelectedScenarioId(scenarioIdToTemplateId(data.scenario_id));
+      setActivityName(data.title || '');
+      setDescription(data.description || '');
+      setActivityImage(data.image || null);
+    };
+
+    fetchActivityForEdit();
+  }, [editId]);
 
   useEffect(() => {
     const fetchContent = async () => {
@@ -76,7 +136,7 @@ export default function NewActivityFlow() {
           category: c.category,
           description: c.description,
           duration: c.duration,
-          image: c.image,
+          image: resolveCatalogImage(c.image),
           instructions: c.instructions,
           ingredients: c.ingredients,
           videoUrl: c.video_url,
@@ -99,6 +159,17 @@ export default function NewActivityFlow() {
 
     fetchScenarios();
   }, []);
+
+  useEffect(() => {
+    if (!isEditMode || room_id || !selectedScenarioId || scenarioTemplates.length === 0) {
+      return;
+    }
+
+    const selectedScenario = scenarioTemplates.find((scenario) => scenario.id === selectedScenarioId);
+    if (selectedScenario?.room || selectedScenario?.room_id) {
+      setRoomId(selectedScenario.room || selectedScenario.room_id || '');
+    }
+  }, [isEditMode, room_id, selectedScenarioId, scenarioTemplates]);
 
   const allContent = useMemo(() => {
     const combined = [...dbContent];
@@ -176,6 +247,8 @@ export default function NewActivityFlow() {
   };
 
   const handleSave = async () => {
+    if (isSaving) return;
+
     const contentObj = allContent.find(
       (c) => c.id === selectedContentId,
     );
@@ -193,21 +266,8 @@ export default function NewActivityFlow() {
       finalImage = { uri: 'https://picsum.photos/400/600' };
     }
 
-    const newActivity: Activity = {
-      id: Date.now().toString(),
-      title: activityName || 'Untitled Activity',
-      description,
-      room_id,
-      image: finalImage,
-      category: 'My creations',
-      type: activityType,
-      content_id: selectedContentId,
-      scenario_id: selectedScenarioId,
-      shortcuts: false,
-      keywords: [activityType, room_id, 'custom'],
-    };
-
     try {
+      setIsSaving(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Utilizador não autenticado!");
 
@@ -231,8 +291,8 @@ export default function NewActivityFlow() {
       };
       const formattedType = typeMapping[activityType] || 'other';
 
-      // 2. Tentar inserir na DB
-      const insertData = {
+      // 2. Tentar inserir/atualizar na DB
+      const saveData = {
         title: activityName || 'Untitled Activity',
         description,
         image: imageUrl,
@@ -240,12 +300,26 @@ export default function NewActivityFlow() {
         type: formattedType,
         content_id: selectedContentId || null,
         scenario_id: selectedScenarioId ? parseInt(selectedScenarioId.toString().replace(/\D/g, '')) : 1,
-        shortcuts: false,
-        user_id: user.id
       };
 
-      apiLog('INSERT', 'activities', insertData);
-      const { data, error } = await supabase.from('activities').insert(insertData).select('*, id').single();
+      const { data, error } = isEditMode && editId
+        ? await supabase
+            .from('activities')
+            .update(saveData)
+            .eq('id', editId)
+            .eq('user_id', user.id)
+            .select('*, id')
+            .single()
+        : await supabase
+            .from('activities')
+            .insert({ ...saveData, user_id: user.id })
+            .select('*, id')
+            .single();
+
+      apiLog(isEditMode ? 'UPDATE' : 'INSERT', 'activities', {
+        id: editId,
+        ...saveData,
+      });
 
 
       if (error) {
@@ -256,8 +330,10 @@ export default function NewActivityFlow() {
 
       // 3. Trigger Notification
       addNotification(
-        'New Activity Created',
-        `Great job! "${activityName || 'Untitled Activity'}" has been added to your creations.`,
+        isEditMode ? 'Activity Updated' : 'New Activity Created',
+        isEditMode
+          ? `"${activityName || 'Untitled Activity'}" has been updated.`
+          : `Great job! "${activityName || 'Untitled Activity'}" has been added to your creations.`,
         'creation'
       );
 
@@ -266,12 +342,14 @@ export default function NewActivityFlow() {
         pathname: '/activity-details',
         params: {
           id: data.id.toString(),
-          isNew: 'true',
+          isNew: isEditMode ? 'false' : 'true',
         },
       });
     } catch (e) {
       console.error('Erro ao salvar:', e);
       alert('Ocorreu um erro ao salvar a tua atividade.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -290,14 +368,14 @@ export default function NewActivityFlow() {
       >
         <Stack.Screen
           options={{
-            title: `New Activity - Step ${step} of ${totalSteps}`,
+            title: `${isEditMode ? 'Edit' : 'New'} Activity - Step ${step} of ${totalSteps}`,
             headerShown: false,
           }}
         />
         <View style={{ height: insets.top, backgroundColor: '#F9FAF7' }} />
         <View className="px-5 pt-2">
           <FlowHeader
-            title="New activity"
+            title={isEditMode ? 'Edit activity' : 'New activity'}
             step={step}
             totalSteps={totalSteps}
             onBack={prevStep}
@@ -386,13 +464,17 @@ export default function NewActivityFlow() {
                       : 'bg-[#548F53] shadow-lg'
                   }`}
                   onPress={step === 6 ? handleSave : nextStep}
-                  disabled={isNextDisabled()} // Impede o clique físico
+                  disabled={isNextDisabled() || isSaving} // Impede o clique físico
                   accessible={true}
                   accessibilityRole="button"
                   // Informa o leitor de ecrã (VoiceOver/TalkBack) que o botão está inativo
-                  accessibilityState={{ disabled: isNextDisabled() }}
+                  accessibilityState={{ disabled: isNextDisabled() || isSaving }}
                   accessibilityLabel={
-                    step === 6 ? 'Save activity' : 'Continue to next step'
+                    step === 6
+                      ? isEditMode
+                        ? 'Update activity'
+                        : 'Save activity'
+                      : 'Continue to next step'
                   }
                   // Uma dica extra para utilizadores com leitores de ecrã saberem o que falta fazer
                   accessibilityHint={
@@ -406,7 +488,7 @@ export default function NewActivityFlow() {
                     className="text-white text-2xl"
                     style={{ fontFamily: 'Nunito_700Bold' }}
                   >
-                    {step === 6 ? 'Save' : 'Continue'}
+                    {step === 6 ? (isSaving ? 'Saving...' : isEditMode ? 'Update' : 'Save') : 'Continue'}
                   </Text>
                 </TouchableOpacity>
               </View>

@@ -6,7 +6,7 @@ import {
 } from '@expo-google-fonts/nunito';
 import { Stack, router, useFocusEffect } from 'expo-router';
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
-import { Alert, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { UnifiedCard } from '@/components/activitiesScenarios/UnifiedCard';
@@ -14,15 +14,22 @@ import { CarouselSection } from '../../components/activitiesScenarios/CarouselSe
 import { HomeHeader } from '../../components/Homepage/HomeHeader';
 import { StateWidget } from '../../components/Homepage/StateWidget';
 
-import { CONTENTS, Activity, Scenario } from '@/constants/data';
+import { CONTENTS, Activity } from '@/constants/data';
 import { useBiometrics } from '@/context/BiometricsContext';
 import { getDynamicRecommendations } from '@/utils/recommendationEngine';
 import { supabase } from '@/utils/supabase';
 import {
   fetchActivityTemplates,
-  fetchScenarioTemplates,
   mapUserActivity,
 } from '@/utils/catalogTemplates';
+
+type ShortcutRow = {
+  id: number;
+  displayorder: number;
+  activity_idactivity: number | null;
+  scenario_idscenario: number | null;
+  user_id: string | null;
+};
 
 export default function Index() {
   const [fontsLoaded] = useFonts({
@@ -36,7 +43,7 @@ export default function Index() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [myActivities, setMyActivities] = useState<Activity[]>([]);
   const [activityTemplates, setActivityTemplates] = useState<Activity[]>([]);
-  const [scenarioTemplates, setScenarioTemplates] = useState<Scenario[]>([]);
+  const [shortcutRows, setShortcutRows] = useState<ShortcutRow[]>([]);
   const [userHobbies, setUserHobbies] = useState<string[]>([]);
 
 
@@ -131,26 +138,34 @@ export default function Index() {
         const { data, error } = await supabase
           .from('activities')
           .select('*')
-          .eq('user_id', user.id);
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        const { data: shortcutsData, error: shortcutsError } = await supabase
+          .from('shortcuts')
+          .select('id, displayorder, activity_idactivity, scenario_idscenario, user_id')
+          .eq('user_id', user.id)
+          .order('displayorder', { ascending: true });
           
         if (!error && data) {
           setMyActivities(data.map(mapUserActivity));
         } else {
           setMyActivities([]);
         }
+
+        if (!shortcutsError && shortcutsData) {
+          setShortcutRows(shortcutsData);
+        } else {
+          setShortcutRows([]);
+        }
       };
       const loadTemplates = async () => {
         try {
-          const [activities, scenarios] = await Promise.all([
-            fetchActivityTemplates(),
-            fetchScenarioTemplates(),
-          ]);
+          const activities = await fetchActivityTemplates();
           setActivityTemplates(activities);
-          setScenarioTemplates(scenarios);
         } catch (error) {
           console.error('Failed to load home catalog templates:', error);
           setActivityTemplates([]);
-          setScenarioTemplates([]);
         }
       };
       loadTemplates();
@@ -199,12 +214,23 @@ export default function Index() {
 
   // --- NOVA LÓGICA DOS SHORTCUTS (USANDO 'shortcuts' NO PLURAL) ---
   const shortcuts = useMemo(() => {
-    const allActivities = [...activityTemplates, ...myActivities];
+    const activityOrder = new Map(
+      shortcutRows
+        .filter((shortcut) => shortcut.activity_idactivity !== null)
+        .map((shortcut, index) => [
+          String(shortcut.activity_idactivity),
+          shortcut.displayorder ?? index,
+        ]),
+    );
 
-    // 1. Filtrar ATIVIDADES onde shortcuts === true
-    const favActivities = allActivities.filter(
-      (a: any) => a.shortcuts === true,
-    ).map((item) => {
+    const favActivities = myActivities
+      .filter((activity) => activityOrder.has(String(activity.id)))
+      .sort(
+        (a, b) =>
+          (activityOrder.get(String(a.id)) ?? 0) -
+          (activityOrder.get(String(b.id)) ?? 0),
+      )
+      .map((item) => {
       // Tentar encontrar a duração no CONTENTS
       let duration = undefined;
       const cId = item.content_id || item.contentId;
@@ -223,23 +249,8 @@ export default function Index() {
       };
     });
 
-    // 2. Filtrar CENÁRIOS onde shortcuts === true
-    const favScenarios = scenarioTemplates.filter((s: any) => s.shortcuts === true).map(
-      (item) => {
-        return {
-          id: item.id,
-          title: item.title,
-          room: item.room || item.room_id,
-          image: item.image,
-          time: undefined, // Cenários não costumam ter duração definida nos cards
-          type: 'scenario',
-        };
-      },
-    );
-
-    // 3. Juntar as duas listas
-    return [...favActivities, ...favScenarios];
-  }, [activityTemplates, myActivities, scenarioTemplates]); // Agora depende das myActivities vindas no Supabase
+    return favActivities;
+  }, [myActivities, shortcutRows]);
 
   if (!fontsLoaded) return null;
 
@@ -284,12 +295,10 @@ export default function Index() {
             Shortcuts
           </Text>
           <Pressable
-            onPress={() =>
-              Alert.alert('Shortcuts', 'Shortcuts edit feature coming soon!')
-            }
+            onPress={() => router.push('/Activities')}
             accessibilityRole="button"
-            accessibilityLabel="Edit shortcuts"
-            accessibilityHint="Opens the shortcuts editor."
+            accessibilityLabel="Open activities"
+            accessibilityHint="Opens the activities screen, where you can choose one of your created activities to edit."
             hitSlop={10}
           >
             <Text
@@ -313,7 +322,7 @@ export default function Index() {
                   time={item.time}
                   room={item.room}
                   width="100%"
-                  aspectRatio={0.95}
+                  aspectRatio={1}
                   onPress={() =>
                     router.push({
                       pathname: '/activity-details',

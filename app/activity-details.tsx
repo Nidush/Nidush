@@ -44,6 +44,14 @@ type AlertConfigState = {
   onConfirm?: () => void;
 };
 
+type ShortcutRow = {
+  id: number;
+  displayorder: number;
+  activity_idactivity: number | null;
+  scenario_idscenario: number | null;
+  user_id: string | null;
+};
+
 export default function ActivityDetails() {
   const { id, isNew } = useLocalSearchParams<{ id: string; isNew?: string }>();
 
@@ -53,6 +61,7 @@ export default function ActivityDetails() {
   const [focusEnabled, setFocusEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showToast, setShowToast] = useState(false);
+  const [isUpdatingShortcut, setIsUpdatingShortcut] = useState(false);
 
   const isActivity = mainItem ? 'type' in mainItem : false;
 
@@ -99,6 +108,27 @@ export default function ActivityDetails() {
       }
 
       if (foundActivity) {
+        if (!String(foundActivity.id).startsWith('template:')) {
+          const { data: { user } } = await supabase.auth.getUser();
+          const activityId = Number(foundActivity.id);
+
+          if (user && Number.isFinite(activityId)) {
+            const { data: shortcutData, error: shortcutError } = await supabase
+              .from('shortcuts')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('activity_idactivity', activityId)
+              .maybeSingle();
+
+            if (!shortcutError) {
+              foundActivity = {
+                ...foundActivity,
+                shortcuts: Boolean(shortcutData),
+              };
+            }
+          }
+        }
+
         setMainItem(foundActivity);
         if (foundActivity.scenario_id) {
           let scen = await fetchScenarioTemplateById(foundActivity.scenario_id);
@@ -208,27 +238,160 @@ export default function ActivityDetails() {
     }
   };
 
-  const handleAddToShortcuts = () => {
-    setAlertConfig({
-      visible: true,
-      title: 'Shortcuts',
-      message: 'Shortcuts feature coming soon!',
-      confirmText: 'OK',
-      cancelText: '',
-      isDestructive: false,
-      onConfirm: undefined,
-    });
+  const handleAddToShortcuts = async () => {
+    const activityId = String(id);
+
+    if (isUpdatingShortcut) return;
+
+    if (!isActivity || activityId.startsWith('template:')) {
+      setAlertConfig({
+        visible: true,
+        title: 'Shortcuts',
+        message: 'Only your own created activities can be added to shortcuts.',
+        confirmText: 'OK',
+        cancelText: '',
+        isDestructive: false,
+        onConfirm: undefined,
+      });
+      return;
+    }
+
+    const activity = mainItem as Activity;
+    const nextShortcutValue = !activity.shortcuts;
+    const numericActivityId = Number(activityId);
+
+    if (!Number.isFinite(numericActivityId)) {
+      setAlertConfig({
+        visible: true,
+        title: 'Shortcuts',
+        message: 'Could not identify this activity in the shortcuts table.',
+        confirmText: 'OK',
+        cancelText: '',
+        isDestructive: false,
+        onConfirm: undefined,
+      });
+      return;
+    }
+
+    try {
+      setIsUpdatingShortcut(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      apiLog(nextShortcutValue ? 'INSERT' : 'DELETE', 'shortcuts', {
+        id: activityId,
+        activity_idactivity: numericActivityId,
+        user_id: user.id,
+      });
+
+      if (nextShortcutValue) {
+        const { data: existingShortcut, error: existingError } = await supabase
+          .from('shortcuts')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('activity_idactivity', numericActivityId)
+          .maybeSingle();
+
+        if (existingError) throw existingError;
+
+        if (!existingShortcut) {
+          const { data: orderRows, error: orderError } = await supabase
+            .from('shortcuts')
+            .select('displayorder')
+            .eq('user_id', user.id)
+            .order('displayorder', { ascending: false })
+            .limit(1);
+
+          if (orderError) throw orderError;
+
+          const nextDisplayOrder =
+            ((orderRows?.[0] as Pick<ShortcutRow, 'displayorder'> | undefined)?.displayorder ?? 0) + 1;
+
+          const { error: insertError } = await supabase
+            .from('shortcuts')
+            .insert({
+              user_id: user.id,
+              activity_idactivity: numericActivityId,
+              scenario_idscenario: null,
+              displayorder: nextDisplayOrder,
+            });
+
+          if (insertError) throw insertError;
+        }
+      } else {
+        const { error: deleteError } = await supabase
+          .from('shortcuts')
+          .delete()
+          .eq('activity_idactivity', numericActivityId)
+          .eq('user_id', user.id);
+
+        if (deleteError) throw deleteError;
+      }
+
+      setMainItem({
+        ...activity,
+        shortcuts: nextShortcutValue,
+      });
+
+      const { error: mirrorError } = await supabase
+        .from('activities')
+        .update({ shortcuts: nextShortcutValue })
+        .eq('id', numericActivityId)
+        .eq('user_id', user.id)
+        .select('id')
+        .maybeSingle();
+
+      if (mirrorError) {
+        console.warn('Shortcut saved, but activities.shortcuts mirror was not updated:', mirrorError);
+      }
+
+      setShowToast(true);
+      AccessibilityInfo.announceForAccessibility(
+        nextShortcutValue
+          ? 'Activity added to shortcuts.'
+          : 'Activity removed from shortcuts.',
+      );
+
+      if (nextShortcutValue) {
+        router.navigate('/(tabs)');
+      } else {
+        setTimeout(() => setShowToast(false), 3000);
+      }
+    } catch (error: any) {
+      console.error('Failed to update shortcuts:', error);
+      setAlertConfig({
+        visible: true,
+        title: 'Shortcuts',
+        message: error?.message
+          ? `Could not update shortcuts: ${error.message}`
+          : 'Could not update shortcuts. Please try again.',
+        confirmText: 'OK',
+        cancelText: '',
+        isDestructive: false,
+        onConfirm: undefined,
+      });
+    } finally {
+      setIsUpdatingShortcut(false);
+    }
   };
 
   const handleEditActivity = () => {
-    setAlertConfig({
-      visible: true,
-      title: 'Edit',
-      message: 'Edit feature coming soon!',
-      confirmText: 'OK',
-      cancelText: '',
-      isDestructive: false,
-      onConfirm: undefined,
+    if (!isActivity || String(id).startsWith('template:')) {
+      setAlertConfig({
+        visible: true,
+        title: 'Edit',
+        message: 'Only your own created activities can be edited.',
+        confirmText: 'OK',
+        cancelText: '',
+        isDestructive: false,
+        onConfirm: undefined,
+      });
+      return;
+    }
+
+    router.push({
+      pathname: '/new-activity',
+      params: { editId: id },
     });
   };
 
@@ -357,6 +520,8 @@ export default function ActivityDetails() {
           onAddToShortcuts={handleAddToShortcuts}
           onEdit={handleEditActivity}
           onDelete={handleDeleteActivity}
+          isShortcut={isActivity ? (mainItem as Activity).shortcuts : false}
+          isUpdatingShortcut={isUpdatingShortcut}
         />
 
         <View className="px-6 pt-8">

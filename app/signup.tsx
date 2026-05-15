@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
@@ -43,6 +44,7 @@ export default function SignUp() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -216,14 +218,35 @@ export default function SignUp() {
 
                   <View className="w-full mb-[15px]">
                     <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">Password</Text>
-                    <TextInput
-                      style={{ fontFamily: 'Nunito_400Regular' }}
-                      className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]"
-                      secureTextEntry
-                      testID="password-input"
-                      value={password}
-                      onChangeText={setPassword}
-                    />
+                    <View className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] bg-[#FBFDFB] flex-row items-center">
+                      <TextInput
+                        style={{ fontFamily: 'Nunito_400Regular', color: '#1F2D2F' }}
+                        className="flex-1 h-full px-[15px] pr-2"
+                        secureTextEntry={!showPassword}
+                        testID="password-input"
+                        value={password}
+                        onChangeText={setPassword}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        selectionColor="#5C8D58"
+                        placeholderTextColor="#7B8A7B"
+                      />
+                      <TouchableOpacity
+                        onPress={() => setShowPassword((current) => !current)}
+                        className="h-full w-12 items-center justify-center"
+                        testID="toggle-password-visibility"
+                        accessible
+                        accessibilityRole="button"
+                        accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                        accessibilityHint="Toggles password visibility"
+                      >
+                        <MaterialIcons
+                          name={showPassword ? 'visibility-off' : 'visibility'}
+                          size={22}
+                          color="#5C8D58"
+                        />
+                      </TouchableOpacity>
+                    </View>
                   </View>
 
                    {errorMsg ? (

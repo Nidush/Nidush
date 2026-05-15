@@ -89,6 +89,7 @@ const UnifiedActivitiesScreen = () => {
       .from('activities')
       .select('*', { count: 'exact' })
       .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
       .range(start, end);
 
 
