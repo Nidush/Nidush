@@ -232,6 +232,23 @@ export default function Index() {
 
   // --- LÓGICA DO CARROSSEL (Recomendações) ---
   const dynamicActivities = useMemo(() => {
+    const formatActivityForCarousel = (item: Activity) => {
+      let duration: string | undefined = undefined;
+      const cId = item.content_id || item.contentId;
+      if (cId && (CONTENTS as any)[cId]) {
+        const contentData = (CONTENTS as any)[cId];
+        if (contentData) {
+          duration = contentData.duration;
+        }
+      }
+
+      return {
+        ...item,
+        time: duration,
+        room: item.room || (item as any).room_id,
+      };
+    };
+
     // 1. Aplicar filtro de Hobbies se o utilizador tiver algum selecionado
     const appActivities = activityTemplates.filter((item) => {
       // Ignorar as criações próprias no carrossel de recomendações
@@ -249,21 +266,21 @@ export default function Index() {
     const sortedList = getDynamicRecommendations(
       appActivities,
       currentState,
-    ).slice(0, 5);
+    ) as Activity[];
 
-    return sortedList.map((item) => {
-      let duration: string | undefined = undefined;
-      const activity = item as Activity;
-      const cId = activity.content_id || activity.contentId;
-      if (cId && (CONTENTS as any)[cId]) {
-        const contentData = (CONTENTS as any)[cId];
-        if (contentData) {
-          duration = contentData.duration;
-        }
-      }
-      return { ...item, time: duration, room: item.room || (item as any).room_id };
-    });
-  }, [activityTemplates, currentState, userHobbies]);
+    const combinedList = [...myActivities, ...sortedList];
+    const seenIds = new Set<string>();
+
+    return combinedList
+      .filter((item) => {
+        const key = String(item.id);
+        if (seenIds.has(key)) return false;
+        seenIds.add(key);
+        return true;
+      })
+      .slice(0, 8)
+      .map(formatActivityForCarousel);
+  }, [activityTemplates, currentState, myActivities, userHobbies]);
 
 
   const dynamicTitle = useMemo(() => 'Activities for you', []);

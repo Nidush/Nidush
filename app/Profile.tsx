@@ -15,10 +15,12 @@ import {
 } from '@expo-google-fonts/nunito';
 import { useSpotify } from '../context/SpotifyContext';
 import { useNotifications } from '../context/NotificationsContext';
+import { useBiometrics } from '../context/BiometricsContext';
 
 export default function Profile() {
   const router = useRouter();
   const { isAuthenticated, login, logout, userProfile } = useSpotify();
+  const { data: biometricData, currentState, addTestHeartRate } = useBiometrics();
   const {
     notifications,
     unreadCount,
@@ -48,8 +50,27 @@ export default function Profile() {
     shortcutsCount: 0,
   });
   const [healthConnectStatus, setHealthConnectStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
+  const [isSavingTestHeartRate, setIsSavingTestHeartRate] = useState(false);
 
 const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
+  const testHeartRateOptions = [
+    { label: 'Relaxed', bpm: 68 },
+    { label: 'Focused', bpm: 82 },
+    { label: 'Stressed', bpm: 96 },
+    { label: 'Anxious', bpm: 114 },
+  ];
+
+  const handleAddTestHeartRate = async (bpm: number) => {
+    try {
+      setIsSavingTestHeartRate(true);
+      await addTestHeartRate(bpm);
+    } catch (error) {
+      console.error('Could not save test heart rate:', error);
+      alert('Could not save the test heart rate.');
+    } finally {
+      setIsSavingTestHeartRate(false);
+    }
+  };
   const notificationStats = useMemo(() => {
     const importantCount = notifications.filter((item) => !item.read && item.type !== 'system').length;
     const latest = notifications[0];
@@ -653,6 +674,50 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
               {healthConnectStatus === 'connected' ? 'Update Permissions' : 'Connect Health Connect'}
             </Text>
           </TouchableOpacity>
+
+          <View className="bg-white/60 rounded-2xl p-4 mt-4 border border-[#E8EDDF]">
+            <View className="flex-row items-center justify-between mb-3">
+              <View>
+                <Text
+                  maxFontSizeMultiplier={1.2}
+                  className="text-[#4A5D4E] text-base"
+                  style={{ fontFamily: 'Nunito_700Bold' }}
+                >
+                  Test heart rate
+                </Text>
+                <Text
+                  maxFontSizeMultiplier={1.2}
+                  className="text-gray-500 text-xs mt-0.5"
+                  style={{ fontFamily: 'Nunito_400Regular' }}
+                >
+                  Current: {biometricData?.heartRate ? `${biometricData.heartRate} bpm` : 'No reading'} · {currentState.toLowerCase()}
+                </Text>
+              </View>
+              <MaterialIcons name="monitor-heart" size={24} color="#5B8C51" />
+            </View>
+
+            <View className="flex-row flex-wrap gap-2">
+              {testHeartRateOptions.map((option) => (
+                <TouchableOpacity
+                  key={option.label}
+                  className={`px-3 py-2 rounded-full border border-[#D1D9C5] bg-[#F5F7F0] ${isSavingTestHeartRate ? 'opacity-50' : ''}`}
+                  disabled={isSavingTestHeartRate}
+                  onPress={() => handleAddTestHeartRate(option.bpm)}
+                  accessible
+                  accessibilityRole="button"
+                  accessibilityLabel={`Save ${option.bpm} beats per minute test heart rate`}
+                >
+                  <Text
+                    maxFontSizeMultiplier={1.2}
+                    className="text-[#4A5D4E] text-sm"
+                    style={{ fontFamily: 'Nunito_700Bold' }}
+                  >
+                    {option.label} · {option.bpm}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
         </View>
 
         {/* Menu Principal */}
