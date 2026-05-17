@@ -27,6 +27,7 @@ import {
   Scenario,
   ScenarioDeviceState,
 } from '@/constants/data';
+import { resolveCatalogImage } from '@/constants/data/catalogAssets';
 import { SMART_HOME_DEVICES } from '@/constants/devices';
 import {
   fetchActivityTemplateById,
@@ -167,6 +168,7 @@ export default function ActivityDetails() {
 
         const contentPromise = foundActivity.content_id
           ? (async () => {
+              const localContent = CONTENTS[foundActivity.content_id as any];
               const { data: contentRows, error: contentError } = await supabase
                 .from('contents')
                 .select('*')
@@ -182,16 +184,15 @@ export default function ActivityDetails() {
                   category: contentData.category,
                   description: contentData.description,
                   duration: contentData.duration,
-                  image: contentData.image,
-                  instructions: contentData.instructions,
-                  ingredients: contentData.ingredients,
-                  videoUrl: contentData.video_url,
-                  author: contentData.author,
+                  image: resolveCatalogImage(contentData.image || localContent?.image),
+                  instructions: contentData.instructions || localContent?.instructions,
+                  ingredients: contentData.ingredients || localContent?.ingredients,
+                  videoUrl: localContent?.videoUrl || contentData.video_url,
+                  author: contentData.author || localContent?.author,
                 } as Content;
               }
 
-              const cont = CONTENTS[foundActivity.content_id as any];
-              return cont || null;
+              return localContent || null;
             })()
           : Promise.resolve(null);
 

@@ -23,7 +23,9 @@ import {
   Activity,
   CONTENTS,
   Scenario,
+  ScenarioDeviceState,
 } from '@/constants/data';
+import { SMART_HOME_DEVICES } from '@/constants/devices';
 import {
   fetchActivityTemplateById,
   fetchScenarioTemplateById,
@@ -51,6 +53,8 @@ export default function ActiveSession() {
     instructions: FormattedInstruction[];
     type: 'audio' | 'video' | 'mixed';
     videoUrl?: string;
+    devices: ScenarioDeviceState[];
+    tvDeviceName?: string;
   } | null>(null);
 
   const [isActive, setIsActive] = useState(true);
@@ -100,6 +104,8 @@ export default function ActiveSession() {
       let contentType: 'audio' | 'video' | 'mixed' = 'audio';
       let videoUrl: string | undefined = undefined;
       let contentData: any = null;
+      let relatedScenario: Scenario | null = null;
+      let connectedTvName: string | undefined = undefined;
 
       // Helper: parse JSON safely
       const safeParse = (value: any): any[] => {
@@ -115,45 +121,60 @@ export default function ActiveSession() {
         return Array.isArray(value) ? value : [value];
       };
 
-      if (foundItem && (foundItem as any).content_id) {
+      const contentId = (foundItem as any).content_id;
+      const localContent = contentId ? CONTENTS[contentId as any] : null;
+
+      if (foundItem && contentId) {
         // Fetch content from Supabase
         const { data: contentRows } = await supabase
           .from('contents')
           .select('*')
-          .eq('id', (foundItem as any).content_id)
+          .eq('id', contentId)
           .limit(1);
 
         contentData = contentRows && contentRows.length > 0 ? contentRows[0] : null;
 
         if (contentData) {
-          playlistName = contentData.title;
-          if (contentData.type === 'video') {
+          playlistName = contentData.title || localContent?.title || playlistName;
+          if (contentData.type === 'video' || localContent?.type === 'video') {
             contentType = 'video';
-            videoUrl = contentData.video_url;
+            videoUrl = localContent?.videoUrl || contentData.video_url;
           }
         } else {
           // Fallback to local CONTENTS
-          const cId = (foundItem as any).content_id;
-          const content = cId ? CONTENTS[cId as any] : null;
-          if (content) {
-            playlistName = content.title;
-            if (content.type === 'video') {
+          if (localContent) {
+            playlistName = localContent.title;
+            if (localContent.type === 'video') {
               contentType = 'video';
-              videoUrl = (content as any).videoUrl;
+              videoUrl = localContent.videoUrl;
             }
           }
         }
       }
 
-      if (contentType !== 'video') {
-        const sId = (foundItem as any).scenario_id;
-        const relatedScenario = sId ? await fetchScenarioTemplateById(sId) : null;
-        if (relatedScenario?.playlist) playlistName = relatedScenario.playlist;
+      const sId = (foundItem as any).scenario_id;
+      relatedScenario = sId ? await fetchScenarioTemplateById(sId) : null;
+      if (contentType !== 'video' && relatedScenario?.playlist) {
+        playlistName = relatedScenario.playlist;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: tvDevice } = await supabase
+          .from('devices')
+          .select('name')
+          .eq('user_id', user.id)
+          .eq('type', 'tv')
+          .eq('status', 'connected')
+          .limit(1)
+          .maybeSingle();
+
+        connectedTvName = tvDevice?.name;
       }
 
       const rawInstructions = safeParse(
         contentData?.instructions ||
-        (foundItem && (foundItem as any).content_id ? CONTENTS[(foundItem as any).content_id as any]?.instructions : []) ||
+        localContent?.instructions ||
         []
       );
 
@@ -177,12 +198,14 @@ export default function ActiveSession() {
         playlistName: playlistName,
         image: foundItem.image,
         instructions: formattedInstructions,
-        type: contentType === 'video' ? 'mixed' : contentType,
+        type: contentType,
         videoUrl: videoUrl,
+        devices: relatedScenario?.devices || (foundItem as any).devices || [],
+        tvDeviceName: connectedTvName,
       });
 
-      // Tocar música no Spotify se houver um playlist_id (Mock ou DB)
-      if (isAuthenticated) {
+      // Tocar música no Spotify só em sessões sem vídeo.
+      if (isAuthenticated && contentType !== 'video') {
         let pId = (foundItem as any).playlist_id;
         
         if (!pId) {
@@ -219,9 +242,33 @@ export default function ActiveSession() {
           if (!pId) pId = '37i9dQZF1DX76W9kuv1Z0g';
         }
         
+        const sessionDevices = relatedScenario?.devices || (foundItem as any).devices || [];
+        const hasScenarioTv = sessionDevices.some((config: ScenarioDeviceState) => {
+          const device = SMART_HOME_DEVICES[config.deviceId];
+          return device?.type === 'tv';
+        });
+        const shouldPreferTv =
+          hasScenarioTv &&
+          ['meditation', 'yoga', 'general', 'other'].includes(
+            String((foundItem as any).type || '').toLowerCase(),
+          );
+        const tvPlaybackOptions = shouldPreferTv
+          ? {
+              preferredDeviceTypes: ['TV'],
+              preferredDeviceNameIncludes: [
+                connectedTvName || '',
+                'tv',
+                'samsung',
+                'lg',
+                'android tv',
+                'chromecast',
+              ].filter(Boolean),
+            }
+          : undefined;
+
         if (pId) {
           console.log('[Spotify] A iniciar música no momento do Exercício:', pId);
-          playPlaylist(pId);
+          playPlaylist(pId, tvPlaybackOptions);
         } else {
           // Fallback por tipo de atividade
           const type = (foundItem as any).type?.toLowerCase();
@@ -232,10 +279,10 @@ export default function ActiveSession() {
           };
           if (fallbacks[type]) {
             console.log('[Spotify] A usar fallback no Exercício:', type);
-            playPlaylist(fallbacks[type]);
+            playPlaylist(fallbacks[type], tvPlaybackOptions);
           }
         }
-      } else {
+      } else if (contentType !== 'video') {
         console.log('[Spotify] Utilizador não autenticado.');
       }
 

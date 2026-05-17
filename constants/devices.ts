@@ -3,6 +3,7 @@
 export type DeviceType =
   | 'light'
   | 'speaker'
+  | 'tv'
   | 'diffuser'
   | 'purifier'
   | 'thermostat'
@@ -54,6 +55,12 @@ export const SMART_HOME_DEVICES: Record<string, SmartDevice> = {
     id: 'dev_speaker_living',
     name: 'Speakers',
     type: 'speaker',
+    room: 'Living Room',
+  },
+  dev_tv_living: {
+    id: 'dev_tv_living',
+    name: 'Living Room TV',
+    type: 'tv',
     room: 'Living Room',
   },
 

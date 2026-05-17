@@ -34,10 +34,15 @@ interface SpotifyContextType {
   currentTrack: { title: string; artist: string } | null;
   isLoading: boolean;
   getUserPlaylists: () => Promise<any[]>;
-  playPlaylist: (playlistId: string) => Promise<void>;
+  playPlaylist: (playlistId: string, options?: SpotifyPlaybackOptions) => Promise<void>;
   pausePlayback: () => Promise<void>;
   resumePlayback: () => Promise<void>;
 }
+
+type SpotifyPlaybackOptions = {
+  preferredDeviceTypes?: string[];
+  preferredDeviceNameIncludes?: string[];
+};
 
 const SpotifyContext = createContext<SpotifyContextType | undefined>(undefined);
 
@@ -305,7 +310,24 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const playPlaylist = async (playlistId: string) => {
+  const findPreferredSpotifyDevice = (devices: any[], options?: SpotifyPlaybackOptions) => {
+    const availableDevices = devices.filter((device) => !device.is_restricted);
+    const preferredTypes = options?.preferredDeviceTypes?.map((type) => type.toLowerCase()) ?? [];
+    const preferredNames = options?.preferredDeviceNameIncludes?.map((name) => name.toLowerCase()) ?? [];
+
+    return (
+      availableDevices.find((device) =>
+        preferredTypes.includes(String(device.type || '').toLowerCase()),
+      ) ||
+      availableDevices.find((device) =>
+        preferredNames.some((name) => String(device.name || '').toLowerCase().includes(name)),
+      ) ||
+      availableDevices.find((device) => device.type === 'Smartphone') ||
+      availableDevices[0]
+    );
+  };
+
+  const playPlaylist = async (playlistId: string, options?: SpotifyPlaybackOptions) => {
     console.log('[Spotify] playPlaylist chamada para:', playlistId);
     if (!token) {
       console.warn('[Spotify] Impossível tocar: Token não existe.');
@@ -373,15 +395,19 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       let res = await doPlay();
 
-      if (res.status === 404) {
-        console.warn('[Spotify] No active device. Fetching available devices...');
+      if (res.status === 404 || options?.preferredDeviceTypes?.length || options?.preferredDeviceNameIncludes?.length) {
+        console.warn('[Spotify] Fetching available devices...');
         const devicesRes = await fetch('https://api.spotify.com/v1/me/player/devices', {
           headers: { Authorization: `Bearer ${token}` },
         });
         const devicesData = await devicesRes.json();
 
         if (devicesData.devices && devicesData.devices.length > 0) {
-          const target = devicesData.devices.find((d: any) => d.type === 'Smartphone') || devicesData.devices[0];
+          const target = findPreferredSpotifyDevice(devicesData.devices, options);
+          if (!target) {
+            console.warn('[Spotify] No unrestricted Spotify devices available.');
+            return;
+          }
           console.log(`[Spotify] Forçando ativação em: ${target.name}`);
 
           await fetch('https://api.spotify.com/v1/me/player', {

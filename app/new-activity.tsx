@@ -129,19 +129,23 @@ export default function NewActivityFlow() {
         .select('*');
       
       if (data && !error) {
-        setDbContent(data.map((c: any) => ({
-          id: c.id,
-          title: c.title,
-          type: c.type,
-          category: c.category,
-          description: c.description,
-          duration: c.duration,
-          image: resolveCatalogImage(c.image),
-          instructions: c.instructions,
-          ingredients: c.ingredients,
-          videoUrl: c.video_url,
-          author: c.author,
-        })));
+        setDbContent(data.map((c: any) => {
+          const localContent = CONTENTS[c.id as keyof typeof CONTENTS];
+
+          return {
+            id: c.id,
+            title: c.title || localContent?.title,
+            type: c.type || localContent?.type,
+            category: c.category || localContent?.category,
+            description: c.description || localContent?.description,
+            duration: c.duration || localContent?.duration,
+            image: resolveCatalogImage(c.image || localContent?.image),
+            instructions: c.instructions || localContent?.instructions,
+            ingredients: c.ingredients || localContent?.ingredients,
+            videoUrl: localContent?.videoUrl || c.video_url,
+            author: c.author || localContent?.author,
+          };
+        }));
       }
     };
     fetchContent();
