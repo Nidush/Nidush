@@ -251,9 +251,6 @@ export default function Index() {
 
     // 1. Aplicar filtro de Hobbies se o utilizador tiver algum selecionado
     const appActivities = activityTemplates.filter((item) => {
-      // Ignorar as criações próprias no carrossel de recomendações
-      if (item.category === 'My creations') return false;
-      
       // Se o user tiver hobbies, filtramos; se não tiver, mostramos todos
       if (userHobbies.length > 0) {
         // item.type (meditation, cooking, workout, audiobooks)

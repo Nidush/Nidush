@@ -16,3 +16,6 @@ verify_jwt = false
 
 [functions.manage-home]
 verify_jwt = false
+
+[functions.weekly-api-content-sync]
+verify_jwt = false

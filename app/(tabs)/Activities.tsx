@@ -149,19 +149,22 @@ const UnifiedActivitiesScreen = () => {
   };
 
   const processedData = useMemo(() => {
-    const rawData =
-      viewMode === 'activities' ? [...myActivities, ...activityTemplates] : scenarioTemplates;
+    const dedupeById = (items: (Activity | Scenario)[]) => {
+      const seen = new Set<string | number>();
+      return items.filter((item) => {
+        const key = String(item.id);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    };
 
-    // Deduplicar por ID para evitar React key warnings (ex: diferentes seeds/migrations)
-    const seen = new Set<string | number>();
-    const baseData = rawData.filter((item) => {
-      const key = String(item.id);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+    const userActivityData = viewMode === 'activities' ? dedupeById(myActivities) : [];
+    const catalogData = dedupeById(
+      viewMode === 'activities' ? activityTemplates : scenarioTemplates,
+    );
 
-    const filteredBase = baseData.filter((item) => {
+    const matchesActiveView = (item: Activity | Scenario) => {
       const matchesSearch = item.title
         .toLowerCase()
         .includes(searchQuery.toLowerCase());
@@ -174,16 +177,26 @@ const UnifiedActivitiesScreen = () => {
         matchesFilter = ((item as Scenario).room || item.room_id)?.toLowerCase() === activeFilter.toLowerCase();
       }
       return matchesFilter && matchesSearch;
-    });
+    };
 
-    const myCreationsList = filteredBase.filter(
-      (item) => item.category === 'My creations',
-    );
-    const appPool = filteredBase.filter(
-      (item) => item.category !== 'My creations',
+    const filteredUserActivities = userActivityData.filter(matchesActiveView);
+    const filteredCatalog = catalogData.filter(matchesActiveView);
+
+    const myCreationsList =
+      viewMode === 'activities'
+        ? filteredUserActivities
+        : filteredCatalog.filter((item) => item.category === 'My creations');
+
+    const appPool =
+      viewMode === 'activities'
+        ? filteredCatalog
+        : filteredCatalog.filter((item) => item.category !== 'My creations');
+
+    const recommendedPool = appPool.filter(
+      (item) => item.category !== 'Simple recipes',
     );
 
-    const recommendedList = getDynamicRecommendations(appPool, currentState);
+    const recommendedList = getDynamicRecommendations(recommendedPool, currentState);
 
     const simpleRecipesList = appPool.filter(
       (item) => item.category === 'Simple recipes',
@@ -193,7 +206,7 @@ const UnifiedActivitiesScreen = () => {
       myCreations: myCreationsList,
       recommended: recommendedList,
       simpleRecipes: simpleRecipesList,
-      isEmpty: filteredBase.length === 0,
+      isEmpty: filteredUserActivities.length + filteredCatalog.length === 0,
     };
   }, [viewMode, activeFilter, searchQuery, myActivities, activityTemplates, scenarioTemplates, currentState]);
 
