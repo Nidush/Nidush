@@ -139,11 +139,15 @@ export default function SignUp() {
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
           className="flex-1"
           style={{ zIndex: 10 }}
         >
           <ScrollView
-            contentContainerStyle={{ flexGrow: 1 }}
+            contentContainerStyle={{
+              flexGrow: 1,
+              paddingBottom: Platform.OS === 'ios' ? 120 : 160,
+            }}
             bounces={false}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -170,7 +174,7 @@ export default function SignUp() {
                   />
                 </View>
 
-                <View className={isWebPC ? 'mt-[10px]' : 'mt-[25px]'}>
+                <View className={isWebPC ? 'mt-[10px]' : 'mt-[14px]'}>
                   <Text
                     style={{ fontFamily: 'Nunito_700Bold' }}
                     className="text-[40px] text-[#3E545C]"
@@ -182,7 +186,7 @@ export default function SignUp() {
 
                   <Text
                     style={{ fontFamily: 'Nunito_400Regular' }}
-                    className="text-[16px] text-[#3E545C] mt-[8px] mb-[30px]"
+                    className="text-[16px] text-[#3E545C] mt-[8px] mb-[20px]"
                     accessibilityLabel="Join Nidush and let your home be your safe space"
                     maxFontSizeMultiplier={1.2}
                   >
