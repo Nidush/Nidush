@@ -659,7 +659,30 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
             accessibilityHint="Starts the process to connect a new wearable device"
             onPress={async () => {
               try {
-                const { openHealthConnectSettings } = require('react-native-health-connect');
+                const {
+                  getSdkStatus,
+                  initialize,
+                  requestPermission,
+                  SdkAvailabilityStatus,
+                  openHealthConnectSettings,
+                } = require('react-native-health-connect');
+                const status = await getSdkStatus();
+                if (status !== SdkAvailabilityStatus.SDK_AVAILABLE) {
+                  alert('Health Connect is not available or needs to be installed.');
+                  return;
+                }
+
+                const initialized = await initialize();
+                if (initialized) {
+                  try {
+                    await requestPermission([
+                      { accessType: 'read', recordType: 'HeartRate' },
+                    ]);
+                  } catch (permissionError) {
+                    console.warn('Health Connect permission request failed:', permissionError);
+                  }
+                }
+
                 openHealthConnectSettings();
               } catch (e) {
                 alert('Could not open Health Connect settings.');

@@ -156,7 +156,13 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
                 <TouchableOpacity 
                   onPress={async () => {
                     try {
-                      const { getSdkStatus, SdkAvailabilityStatus, openHealthConnectSettings } = require('react-native-health-connect');
+                      const {
+                        getSdkStatus,
+                        initialize,
+                        requestPermission,
+                        SdkAvailabilityStatus,
+                        openHealthConnectSettings,
+                      } = require('react-native-health-connect');
                       const status = await getSdkStatus();
                       if (status !== SdkAvailabilityStatus.SDK_AVAILABLE) {
                         alert('Health Connect is not available or needs to be installed.');
@@ -164,11 +170,19 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
                         return;
                       }
 
-                      // Em vez de pedir permissão interna (que está a dar o crash nativo), 
-                      // abrimos as definições para o utilizador ativar lá. É 100% seguro contra crashes.
-                      openHealthConnectSettings();
+                      const initialized = await initialize();
+                      if (initialized) {
+                        try {
+                          await requestPermission([
+                            { accessType: 'read', recordType: 'HeartRate' },
+                          ]);
+                        } catch (permissionError) {
+                          console.warn('Health Connect permission request failed:', permissionError);
+                        }
+                      }
                       
-                      // Damos um pequeno aviso e avançamos
+                      openHealthConnectSettings();
+
                       alert('Please enable Nidush permissions in the Health Connect app that just opened.');
                       onNext();
                     } catch (error) {
