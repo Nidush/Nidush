@@ -9,6 +9,14 @@ export const getFriendlyErrorMessage = (error: any): string => {
     if (message.includes('User already registered')) {
         return 'Este email já está registado. Tente fazer login.';
     }
+    if (
+        message.toLowerCase().includes('password') &&
+        (message.toLowerCase().includes('weak') ||
+            message.toLowerCase().includes('short') ||
+            message.toLowerCase().includes('characters'))
+    ) {
+        return 'A password deve ter pelo menos 12 caracteres, letras maiúsculas e minúsculas, números e um símbolo.';
+    }
     if (message.includes('network error') || message.includes('fetch')) {
         return 'Parece que estás sem ligação à internet. Verifica a tua rede.';
     }

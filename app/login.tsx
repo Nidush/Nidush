@@ -85,10 +85,7 @@ export default function Login() {
 
       if (userQueryError || !homeAssoc?.home_id) {
         await AsyncStorage.removeItem('@onboarding_progress');
-        router.replace({
-          pathname: '/setup-profile',
-          params: { pwd: password }
-        });
+        router.replace('/setup-profile');
       } else {
         // Sucesso - Ir para a página principal / Dashboard
         await AsyncStorage.setItem('@viewedOnboarding', 'true');
@@ -164,6 +161,8 @@ export default function Login() {
                   className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]" 
                   keyboardType="email-address" 
                   autoCapitalize="none"
+                  autoComplete="email"
+                  textContentType="emailAddress"
                   value={email}
                   onChangeText={setEmail}
                 />
@@ -180,6 +179,8 @@ export default function Login() {
                     value={password}
                     onChangeText={setPassword}
                     autoCapitalize="none"
+                    autoComplete="current-password"
+                    textContentType="password"
                     autoCorrect={false}
                     selectionColor="#5C8D58"
                     placeholderTextColor="#7B8A7B"

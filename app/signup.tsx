@@ -26,6 +26,7 @@ import {
 import { apiLog, invokeFunction, supabase } from '../utils/supabase';
 
 import { getFriendlyErrorMessage } from '../utils/errorHandlers';
+import { getNextPasswordRequirement, validatePassword } from '../utils/passwordPolicy';
 
 
 export default function SignUp() {
@@ -47,6 +48,7 @@ export default function SignUp() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const nextPasswordRequirement = getNextPasswordRequirement(password);
 
   useEffect(() => {
     const sub = Dimensions.addEventListener('change', ({ window }) =>
@@ -60,6 +62,13 @@ export default function SignUp() {
       setErrorMsg('Por favor preenche todos os campos.');
       return;
     }
+
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      setErrorMsg(passwordValidation.message);
+      return;
+    }
+
     setLoading(true);
     setErrorMsg('');
 
@@ -210,6 +219,8 @@ export default function SignUp() {
                       className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]"
                       keyboardType="email-address"
                       autoCapitalize="none"
+                      autoComplete="email"
+                      textContentType="emailAddress"
                       testID="email-input"
                       value={email}
                       onChangeText={setEmail}
@@ -227,6 +238,8 @@ export default function SignUp() {
                         value={password}
                         onChangeText={setPassword}
                         autoCapitalize="none"
+                        autoComplete="new-password"
+                        textContentType="newPassword"
                         autoCorrect={false}
                         selectionColor="#5C8D58"
                         placeholderTextColor="#7B8A7B"
@@ -247,6 +260,23 @@ export default function SignUp() {
                         />
                       </TouchableOpacity>
                     </View>
+                    {password ? (
+                      <View className="flex-row items-center mt-2">
+                        <MaterialIcons
+                          name={nextPasswordRequirement ? 'info-outline' : 'check-circle'}
+                          size={15}
+                          color={nextPasswordRequirement ? '#8A9A8A' : '#5C8D58'}
+                        />
+                        <Text
+                          style={{ fontFamily: 'Nunito_400Regular' }}
+                          className={`ml-2 text-[12px] ${nextPasswordRequirement ? 'text-[#6A7D6A]' : 'text-[#5C8D58]'}`}
+                        >
+                          {nextPasswordRequirement
+                            ? `Missing: ${nextPasswordRequirement.toLowerCase()}`
+                            : 'Strong password'}
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
 
                    {errorMsg ? (
