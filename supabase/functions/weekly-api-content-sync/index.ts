@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from '@supabase/supabase-js'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,6 +19,27 @@ type ContentPayload = {
   ingredients?: unknown[] | null
   video_url?: string | null
   author: string
+}
+
+type MealDbMeal = {
+  idMeal: string
+  strMeal: string
+  strArea?: string | null
+  strCategory?: string | null
+  strMealThumb?: string | null
+  strInstructions?: string | null
+  strYoutube?: string | null
+  [key: `strIngredient${number}`]: string | null | undefined
+  [key: `strMeasure${number}`]: string | null | undefined
+}
+
+type ApiNinjasExercise = {
+  name: string
+  type?: string | null
+  muscle?: string | null
+  equipment?: string | null
+  difficulty?: string | null
+  instructions?: string | null
 }
 
 const THE_MEAL_DB_RANDOM_URL = 'https://www.themealdb.com/api/json/v1/1/random.php'
@@ -61,7 +82,7 @@ const fetchJson = async <T>(url: string, init?: RequestInit): Promise<T> => {
 }
 
 const fetchMealContent = async (): Promise<ContentPayload | null> => {
-  const data = await fetchJson<{ meals: any[] | null }>(THE_MEAL_DB_RANDOM_URL)
+  const data = await fetchJson<{ meals: MealDbMeal[] | null }>(THE_MEAL_DB_RANDOM_URL)
   const meal = data.meals?.[0]
   if (!meal?.idMeal || !meal?.strMeal) return null
 
@@ -93,7 +114,7 @@ const fetchMealContent = async (): Promise<ContentPayload | null> => {
 }
 
 const fetchExerciseContent = async (apiKey: string, muscle: string): Promise<ContentPayload | null> => {
-  const data = await fetchJson<any[]>(`${API_NINJAS_EXERCISE_URL}?muscle=${encodeURIComponent(muscle)}`, {
+  const data = await fetchJson<ApiNinjasExercise[]>(`${API_NINJAS_EXERCISE_URL}?muscle=${encodeURIComponent(muscle)}`, {
     headers: { 'X-Api-Key': apiKey },
   })
 
