@@ -1,13 +1,13 @@
 import { supabase } from '@/utils/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  makeRedirectUri,
-  ResponseType,
-  useAuthRequest
+    makeRedirectUri,
+    ResponseType,
+    useAuthRequest
 } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Alert, Linking, Platform, Share } from 'react-native';
+import { Alert, Linking, Platform } from 'react-native';
 import { SPOTIFY_CONFIG } from '../constants/spotify-config';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -34,10 +34,15 @@ interface SpotifyContextType {
   currentTrack: { title: string; artist: string } | null;
   isLoading: boolean;
   getUserPlaylists: () => Promise<any[]>;
-  playPlaylist: (playlistId: string) => Promise<void>;
+  playPlaylist: (playlistId: string, options?: SpotifyPlaybackOptions) => Promise<void>;
   pausePlayback: () => Promise<void>;
   resumePlayback: () => Promise<void>;
 }
+
+type SpotifyPlaybackOptions = {
+  preferredDeviceTypes?: string[];
+  preferredDeviceNameIncludes?: string[];
+};
 
 const SpotifyContext = createContext<SpotifyContextType | undefined>(undefined);
 
@@ -92,6 +97,12 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return;
       }
 
+      if (response.status === 401 || response.status === 403) {
+        console.warn('[Spotify] Token invalid or insufficient permissions. Logging out...');
+        logout();
+        return;
+      }
+
       if (response.status === 200) {
         const data = await response.json();
         if (data && data.item) {
@@ -131,11 +142,19 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
         body: params.toString(),
       });
 
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('[Spotify] Token exchange failed:', res.status, errorText);
+        return;
+      }
+
       const data = await res.json();
       if (data.access_token) {
         console.log('[Spotify] Token exchanged successfully!');
         saveToken(data.access_token);
         fetchUserProfile(data.access_token);
+      } else if (data.error) {
+        console.error('[Spotify] Token exchange error:', data.error, data.error_description);
       } else {
         console.error('Error exchanging code for token:', data);
       }
@@ -210,57 +229,45 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
         headers: { Authorization: `Bearer ${authToken}` },
       });
 
-      if (res.status === 401) {
-        console.warn('[Spotify] Token invalid or expired. Logging out...');
+      if (res.status === 401 || res.status === 403) {
+        console.warn('[Spotify] Token invalid, expired, or insufficient permissions. Logging out...');
         logout();
         return;
       }
 
-      const data = await res.json();
+      if (!res.ok) {
+        console.warn('[Spotify] API returned error status:', res.status);
+        return;
+      }
+
+      const text = await res.text();
+      if (!text) {
+        console.warn('[Spotify] Empty response from API');
+        return;
+      }
+
+      const data = JSON.parse(text);
       setUserProfile(data);
     } catch (e) {
       console.error('Error fetching Spotify profile:', e);
-      // Não damos logout imediato aqui por erro de rede, apenas se for 401
+      logout();
     }
   };
 
   const login = async () => {
-    console.log('[Spotify] Redirect URI a configurar no Dashboard:', REDIRECT_URI);
+    if (!request) {
+      console.warn('[Spotify] Auth request is not ready yet. Please try again in a moment.');
+      return;
+    }
 
-    if (Platform.OS !== 'web') {
-      Alert.alert(
-        'Configura o Spotify Dashboard',
-        `A tua URI atual é:\n\n${REDIRECT_URI}\n\nUsa o botão de copiar abaixo para facilitar!`,
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          {
-            text: 'Copiar Link',
-            onPress: async () => {
-              try {
-                await Share.share({ message: REDIRECT_URI });
-              } catch (e) {
-                console.error(e);
-              }
-            }
-          },
-          { 
-            text: 'Iniciar Login', 
-            onPress: async () => {
-              try {
-                await AsyncStorage.removeItem('expo-auth-session-state');
-              } catch (e) { }
+    try {
+      await AsyncStorage.removeItem('expo-auth-session-state');
+    } catch (e) { }
 
-              await promptAsync();
-            } 
-          }
-        ]
-      );
-    } else {
-      try {
-        await AsyncStorage.removeItem('expo-auth-session-state');
-      } catch (e) { }
-      
+    if (Platform.OS === 'web') {
       await promptAsync({ windowName: '_self' });
+    } else {
+      await promptAsync();
     }
   };
 
@@ -268,6 +275,18 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
     await AsyncStorage.removeItem('@spotify_token');
     setToken(null);
     setUserProfile(null);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase
+          .from('users')
+          .update({ spotify_token: null, spotify_connected: false })
+          .eq('auth_uid', user.id);
+      }
+    } catch (e) {
+      console.error('[Spotify] Error clearing Spotify state in Supabase:', e);
+    }
   };
 
   const getUserPlaylists = async () => {
@@ -276,6 +295,13 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const res = await fetch('https://api.spotify.com/v1/me/playlists', {
         headers: { Authorization: `Bearer ${token}` },
       });
+
+      if (res.status === 401 || res.status === 403) {
+        console.warn('[Spotify] Token invalid or insufficient permissions. Logging out...');
+        logout();
+        return [];
+      }
+
       const data = await res.json();
       return data.items || [];
     } catch (e) {
@@ -284,7 +310,24 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const playPlaylist = async (playlistId: string) => {
+  const findPreferredSpotifyDevice = (devices: any[], options?: SpotifyPlaybackOptions) => {
+    const availableDevices = devices.filter((device) => !device.is_restricted);
+    const preferredTypes = options?.preferredDeviceTypes?.map((type) => type.toLowerCase()) ?? [];
+    const preferredNames = options?.preferredDeviceNameIncludes?.map((name) => name.toLowerCase()) ?? [];
+
+    return (
+      availableDevices.find((device) =>
+        preferredTypes.includes(String(device.type || '').toLowerCase()),
+      ) ||
+      availableDevices.find((device) =>
+        preferredNames.some((name) => String(device.name || '').toLowerCase().includes(name)),
+      ) ||
+      availableDevices.find((device) => device.type === 'Smartphone') ||
+      availableDevices[0]
+    );
+  };
+
+  const playPlaylist = async (playlistId: string, options?: SpotifyPlaybackOptions) => {
     console.log('[Spotify] playPlaylist chamada para:', playlistId);
     if (!token) {
       console.warn('[Spotify] Impossível tocar: Token não existe.');
@@ -338,6 +381,13 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const checkRes = await fetch('https://api.spotify.com/v1/me/player', {
         headers: { Authorization: `Bearer ${token}` }
       });
+
+      if (checkRes.status === 401 || checkRes.status === 403) {
+        console.warn('[Spotify] Token invalid or insufficient permissions. Logging out...');
+        logout();
+        return;
+      }
+
       if (checkRes.status === 200) {
         const checkData = await checkRes.json();
         console.log(`[Spotify] A tocar em: ${checkData.device?.name} (${checkData.device?.type})`);
@@ -345,15 +395,19 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       let res = await doPlay();
 
-      if (res.status === 404) {
-        console.warn('[Spotify] No active device. Fetching available devices...');
+      if (res.status === 404 || options?.preferredDeviceTypes?.length || options?.preferredDeviceNameIncludes?.length) {
+        console.warn('[Spotify] Fetching available devices...');
         const devicesRes = await fetch('https://api.spotify.com/v1/me/player/devices', {
           headers: { Authorization: `Bearer ${token}` },
         });
         const devicesData = await devicesRes.json();
 
         if (devicesData.devices && devicesData.devices.length > 0) {
-          const target = devicesData.devices.find((d: any) => d.type === 'Smartphone') || devicesData.devices[0];
+          const target = findPreferredSpotifyDevice(devicesData.devices, options);
+          if (!target) {
+            console.warn('[Spotify] No unrestricted Spotify devices available.');
+            return;
+          }
           console.log(`[Spotify] Forçando ativação em: ${target.name}`);
 
           await fetch('https://api.spotify.com/v1/me/player', {
@@ -400,10 +454,15 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const pausePlayback = async () => {
     if (!token) return;
     try {
-      await fetch('https://api.spotify.com/v1/me/player/pause', {
+      const response = await fetch('https://api.spotify.com/v1/me/player/pause', {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}` },
       });
+
+      if (response.status === 401 || response.status === 403) {
+        console.warn('[Spotify] Token invalid or insufficient permissions. Logging out...');
+        logout();
+      }
     } catch (e) {
       console.error('Error pausing playback:', e);
     }
@@ -417,20 +476,38 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
         headers: { Authorization: `Bearer ${token}` },
       });
 
+      if (response.status === 401 || response.status === 403) {
+        console.warn('[Spotify] Token invalid or insufficient permissions. Logging out...');
+        logout();
+        return;
+      }
+
       if (response.status === 404) {
         console.log('[Spotify] Sem aparelho ativo para Resume. A tentar encontrar...');
         const devicesRes = await fetch('https://api.spotify.com/v1/me/player/devices', {
           headers: { Authorization: `Bearer ${token}` },
         });
+
+        if (devicesRes.status === 401 || devicesRes.status === 403) {
+          console.warn('[Spotify] Token invalid or insufficient permissions. Logging out...');
+          logout();
+          return;
+        }
+
         const devicesData = await devicesRes.json();
         const target = devicesData.devices?.find((d: any) => d.type === 'Smartphone') || devicesData.devices?.[0];
 
         if (target) {
-          await fetch('https://api.spotify.com/v1/me/player', {
+          const transferRes = await fetch('https://api.spotify.com/v1/me/player', {
             method: 'PUT',
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ device_ids: [target.id], play: true }),
           });
+
+          if (transferRes.status === 401 || transferRes.status === 403) {
+            console.warn('[Spotify] Token invalid or insufficient permissions. Logging out...');
+            logout();
+          }
         }
       }
     } catch (e) {

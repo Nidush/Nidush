@@ -1,6 +1,4 @@
-// @ts-nocheck
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from '@supabase/supabase-js'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Max-Age': '86400',
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders })
 
   try {
@@ -84,7 +82,9 @@ serve(async (req) => {
     throw new Error('Ação inválida.')
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), { 
+    const message = error instanceof Error ? error.message : String(error)
+
+    return new Response(JSON.stringify({ error: message }), { 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
       status: 400 
     })

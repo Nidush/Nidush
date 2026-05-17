@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
-  Platform,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -25,7 +24,6 @@ export default function VerificationModal({
   onResend,
 }: VerificationModalProps) {
   const { width } = Dimensions.get('window');
-  const isWeb = Platform.OS === 'web';
 
   return (
     <Modal
@@ -51,9 +49,9 @@ export default function VerificationModal({
           <Text style={styles.title}>Verify your email</Text>
           
           <Text style={styles.description}>
-            Welcome! We've gently sent a confirmation link to{' '}
+            Welcome! We have gently sent a confirmation link to{' '}
             <Text style={styles.emailText}>[{email || 'email@example.com'}]</Text>.
-            Tap it whenever you're ready to enter your new safe space.
+            Tap it whenever you are ready to enter your new safe space.
           </Text>
 
           {/* Button Section */}
@@ -62,7 +60,7 @@ export default function VerificationModal({
             onPress={onCheckEmail}
             activeOpacity={0.8}
           >
-            <Text style={styles.primaryButtonText}>I'll check my email</Text>
+            <Text style={styles.primaryButtonText}>I will check my email</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -70,7 +68,7 @@ export default function VerificationModal({
             onPress={onResend}
             activeOpacity={0.6}
           >
-            <Text style={styles.secondaryButtonText}>Didn't receive it?</Text>
+            <Text style={styles.secondaryButtonText}>Did not receive it?</Text>
           </TouchableOpacity>
         </View>
       </View>

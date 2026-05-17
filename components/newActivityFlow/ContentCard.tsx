@@ -1,4 +1,5 @@
 import { Content } from '@/constants/data/types';
+import { resolveCatalogImage } from '@/constants/data/catalogAssets';
 import { MaterialIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -28,6 +29,8 @@ export const ContentCard = ({
   onSelect,
   type = 'small',
 }: ContentCardProps) => {
+  const imageSource = resolveCatalogImage(item.image);
+
   const getIconName = (
     contentType: string,
   ): keyof typeof MaterialIcons.glyphMap => {
@@ -65,7 +68,7 @@ export const ContentCard = ({
         importantForAccessibility="no-hide-descendants"
       >
         <Image
-          source={item.image}
+          source={imageSource}
           style={StyleSheet.absoluteFill}
           resizeMode="cover"
           blurRadius={Platform.OS === 'ios' ? 70 : 50}
@@ -86,7 +89,7 @@ export const ContentCard = ({
         }
       >
         <Image
-          source={item.image}
+          source={imageSource}
           style={StyleSheet.absoluteFill}
           resizeMode="cover"
         />

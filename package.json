@@ -13,7 +13,7 @@
     "test": "jest",
     "test:e2e": "node selenium/onboarding.spec.js",
     "build": "expo export --platform web",
-    "backend": "node server.js"
+    "generate:policies": "node scripts/convert-policies.js"
   },
   "dependencies": {
     "@expo-google-fonts/nunito": "^0.4.2",
@@ -60,6 +60,7 @@
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.28.0",
+    "react-native-google-cast": "^4.9.1",
     "react-native-health-connect": "^3.5.0",
     "react-native-reanimated": "~4.1.1",
     "react-native-safe-area-context": "~5.6.0",
@@ -68,9 +69,7 @@
     "react-native-url-polyfill": "^3.0.0",
     "react-native-web": "~0.21.0",
     "react-native-worklets": "0.5.1",
-    "swagger-ui-express": "^5.0.1",
-    "tailwindcss": "^3.4.19",
-    "yamljs": "^0.3.0"
+    "tailwindcss": "^3.4.19"
   },
   "devDependencies": {
     "@babel/core": "^7.28.5",

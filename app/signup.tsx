@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
@@ -22,11 +23,10 @@ import {
   Nunito_700Bold,
   useFonts,
 } from '@expo-google-fonts/nunito';
-import { supabase, apiLog, invokeFunction } from '../utils/supabase';
-
-
+import { apiLog, invokeFunction, supabase } from '../utils/supabase';
 
 import { getFriendlyErrorMessage } from '../utils/errorHandlers';
+import { getNextPasswordRequirement, validatePassword } from '../utils/passwordPolicy';
 
 
 export default function SignUp() {
@@ -45,8 +45,10 @@ export default function SignUp() {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const nextPasswordRequirement = getNextPasswordRequirement(password);
 
   useEffect(() => {
     const sub = Dimensions.addEventListener('change', ({ window }) =>
@@ -60,6 +62,13 @@ export default function SignUp() {
       setErrorMsg('Por favor preenche todos os campos.');
       return;
     }
+
+    const passwordValidation = validatePassword(password);
+    if (!passwordValidation.isValid) {
+      setErrorMsg(passwordValidation.message);
+      return;
+    }
+
     setLoading(true);
     setErrorMsg('');
 
@@ -130,11 +139,15 @@ export default function SignUp() {
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
           className="flex-1"
           style={{ zIndex: 10 }}
         >
           <ScrollView
-            contentContainerStyle={{ flexGrow: 1 }}
+            contentContainerStyle={{
+              flexGrow: 1,
+              paddingBottom: Platform.OS === 'ios' ? 120 : 160,
+            }}
             bounces={false}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -161,7 +174,7 @@ export default function SignUp() {
                   />
                 </View>
 
-                <View className={isWebPC ? 'mt-[10px]' : 'mt-[25px]'}>
+                <View className={isWebPC ? 'mt-[10px]' : 'mt-[14px]'}>
                   <Text
                     style={{ fontFamily: 'Nunito_700Bold' }}
                     className="text-[40px] text-[#3E545C]"
@@ -173,7 +186,7 @@ export default function SignUp() {
 
                   <Text
                     style={{ fontFamily: 'Nunito_400Regular' }}
-                    className="text-[16px] text-[#3E545C] mt-[8px] mb-[30px]"
+                    className="text-[16px] text-[#3E545C] mt-[8px] mb-[20px]"
                     accessibilityLabel="Join Nidush and let your home be your safe space"
                     maxFontSizeMultiplier={1.2}
                   >
@@ -210,6 +223,8 @@ export default function SignUp() {
                       className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]"
                       keyboardType="email-address"
                       autoCapitalize="none"
+                      autoComplete="email"
+                      textContentType="emailAddress"
                       testID="email-input"
                       value={email}
                       onChangeText={setEmail}
@@ -218,14 +233,54 @@ export default function SignUp() {
 
                   <View className="w-full mb-[15px]">
                     <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">Password</Text>
-                    <TextInput
-                      style={{ fontFamily: 'Nunito_400Regular' }}
-                      className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]"
-                      secureTextEntry
-                      testID="password-input"
-                      value={password}
-                      onChangeText={setPassword}
-                    />
+                    <View className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] bg-[#FBFDFB] flex-row items-center">
+                      <TextInput
+                        style={{ fontFamily: 'Nunito_400Regular', color: '#1F2D2F' }}
+                        className="flex-1 h-full px-[15px] pr-2"
+                        secureTextEntry={!showPassword}
+                        testID="password-input"
+                        value={password}
+                        onChangeText={setPassword}
+                        autoCapitalize="none"
+                        autoComplete="new-password"
+                        textContentType="newPassword"
+                        autoCorrect={false}
+                        selectionColor="#5C8D58"
+                        placeholderTextColor="#7B8A7B"
+                      />
+                      <TouchableOpacity
+                        onPress={() => setShowPassword((current) => !current)}
+                        className="h-full w-12 items-center justify-center"
+                        testID="toggle-password-visibility"
+                        accessible
+                        accessibilityRole="button"
+                        accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                        accessibilityHint="Toggles password visibility"
+                      >
+                        <MaterialIcons
+                          name={showPassword ? 'visibility-off' : 'visibility'}
+                          size={22}
+                          color="#5C8D58"
+                        />
+                      </TouchableOpacity>
+                    </View>
+                    {password ? (
+                      <View className="flex-row items-center mt-2">
+                        <MaterialIcons
+                          name={nextPasswordRequirement ? 'info-outline' : 'check-circle'}
+                          size={15}
+                          color={nextPasswordRequirement ? '#8A9A8A' : '#5C8D58'}
+                        />
+                        <Text
+                          style={{ fontFamily: 'Nunito_400Regular' }}
+                          className={`ml-2 text-[12px] ${nextPasswordRequirement ? 'text-[#6A7D6A]' : 'text-[#5C8D58]'}`}
+                        >
+                          {nextPasswordRequirement
+                            ? `Missing: ${nextPasswordRequirement.toLowerCase()}`
+                            : 'Strong password'}
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
 
                    {errorMsg ? (

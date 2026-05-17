@@ -27,6 +27,7 @@ import {
   Scenario,
   ScenarioDeviceState,
 } from '@/constants/data';
+import { resolveCatalogImage } from '@/constants/data/catalogAssets';
 import { SMART_HOME_DEVICES } from '@/constants/devices';
 import {
   fetchActivityTemplateById,
@@ -44,6 +45,14 @@ type AlertConfigState = {
   onConfirm?: () => void;
 };
 
+type ShortcutRow = {
+  id: number;
+  displayorder: number;
+  activity_idactivity: number | null;
+  scenario_idscenario: number | null;
+  user_id: string | null;
+};
+
 export default function ActivityDetails() {
   const { id, isNew } = useLocalSearchParams<{ id: string; isNew?: string }>();
 
@@ -53,6 +62,8 @@ export default function ActivityDetails() {
   const [focusEnabled, setFocusEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [isUpdatingShortcut, setIsUpdatingShortcut] = useState(false);
 
   const isActivity = mainItem ? 'type' in mainItem : false;
 
@@ -68,9 +79,10 @@ export default function ActivityDetails() {
 
   useEffect(() => {
     if (isNew === 'true') {
+      setToastMessage('Atividade criada com sucesso!');
       setShowToast(true);
       AccessibilityInfo.announceForAccessibility(
-        'Activity created successfully!',
+        'Atividade criada com sucesso!',
       );
       const timer = setTimeout(() => {
         setShowToast(false);
@@ -99,63 +111,102 @@ export default function ActivityDetails() {
       }
 
       if (foundActivity) {
-        setMainItem(foundActivity);
-        if (foundActivity.scenario_id) {
-          let scen = await fetchScenarioTemplateById(foundActivity.scenario_id);
-          
-          if (!scen) {
-            console.log('[ActivityDetails] Fetching scenario from DB:', foundActivity.scenario_id);
-            const { data: scenData } = await supabase
-              .from('scenarios')
-              .select('*')
-              .eq('id', foundActivity.scenario_id)
+        const shortcutPromise = (async () => {
+          if (String(foundActivity.id).startsWith('template:')) {
+            return foundActivity.shortcuts;
+          }
+
+          const { data: { user } } = await supabase.auth.getUser();
+          const activityId = Number(foundActivity.id);
+
+          if (user && Number.isFinite(activityId)) {
+            const { data: shortcutData, error: shortcutError } = await supabase
+              .from('shortcuts')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('activity_idactivity', activityId)
               .maybeSingle();
-            
-            if (scenData) {
-              scen = {
-                id: scenData.id.toString(),
-                title: scenData.name,
-                description: scenData.description || '',
-                playlist: scenData.playlist_id ? 'Spotify Music' : (scenData.playlist_name || 'No music'),
-                playlist_id: scenData.playlist_id,
-                focusMode: false, // Default fallback
-                shortcuts: false,
-                devices: [], // Fallback
-                image: { uri: 'https://picsum.photos/200' } // Fallback
-              } as Scenario;
+
+            if (!shortcutError) {
+              return Boolean(shortcutData);
             }
           }
 
-          setRelatedScenario(scen || null);
-          if (scen) setFocusEnabled(scen.focusMode);
-        }
-        if (foundActivity.content_id) {
-          const { data: contentRows, error: contentError } = await supabase
-            .from('contents')
-            .select('*')
-            .eq('id', foundActivity.content_id)
-            .limit(1);
+          return foundActivity.shortcuts;
+        })();
 
-          if (contentRows && contentRows.length > 0 && !contentError) {
-            const contentData = contentRows[0];
-            setRelatedContent({
-              id: contentData.id,
-              title: contentData.title,
-              type: contentData.type,
-              category: contentData.category,
-              description: contentData.description,
-              duration: contentData.duration,
-              image: contentData.image,
-              instructions: contentData.instructions,
-              ingredients: contentData.ingredients,
-              videoUrl: contentData.video_url,
-              author: contentData.author,
-            } as Content);
-          } else {
-            const cont = CONTENTS[foundActivity.content_id as any];
-            setRelatedContent(cont || null);
-          }
-        }
+        const scenarioPromise = foundActivity.scenario_id
+          ? (async () => {
+              let scen = await fetchScenarioTemplateById(foundActivity.scenario_id!);
+
+              if (!scen) {
+                console.log('[ActivityDetails] Fetching scenario from DB:', foundActivity.scenario_id);
+                const { data: scenData } = await supabase
+                  .from('scenarios')
+                  .select('*')
+                  .eq('id', foundActivity.scenario_id)
+                  .maybeSingle();
+
+                if (scenData) {
+                  scen = {
+                    id: scenData.id.toString(),
+                    title: scenData.name,
+                    description: scenData.description || '',
+                    playlist: scenData.playlist_id ? 'Spotify Music' : (scenData.playlist_name || 'No music'),
+                    playlist_id: scenData.playlist_id,
+                    focusMode: false, // Default fallback
+                    shortcuts: false,
+                    devices: [], // Fallback
+                    image: { uri: 'https://picsum.photos/200' } // Fallback
+                  } as Scenario;
+                }
+              }
+
+              return scen || null;
+            })()
+          : Promise.resolve(null);
+
+        const contentPromise = foundActivity.content_id
+          ? (async () => {
+              const localContent = CONTENTS[foundActivity.content_id as any];
+              const { data: contentRows, error: contentError } = await supabase
+                .from('contents')
+                .select('*')
+                .eq('id', foundActivity.content_id)
+                .limit(1);
+
+              if (contentRows && contentRows.length > 0 && !contentError) {
+                const contentData = contentRows[0];
+                return {
+                  id: contentData.id,
+                  title: contentData.title,
+                  type: contentData.type,
+                  category: contentData.category,
+                  description: contentData.description,
+                  duration: contentData.duration,
+                  image: resolveCatalogImage(contentData.image || localContent?.image),
+                  instructions: contentData.instructions || localContent?.instructions,
+                  ingredients: contentData.ingredients || localContent?.ingredients,
+                  videoUrl: localContent?.videoUrl || contentData.video_url,
+                  author: contentData.author || localContent?.author,
+                } as Content;
+              }
+
+              return localContent || null;
+            })()
+          : Promise.resolve(null);
+
+        const [shortcutValue, scen, content] = await Promise.all([
+          shortcutPromise,
+          scenarioPromise,
+          contentPromise,
+        ]);
+        const activityWithShortcut = { ...foundActivity, shortcuts: shortcutValue };
+
+        setMainItem(activityWithShortcut);
+        setRelatedScenario(scen);
+        setRelatedContent(content);
+        if (scen) setFocusEnabled(scen.focusMode);
       } else {
         const foundScenario = await fetchScenarioTemplateById(id);
         if (foundScenario) {
@@ -208,27 +259,165 @@ export default function ActivityDetails() {
     }
   };
 
-  const handleAddToShortcuts = () => {
-    setAlertConfig({
-      visible: true,
-      title: 'Shortcuts',
-      message: 'Shortcuts feature coming soon!',
-      confirmText: 'OK',
-      cancelText: '',
-      isDestructive: false,
-      onConfirm: undefined,
-    });
+  const handleAddToShortcuts = async () => {
+    const activityId = String(id);
+
+    if (isUpdatingShortcut) return;
+
+    if (!isActivity || activityId.startsWith('template:')) {
+      setAlertConfig({
+        visible: true,
+        title: 'Shortcuts',
+        message: 'Only your own created activities can be added to shortcuts.',
+        confirmText: 'OK',
+        cancelText: '',
+        isDestructive: false,
+        onConfirm: undefined,
+      });
+      return;
+    }
+
+    const activity = mainItem as Activity;
+    const nextShortcutValue = !activity.shortcuts;
+    const numericActivityId = Number(activityId);
+
+    if (!Number.isFinite(numericActivityId)) {
+      setAlertConfig({
+        visible: true,
+        title: 'Shortcuts',
+        message: 'Could not identify this activity in the shortcuts table.',
+        confirmText: 'OK',
+        cancelText: '',
+        isDestructive: false,
+        onConfirm: undefined,
+      });
+      return;
+    }
+
+    try {
+      setIsUpdatingShortcut(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      apiLog(nextShortcutValue ? 'INSERT' : 'DELETE', 'shortcuts', {
+        id: activityId,
+        activity_idactivity: numericActivityId,
+        user_id: user.id,
+      });
+
+      if (nextShortcutValue) {
+        const { data: existingShortcut, error: existingError } = await supabase
+          .from('shortcuts')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('activity_idactivity', numericActivityId)
+          .maybeSingle();
+
+        if (existingError) throw existingError;
+
+        if (!existingShortcut) {
+          const { data: orderRows, error: orderError } = await supabase
+            .from('shortcuts')
+            .select('displayorder')
+            .eq('user_id', user.id)
+            .order('displayorder', { ascending: false })
+            .limit(1);
+
+          if (orderError) throw orderError;
+
+          const nextDisplayOrder =
+            ((orderRows?.[0] as Pick<ShortcutRow, 'displayorder'> | undefined)?.displayorder ?? 0) + 1;
+
+          const { error: insertError } = await supabase
+            .from('shortcuts')
+            .insert({
+              user_id: user.id,
+              activity_idactivity: numericActivityId,
+              scenario_idscenario: null,
+              displayorder: nextDisplayOrder,
+            });
+
+          if (insertError) throw insertError;
+        }
+      } else {
+        const { error: deleteError } = await supabase
+          .from('shortcuts')
+          .delete()
+          .eq('activity_idactivity', numericActivityId)
+          .eq('user_id', user.id);
+
+        if (deleteError) throw deleteError;
+      }
+
+      setMainItem({
+        ...activity,
+        shortcuts: nextShortcutValue,
+      });
+
+      const { error: mirrorError } = await supabase
+        .from('activities')
+        .update({ shortcuts: nextShortcutValue })
+        .eq('id', numericActivityId)
+        .eq('user_id', user.id)
+        .select('id')
+        .maybeSingle();
+
+      if (mirrorError) {
+        console.warn('Shortcut saved, but activities.shortcuts mirror was not updated:', mirrorError);
+      }
+
+      setShowToast(true);
+      setToastMessage(
+        nextShortcutValue
+          ? 'Atividade adicionada aos shortcuts.'
+          : 'Atividade removida dos shortcuts.',
+      );
+      AccessibilityInfo.announceForAccessibility(
+        nextShortcutValue
+          ? 'Atividade adicionada aos shortcuts.'
+          : 'Atividade removida dos shortcuts.',
+      );
+
+      if (nextShortcutValue) {
+        router.navigate('/(tabs)');
+      } else {
+        setTimeout(() => setShowToast(false), 3000);
+      }
+    } catch (error: any) {
+      console.error('Failed to update shortcuts:', error);
+      setAlertConfig({
+        visible: true,
+        title: 'Shortcuts',
+        message: error?.message
+          ? `Could not update shortcuts: ${error.message}`
+          : 'Could not update shortcuts. Please try again.',
+        confirmText: 'OK',
+        cancelText: '',
+        isDestructive: false,
+        onConfirm: undefined,
+      });
+    } finally {
+      setIsUpdatingShortcut(false);
+    }
   };
 
   const handleEditActivity = () => {
-    setAlertConfig({
-      visible: true,
-      title: 'Edit',
-      message: 'Edit feature coming soon!',
-      confirmText: 'OK',
-      cancelText: '',
-      isDestructive: false,
-      onConfirm: undefined,
+    if (!isActivity || String(id).startsWith('template:')) {
+      setAlertConfig({
+        visible: true,
+        title: 'Edit',
+        message: 'Only your own created activities can be edited.',
+        confirmText: 'OK',
+        cancelText: '',
+        isDestructive: false,
+        onConfirm: undefined,
+      });
+      return;
+    }
+
+    router.push({
+      pathname: '/new-activity',
+      params: { editId: id },
     });
   };
 
@@ -357,6 +546,8 @@ export default function ActivityDetails() {
           onAddToShortcuts={handleAddToShortcuts}
           onEdit={handleEditActivity}
           onDelete={handleDeleteActivity}
+          isShortcut={isActivity ? (mainItem as Activity).shortcuts : false}
+          isUpdatingShortcut={isUpdatingShortcut}
         />
 
         <View className="px-6 pt-8">
@@ -451,7 +642,7 @@ export default function ActivityDetails() {
               className="text-[#2F4F4F] text-lg"
               style={{ fontFamily: 'Nunito_700Bold' }}
             >
-              Activity created successfully!
+              {toastMessage}
             </Text>
           </View>
         </View>

@@ -40,6 +40,7 @@ interface ScenarioReviewCardProps {
 const getDeviceIcon = (id: string) => {
   if (id.includes('light')) return 'lightbulb';
   if (id.includes('speaker')) return 'speaker';
+  if (id.includes('tv')) return 'tv';
   if (id.includes('thermostat')) return 'thermostat';
   if (id.includes('diffuser')) return 'air';
   if (id.includes('purifier')) return 'filter-vintage';

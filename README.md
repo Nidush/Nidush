@@ -78,6 +78,56 @@ Since this is a mobile-first application, we recommend testing the native experi
 
 ---
 
+## Spotify Integration & App Review
+
+Nidush integrates with Spotify to provide immersive music experiences. For production use, the Spotify app must be approved for public access.
+
+### 📋 App Review Status
+- **Current Status:** Development Mode (Limited to 5 test users)
+- **Client ID:** `4a9f8400a01545008b0addcfa7a6b9c3`
+- **Scopes:** User playback control, playlist access, current track info
+
+### 🚀 Submission Requirements
+Before submitting for Spotify App Review, ensure you have:
+
+1. **Privacy Policy** hosted online (see `PRIVACY_POLICY.md`)
+2. **Terms of Service** hosted online (see `TERMS_OF_SERVICE.md`)
+3. **App screenshots** showing Spotify integration
+4. **Detailed app description** explaining music features
+
+### 📖 Documentation
+- [Privacy Policy](./PRIVACY_POLICY.md)
+- [Terms of Service](./TERMS_OF_SERVICE.md)
+- [Spotify Submission Guide](./SPOTIFY_SUBMISSION_GUIDE.md)
+
+### 🔧 Hosting Policies Online
+To host the Privacy Policy and Terms of Service:
+
+1. **Generate HTML versions first**:
+   ```bash
+   npm run generate:policies
+   ```
+   This creates `privacy-policy.html` and `terms-of-service.html` in the project root.
+
+2. **GitHub Pages** (Free):
+   - Push `privacy-policy.html` and `terms-of-service.html` to the branch selected for GitHub Pages.
+   - Or use the `docs/` folder if your Pages site is configured to serve from there.
+
+3. **Netlify/Vercel** (Free tier available):
+   - Deploy the repository or upload the generated HTML files.
+   - Use the generated public URLs for Spotify review.
+
+4. **Local preview with backend server**:
+   ```bash
+   npm run backend
+   ```
+   Then open:
+   - `http://localhost:3000/privacy-policy`
+   - `http://localhost:3000/terms-of-service`
+
+5. **WordPress/Blog** (Free):
+---
+
 ## Contributors
 
 Developed as part of the **TDW/MCTW Master's program** for the Altice Labs challenge, by **Group 4**:

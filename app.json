@@ -64,6 +64,13 @@
       "expo-video",
       "expo-asset",
       [
+        "react-native-google-cast",
+        {
+          "receiverAppId": "CC1AD845",
+          "expandedController": true
+        }
+      ],
+      [
         "react-native-health-connect",
         {
           "privacyPolicyUrl": "https://nidush.app/privacy",

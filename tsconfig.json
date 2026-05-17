@@ -14,5 +14,8 @@
     "nativewind-env.d.ts",
     "__tests__/SignUp.test.js",
     "app/profile-selection.jsx"
+  ],
+  "exclude": [
+    "supabase/functions"
   ]
 }

@@ -18,6 +18,8 @@ const getDeviceIcon = (type: DeviceType, color: string) => {
       );
     case 'speaker':
       return <MaterialIcons name="speaker" size={20} color={color} />;
+    case 'tv':
+      return <MaterialIcons name="tv" size={20} color={color} />;
     case 'blind':
       return <MaterialCommunityIcons name="blinds" size={20} color={color} />;
     case 'diffuser':

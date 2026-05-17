@@ -31,6 +31,8 @@ interface ActivityHeaderProps {
   onAddToShortcuts?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  isShortcut?: boolean;
+  isUpdatingShortcut?: boolean;
 }
 
 export const ActivityHeader = ({
@@ -44,6 +46,8 @@ export const ActivityHeader = ({
   onAddToShortcuts,
   onEdit,
   onDelete,
+  isShortcut,
+  isUpdatingShortcut,
 }: ActivityHeaderProps) => {
   const [menuVisible, setMenuVisible] = useState(false);
 
@@ -190,7 +194,13 @@ export const ActivityHeader = ({
                 <View style={{ paddingTop: 5, paddingBottom: 5 }}>
                   <MenuItem
                     icon="bookmark-border"
-                    label="Add to shortcuts"
+                    label={
+                      isUpdatingShortcut
+                        ? 'A guardar shortcut...'
+                        : isShortcut
+                          ? 'Remover dos shortcuts'
+                          : 'Adicionar aos shortcuts'
+                    }
                     onPress={onAddToShortcuts}
                   />
                   <MenuItem

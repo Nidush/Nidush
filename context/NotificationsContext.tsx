@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../utils/supabase';
 
 export interface AppNotification {
@@ -19,6 +20,8 @@ interface NotificationsContextType {
   clearAll: () => void;
   loadMore: () => void;
   refreshNotifications: () => Promise<void>;
+  notificationsEnabled: boolean;
+  setNotificationsEnabled: (enabled: boolean) => Promise<void>;
   hasMore: boolean;
   isLoading: boolean;
 }
@@ -26,10 +29,25 @@ interface NotificationsContextType {
 
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
+const NOTIFICATIONS_ENABLED_KEY = 'nidush.notifications.enabled';
+
+const mergeUniqueNotifications = (
+  current: AppNotification[],
+  incoming: AppNotification[],
+) => {
+  const byId = new Map<string, AppNotification>();
+
+  [...current, ...incoming].forEach((notification) => {
+    byId.set(notification.id, notification);
+  });
+
+  return Array.from(byId.values()).sort((a, b) => b.timestamp - a.timestamp);
+};
 
 export const NotificationsProvider = ({ children }: { children: React.ReactNode }) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
+  const [notificationsEnabled, setNotificationsEnabledState] = useState(true);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -48,6 +66,29 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
     setHasMore(nextHasMore);
   };
 
+  useEffect(() => {
+    const loadNotificationSetting = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(NOTIFICATIONS_ENABLED_KEY);
+        if (stored !== null) {
+          setNotificationsEnabledState(stored === 'true');
+        }
+      } catch (error) {
+        console.error('Error loading notifications preference:', error);
+      }
+    };
+
+    loadNotificationSetting();
+  }, []);
+
+  const setNotificationsEnabled = async (enabled: boolean) => {
+    setNotificationsEnabledState(enabled);
+    try {
+      await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, String(enabled));
+    } catch (error) {
+      console.error('Error saving notifications preference:', error);
+    }
+  };
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -93,13 +134,10 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
     try {
       const currentPage = isNextPage ? pageRef.current + 1 : 0;
       const start = currentPage * PAGE_SIZE;
-      const end = start + PAGE_SIZE;
+      const end = start + PAGE_SIZE - 1;
 
-      console.log(`[API] Notificações - Página ${currentPage}: A pedir itens ${start} a ${end - 1}...`);
+      console.log(`[API] Notificações - Página ${currentPage}: A pedir itens ${start} a ${end}...`);
       
-      // Adicionar um pequeno atraso para a animação ser visível no vídeo de entrega
-      await new Promise(resolve => setTimeout(resolve, 800));
-
       const { data, error, count } = await supabase
         .from('notifications')
         .select('*', { count: 'exact' })
@@ -135,9 +173,9 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
       }));
 
       if (isNextPage) {
-        setNotifications((prev) => [...prev, ...mapped]);
+        setNotifications((prev) => mergeUniqueNotifications(prev, mapped));
       } else {
-        setNotifications(mapped);
+        setNotifications(mergeUniqueNotifications([], mapped));
       }
 
       setPageState(currentPage);
@@ -192,6 +230,7 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
 
 
   const addNotification = async (title: string, message: string, type: AppNotification['type']) => {
+    if (!notificationsEnabled) return;
     if (!userId) return;
 
     // We can optimistically add it locally based on a temporary ID, or just insert and reload.
@@ -290,6 +329,8 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
         clearAll,
         loadMore,
         refreshNotifications,
+        notificationsEnabled,
+        setNotificationsEnabled,
         hasMore,
         isLoading,
       }}
