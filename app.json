@@ -35,15 +35,9 @@
       ],
       "intentFilters": [
         {
-          "action": "androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE",
+          "action": "VIEW_PERMISSION_USAGE",
           "category": [
-            "android.intent.category.DEFAULT"
-          ]
-        },
-        {
-          "action": "android.intent.action.VIEW_PERMISSION_USAGE",
-          "category": [
-            "android.intent.category.HEALTH_PERMISSIONS"
+            "HEALTH_PERMISSIONS"
           ]
         }
       ]
