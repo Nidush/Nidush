@@ -30,6 +30,8 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.health.READ_HEART_RATE",
+        "android.permission.health.READ_RESTING_HEART_RATE",
+        "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND",
         "android.permission.health.READ_STEPS",
         "android.permission.health.READ_TOTAL_CALORIES_BURNED"
       ],
@@ -75,6 +77,14 @@
             },
             {
               "accessType": "read",
+              "recordType": "RestingHeartRate"
+            },
+            {
+              "accessType": "read",
+              "recordType": "BackgroundAccessPermission"
+            },
+            {
+              "accessType": "read",
               "recordType": "Steps"
             },
             {
@@ -94,7 +104,8 @@
           }
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-background-task"
     ],
     "extra": {
       "eas": {

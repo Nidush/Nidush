@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Image, Modal, ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Image, Modal, ScrollView, Switch, Text, TouchableOpacity, View, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { pickImage } from '../utils/imagePicker';
 import { supabase, uploadImage } from '../utils/supabase';
@@ -16,11 +16,19 @@ import {
 import { useSpotify } from '../context/SpotifyContext';
 import { useNotifications } from '../context/NotificationsContext';
 import { useBiometrics } from '../context/BiometricsContext';
+import { LegalContent } from '../components/legal/LegalContent';
+import {
+  HEALTH_CONNECT_HEART_RATE_PERMISSIONS,
+  hasHeartRateReadPermission,
+} from '../utils/healthConnectSync';
 
 export default function Profile() {
   const router = useRouter();
   const { isAuthenticated, login, logout, userProfile } = useSpotify();
-  const { data: biometricData, currentState, addTestHeartRate } = useBiometrics();
+  const {
+    data: biometricData,
+    currentState,
+  } = useBiometrics();
   const {
     notifications,
     unreadCount,
@@ -50,27 +58,8 @@ export default function Profile() {
     shortcutsCount: 0,
   });
   const [healthConnectStatus, setHealthConnectStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
-  const [isSavingTestHeartRate, setIsSavingTestHeartRate] = useState(false);
 
 const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
-  const testHeartRateOptions = [
-    { label: 'Relaxed', bpm: 68 },
-    { label: 'Focused', bpm: 82 },
-    { label: 'Stressed', bpm: 96 },
-    { label: 'Anxious', bpm: 114 },
-  ];
-
-  const handleAddTestHeartRate = async (bpm: number) => {
-    try {
-      setIsSavingTestHeartRate(true);
-      await addTestHeartRate(bpm);
-    } catch (error) {
-      console.error('Could not save test heart rate:', error);
-      alert('Could not save the test heart rate.');
-    } finally {
-      setIsSavingTestHeartRate(false);
-    }
-  };
   const notificationStats = useMemo(() => {
     const importantCount = notifications.filter((item) => !item.read && item.type !== 'system').length;
     const latest = notifications[0];
@@ -82,6 +71,28 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
       latest,
     };
   }, [notifications, unreadCount]);
+
+  const getWearableSourceLabel = (source?: string) => {
+    if (!source || source === 'health_connect') return 'Health Connect';
+    if (source.includes('samsung')) return 'Samsung Health';
+    if (source.includes('fitbit')) return 'Fitbit';
+    if (source.includes('google')) return 'Google Fit';
+    if (source.includes('huawei')) return 'Huawei Health';
+    return source.replace(/^com\./, '').replace(/\./g, ' ');
+  };
+
+  const latestHeartRateLabel = biometricData?.heartRate
+    ? `${biometricData.heartRate} bpm`
+    : 'No reading yet';
+  const latestWearableSource = getWearableSourceLabel(biometricData?.source);
+  const latestWearableTime = biometricData?.timestamp
+    ? new Date(biometricData.timestamp).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : null;
+  const currentStateLabel =
+    currentState.charAt(0) + currentState.slice(1).toLowerCase();
 
   const parseHobbies = (value: unknown) => {
     if (!value) return [];
@@ -349,15 +360,29 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
     const checkHealthConnect = async () => {
       try {
-        const { getSdkStatus, SdkAvailabilityStatus } = require('react-native-health-connect');
+        const {
+          getGrantedPermissions,
+          getSdkStatus,
+          SdkAvailabilityStatus,
+        } = require('react-native-health-connect');
         const status = await getSdkStatus();
-        if (status === SdkAvailabilityStatus.SDK_AVAILABLE) {
-          setHealthConnectStatus('connected');
-          // Salvar o estado da Health Connect na BD como um dispositivo/serviço
-          await syncDeviceToDB('Health Connect', 'heart', 'health_connect', 'android_hc');
-        } else {
+        if (status !== SdkAvailabilityStatus.SDK_AVAILABLE) {
           setHealthConnectStatus('disconnected');
+          return;
         }
+
+        const grantedPermissions = await getGrantedPermissions();
+        const canReadHeartRate = hasHeartRateReadPermission(
+          grantedPermissions,
+        );
+
+        if (!canReadHeartRate) {
+          setHealthConnectStatus('disconnected');
+          return;
+        }
+
+        setHealthConnectStatus('connected');
+        await syncDeviceToDB('Health Connect', 'heart', 'health_connect', 'android_hc');
       } catch (e) {
         setHealthConnectStatus('disconnected');
       }
@@ -365,6 +390,16 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
     fetchUser();
     checkHealthConnect();
+
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        checkHealthConnect();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
 
@@ -643,10 +678,16 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
           </Text>
 
           <DeviceItem
-            name="Health Connect"
-            status={healthConnectStatus === 'checking' ? 'Checking...' : healthConnectStatus === 'connected' ? 'Connected' : 'Not Connected'}
+            name="Smartwatch via Health Connect"
+            status={
+              healthConnectStatus === 'checking'
+                ? 'Checking...'
+                : healthConnectStatus === 'connected'
+                  ? `${latestHeartRateLabel} · ${latestWearableSource}${latestWearableTime ? ` · ${latestWearableTime}` : ''}`
+                  : 'Not Connected'
+            }
             connected={healthConnectStatus === 'connected'}
-            icon="favorite"
+            icon="watch"
             testID="device-health-connect"
           />
 
@@ -662,7 +703,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
                 const {
                   getSdkStatus,
                   initialize,
-                  requestPermission,
+                  openHealthConnectDataManagement,
                   SdkAvailabilityStatus,
                   openHealthConnectSettings,
                 } = require('react-native-health-connect');
@@ -674,16 +715,18 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
                 const initialized = await initialize();
                 if (initialized) {
+                  if (healthConnectStatus !== 'connected') {
+                    openHealthConnectSettings();
+                    alert('Please enable Nidush heart rate permissions in Health Connect settings.');
+                    return;
+                  }
+
                   try {
-                    await requestPermission([
-                      { accessType: 'read', recordType: 'HeartRate' },
-                    ]);
-                  } catch (permissionError) {
-                    console.warn('Health Connect permission request failed:', permissionError);
+                    openHealthConnectDataManagement();
+                  } catch {
+                    openHealthConnectSettings();
                   }
                 }
-
-                openHealthConnectSettings();
               } catch (e) {
                 alert('Could not open Health Connect settings.');
               }
@@ -694,7 +737,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
               className="text-white text-xl"
               style={{ fontFamily: 'Nunito_700Bold' }}
             >
-              {healthConnectStatus === 'connected' ? 'Update Permissions' : 'Connect Health Connect'}
+              {healthConnectStatus === 'connected' ? 'Manage Apps & Data' : 'Open Health Connect'}
             </Text>
           </TouchableOpacity>
 
@@ -706,39 +749,43 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
                   className="text-[#4A5D4E] text-base"
                   style={{ fontFamily: 'Nunito_700Bold' }}
                 >
-                  Test heart rate
+                  Heart rate
                 </Text>
                 <Text
                   maxFontSizeMultiplier={1.2}
                   className="text-gray-500 text-xs mt-0.5"
                   style={{ fontFamily: 'Nunito_400Regular' }}
                 >
-                  Current: {biometricData?.heartRate ? `${biometricData.heartRate} bpm` : 'No reading'} · {currentState.toLowerCase()}
+                  Current: {latestHeartRateLabel} · {currentState.toLowerCase()}
                 </Text>
               </View>
               <MaterialIcons name="monitor-heart" size={24} color="#5B8C51" />
             </View>
-
-            <View className="flex-row flex-wrap gap-2">
-              {testHeartRateOptions.map((option) => (
-                <TouchableOpacity
-                  key={option.label}
-                  className={`px-3 py-2 rounded-full border border-[#D1D9C5] bg-[#F5F7F0] ${isSavingTestHeartRate ? 'opacity-50' : ''}`}
-                  disabled={isSavingTestHeartRate}
-                  onPress={() => handleAddTestHeartRate(option.bpm)}
-                  accessible
-                  accessibilityRole="button"
-                  accessibilityLabel={`Save ${option.bpm} beats per minute test heart rate`}
-                >
-                  <Text
-                    maxFontSizeMultiplier={1.2}
-                    className="text-[#4A5D4E] text-sm"
-                    style={{ fontFamily: 'Nunito_700Bold' }}
-                  >
-                    {option.label} · {option.bpm}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            <View className="bg-[#F5F7F0] rounded-2xl p-3 border border-[#D1D9C5]">
+              <Text
+                maxFontSizeMultiplier={1.2}
+                className="text-[#71806F] text-xs"
+                style={{ fontFamily: 'Nunito_600SemiBold' }}
+              >
+                Nidush analysis
+              </Text>
+              <Text
+                maxFontSizeMultiplier={1.2}
+                className="text-[#4A5D4E] text-lg mt-1"
+                style={{ fontFamily: 'Nunito_700Bold' }}
+              >
+                {biometricData?.heartRate
+                  ? `${currentStateLabel} from ${latestHeartRateLabel}`
+                  : 'Waiting for today\'s watch reading'}
+              </Text>
+              <Text
+                maxFontSizeMultiplier={1.2}
+                className="text-gray-500 text-xs mt-1"
+                style={{ fontFamily: 'Nunito_400Regular' }}
+              >
+                Source: {latestWearableSource}
+                {latestWearableTime ? ` · ${latestWearableTime}` : ''}
+              </Text>
             </View>
           </View>
         </View>
@@ -1055,7 +1102,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
         onRequestClose={() => setIsPrivacyModalVisible(false)}
       >
         <View className="flex-1 justify-end bg-black/50">
-          <View className="bg-white w-full rounded-t-[40px] p-8 shadow-2xl h-[80%]">
+          <View className="bg-white w-full rounded-t-[40px] px-8 pt-8 pb-16 shadow-2xl h-[76%]">
             <View className="flex-row justify-between items-center mb-6">
               <Text
                 className="text-2xl text-[#3A4D3F]"
@@ -1069,85 +1116,12 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} className="mb-4">
-              <View className="gap-y-6">
-                <Section
-                  title="Privacy Policy"
-                  content={'Welcome to Nidush ("we," "our," or "us"). We are committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application (the "App").'}
-                />
-                <Section
-                  title="Information We Collect"
-                  content="Account information (name, email) when you sign up; profile information and preferences; activity data and routines you create."
-                />
-                <Section
-                  title="Third-Party Data"
-                  content="Spotify Integration: when you connect Spotify, we access your Spotify profile information, current playback state, playlists and music preferences, and recently played tracks."
-                />
-                <Section
-                  title="Automatic Data"
-                  content="Device information (device type, operating system); app usage data and analytics; network information for device discovery."
-                />
-                <Section
-                  title="How We Use Your Information"
-                  content="We use the information we collect to provide and maintain our services, personalize your experience with music integration, connect and control smart home devices, improve the app, and communicate with you about updates and support."
-                />
-                <Section
-                  title="Information Sharing"
-                  content="We do not sell, trade, or otherwise transfer your personal information to third parties except with your explicit consent, to comply with legal obligations, to protect our rights and safety, or with service providers who help us operate the app under strict confidentiality agreements."
-                />
-                <Section
-                  title="Spotify Integration"
-                  content="Our app integrates with Spotify to enhance your experience. We only access the minimum data necessary for functionality. You can disconnect Spotify at any time. We do not store access tokens permanently. All Spotify data is handled according to Spotify's Developer Terms."
-                />
-                <Section
-                  title="Your Rights"
-                  content="You have the right to access your personal information, correct inaccurate information, delete your account and data, withdraw consent for data processing, and data portability."
-                />
-                <Section
-                  title="Data Retention"
-                  content="We retain your information for as long as necessary to provide our services and comply with legal obligations. If you delete your account, we remove your information from active systems within 30 days."
-                />
-                <Section
-                  title="Terms of Service"
-                  content="By downloading, installing, or using Nidush, you agree to be bound by these Terms of Service. If you do not agree, please do not use the App. Nidush is a smart home and lifestyle management application that integrates with music streaming services and smart home devices."
-                />
-                <Section
-                  title="User Accounts"
-                  content="You must provide accurate and complete information when creating an account. You are responsible for maintaining the confidentiality of your credentials. You must be at least 13 years old to use this service. You may delete your account at any time. We may terminate accounts that violate these Terms."
-                />
-                <Section
-                  title="Third-Party Integrations"
-                  content="Spotify integration uses the Spotify Web API; you are responsible for complying with Spotify's Terms of Service. Smart home device integration is provided 'as is'; we are not responsible for device compatibility or functionality, and use is at your own risk."
-                />
-                <Section
-                  title="User Conduct"
-                  content="You agree not to use the app for illegal or unauthorized purposes, interfere with or disrupt the app, attempt unauthorized access to our systems, share account credentials, or upload malicious content."
-                />
-                <Section
-                  title="Intellectual Property"
-                  content="The App and its content are owned by us or our licensors. You may not copy, modify, or distribute our intellectual property. You retain ownership of content you create within the app."
-                />
-                <Section
-                  title="Disclaimers"
-                  content="THE APP IS PROVIDED 'AS IS' WITHOUT WARRANTIES OF ANY KIND. WE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE."
-                />
-                <Section
-                  title="Limitation of Liability"
-                  content="TO THE MAXIMUM EXTENT PERMITTED BY LAW, WE SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES."
-                />
-                <Section
-                  title="Indemnification"
-                  content="You agree to indemnify and hold us harmless from any claims arising from your use of the App or violation of these Terms."
-                />
-                <Section
-                  title="Contact"
-                  content="If you have questions, contact privacy@nidush.com or support@nidush.com."
-                />
-              </View>
+              <LegalContent />
             </ScrollView>
 
             <TouchableOpacity
               onPress={() => setIsPrivacyModalVisible(false)}
-              className="bg-[#5B8C51] py-4 rounded-full items-center shadow-md"
+              className="bg-[#5B8C51] py-4 rounded-full items-center shadow-md mb-4"
             >
               <Text
                 className="text-white text-xl"
@@ -1416,24 +1390,5 @@ function MenuItem({ icon, label, border = true, testID, onPress, badge }: any) {
         <MaterialIcons name="chevron-right" size={28} color="#4A5D4E" />
       </View>
     </TouchableOpacity>
-  );
-}
-
-function Section({ title, content }: { title: string, content: string }) {
-  return (
-    <View>
-      <Text
-        className="text-lg text-[#3A4D3F] mb-1"
-        style={{ fontFamily: 'Nunito_700Bold' }}
-      >
-        {title}
-      </Text>
-      <Text
-        className="text-[#4A5D4E] leading-6"
-        style={{ fontFamily: 'Nunito_400Regular' }}
-      >
-        {content}
-      </Text>
-    </View>
   );
 }

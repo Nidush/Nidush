@@ -1,6 +1,8 @@
 import { BiometricsProvider } from '@/context/BiometricsContext';
 import { NotificationsProvider } from '@/context/NotificationsContext';
 import { SpotifyProvider } from '@/context/SpotifyContext';
+import { ConsentModal } from '@/components/legal/ConsentModal';
+import { LEGAL_CONSENT_KEY } from '@/components/legal/LegalContent';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAudioPlayer } from 'expo-audio';
 import { Stack, useRouter } from 'expo-router';
@@ -8,6 +10,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View, Platform } from 'react-native';
 import { supabase } from '../utils/supabase';
+import { registerHealthConnectBackgroundSync } from '../utils/healthConnectBackgroundTask';
 import * as WebBrowser from 'expo-web-browser';
 import './../global.css';
 
@@ -24,6 +27,7 @@ export default function RootLayout() {
   const [isRoutingReady, setIsRoutingReady] = useState(false);
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const [isAnimationComplete, setAnimationComplete] = useState(false);
+  const [isConsentVisible, setIsConsentVisible] = useState(false);
 
   const opacityAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -43,6 +47,7 @@ export default function RootLayout() {
           const status = await getSdkStatus();
           if (status === SdkAvailabilityStatus.SDK_AVAILABLE) {
             await initialize();
+            await registerHealthConnectBackgroundSync();
             console.log('Health Connect Pre-initialized');
           }
         } catch (e) {
@@ -52,6 +57,8 @@ export default function RootLayout() {
 
       try {
         const viewed = await AsyncStorage.getItem('@viewedOnboarding');
+        const legalConsent = await AsyncStorage.getItem(LEGAL_CONSENT_KEY);
+        setIsConsentVisible(legalConsent !== 'accepted');
 
         const { data: { user } } = await supabase.auth.getUser();
         
@@ -93,6 +100,11 @@ export default function RootLayout() {
     };
     checkOnboarding();
   }, [isReady, router]);
+
+  const handleAcceptLegalConsent = async () => {
+    await AsyncStorage.setItem(LEGAL_CONSENT_KEY, 'accepted');
+    setIsConsentVisible(false);
+  };
 
   useEffect(() => {
     if (isRoutingReady && isImageLoaded) {
@@ -178,6 +190,11 @@ export default function RootLayout() {
                 </Animated.View>
               </Animated.View>
             )}
+
+            <ConsentModal
+              visible={isAnimationComplete && isConsentVisible}
+              onAccept={handleAcceptLegalConsent}
+            />
           </View>
         </SpotifyProvider>
       </BiometricsProvider>

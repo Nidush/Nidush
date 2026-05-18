@@ -27,7 +27,7 @@ import {
   type MediaLoadRequest,
   type RemoteMediaClient,
   useCastSession,
-} from 'react-native-google-cast';
+} from './googleCast';
 
 interface SessionVideoProps {
   videoUrl?: string;
