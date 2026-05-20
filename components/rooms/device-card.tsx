@@ -2,7 +2,24 @@ import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import React, { useEffect, useRef, useState } from 'react';
 import { PanResponder, Text, TouchableOpacity, View } from 'react-native';
 
-export type DeviceType = 'light' | 'speaker' | 'difuser' | 'purifier';
+export type DeviceType =
+  | 'light'
+  | 'speaker'
+  | 'difuser'
+  | 'purifier'
+  | 'tv'
+  | 'computer'
+  | 'assistant'
+  | 'outlet'
+  | 'display'
+  | 'router'
+  | 'sensor'
+  | 'appliance'
+  | 'coffee'
+  | 'ac'
+  | 'heater'
+  | 'heart'
+  | 'unknown';
 
 export interface Device {
   id: number;
@@ -58,6 +75,114 @@ const GetDeviceIcon = ({ type, size = 40, color, isFilled }: IconProps) => {
       return (
         <MaterialIcons
           name="air"
+          size={size}
+          color={color}
+          accessible={false}
+        />
+      );
+    case 'tv':
+      return (
+        <MaterialIcons
+          name="tv"
+          size={size}
+          color={color}
+          accessible={false}
+        />
+      );
+    case 'computer':
+      return (
+        <MaterialIcons
+          name="computer"
+          size={size}
+          color={color}
+          accessible={false}
+        />
+      );
+    case 'assistant':
+      return (
+        <MaterialCommunityIcons
+          name="google-assistant"
+          size={size}
+          color={color}
+          accessible={false}
+        />
+      );
+    case 'outlet':
+      return (
+        <MaterialCommunityIcons
+          name="power-socket-eu"
+          size={size}
+          color={color}
+          accessible={false}
+        />
+      );
+    case 'display':
+      return (
+        <MaterialIcons
+          name="cast-connected"
+          size={size}
+          color={color}
+          accessible={false}
+        />
+      );
+    case 'router':
+      return (
+        <MaterialCommunityIcons
+          name="router-wireless"
+          size={size}
+          color={color}
+          accessible={false}
+        />
+      );
+    case 'sensor':
+      return (
+        <MaterialCommunityIcons
+          name="access-point"
+          size={size}
+          color={color}
+          accessible={false}
+        />
+      );
+    case 'appliance':
+      return (
+        <MaterialCommunityIcons
+          name="fridge-outline"
+          size={size}
+          color={color}
+          accessible={false}
+        />
+      );
+    case 'coffee':
+      return (
+        <MaterialCommunityIcons
+          name="coffee-maker-outline"
+          size={size}
+          color={color}
+          accessible={false}
+        />
+      );
+    case 'ac':
+      return (
+        <MaterialCommunityIcons
+          name="air-conditioner"
+          size={size}
+          color={color}
+          accessible={false}
+        />
+      );
+    case 'heater':
+      return (
+        <MaterialCommunityIcons
+          name="radiator"
+          size={size}
+          color={color}
+          accessible={false}
+        />
+      );
+    case 'heart':
+      return (
+        <MaterialCommunityIcons
+          name="heart-pulse"
           size={size}
           color={color}
           accessible={false}

@@ -5,6 +5,12 @@ import { Image, Modal, ScrollView, Switch, Text, TouchableOpacity, View, AppStat
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { pickImage } from '../utils/imagePicker';
 import { supabase, uploadImage } from '../utils/supabase';
+import {
+  DeviceRecord,
+  isRealHomeDevice,
+  sortDevicesByFreshness,
+  subscribeToHomeDeviceChanges,
+} from '../utils/devices';
 
 
 import {
@@ -121,9 +127,9 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
   };
 
   const [discoveredDevices, setDiscoveredDevices] = useState<ConnectedDevice[]>([]);
-  const [isScanning, setIsScanning] = useState(false);
+  const [isRefreshingDevices, setIsRefreshingDevices] = useState(false);
+  const [isRequestingDiscovery, setIsRequestingDiscovery] = useState(false);
   const [hardwareError, setHardwareError] = useState<string | null>(null);
-
   const getCurrentUserHomeId = async (userId: string) => {
     const { data, error } = await supabase
       .from('user_homes')
@@ -150,23 +156,71 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     return `${source}:${slug || 'device'}`;
   };
 
-  const loadNetworkDevices = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('devices')
-      .select('id, name, type, source, status, external_id, last_seen, home_id')
-      .eq('user_id', userId)
-      .eq('source', 'network')
-      .order('last_seen', { ascending: false });
+  const loadConnectedDevices = async (userId: string, homeId: number | string | null) => {
+    const buildQuery = (selectClause: string) => {
+      let query = supabase
+        .from('devices')
+        .select(selectClause)
+        .order('last_seen', { ascending: false });
+
+      if (homeId) {
+        query = query.eq('home_id', Number(homeId));
+      } else {
+        query = query.eq('user_id', userId);
+      }
+
+      return query;
+    };
+
+    let { data, error } = await buildQuery(
+      'id, name, type, source, status, external_id, last_seen, home_id, connectivity_status, discovery_method',
+    );
+
+    if (error?.code === '42703') {
+      const fallbackResult = await buildQuery(
+        'id, name, type, source, status, external_id, last_seen, home_id',
+      );
+      data = fallbackResult.data;
+      error = fallbackResult.error;
+    }
 
     if (error) {
       console.error('Erro a carregar devices da BD:', error);
-      setHardwareError('Could not load hardware devices.');
+      setHardwareError('Could not load smart home devices.');
       return [];
     }
 
-    const devices = data ?? [];
+    const rawDevices = ((data ?? []) as unknown) as DeviceRecord[];
+    const devices = sortDevicesByFreshness(
+      rawDevices.filter((device) => isRealHomeDevice(device)),
+    ) as ConnectedDevice[];
+    setHardwareError(null);
     setDiscoveredDevices(devices);
     return devices;
+  };
+
+  const refreshConnectedDevices = async (userId: string, homeId: number | string | null) => {
+    setIsRefreshingDevices(true);
+    try {
+      await loadConnectedDevices(userId, homeId);
+    } finally {
+      setIsRefreshingDevices(false);
+    }
+  };
+
+  const requestAutomaticDiscovery = async () => {
+    setIsRequestingDiscovery(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('request-device-discovery', {
+        body: {},
+      });
+
+      if (error) throw error;
+    } catch (error: any) {
+      console.error('Failed to request automatic discovery:', error);
+    } finally {
+      setIsRequestingDiscovery(false);
+    }
   };
 
   // Função para sincronizar dispositivos com o Supabase
@@ -178,6 +232,19 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     const normalizedExternalId = externalId || buildExternalId(name, source);
     const homeId = await getCurrentUserHomeId(user.id);
     const payload = {
+      name,
+      type,
+      source,
+      status: 'connected',
+      connectivity_status: 'online',
+      discovery_method: source === 'health_connect' ? 'health' : 'manual',
+      sync_source: source === 'health_connect' ? 'health_connect' : source,
+      user_id: user.id,
+      home_id: homeId,
+      external_id: normalizedExternalId,
+      last_seen: now,
+    };
+    const legacyPayload = {
       name,
       type,
       source,
@@ -213,41 +280,34 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
           .select('id, name, type, source, status, external_id, last_seen, home_id')
           .single();
 
-    const { data, error } = await request;
+    let { data, error } = await request;
+
+    if (error?.code === '42703') {
+      const fallbackRequest = existing
+        ? supabase
+            .from('devices')
+            .update(legacyPayload)
+            .eq('id', existing.id)
+            .select('id, name, type, source, status, external_id, last_seen, home_id')
+            .single()
+        : supabase
+            .from('devices')
+            .insert(legacyPayload)
+            .select('id, name, type, source, status, external_id, last_seen, home_id')
+            .single();
+
+      const fallbackResult = await fallbackRequest;
+      data = fallbackResult.data;
+      error = fallbackResult.error;
+    }
+
     if (error) throw error;
     return data;
   };
 
-  // Simula descoberta local; quando houver ZeroConf/Bluetooth real, basta trocar esta lista pela descoberta real.
-  const scanForDevices = async () => {
-    if (isScanning) return;
-
-    setIsScanning(true);
-    setHardwareError(null);
-
-    try {
-      const mockDevices = [
-        { name: 'Samsung Smart TV', type: 'tv', externalId: 'network:samsung-smart-tv' },
-        { name: 'Google Nest Speaker', type: 'speaker', externalId: 'network:google-nest-speaker' },
-        { name: 'HP-ENVY-Laptop', type: 'computer', externalId: 'network:hp-envy-laptop' },
-      ];
-
-      for (const dev of mockDevices) {
-        await syncDeviceToDB(dev.name, dev.type, 'network', dev.externalId);
-      }
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) await loadNetworkDevices(user.id);
-    } catch (error) {
-      console.error('Erro a guardar hardware devices:', error);
-      setHardwareError('Could not save hardware devices.');
-      alert('Erro ao guardar dispositivos na base de dados: ' + (error as any).message);
-    } finally {
-      setIsScanning(false);
-    }
-  };
-
   useEffect(() => {
+    let activeHomeChannel: ReturnType<typeof subscribeToHomeDeviceChanges> | null = null;
+
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -315,10 +375,10 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
           homeDataResult,
           activitiesCountResult,
           shortcutsCountResult,
-          networkDevices,
+          connectedDevices,
         ] = await Promise.all([
           finalHomeId
-            ? supabase.from('homes').select('name, join_code').eq('id', finalHomeId).maybeSingle()
+            ? supabase.from('homes').select('name, join_code, device_sync_token').eq('id', finalHomeId).maybeSingle()
             : Promise.resolve({ data: null }),
           supabase
             .from('activities')
@@ -328,10 +388,18 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
             .from('shortcuts')
             .select('id', { count: 'exact', head: true })
             .eq('user_id', user.id),
-          loadNetworkDevices(user.id),
+          loadConnectedDevices(user.id, finalHomeId),
         ]);
 
-        const homeData = homeDataResult.data;
+        let homeData = homeDataResult.data;
+        if ('error' in homeDataResult && homeDataResult.error?.code === '42703' && finalHomeId) {
+          const legacyHomeResult = await supabase
+            .from('homes')
+            .select('name, join_code')
+            .eq('id', finalHomeId)
+            .maybeSingle();
+          homeData = legacyHomeResult.data as typeof homeData;
+        }
         const homeName = homeData?.name || 'Not connected';
         const resolvedJoinCode = homeData?.join_code || null;
         if (resolvedJoinCode) {
@@ -350,7 +418,13 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
           setJoinCode(null);
         }
 
-        setDiscoveredDevices(networkDevices);
+        setDiscoveredDevices(connectedDevices);
+
+        if (finalHomeId) {
+          activeHomeChannel = subscribeToHomeDeviceChanges(Number(finalHomeId), async () => {
+            await loadConnectedDevices(user.id, finalHomeId);
+          });
+        }
 
       } else {
         setUserName('Visitante');
@@ -399,6 +473,9 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
     return () => {
       subscription.remove();
+      if (activeHomeChannel) {
+        supabase.removeChannel(activeHomeChannel);
+      }
     };
   }, []);
 
@@ -611,60 +688,111 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
             )}
           </View>
         </View>
-{/* Smart Home & Hardware Devices */}
-<View className="bg-[#F5F7F0] rounded-[24px] p-5 mb-4 border border-[#D1D9C5]">
-  <View className="flex-row justify-between items-center mb-4">
-    <Text
-      maxFontSizeMultiplier={1.2}
-      className="text-lg text-[#4A5D4E]"
-      style={{ fontFamily: 'Nunito_600SemiBold' }}
-    >
-      Connected Hardware
-    </Text>
-    {isScanning && <Text className="text-[#5B8C51] text-xs animate-pulse">Scanning...</Text>}
-  </View>
 
-  {hardwareError && (
-    <Text className="text-red-500 text-xs mb-3">{hardwareError}</Text>
-  )}
-
-  <View className="gap-y-3">
-    {discoveredDevices.length > 0 ? (
-      discoveredDevices.map((device, index) => (
-        <View key={device.id ?? device.external_id ?? index} className="flex-row items-center bg-white/50 p-3 rounded-2xl border border-[#E8EDDF]">
-          <View className="bg-[#5B8C51] p-2 rounded-full">
-            <MaterialIcons 
-              name={device.type === 'tv' ? 'tv' : device.type === 'speaker' ? 'speaker' : 'computer'} 
-              size={20} 
-              color="white" 
-            />
+        {/* Smart Home & Hardware Devices */}
+        <View className="bg-[#F5F7F0] rounded-[24px] p-5 mb-4 border border-[#D1D9C5]">
+          <View className="flex-row justify-between items-center mb-4">
+            <View className="flex-1 pr-4">
+              <Text
+                maxFontSizeMultiplier={1.2}
+                className="text-lg text-[#4A5D4E]"
+                style={{ fontFamily: 'Nunito_600SemiBold' }}
+              >
+                Connected Hardware
+              </Text>
+              <Text
+                className="text-xs text-[#71806F] mt-1"
+                style={{ fontFamily: 'Nunito_400Regular' }}
+              >
+                Real home devices synced from your local network agent.
+              </Text>
+            </View>
+            {isRefreshingDevices && (
+              <Text className="text-[#5B8C51] text-xs" style={{ fontFamily: 'Nunito_700Bold' }}>
+                Refreshing...
+              </Text>
+            )}
           </View>
-          <View className="ml-3">
-            <Text className="text-[#4A5D4E] font-bold">{device.name}</Text>
-            <Text className="text-gray-500 text-xs">
-              {device.status === 'connected' ? 'Saved to local network' : 'Local Network'}
+
+          {hardwareError && (
+            <Text className="text-red-500 text-xs mb-3">{hardwareError}</Text>
+          )}
+
+          <View className="gap-y-3">
+            {discoveredDevices.length > 0 ? (
+              discoveredDevices.map((device, index) => (
+                <View
+                  key={device.id ?? device.external_id ?? index}
+                  className="flex-row items-center bg-white/50 p-3 rounded-2xl border border-[#E8EDDF]"
+                >
+                  <View className="bg-[#5B8C51] p-2 rounded-full">
+                    <MaterialIcons
+                      name={
+                        device.type === 'tv'
+                          ? 'tv'
+                          : device.type === 'speaker'
+                            ? 'speaker'
+                            : device.type === 'light'
+                              ? 'lightbulb'
+                              : 'devices'
+                      }
+                      size={20}
+                      color="white"
+                    />
+                  </View>
+                  <View className="ml-3 flex-1">
+                    <Text className="text-[#4A5D4E] font-bold">{device.name}</Text>
+                    <Text className="text-gray-500 text-xs">
+                      {device.status === 'connected' || device.status === 'On'
+                        ? 'Online on your home network'
+                        : 'Offline or waiting for the next sync'}
+                    </Text>
+                  </View>
+                  <View className="ml-auto items-end">
+                    <View
+                      className={`w-2.5 h-2.5 rounded-full ${
+                        device.status === 'connected' || device.status === 'On'
+                          ? 'bg-green-500'
+                          : 'bg-gray-300'
+                      }`}
+                    />
+                    <Text className="text-[10px] text-gray-400 mt-1">
+                      {device.source || 'network'}
+                    </Text>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <Text className="text-gray-400 italic text-center">
+                No real smart home devices synced yet.
+              </Text>
+            )}
+          </View>
+
+          <TouchableOpacity
+            onPress={requestAutomaticDiscovery}
+            disabled={isRequestingDiscovery}
+            className={`mt-4 py-3 items-center bg-[#5B8C51] rounded-full ${isRequestingDiscovery ? 'opacity-50' : ''}`}
+          >
+            <Text className="text-white font-bold">
+              {isRequestingDiscovery ? 'Requesting Scan...' : 'Scan Smart Devices'}
             </Text>
-          </View>
-          <View className="ml-auto">
-            <View className="w-2 h-2 rounded-full bg-green-500" />
-          </View>
-        </View>
-      ))
-    ) : (
-      <Text className="text-gray-400 italic text-center">No hardware devices found.</Text>
-    )}
-  </View>
+          </TouchableOpacity>
 
-  <TouchableOpacity
-    onPress={scanForDevices}
-    disabled={isScanning}
-    className={`mt-4 py-2 items-center ${isScanning ? 'opacity-50' : ''}`}
-  >
-    <Text className="text-[#5B8C51] font-bold">
-      {isScanning ? 'Saving Devices...' : discoveredDevices.length > 0 ? 'Refresh Devices' : 'Scan & Save Devices'}
-    </Text>
-  </TouchableOpacity>
-</View>
+          <TouchableOpacity
+            onPress={async () => {
+              const { data: { user } } = await supabase.auth.getUser();
+              if (!user) return;
+              await refreshConnectedDevices(user.id, userHomeId);
+            }}
+            disabled={isRefreshingDevices}
+            className={`mt-3 py-2 items-center ${isRefreshingDevices ? 'opacity-50' : ''}`}
+          >
+            <Text className="text-[#5B8C51] font-bold">
+              {isRefreshingDevices ? 'Refreshing Devices...' : 'Refresh Synced Devices'}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Wearables */}
         <View className="bg-[#F5F7F0] rounded-[24px] p-5 mb-4 border border-[#D1D9C5]">

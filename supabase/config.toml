@@ -19,3 +19,15 @@ verify_jwt = false
 
 [functions.weekly-api-content-sync]
 verify_jwt = false
+
+[functions.sync-network-devices]
+verify_jwt = false
+
+[functions.request-device-discovery]
+verify_jwt = true
+
+[functions.claim-device-discovery]
+verify_jwt = false
+
+[functions.complete-device-discovery]
+verify_jwt = false

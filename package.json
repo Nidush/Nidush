@@ -13,7 +13,9 @@
     "test": "jest",
     "test:e2e": "node selenium/onboarding.spec.js",
     "build": "expo export --platform web",
-    "generate:policies": "node scripts/convert-policies.js"
+    "generate:policies": "node scripts/convert-policies.js",
+    "devices:discover": "node scripts/discover-network-devices.js",
+    "devices:watch": "node scripts/watch-device-discovery.js"
   },
   "dependencies": {
     "@expo-google-fonts/nunito": "^0.4.2",

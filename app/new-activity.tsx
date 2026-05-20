@@ -295,7 +295,27 @@ export default function NewActivityFlow() {
       };
       const formattedType = typeMapping[activityType] || 'other';
 
-      // 2. Tentar inserir/atualizar na DB
+      // 2. Resolve room_id string to database room integer ID
+      let dbRoomId = null;
+      if (room_id) {
+        const { data: homeAssoc } = await supabase
+          .from('user_homes')
+          .select('home_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        if (homeAssoc?.home_id) {
+          const { data: roomData } = await supabase
+            .from('rooms')
+            .select('id')
+            .eq('home_id', homeAssoc.home_id)
+            .eq('name', room_id)
+            .maybeSingle();
+          dbRoomId = roomData?.id || null;
+        }
+      }
+
+      // 3. Tentar inserir/atualizar na DB
       const saveData = {
         title: activityName || 'Untitled Activity',
         description,
@@ -304,6 +324,7 @@ export default function NewActivityFlow() {
         type: formattedType,
         content_id: selectedContentId || null,
         scenario_id: selectedScenarioId ? parseInt(selectedScenarioId.toString().replace(/\D/g, '')) : 1,
+        room_id: dbRoomId,
       };
 
       const { data, error } = isEditMode && editId
