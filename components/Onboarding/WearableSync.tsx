@@ -3,8 +3,10 @@ import { View, Text, TouchableOpacity, Image, Dimensions, Animated, Easing, Scro
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icons } from '../../assets/assets'; 
 
-// Import types for TS if needed, otherwise use require for logic
-import type { Permission } from 'react-native-health-connect';
+import {
+  HEALTH_CONNECT_HEART_RATE_PERMISSIONS,
+  hasHeartRateReadPermission,
+} from '../../utils/healthConnectSync';
 
 import {
   useFonts,
@@ -156,7 +158,13 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
                 <TouchableOpacity 
                   onPress={async () => {
                     try {
-                      const { getSdkStatus, SdkAvailabilityStatus, openHealthConnectSettings } = require('react-native-health-connect');
+                      const {
+                        getSdkStatus,
+                        initialize,
+                        requestPermission,
+                        SdkAvailabilityStatus,
+                        openHealthConnectSettings,
+                      } = require('react-native-health-connect');
                       const status = await getSdkStatus();
                       if (status !== SdkAvailabilityStatus.SDK_AVAILABLE) {
                         alert('Health Connect is not available or needs to be installed.');
@@ -164,12 +172,15 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
                         return;
                       }
 
-                      // Em vez de pedir permissão interna (que está a dar o crash nativo), 
-                      // abrimos as definições para o utilizador ativar lá. É 100% seguro contra crashes.
-                      openHealthConnectSettings();
-                      
-                      // Damos um pequeno aviso e avançamos
-                      alert('Please enable Nidush permissions in the Health Connect app that just opened.');
+                      const initialized = await initialize();
+                      if (initialized) {
+                        try {
+                          openHealthConnectSettings();
+                          alert('Please enable Nidush heart rate permissions in Health Connect settings.');
+                        } catch (permissionError) {
+                          console.warn('Health Connect settings open failed:', permissionError);
+                        }
+                      }
                       onNext();
                     } catch (error) {
                       console.error('Health Connect error:', error);

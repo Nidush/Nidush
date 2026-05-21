@@ -225,6 +225,8 @@ export const CONTENTS: Record<string, Content> = {
     category: 'meditation',
     duration: '60 min',
     image: require('@/assets/meditation_activities/my_creations/gratitude_flow.png'),
+    videoUrl:
+      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
   },
 
   c9: {

@@ -1,6 +1,16 @@
 import { UserState, WearableData } from '@/constants/data/types';
-import { inferStateFromData } from '@/utils/biometricLogic';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  getBiometricBaselineSnapshot,
+  hydrateBiometricBaseline,
+  inferStateFromData,
+} from '@/utils/biometricLogic';
 import { generateBiometricsFromStress } from '@/utils/biometricSimulator';
+import {
+  HEALTH_CONNECT_SYNC_INTERVAL_MS,
+  HealthConnectSyncResult,
+  syncLatestHealthConnectReading,
+} from '@/utils/healthConnectSync';
 import { supabase } from '@/utils/supabase';
 import { useSegments } from 'expo-router';
 import React, {
@@ -10,40 +20,26 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Platform } from 'react-native';
+import { AppState } from 'react-native';
 import { useNotifications } from './NotificationsContext';
 
 interface BiometricsContextType {
   data: WearableData | null;
   currentState: UserState;
   addTestHeartRate: (heartRate: number) => Promise<void>;
+  syncHealthConnectNow: () => Promise<HealthConnectSyncResult>;
 }
 
 const BiometricsContext = createContext<BiometricsContextType | undefined>(
   undefined,
 );
 
-const HEALTH_CONNECT_SYNC_INTERVAL_MS = 30 * 60 * 1000;
-const SIMULATED_SYNC_INTERVAL_MS = 30000;
-
-type HealthConnectHeartRateSample = {
-  beatsPerMinute: number;
-  time: string;
-};
-
-type HealthConnectHeartRateRecord = {
-  startTime?: string;
-  endTime?: string;
-  samples?: HealthConnectHeartRateSample[];
-  metadata?: {
-    id?: string;
-    dataOrigin?: string;
-  };
-};
+const BIOMETRIC_BASELINE_STORAGE_KEY = '@biometric_baseline_v1';
 
 const deriveBiometricsFromHeartRate = (
   heartRate: number,
   timestamp: number,
+  source = 'health_connect',
 ): WearableData => {
   let hrv = 85;
   let eda = 2;
@@ -65,6 +61,7 @@ const deriveBiometricsFromHeartRate = (
 
   return {
     deviceId: 'health_connect',
+    source,
     timestamp,
     heartRate,
     hrv,
@@ -87,7 +84,32 @@ export const BiometricsProvider = ({
   const stressLevelRef = useRef(10);
   const trendRef = useRef<'UP' | 'DOWN'>('UP');
   const lastStateRef = useRef<UserState>('RELAXED');
+  const lastHealthConnectSyncRef = useRef(0);
   const segments = useSegments();
+
+  const persistBaselineSnapshot = async () => {
+    try {
+      const snapshot = getBiometricBaselineSnapshot();
+      await AsyncStorage.setItem(
+        BIOMETRIC_BASELINE_STORAGE_KEY,
+        JSON.stringify(snapshot),
+      );
+    } catch (error) {
+      console.warn('[Biometrics] Failed to persist baseline snapshot:', error);
+    }
+  };
+
+  const restoreBaselineSnapshot = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(BIOMETRIC_BASELINE_STORAGE_KEY);
+      if (!stored) return;
+
+      const parsed = JSON.parse(stored);
+      hydrateBiometricBaseline(parsed);
+    } catch (error) {
+      console.warn('[Biometrics] Failed to restore baseline snapshot:', error);
+    }
+  };
 
   const notifyStateChange = (newState: UserState) => {
     if (newState !== lastStateRef.current) {
@@ -108,6 +130,7 @@ export const BiometricsProvider = ({
     notifyStateChange(testData.detectedState);
     setCurrentState(testData.detectedState);
     setData(testData);
+    await persistBaselineSnapshot();
 
     const {
       data: { user },
@@ -137,6 +160,19 @@ export const BiometricsProvider = ({
     if (error) throw error;
   };
 
+  const syncHealthConnectNow = async (): Promise<HealthConnectSyncResult> => {
+    const result = await syncLatestHealthConnectReading();
+
+    if (result.latest) {
+      notifyStateChange(result.latest.detectedState);
+      setCurrentState(result.latest.detectedState);
+      setData(result.latest);
+      await persistBaselineSnapshot();
+    }
+
+    return result;
+  };
+
   useEffect(() => {
     const isOnboarding = segments.some(
       (segment) => segment === 'onboarding' || segment === 'profile-selection',
@@ -145,8 +181,6 @@ export const BiometricsProvider = ({
     if (isOnboarding) return;
 
     let isMounted = true;
-    let fallbackInterval: ReturnType<typeof setInterval> | null = null;
-
     const useSimulatedBiometrics = () => {
       if (trendRef.current === 'UP') {
         stressLevelRef.current += Math.floor(Math.random() * 5) + 1;
@@ -172,157 +206,69 @@ export const BiometricsProvider = ({
 
       setCurrentState(newState);
       setData(newData);
+      void persistBaselineSnapshot();
     };
 
     const startFallbackSimulation = () => {
-      if (fallbackInterval) return;
       useSimulatedBiometrics();
-      fallbackInterval = setInterval(
-        useSimulatedBiometrics,
-        SIMULATED_SYNC_INTERVAL_MS,
-      );
     };
 
     const syncHealthConnectHeartRate = async () => {
-      if (Platform.OS !== 'android') {
-        startFallbackSimulation();
-        return;
-      }
+      lastHealthConnectSyncRef.current = Date.now();
 
-      try {
-        const {
-          initialize,
-          getGrantedPermissions,
-          readRecords,
-        } = require('react-native-health-connect');
+      const result = await syncHealthConnectNow();
+      if (!isMounted) return;
 
-        const initialized = await initialize();
-        if (!initialized) {
-          startFallbackSimulation();
-          return;
-        }
-
-        const grantedPermissions = await getGrantedPermissions();
-        const canReadHeartRate = grantedPermissions.some(
-          (permission: { accessType?: string; recordType?: string }) =>
-            permission.accessType === 'read' &&
-            permission.recordType === 'HeartRate',
-        );
-
-        if (!canReadHeartRate) {
-          startFallbackSimulation();
-          return;
-        }
-
-        const endTime = new Date();
-        const startTime = new Date(
-          endTime.getTime() - HEALTH_CONNECT_SYNC_INTERVAL_MS,
-        );
-
-        const result = await readRecords('HeartRate', {
-          timeRangeFilter: {
-            operator: 'between',
-            startTime: startTime.toISOString(),
-            endTime: endTime.toISOString(),
-          },
-          ascendingOrder: false,
-        });
-
-        const samples = ((result?.records || result?.result || []) as HealthConnectHeartRateRecord[])
-          .flatMap((record) =>
-            (record.samples || []).map((sample) => ({
-              ...sample,
-              sourceRecordId: record.metadata?.id || null,
-              dataOrigin: record.metadata?.dataOrigin || 'health_connect',
-              rawRecord: record,
-            })),
-          )
-          .filter((sample) => Number.isFinite(sample.beatsPerMinute))
-          .sort(
-            (a, b) =>
-              new Date(b.time).getTime() - new Date(a.time).getTime(),
-          );
-
-        if (!samples.length) {
-          startFallbackSimulation();
-          return;
-        }
-
-        if (fallbackInterval) {
-          clearInterval(fallbackInterval);
-          fallbackInterval = null;
-        }
-
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        const latest = samples[0];
-        const latestData = deriveBiometricsFromHeartRate(
-          latest.beatsPerMinute,
-          new Date(latest.time).getTime(),
-        );
-
-        if (user) {
-          const rows = samples.map((sample) => {
-            const sampleData = deriveBiometricsFromHeartRate(
-              sample.beatsPerMinute,
-              new Date(sample.time).getTime(),
-            );
-
-            return {
-              user_id: user.id,
-              device_id: 'health_connect',
-              source: sample.dataOrigin,
-              source_record_id: sample.sourceRecordId || `${sample.time}:${sample.beatsPerMinute}`,
-              recorded_at: sample.time,
-              heart_rate: sampleData.heartRate,
-              hrv: sampleData.hrv,
-              skin_temperature: sampleData.skinTemperature,
-              eda: sampleData.eda,
-              stress_score: sampleData.stressScore,
-              detected_state: sampleData.detectedState,
-              raw_payload: sample.rawRecord,
-            };
-          });
-
-          const { error } = await supabase
-            .from('biometric_readings')
-            .upsert(rows, {
-              onConflict: 'user_id,source,recorded_at,source_record_id',
-            });
-
-          if (error) {
-            console.error('Failed to save biometric readings:', error);
-          }
-        }
-
-        if (!isMounted) return;
-
-        notifyStateChange(latestData.detectedState);
-        setCurrentState(latestData.detectedState);
-        setData(latestData);
-      } catch (error) {
-        console.warn('Health Connect heart rate sync failed:', error);
+      if (
+        result.status !== 'synced' &&
+        result.status !== 'no_data' &&
+        result.status !== 'no_permission'
+      ) {
         startFallbackSimulation();
       }
     };
 
-    syncHealthConnectHeartRate();
-    const healthConnectInterval = setInterval(
-      syncHealthConnectHeartRate,
-      HEALTH_CONNECT_SYNC_INTERVAL_MS,
-    );
+    let healthConnectInterval: ReturnType<typeof setInterval> | null = null;
+    let appStateSubscription: ReturnType<typeof AppState.addEventListener> | null =
+      null;
+
+    const initializeBiometrics = async () => {
+      await restoreBaselineSnapshot();
+      if (!isMounted) return;
+
+      await syncHealthConnectHeartRate();
+      if (!isMounted) return;
+
+      healthConnectInterval = setInterval(
+        syncHealthConnectHeartRate,
+        HEALTH_CONNECT_SYNC_INTERVAL_MS,
+      );
+      appStateSubscription = AppState.addEventListener(
+        'change',
+        (nextAppState) => {
+          if (nextAppState !== 'active') return;
+
+          const elapsed = Date.now() - lastHealthConnectSyncRef.current;
+          if (elapsed >= HEALTH_CONNECT_SYNC_INTERVAL_MS) {
+            syncHealthConnectHeartRate();
+          }
+        },
+      );
+    };
+
+    void initializeBiometrics();
 
     return () => {
       isMounted = false;
-      clearInterval(healthConnectInterval);
-      if (fallbackInterval) clearInterval(fallbackInterval);
+      if (healthConnectInterval) clearInterval(healthConnectInterval);
+      appStateSubscription?.remove();
     };
   }, [segments, addNotification]);
 
   return (
-    <BiometricsContext.Provider value={{ data, currentState, addTestHeartRate }}>
+    <BiometricsContext.Provider
+      value={{ data, currentState, addTestHeartRate, syncHealthConnectNow }}
+    >
       {children}
     </BiometricsContext.Provider>
   );

@@ -48,7 +48,48 @@ const STATE_STYLES: Record<
 };
 
 export const StateWidget = () => {
-  const { currentState } = useBiometrics();
+  const { currentState, data } = useBiometrics();
+
+  if (!data) {
+    return (
+      <View
+        className="w-full mb-6 relative overflow-hidden rounded-3xl shadow-xl h-44 bg-[#354F52]"
+        accessible={true}
+        accessibilityLabel="Waiting for wearable heart rate data"
+      >
+        <View className="flex-1 justify-center p-6">
+          <View className="flex-row items-center mb-3">
+            <View className="bg-white/20 p-1 rounded-full mr-2">
+              <MaterialIcons name="watch" size={16} color="#BFD9B9" />
+            </View>
+            <Text
+              maxFontSizeMultiplier={1.2}
+              style={{ fontFamily: 'Nunito_600SemiBold' }}
+              className="text-white opacity-90 text-lg tracking-widest"
+            >
+              Waiting for wearable data
+            </Text>
+          </View>
+
+          <Text
+            maxFontSizeMultiplier={1.2}
+            style={{ fontFamily: 'Nunito_700Bold' }}
+            className="text-white text-4xl shadow-sm leading-9"
+          >
+            No BPM yet
+          </Text>
+
+          <Text
+            maxFontSizeMultiplier={1.2}
+            style={{ fontFamily: 'Nunito_600SemiBold' }}
+            className="text-white text-md mt-3 opacity-90"
+          >
+            Sync your watch in Health Connect.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   const activeStyle = STATE_STYLES[currentState];
 

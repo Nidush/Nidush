@@ -15,9 +15,10 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 interface FabMenuProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
+  onAiActivityPress?: () => void;
 }
 
-export const FabMenu = ({ isOpen, setIsOpen }: FabMenuProps) => {
+export const FabMenu = ({ isOpen, setIsOpen, onAiActivityPress }: FabMenuProps) => {
   return (
     <>
       {isOpen && (
@@ -68,6 +69,26 @@ export const FabMenu = ({ isOpen, setIsOpen }: FabMenuProps) => {
               Scenario
             </Text>
           </TouchableOpacity>
+
+          {onAiActivityPress && (
+            <TouchableOpacity
+              className="mb-4"
+              onPress={() => {
+                setIsOpen(false);
+                onAiActivityPress();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Create activity with AI"
+            >
+              <Text
+                maxFontSizeMultiplier={1.2}
+                className="bg-[#3E545C] px-10 py-4 rounded-full text-xl text-white shadow-md overflow-hidden"
+                style={{ fontFamily: 'Nunito_600SemiBold' }}
+              >
+                AI idea
+              </Text>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             className="mb-4"

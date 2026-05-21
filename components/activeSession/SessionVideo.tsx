@@ -27,7 +27,7 @@ import {
   type MediaLoadRequest,
   type RemoteMediaClient,
   useCastSession,
-} from 'react-native-google-cast';
+} from './googleCast';
 
 interface SessionVideoProps {
   videoUrl?: string;
@@ -37,15 +37,11 @@ interface SessionVideoProps {
 type CastPlaybackState = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
 type CastLoadResult = 'started' | 'loaded' | 'failed';
 
-const DEFAULT_MEDIA_RECEIVER_APP_ID = 'CC1AD845';
-const CAST_COMPATIBLE_MP4_URL =
-  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4';
-const FALLBACK_VIDEO_URL = CAST_COMPATIBLE_MP4_URL;
-const CAST_FALLBACK_VIDEO_URLS = [CAST_COMPATIBLE_MP4_URL];
-const CAST_STATUS_CHECK_ATTEMPTS = 3;
+const CAST_STATUS_CHECK_ATTEMPTS = 6;
 
 const DIRECT_VIDEO_PATTERN = /\.(mp4|m3u8|webm|mov)(\?|#|$)/i;
 const HLS_VIDEO_PATTERN = /\.m3u8(\?|#|$)/i;
+const REMOTE_VIDEO_URL_PATTERN = /^https?:\/\//i;
 
 const isGoogleCastNativeAvailable = () =>
   Boolean(
@@ -65,17 +61,37 @@ const getCastContentType = (url: string) => {
 
 const getVideoContentType = (url: string): ContentType => {
   if (HLS_VIDEO_PATTERN.test(url)) return 'hls';
-  return DIRECT_VIDEO_PATTERN.test(url) ? 'progressive' : 'auto';
+  if (DIRECT_VIDEO_PATTERN.test(url) || REMOTE_VIDEO_URL_PATTERN.test(url)) {
+    return 'progressive';
+  }
+  return 'auto';
 };
 
-const getCastCandidateUrls = (mediaUrl: string) =>
-  Array.from(new Set([mediaUrl, ...CAST_FALLBACK_VIDEO_URLS]));
-
-const createCastMediaInfo = (url: string) => ({
+const createCastMediaInfo = ({
+  url,
+  title,
+  poster,
+}: {
+  url: string;
+  title: string;
+  poster?: any;
+}) => ({
   contentId: url,
   contentUrl: url,
   contentType: getCastContentType(url),
   streamType: MediaStreamType.BUFFERED,
+  metadata: {
+    type: 'movie' as const,
+    title,
+    subtitle: 'Nidush session',
+    images:
+      typeof poster === 'string' && /^https?:\/\//i.test(poster)
+        ? [{ url: poster }]
+        : undefined,
+  },
+  customData: {
+    sender: 'nidush',
+  },
 });
 
 const openExternalVideo = async (url?: string) => {
@@ -130,8 +146,12 @@ const getLoadedCastMediaStatus = async (client: RemoteMediaClient) => {
 
 const CastControls = ({
   mediaUrl,
+  title,
+  poster,
 }: {
   mediaUrl: string;
+  title: string;
+  poster?: any;
 }) => {
   const castSession = useCastSession();
   const castClient = castSession?.getClient() ?? null;
@@ -182,23 +202,6 @@ const CastControls = ({
             const applicationId = metadata?.applicationId ?? null;
             setReceiverAppId(applicationId);
 
-            if (
-              applicationId &&
-              applicationId !== DEFAULT_MEDIA_RECEIVER_APP_ID
-            ) {
-              await sessionManager.endCurrentSession(true);
-              setCastStatus('idle');
-
-              if (showAlerts) {
-                Alert.alert(
-                  'TV connection was reset',
-                  'The TV was using another Cast receiver. Tap the Cast icon again and choose your TV; Nidush will send the video automatically.',
-                );
-              }
-
-              return null;
-            }
-
             const client = activeSession.getClient();
             await withTimeout(
               client.requestStatus(),
@@ -223,7 +226,7 @@ const CastControls = ({
           }
         }
 
-        await sleep(attempt < 3 ? 500 : 850);
+        await sleep(attempt < 3 ? 750 : 1200);
       }
 
       if (showAlerts) {
@@ -259,7 +262,7 @@ const CastControls = ({
     let loadedMediaSeen = false;
 
     for (let attempt = 0; attempt < CAST_STATUS_CHECK_ATTEMPTS; attempt += 1) {
-      await sleep(attempt === 0 ? 500 : 850);
+      await sleep(attempt === 0 ? 1200 : 1500);
 
       try {
         await withTimeout(
@@ -313,7 +316,7 @@ const CastControls = ({
         }
 
         if (mediaStatus === null) {
-          return 'failed';
+          continue;
         }
 
         if (
@@ -342,11 +345,14 @@ const CastControls = ({
         return false;
       }
 
-      if (!DIRECT_VIDEO_PATTERN.test(mediaUrl)) {
+      if (
+        !DIRECT_VIDEO_PATTERN.test(mediaUrl) &&
+        !REMOTE_VIDEO_URL_PATTERN.test(mediaUrl)
+      ) {
         if (showAlerts) {
           Alert.alert(
             'This video cannot be sent to the TV',
-            'Nidush can cast direct video files such as .mp4 and .m3u8.',
+            'Nidush can cast direct video links such as .mp4, .m3u8, or other supported HTTP video URLs.',
           );
         }
         return false;
@@ -358,86 +364,45 @@ const CastControls = ({
 
         setCastStatus('loading');
 
-        const castUrls = getCastCandidateUrls(mediaUrl);
+        const mediaInfo = createCastMediaInfo({
+          url: mediaUrl,
+          title,
+          poster,
+        });
 
-        for (const castUrl of castUrls) {
-          const mediaInfo = createCastMediaInfo(castUrl);
-          const loadRequests: {
-            label: string;
-            request: MediaLoadRequest;
-          }[] = [
-            {
-              label: HLS_VIDEO_PATTERN.test(castUrl) ? 'hls' : 'direct',
-              request: {
-                autoplay: true,
-                startTime: 0,
-                mediaInfo,
-              },
-            },
-          ];
+        console.log('[Cast] Loading media:', {
+          label: HLS_VIDEO_PATTERN.test(mediaUrl) ? 'hls' : 'direct',
+          receiverAppId,
+          mediaUrl,
+        });
 
-          for (const { label, request } of loadRequests) {
-            const activeClient = readyClient;
+        await withTimeout(
+          readyClient.loadMedia({
+            autoplay: true,
+            startTime: 0,
+            mediaInfo,
+          }),
+          3500,
+          'loadMedia',
+        );
+        console.log('[Cast] loadMedia accepted:', {
+          mediaUrl,
+        });
 
-            if (!activeClient) continue;
+        await sleep(900);
 
-            try {
-              console.log('[Cast] Loading media:', {
-                label,
-                receiverAppId,
-                mediaUrl: castUrl,
-                originalMediaUrl: mediaUrl,
-              });
-
-              await withTimeout(
-                activeClient.loadMedia(request),
-                3500,
-                'loadMedia',
-              );
-              console.log('[Cast] loadMedia accepted:', {
-                label,
-                mediaUrl: castUrl,
-              });
-
-              await sleep(350);
-              await withTimeout(activeClient.play(), 2000, 'play').catch(
-                (error) => {
-                  console.warn('[Cast] Initial play command failed:', error);
-                },
-              );
-
-              const loadResult =
-                await waitForPlayableCastStatus(activeClient);
-              if (loadResult === 'started') {
-                setCastStatus('playing');
-                return true;
-              }
-
-              console.warn(
-                '[Cast] Receiver accepted load but did not render playback:',
-                {
-                  label,
-                  mediaUrl: castUrl,
-                  loadResult,
-                },
-              );
-            } catch (error) {
-              if (!isNoSessionError(error)) throw error;
-
-              console.warn('[Cast] Media session was not ready:', { label });
-            }
-          }
+        const loadResult = await waitForPlayableCastStatus(readyClient);
+        if (loadResult === 'started') {
+          setCastStatus('playing');
+          return true;
         }
 
         setCastStatus('error');
-        await GoogleCast.getSessionManager().endCurrentSession(true).catch(
-          () => {},
-        );
 
         if (showAlerts) {
           Alert.alert(
             'TV video did not start',
-            `The Sony TV accepted the Cast request but did not render video or audio. The video will keep playing in the app. Receiver: ${receiverAppId ?? 'unknown'}.`,
+            'This TV connection can control casting, but it did not start video playback. The video will continue inside the app.',
           );
         }
 
@@ -446,10 +411,7 @@ const CastControls = ({
         console.error('Could not cast video:', error);
         setCastStatus('error');
         if (showAlerts) {
-          Alert.alert(
-            'Could not play on TV',
-            'Please check that the TV is on and connected to the same Wi-Fi.',
-          );
+          Alert.alert('Could not play on TV', 'The video will continue inside the app.');
         }
         return false;
       }
@@ -458,51 +420,12 @@ const CastControls = ({
       castSession,
       getReadyCastClient,
       mediaUrl,
+      poster,
       receiverAppId,
+      title,
       waitForPlayableCastStatus,
     ],
   );
-
-  useEffect(() => {
-    if (!castClient || !castSession) return;
-
-    const sessionKey = `${castSession.id ?? 'cast-session'}:${mediaUrl}`;
-    const loadingSessionKey = `${sessionKey}:loading`;
-    const failedSessionKey = `${sessionKey}:failed`;
-    if (
-      autoLoadKeyRef.current === sessionKey ||
-      autoLoadKeyRef.current === loadingSessionKey ||
-      autoLoadKeyRef.current === failedSessionKey
-    ) {
-      return;
-    }
-
-    console.log('[Cast] Auto load scheduled:', {
-      sessionId: castSession.id,
-      mediaUrl,
-    });
-
-    const timer = setTimeout(() => {
-      if (
-        autoLoadKeyRef.current === sessionKey ||
-        autoLoadKeyRef.current === loadingSessionKey ||
-        autoLoadKeyRef.current === failedSessionKey
-      ) {
-        return;
-      }
-
-      autoLoadKeyRef.current = loadingSessionKey;
-      console.log('[Cast] Auto load fired:', {
-        sessionId: castSession.id,
-        mediaUrl,
-      });
-      loadMediaOnTv(false).then((didStart) => {
-        autoLoadKeyRef.current = didStart ? sessionKey : failedSessionKey;
-      });
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [castClient, castSession, loadMediaOnTv, mediaUrl]);
 
   const handleToggleCastPlayback = async () => {
     if (!castSession) return;
@@ -585,7 +508,9 @@ const CastControls = ({
       ? 'Sending video to TV'
       : castStatus === 'error'
         ? 'TV video did not start'
-        : 'Connected to TV'
+        : showTransportControls
+          ? 'Connected to TV'
+          : 'TV selected. Press play to try the video.'
     : 'Tap the Cast icon to choose your TV';
 
   return (
@@ -597,6 +522,27 @@ const CastControls = ({
             tintColor="#354F52"
           />
         </View>
+
+        {castClient && !showTransportControls && (
+          <TouchableOpacity
+            className={`h-12 w-12 rounded-full border items-center justify-center ${
+              castStatus === 'loading'
+                ? 'bg-[#E6EEE2] border-[#DDE8D8]'
+                : 'bg-[#548F53] border-[#548F53]'
+            }`}
+            onPress={handleToggleCastPlayback}
+            disabled={castStatus === 'loading'}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Start TV video"
+          >
+            <Ionicons
+              name={castStatus === 'loading' ? 'time-outline' : 'play'}
+              size={22}
+              color={castStatus === 'loading' ? '#6A7D5B' : 'white'}
+            />
+          </TouchableOpacity>
+        )}
 
         {showTransportControls && (
           <>
@@ -735,7 +681,9 @@ const DirectVideoPlayer = ({
         </View>
       </View>
 
-      {castAvailable && <CastControls mediaUrl={playbackUrl} />}
+      {castAvailable && (
+        <CastControls mediaUrl={playbackUrl} title={title} poster={poster} />
+      )}
     </View>
   );
 };
@@ -797,8 +745,30 @@ const YouTubeFallback = ({
 export const SessionVideo = ({ videoUrl, poster }: SessionVideoProps) => {
   const trimmedVideoUrl = videoUrl?.trim();
   const isYouTube = isYouTubeUrl(trimmedVideoUrl);
-  const playbackUrl =
-    trimmedVideoUrl && !isYouTube ? trimmedVideoUrl : FALLBACK_VIDEO_URL;
+
+  if (!trimmedVideoUrl) {
+    return (
+      <View className="flex-1 justify-center items-center px-5">
+        <View className="w-full max-w-[360px] rounded-[28px] bg-black/80 border-2 border-white px-6 py-10 items-center">
+          <Ionicons name="videocam-off-outline" size={42} color="#FFFFFF" />
+          <Text
+            maxFontSizeMultiplier={1.2}
+            className="mt-4 text-white text-center text-lg"
+            style={{ fontFamily: 'Nunito_700Bold' }}
+          >
+            This activity has no TV video yet
+          </Text>
+          <Text
+            maxFontSizeMultiplier={1.2}
+            className="mt-2 text-center text-white/80 text-sm"
+            style={{ fontFamily: 'Nunito_600SemiBold' }}
+          >
+            Add a real video link to this activity before trying to play it on your Mi TV Stick.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   if (trimmedVideoUrl && isYouTube) {
     return <YouTubeFallback videoUrl={trimmedVideoUrl} poster={poster} />;
@@ -806,7 +776,7 @@ export const SessionVideo = ({ videoUrl, poster }: SessionVideoProps) => {
 
   return (
     <DirectVideoPlayer
-      playbackUrl={playbackUrl}
+      playbackUrl={trimmedVideoUrl}
       poster={poster}
       title="Nidush video session"
     />

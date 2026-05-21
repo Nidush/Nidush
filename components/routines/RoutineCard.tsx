@@ -2,7 +2,7 @@ import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface RoutineCardProps {
   title: string;
@@ -12,11 +12,17 @@ interface RoutineCardProps {
   isActive: boolean;
   image: any;
   onToggle: () => void;
+  onLongPress?: () => void;
   testID?: string;
 }
 
-const RoutineCard = ({ title, days, time, room, isActive, image, onToggle, testID }: RoutineCardProps) => {
+const RoutineCard = ({ title, days, time, room, isActive, image, onToggle, onLongPress, testID }: RoutineCardProps) => {
   return (
+    <Pressable
+      onLongPress={onLongPress}
+      delayLongPress={300}
+      accessibilityHint="Long press to manage this routine."
+    >
     <View 
       className="w-full mb-5 relative overflow-hidden rounded-[25px] bg-[#2C3A35]" 
       style={{ minHeight: 170 }}
@@ -91,6 +97,7 @@ const RoutineCard = ({ title, days, time, room, isActive, image, onToggle, testI
         </TouchableOpacity>
       </View>
     </View>
+    </Pressable>
   );
 };
 

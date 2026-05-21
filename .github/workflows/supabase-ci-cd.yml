@@ -68,6 +68,11 @@ jobs:
         with:
           version: latest
 
+      - name: Verify Supabase CLI
+        run: |
+          command -v supabase
+          supabase --version
+
       - name: Setup Deno
         uses: denoland/setup-deno@v2
         with:
@@ -93,7 +98,12 @@ jobs:
 
       - name: Stop local Supabase
         if: always()
-        run: supabase stop --no-backup
+        run: |
+          if command -v supabase >/dev/null 2>&1; then
+            supabase stop --no-backup
+          else
+            echo "Supabase CLI not available; skipping cleanup step."
+          fi
 
   deploy-supabase:
     name: Deploy Supabase
@@ -117,6 +127,11 @@ jobs:
         uses: supabase/setup-cli@v2
         with:
           version: latest
+
+      - name: Verify Supabase CLI
+        run: |
+          command -v supabase
+          supabase --version
 
       - name: Check Supabase secrets
         run: |

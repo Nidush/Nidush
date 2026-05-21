@@ -70,6 +70,7 @@ export type UserState = 'RELAXED' | 'FOCUSED' | 'STRESSED' | 'ANXIOUS';
 
 export interface WearableData {
   deviceId: string;
+  source?: string;
   timestamp: number;
   heartRate: number;
   hrv: number;

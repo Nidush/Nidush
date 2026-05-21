@@ -18,7 +18,7 @@ Deno.serve(async (req: Request) => {
 
     // Sem domínio verificado no Resend, só é possível enviar para o email da conta.
     // Quando tiveres domínio próprio, muda TEST_MODE para false.
-    const TEST_MODE = false
+    const TEST_MODE = true
     const VERIFIED_EMAIL = 'nidush7@gmail.com'
     const recipient = TEST_MODE ? VERIFIED_EMAIL : email
 

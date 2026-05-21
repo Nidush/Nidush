@@ -160,14 +160,33 @@ export default function ActiveSession() {
 
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data: tvDevice } = await supabase
+        const { data: homeAssoc } = await supabase
+          .from('user_homes')
+          .select('home_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        let tvQuery = supabase
           .from('devices')
           .select('name')
-          .eq('user_id', user.id)
-          .eq('type', 'tv')
-          .eq('status', 'connected')
-          .limit(1)
-          .maybeSingle();
+          .in('type', ['tv', 'display'])
+          .limit(1);
+
+        if (homeAssoc?.home_id) {
+          tvQuery = tvQuery.eq('home_id', homeAssoc.home_id);
+
+          const activityRoomId = typeof (foundItem as any).room_id === 'number'
+            ? (foundItem as any).room_id
+            : Number((foundItem as any).room_id);
+
+          if (Number.isFinite(activityRoomId)) {
+            tvQuery = tvQuery.eq('room_id', activityRoomId);
+          }
+        } else {
+          tvQuery = tvQuery.eq('user_id', user.id);
+        }
+
+        const { data: tvDevice } = await tvQuery.maybeSingle();
 
         connectedTvName = tvDevice?.name;
       }

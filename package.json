@@ -13,7 +13,9 @@
     "test": "jest",
     "test:e2e": "node selenium/onboarding.spec.js",
     "build": "expo export --platform web",
-    "generate:policies": "node scripts/convert-policies.js"
+    "generate:policies": "node scripts/convert-policies.js",
+    "devices:discover": "node scripts/discover-network-devices.js",
+    "devices:watch": "node scripts/watch-device-discovery.js"
   },
   "dependencies": {
     "@expo-google-fonts/nunito": "^0.4.2",
@@ -33,6 +35,7 @@
     "expo-audio": "~1.1.1",
     "expo-auth-session": "~7.0.10",
     "expo-av": "~16.0.8",
+    "expo-background-task": "~1.0.10",
     "expo-blur": "~15.0.8",
     "expo-build-properties": "~1.0.10",
     "expo-constants": "~18.0.12",
@@ -50,6 +53,7 @@
     "expo-status-bar": "~3.0.9",
     "expo-symbols": "~1.0.8",
     "expo-system-ui": "~6.0.9",
+    "expo-task-manager": "~14.0.9",
     "expo-updates": "~29.0.16",
     "expo-video": "~3.0.15",
     "expo-web-browser": "~15.0.10",

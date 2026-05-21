@@ -73,10 +73,12 @@ export const CarouselSection = ({
               width={180}
               aspectRatio={1}
               onPress={() =>
-                router.push({
-                  pathname: '/activity-details',
-                  params: { id: item.id },
-                })
+                typeof item.onPress === 'function'
+                  ? item.onPress()
+                  : router.push({
+                      pathname: '/activity-details',
+                      params: { id: item.id },
+                    })
               }
             />
           </View>

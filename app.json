@@ -30,20 +30,16 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.health.READ_HEART_RATE",
+        "android.permission.health.READ_RESTING_HEART_RATE",
+        "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND",
         "android.permission.health.READ_STEPS",
         "android.permission.health.READ_TOTAL_CALORIES_BURNED"
       ],
       "intentFilters": [
         {
-          "action": "androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE",
+          "action": "VIEW_PERMISSION_USAGE",
           "category": [
-            "android.intent.category.DEFAULT"
-          ]
-        },
-        {
-          "action": "android.intent.action.VIEW_PERMISSION_USAGE",
-          "category": [
-            "android.intent.category.HEALTH_PERMISSIONS"
+            "HEALTH_PERMISSIONS"
           ]
         }
       ]
@@ -81,6 +77,14 @@
             },
             {
               "accessType": "read",
+              "recordType": "RestingHeartRate"
+            },
+            {
+              "accessType": "read",
+              "recordType": "BackgroundAccessPermission"
+            },
+            {
+              "accessType": "read",
               "recordType": "Steps"
             },
             {
@@ -100,12 +104,16 @@
           }
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-background-task"
     ],
     "extra": {
       "eas": {
         "projectId": "c61332b1-8bad-4bc9-9b37-fcb56e693716"
       }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/c61332b1-8bad-4bc9-9b37-fcb56e693716"
     }
   }
 }
