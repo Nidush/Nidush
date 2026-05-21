@@ -23,6 +23,7 @@ The app is focused on people dealing with stress or anxiety in urban contexts. I
 
 - **Guided Activities:** Meditation, cooking, workout and audiobook experiences connected to content, room ambience and optional focus mode.
 - **Recommended Activities:** Dynamic recommendations based on app catalog templates, user preferences and biometric state.
+- **AI Activity Ideas:** Gemini-powered activity suggestions adapt to the user's current emotional/biometric state, available rooms, connected devices and hobbies.
 - **Activity Creator:** Step-by-step flow to create personal activities with type, content, room, environment, image and review.
 - **Atmospheric Scenarios:** Room presets that combine devices, playlists and ambience.
 - **Smart Home Device Layer:** Device cards and room views for connected or simulated devices.
@@ -30,6 +31,7 @@ The app is focused on people dealing with stress or anxiety in urban contexts. I
 - **Multi-user Homes:** Users can create or join a home with resident/admin roles.
 - **Profile & Onboarding:** User setup, hobbies/preferences, home selection and resident profile flow.
 - **Spotify Integration:** Spotify authentication and playlist support for immersive sessions.
+- **Biometric State Engine:** Personalized `RELAXED` / `FOCUSED` / `STRESSED` / `ANXIOUS` detection based on heart rate, HRV and EDA deviations from the user's own baseline.
 - **Weekly API Sync:** A Supabase cron job refreshes external API content every week without creating duplicates.
 - **Policies & Legal Pages:** Privacy Policy and Terms of Service documents are included.
 
@@ -49,6 +51,8 @@ Recent development work includes:
 - **Spotify and media sessions:** Spotify flows, playlist support, background playback behavior and media session handling were integrated.
 - **TV/casting support:** TV video activity support and Google Cast-related session behavior were added.
 - **Biometrics and recommendations:** Biometric testing, state-based recommendations and home activity suggestions were improved.
+- **Personalized state classification:** Biometrics now use a baseline-driven scoring model with local persistence, instead of only fixed thresholds.
+- **AI home suggestions:** `generate-activity-ideas` now adapts generated ideas to the user's detected state and falls back to mood-aware local suggestions if Gemini is unavailable.
 - **Security updates:** Password validation, signup security and auth-related flows were strengthened.
 - **CI/CD:** Supabase and app workflow checks were added/refined to run across branches.
 - **Documentation:** Privacy Policy, Terms of Service, Spotify submission notes and Supabase setup documentation were added.
@@ -99,6 +103,7 @@ The weekly API sync was deployed and manually tested successfully:
 - **API Ninjas Exercises API:** Imports workout/exercise content.
 - **Spotify API:** Authentication, playlists and music-related session support.
 - **Resend API:** Welcome email Edge Function.
+- **Google Gemini API:** Personalized activity idea generation in the `generate-activity-ideas` Edge Function.
 
 ### Testing & Tooling
 
@@ -202,6 +207,26 @@ If cache causes strange behavior:
 npx expo start -c
 ```
 
+If you are using a development build (`expo-dev-client`), these startup modes are useful:
+
+```bash
+npx expo start --dev-client --localhost -c
+```
+
+- `--localhost`: best for local-only development on your own machine; it is not suitable for sharing across the network.
+
+```bash
+npx expo start --dev-client --lan -c
+```
+
+- `--lan`: use this when your phone/emulator is on the same Wi-Fi network as your computer.
+
+```bash
+npx expo start --dev-client --tunnel -c
+```
+
+- `--tunnel`: best fallback when local network restrictions break device access or when you need a more reliable remote connection path.
+
 ---
 
 ## Useful Commands
@@ -223,6 +248,12 @@ TypeScript check:
 ```bash
 npx tsc --noEmit
 ```
+
+Biometric state behavior:
+
+- The app builds a personal local baseline from recent readings (`heartRate`, `hrv`, `eda`).
+- State inference compares the latest reading to that baseline instead of relying only on fixed universal thresholds.
+- The baseline is persisted locally with `AsyncStorage`, so classification remains personalized across app restarts.
 
 ---
 
@@ -246,6 +277,7 @@ Deploy Edge Functions:
 ```bash
 supabase functions deploy manage-home
 supabase functions deploy welcome-user
+supabase functions deploy generate-activity-ideas
 supabase functions deploy weekly-api-content-sync
 ```
 
@@ -253,6 +285,7 @@ Set required secrets:
 
 ```bash
 supabase secrets set API_NINJAS_KEY="your-api-ninjas-key"
+supabase secrets set GEMINI_API_KEY="your-gemini-api-key"
 supabase secrets set RESEND_API_KEY="your-resend-key"
 ```
 

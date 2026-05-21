@@ -54,6 +54,8 @@ type GeminiIdea = {
   ingredients?: unknown
 }
 
+type UserState = 'RELAXED' | 'FOCUSED' | 'STRESSED' | 'ANXIOUS'
+
 const clampText = (value: unknown, fallback: string, maxLength: number) => {
   const text = String(value ?? '').replace(/\s+/g, ' ').trim()
   return (text || fallback).slice(0, maxLength)
@@ -211,41 +213,205 @@ const findRoom = (rooms: RoomRow[], roomName: unknown) => {
   return partial ?? rooms[0]
 }
 
-const fallbackIdeas = (rooms: RoomRow[]) => {
+const getMoodDirective = (state: UserState) => {
+  switch (state) {
+    case 'ANXIOUS':
+      return {
+        summary: 'Prioritize emotional regulation, grounding, safety, and low stimulation.',
+        guidance: [
+          'Prefer calming activities such as meditation, gentle reading, soft audiobooks, or very light stretching.',
+          'Avoid intense workouts, competitive framing, urgency, loud devices, or cognitively heavy tasks.',
+          'Favor short activities between 5 and 20 minutes with clear, reassuring steps.',
+          'Use bedrooms or quiet living spaces when possible and suggest dimmer lights or softer sound.',
+        ],
+      }
+    case 'STRESSED':
+      return {
+        summary: 'Prioritize decompression, tension release, and a smooth transition out of stress.',
+        guidance: [
+          'Prefer recovery-focused activities like breathing, stretching, calming cooking, yoga, or quiet reading.',
+          'Avoid high-pressure productivity language and avoid very intense or noisy activities.',
+          'Favor activities around 10 to 30 minutes that reduce stimulation and feel achievable.',
+          'Use rooms and devices in a way that lowers sensory load and helps the person reset.',
+        ],
+      }
+    case 'FOCUSED':
+      return {
+        summary: 'Prioritize structured momentum, clarity, and productive energy.',
+        guidance: [
+          'Prefer goal-oriented activities like focused reading, audiobooks, cooking prep, organized workouts, or purposeful yoga.',
+          'Avoid sleepy wind-down ideas unless explicitly requested by the user.',
+          'Favor activities around 15 to 45 minutes with ordered steps and a clear outcome.',
+          'Use devices and rooms to support concentration, bright light, and minimal distraction.',
+        ],
+      }
+    case 'RELAXED':
+    default:
+      return {
+        summary: 'Prioritize enjoyment, comfort, and balanced wellbeing.',
+        guidance: [
+          'Prefer pleasant, easy-to-start activities such as enjoyable cooking, relaxed reading, meditation, or light movement.',
+          'Avoid stress-heavy framing, but it is okay to mix calm and mildly active ideas.',
+          'Favor activities around 10 to 40 minutes that feel restorative or cozy.',
+          'Use the home setup to create atmosphere and comfort rather than urgency.',
+        ],
+      }
+  }
+}
+
+const fallbackIdeas = (rooms: RoomRow[], state: UserState) => {
   const livingRoom = rooms.find((room) => /living|sala/i.test(room.name)) ?? rooms[0]
   const kitchen = rooms.find((room) => /kitchen|cozinha/i.test(room.name)) ?? rooms[0]
   const bedroom = rooms.find((room) => /bed|quarto/i.test(room.name)) ?? rooms[0]
 
+  if (state === 'ANXIOUS') {
+    return [
+      {
+        title: 'Grounding Breath Reset',
+        description: 'A very gentle grounding pause with slower breathing, low lights, and minimal stimulation.',
+        type: 'Meditation',
+        roomName: bedroom?.name ?? livingRoom?.name,
+        durationMinutes: 8,
+        image: 'meditation_content/video_sessions/morning_zen.png',
+        reason: 'Designed to help someone who feels anxious settle their body and attention.',
+        devicePlan: ['Dim lights', 'Keep the room quiet'],
+        contentTitle: 'Grounding Breath Reset',
+        contentType: 'audio',
+        contentCategory: 'meditation',
+        instructions: [
+          { text: 'Sit somewhere supported and place both feet on the floor.', duration: 60 },
+          { text: 'Breathe in gently for four counts and out for six counts.', duration: 300 },
+          { text: 'Name three things you can see and one thing you can hear.', duration: 120 },
+        ],
+        ingredients: [],
+      },
+      {
+        title: 'Comfort Reading Corner',
+        description: 'A soft reading or audiobook break that keeps the environment quiet and reassuring.',
+        type: 'Reading',
+        roomName: bedroom?.name ?? livingRoom?.name,
+        durationMinutes: 12,
+        image: 'activities_for_you/evening_read.png',
+        reason: 'Useful when the person needs something calm, familiar, and low effort.',
+        devicePlan: ['Lower lights', 'Keep screens optional'],
+        contentTitle: 'Comfort Reading Corner',
+        contentType: 'audio',
+        contentCategory: 'audiobook',
+        instructions: [
+          { text: 'Settle into a comfortable seat or bed and relax your shoulders.', duration: 60 },
+          { text: 'Read or listen to something familiar and gentle.', duration: 540 },
+          { text: 'Finish by taking one longer exhale.', duration: 60 },
+        ],
+        ingredients: [],
+      },
+    ]
+  }
+
+  if (state === 'STRESSED') {
+    return [
+      {
+        title: 'Calm Reset',
+        description: 'A short reset with soft breathing, low lights, and a quiet room transition.',
+        type: 'Meditation',
+        roomName: livingRoom?.name,
+        durationMinutes: 10,
+        image: 'meditation_content/video_sessions/morning_zen.png',
+        reason: 'A simple recovery moment for your current home setup.',
+        devicePlan: ['Dim lights', 'Use nearby speaker if available'],
+        contentTitle: 'Calm Reset Guide',
+        contentType: 'audio',
+        contentCategory: 'meditation',
+        instructions: [
+          { text: 'Sit comfortably and soften your shoulders.', duration: 60 },
+          { text: 'Breathe in for four counts and out for six counts.', duration: 420 },
+          { text: 'Open your eyes and set one small intention.', duration: 60 },
+        ],
+        ingredients: [],
+      },
+      {
+        title: 'Slow Kitchen Reset',
+        description: 'A practical but calming kitchen activity that turns stress into one manageable sequence.',
+        type: 'Cooking',
+        roomName: kitchen?.name,
+        durationMinutes: 20,
+        image: 'cooking_activities/recommended/eggs_benedict.png',
+        reason: 'Good for releasing tension through a simple hands-on routine.',
+        devicePlan: ['Turn on kitchen lights', 'Keep speaker volume low'],
+        contentTitle: 'Slow Kitchen Reset Recipe',
+        contentType: 'recipe',
+        contentCategory: 'cooking',
+        ingredients: [
+          { item: 'Eggs or protein', amount: '2 portions' },
+          { item: 'Bread or base', amount: '2 slices' },
+          { item: 'Fresh herbs', amount: '1 handful' },
+        ],
+        instructions: [
+          'Prepare ingredients and clear the counter.',
+          'Cook one step at a time without rushing the heat.',
+          'Plate everything and leave the space tidy.',
+        ],
+      },
+    ]
+  }
+
+  if (state === 'FOCUSED') {
+    return [
+      {
+        title: 'Kitchen Focus Prep',
+        description: 'A practical cooking prep session with light music and one focused recipe step at a time.',
+        type: 'Cooking',
+        roomName: kitchen?.name,
+        durationMinutes: 25,
+        image: 'cooking_activities/recommended/eggs_benedict.png',
+        reason: 'Good for turning kitchen devices into a guided routine.',
+        devicePlan: ['Turn on kitchen lights', 'Keep speaker available'],
+        contentTitle: 'Kitchen Focus Prep Recipe',
+        contentType: 'recipe',
+        contentCategory: 'cooking',
+        ingredients: [
+          { item: 'Eggs or protein', amount: '2 portions' },
+          { item: 'Bread or base', amount: '2 slices' },
+          { item: 'Fresh herbs', amount: '1 handful' },
+        ],
+        instructions: [
+          'Prepare ingredients and clear the counter.',
+          'Cook the main component slowly and keep the heat steady.',
+          'Plate everything and finish with herbs.',
+        ],
+      },
+      {
+        title: 'Deep Reading Sprint',
+        description: 'A focused reading or audiobook block designed for clarity and momentum.',
+        type: 'Reading',
+        roomName: livingRoom?.name ?? bedroom?.name,
+        durationMinutes: 20,
+        image: 'activities_for_you/evening_read.png',
+        reason: 'Fits a focused state without overloading the person.',
+        devicePlan: ['Brighten lights', 'Silence distractions'],
+        contentTitle: 'Deep Reading Sprint',
+        contentType: 'audio',
+        contentCategory: 'audiobook',
+        instructions: [
+          { text: 'Choose one topic and set distractions aside.', duration: 60 },
+          { text: 'Read or listen with full attention for one uninterrupted block.', duration: 1020 },
+          { text: 'Note one useful takeaway before stopping.', duration: 120 },
+        ],
+        ingredients: [],
+      },
+    ]
+  }
+
   return [
     {
-      title: 'Calm Reset',
-      description: 'A short reset with soft breathing, low lights, and a quiet room transition.',
-      type: 'Meditation',
-      roomName: livingRoom?.name,
-      durationMinutes: 10,
-      image: 'meditation_content/video_sessions/morning_zen.png',
-      reason: 'A simple recovery moment for your current home setup.',
-      devicePlan: ['Dim lights', 'Use nearby speaker if available'],
-      contentTitle: 'Calm Reset Guide',
-      contentType: 'audio',
-      contentCategory: 'meditation',
-      instructions: [
-        { text: 'Sit comfortably and soften your shoulders.', duration: 60 },
-        { text: 'Breathe in for four counts and out for six counts.', duration: 420 },
-        { text: 'Open your eyes and set one small intention.', duration: 60 },
-      ],
-      ingredients: [],
-    },
-    {
-      title: 'Kitchen Focus Prep',
-      description: 'A practical cooking prep session with light music and one focused recipe step at a time.',
+      title: 'Easy Morning Prep',
+      description: 'A light cooking moment that keeps the relaxed mood going without asking too much.',
       type: 'Cooking',
       roomName: kitchen?.name,
-      durationMinutes: 25,
+      durationMinutes: 20,
       image: 'cooking_activities/recommended/eggs_benedict.png',
-      reason: 'Good for turning kitchen devices into a guided routine.',
+      reason: 'Fits a relaxed state with something pleasant and simple to do.',
       devicePlan: ['Turn on kitchen lights', 'Keep speaker available'],
-      contentTitle: 'Kitchen Focus Prep Recipe',
+      contentTitle: 'Easy Morning Prep Recipe',
       contentType: 'recipe',
       contentCategory: 'cooking',
       ingredients: [
@@ -275,6 +441,25 @@ const fallbackIdeas = (rooms: RoomRow[]) => {
         { text: 'Choose a comfortable spot and lower the lights.', duration: 60 },
         { text: 'Read or listen without checking the phone.', duration: 780 },
         { text: 'Write down one sentence to remember.', duration: 60 },
+      ],
+      ingredients: [],
+    },
+    {
+      title: 'Soft Stretch Flow',
+      description: 'A light mobility break that keeps the body loose without raising intensity too much.',
+      type: 'Yoga',
+      roomName: livingRoom?.name ?? bedroom?.name,
+      durationMinutes: 12,
+      image: 'activities_for_you/stretching.png',
+      reason: 'A good fit when the person already feels calm and wants gentle movement.',
+      devicePlan: ['Clear floor space', 'Keep lights warm'],
+      contentTitle: 'Soft Stretch Flow',
+      contentType: 'exercise',
+      contentCategory: 'workout',
+      instructions: [
+        { text: 'Start with a slow neck and shoulder release.', duration: 180 },
+        { text: 'Move through light standing stretches and side bends.', duration: 420 },
+        { text: 'Finish with slower breathing and a full-body reach.', duration: 120 },
       ],
       ingredients: [],
     },
@@ -338,7 +523,7 @@ Deno.serve(async (req) => {
     if (authError || !user) throw new Error('Invalid session.')
 
     const body = await req.json().catch(() => ({}))
-    const mood = clampText(body?.mood, 'RELAXED', 40)
+    const mood = clampText(body?.mood, 'RELAXED', 40) as UserState
     const activeFilter = clampText(body?.activeFilter, 'All', 40)
     const promptHint = clampText(body?.prompt, '', 220)
     const localTime = clampText(body?.localTime, new Date().toISOString(), 80)
@@ -451,6 +636,7 @@ Deno.serve(async (req) => {
     let rawIdeas: GeminiIdea[] = []
 
     let modelUsed = 'local-fallback'
+    const moodDirective = getMoodDirective(mood)
 
     if (geminiApiKey) {
       try {
@@ -458,6 +644,9 @@ Deno.serve(async (req) => {
           'You are Nidush, a smart home wellbeing assistant.',
           'Create exactly 5 personalized activity ideas for this home.',
           'Use the real rooms and devices. Avoid duplicating recent activity titles.',
+          `Emotional state to optimize for: ${mood}. ${moodDirective.summary}`,
+          'The emotional state is the main driver of your suggestions. Adapt intensity, duration, room choice, and wording to match it.',
+          ...moodDirective.guidance,
           'Return JSON only with this shape:',
           '{"ideas":[{"title":"string","description":"string","type":"Cooking|Meditation|Workout|Audiobooks|Yoga|Reading|other","roomName":"one of the provided room names","durationMinutes":number,"image":"one of the allowed image keys","reason":"short reason","devicePlan":["short action"],"contentTitle":"string","contentType":"recipe|audio|exercise|video","contentCategory":"cooking|meditation|workout|audiobook|general","ingredients":[{"item":"string","amount":"string"}],"instructions":[{"text":"string","duration":number}]}]}',
           `Allowed image keys: ${IMAGE_KEYS.join(', ')}`,
@@ -515,14 +704,14 @@ Deno.serve(async (req) => {
         modelUsed = geminiModel
       } catch (error) {
         console.warn('Gemini generation failed; using local fallback ideas.', error)
-        rawIdeas = fallbackIdeas(safeRooms)
+        rawIdeas = fallbackIdeas(safeRooms, mood)
       }
     } else {
-      rawIdeas = fallbackIdeas(safeRooms)
+      rawIdeas = fallbackIdeas(safeRooms, mood)
     }
 
     const normalizedIdeas = normalizeIdeas(rawIdeas, safeRooms)
-    const fallbackNormalizedIdeas = normalizeIdeas(fallbackIdeas(safeRooms), safeRooms)
+    const fallbackNormalizedIdeas = normalizeIdeas(fallbackIdeas(safeRooms, mood), safeRooms)
 
     return new Response(
       JSON.stringify({

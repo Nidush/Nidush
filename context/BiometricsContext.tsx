@@ -1,5 +1,10 @@
 import { UserState, WearableData } from '@/constants/data/types';
-import { inferStateFromData } from '@/utils/biometricLogic';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  getBiometricBaselineSnapshot,
+  hydrateBiometricBaseline,
+  inferStateFromData,
+} from '@/utils/biometricLogic';
 import { generateBiometricsFromStress } from '@/utils/biometricSimulator';
 import {
   HEALTH_CONNECT_SYNC_INTERVAL_MS,
@@ -28,6 +33,8 @@ interface BiometricsContextType {
 const BiometricsContext = createContext<BiometricsContextType | undefined>(
   undefined,
 );
+
+const BIOMETRIC_BASELINE_STORAGE_KEY = '@biometric_baseline_v1';
 
 const deriveBiometricsFromHeartRate = (
   heartRate: number,
@@ -80,6 +87,30 @@ export const BiometricsProvider = ({
   const lastHealthConnectSyncRef = useRef(0);
   const segments = useSegments();
 
+  const persistBaselineSnapshot = async () => {
+    try {
+      const snapshot = getBiometricBaselineSnapshot();
+      await AsyncStorage.setItem(
+        BIOMETRIC_BASELINE_STORAGE_KEY,
+        JSON.stringify(snapshot),
+      );
+    } catch (error) {
+      console.warn('[Biometrics] Failed to persist baseline snapshot:', error);
+    }
+  };
+
+  const restoreBaselineSnapshot = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(BIOMETRIC_BASELINE_STORAGE_KEY);
+      if (!stored) return;
+
+      const parsed = JSON.parse(stored);
+      hydrateBiometricBaseline(parsed);
+    } catch (error) {
+      console.warn('[Biometrics] Failed to restore baseline snapshot:', error);
+    }
+  };
+
   const notifyStateChange = (newState: UserState) => {
     if (newState !== lastStateRef.current) {
       addNotification(
@@ -99,6 +130,7 @@ export const BiometricsProvider = ({
     notifyStateChange(testData.detectedState);
     setCurrentState(testData.detectedState);
     setData(testData);
+    await persistBaselineSnapshot();
 
     const {
       data: { user },
@@ -135,6 +167,7 @@ export const BiometricsProvider = ({
       notifyStateChange(result.latest.detectedState);
       setCurrentState(result.latest.detectedState);
       setData(result.latest);
+      await persistBaselineSnapshot();
     }
 
     return result;
@@ -173,6 +206,7 @@ export const BiometricsProvider = ({
 
       setCurrentState(newState);
       setData(newData);
+      void persistBaselineSnapshot();
     };
 
     const startFallbackSimulation = () => {
@@ -194,27 +228,40 @@ export const BiometricsProvider = ({
       }
     };
 
-    syncHealthConnectHeartRate();
-    const healthConnectInterval = setInterval(
-      syncHealthConnectHeartRate,
-      HEALTH_CONNECT_SYNC_INTERVAL_MS,
-    );
-    const appStateSubscription = AppState.addEventListener(
-      'change',
-      (nextAppState) => {
-        if (nextAppState !== 'active') return;
+    let healthConnectInterval: ReturnType<typeof setInterval> | null = null;
+    let appStateSubscription: ReturnType<typeof AppState.addEventListener> | null =
+      null;
 
-        const elapsed = Date.now() - lastHealthConnectSyncRef.current;
-        if (elapsed >= HEALTH_CONNECT_SYNC_INTERVAL_MS) {
-          syncHealthConnectHeartRate();
-        }
-      },
-    );
+    const initializeBiometrics = async () => {
+      await restoreBaselineSnapshot();
+      if (!isMounted) return;
+
+      await syncHealthConnectHeartRate();
+      if (!isMounted) return;
+
+      healthConnectInterval = setInterval(
+        syncHealthConnectHeartRate,
+        HEALTH_CONNECT_SYNC_INTERVAL_MS,
+      );
+      appStateSubscription = AppState.addEventListener(
+        'change',
+        (nextAppState) => {
+          if (nextAppState !== 'active') return;
+
+          const elapsed = Date.now() - lastHealthConnectSyncRef.current;
+          if (elapsed >= HEALTH_CONNECT_SYNC_INTERVAL_MS) {
+            syncHealthConnectHeartRate();
+          }
+        },
+      );
+    };
+
+    void initializeBiometrics();
 
     return () => {
       isMounted = false;
-      clearInterval(healthConnectInterval);
-      appStateSubscription.remove();
+      if (healthConnectInterval) clearInterval(healthConnectInterval);
+      appStateSubscription?.remove();
     };
   }, [segments, addNotification]);
 
