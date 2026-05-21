@@ -22,9 +22,21 @@ export const SelectionCard = ({
       isSelected ? 'border-[#548F53]' : 'border-transparent'
     }`}
     onPress={onPress}
+    accessible={true}
+    accessibilityRole="radio" // Alterado para radio para casar com o radiogroup do componente pai
+    accessibilityLabel={label}
+    accessibilityState={{ selected: isSelected }}
+    accessibilityHint="Touch to select this option" // Dica mais padronizada para leitores de ecrã
   >
-    <MaterialIcons name={icon} size={50} color="#354F52" />
+    <MaterialIcons
+      name={icon}
+      size={50}
+      color="#354F52"
+      importantForAccessibility="no-hide-descendants"
+      accessibilityElementsHidden={true}
+    />
     <Text
+      maxFontSizeMultiplier={1.2}
       className="mt-2.5 text-lg text-[#2F4F4F]"
       style={{ fontFamily: 'Nunito_700Bold' }}
     >

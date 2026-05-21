@@ -1,4 +1,4 @@
-import { Scenario } from '@/constants/data';
+import { Scenario } from '@/constants/data/types';
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -34,6 +34,10 @@ export const ScenarioCard = ({
         'relative rounded-2xl overflow-hidden bg-gray-900',
         'w-full aspect-square',
       )}
+      accessible={true}
+      accessibilityRole="radio"
+      accessibilityLabel={`${item.title}, Room: ${item.room}. Double tap to select.`}
+      accessibilityState={{ selected: isSelected }}
     >
       <View style={StyleSheet.absoluteFill}>
         <Image
@@ -47,6 +51,8 @@ export const ScenarioCard = ({
 
       <MaskedView
         style={StyleSheet.absoluteFill}
+        importantForAccessibility="no"
+        accessibilityElementsHidden={true}
         maskElement={
           <LinearGradient
             colors={['black', 'black', 'transparent']}
@@ -68,12 +74,21 @@ export const ScenarioCard = ({
         pointerEvents="none"
       />
 
-      <TouchableOpacity className="absolute top-2.5 right-1 z-20 p-1">
+      <TouchableOpacity
+        className="absolute top-2.5 right-1 z-20 p-1"
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden={true}
+      >
         <MaterialIcons name="more-vert" size={24} color="white" />
       </TouchableOpacity>
 
-      <View className="absolute bottom-0 w-full p-3 z-30">
+      <View
+        className="absolute bottom-0 w-full p-3 z-30"
+        importantForAccessibility="no-hide-descendants"
+        accessibilityElementsHidden={true}
+      >
         <Text
+          maxFontSizeMultiplier={1.2}
           numberOfLines={2}
           className="text-white text-[16px] leading-tight mb-2"
           style={{ fontFamily: 'Nunito_700Bold' }}
@@ -84,6 +99,7 @@ export const ScenarioCard = ({
         <View className="flex-row items-center opacity-95">
           <MaterialCommunityIcons name="door" size={16} color="white" />
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-white text-md ml-1.5"
             style={{ fontFamily: 'Nunito_600SemiBold' }}
           >

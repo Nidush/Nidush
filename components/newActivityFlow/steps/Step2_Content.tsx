@@ -1,5 +1,4 @@
-import { CONTENTS } from '@/constants/data';
-import { Activity } from '@/constants/data/types';
+import { Activity, Content } from '@/constants/data/types';
 import React, { useMemo } from 'react';
 import { FlatList, Text, View } from 'react-native';
 import { ContentCard } from '../ContentCard';
@@ -9,36 +8,37 @@ interface Step2Props {
   selectedContentId: string;
   onSelect: (id: string) => void;
   activityType: Activity['type'];
+  contentList: Content[];
 }
 
 export const Step2_Content = ({
   selectedContentId,
   onSelect,
   activityType,
+  contentList,
 }: Step2Props) => {
   const filteredContent = useMemo(() => {
-    const categoryMap: Record<string, string> = {
-      cooking: 'cooking',
-      meditation: 'meditation',
-      workout: 'workout',
-      audiobooks: 'audiobook',
-      general: 'general',
-    };
+    if (activityType === 'general') return contentList;
 
-    if (activityType === 'general') return Object.values(CONTENTS);
+    const targetCategory = (activityType || '').toLowerCase();
 
-    const targetCategory = categoryMap[activityType] || activityType;
+    return contentList.filter(
+      (content) => {
+        // Fallback checks for API data
+        if (targetCategory === 'cooking' && content.type === 'recipe') return true;
+        if (targetCategory === 'workout' && content.type === 'exercise') return true;
 
-    return Object.values(CONTENTS).filter(
-      (content) => content.category === targetCategory,
+        const cat = (content.category || '').toLowerCase();
+        return cat === targetCategory || cat === 'general';
+      }
     );
-  }, [activityType]);
+  }, [activityType, contentList]);
 
-  const recipes = filteredContent.filter((c) => c.type === 'recipe');
+  const recipes = filteredContent.filter((c) => c.type === 'recipe' || c.category?.toLowerCase() === 'cooking');
   const videos = filteredContent.filter(
-    (c) => c.type === 'video' || c.type === 'workout',
+    (c) => c.type === 'video' || c.type === 'workout' || c.type === 'exercise'
   );
-  const audios = filteredContent.filter((c) => c.type === 'audio');
+  const audios = filteredContent.filter((c) => c.type === 'audio' || c.category?.toLowerCase() === 'audiobook');
 
   const renderCarousel = (title: string, data: typeof filteredContent) => {
     if (data.length === 0) return null;
@@ -46,8 +46,10 @@ export const Step2_Content = ({
     return (
       <View className="mb-8">
         <Text
+          maxFontSizeMultiplier={1.2}
           className="text-2xl text-[#2F4F4F] mb-3"
           style={{ fontFamily: 'Nunito_600SemiBold' }}
+          accessibilityRole="header"
         >
           {title}
         </Text>
@@ -77,13 +79,14 @@ export const Step2_Content = ({
   return (
     <StepWrapper
       title="Choose your content"
-      subtitle={`Select content for your ${activityType} session.`}
+      subtitle={`Required: Select content for your ${activityType} session.`}
     >
       {filteredContent.length === 0 && (
         <View className="items-center mt-10">
           <Text
             className="text-[#2F4F4F] text-base"
             style={{ fontFamily: 'Nunito_600SemiBold' }}
+            maxFontSizeMultiplier={1.2}
           >
             {`No content found for "${activityType}".`}
           </Text>

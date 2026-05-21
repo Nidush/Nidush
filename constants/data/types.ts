@@ -13,7 +13,7 @@ export type InstructionStep = {
 export interface Content {
   id: string;
   title: string;
-  type: 'video' | 'recipe' | 'audio' | 'workout';
+  type: 'video' | 'recipe' | 'audio' | 'workout' | 'exercise' | string;
   category: 'meditation' | 'audiobook' | 'cooking' | 'workout' | string;
   description: string;
   duration: string;
@@ -35,11 +35,13 @@ export interface Scenario {
   id: string;
   title: string;
   description: string;
-  room: string;
+  room_id?: string; // Tornado opcional para os mocks
+  room?: string;    // Adicionado para compatibilidade
   image: ImageSourcePropType;
   category?: 'My creations' | string;
   devices: ScenarioDeviceState[];
   playlist?: string;
+  playlist_id?: string;
   focusMode: boolean;
   shortcuts: boolean;
   keywords?: string[];
@@ -49,20 +51,26 @@ export interface Activity {
   id: string;
   title: string;
   description: string;
-  room: string;
+  room_id?: string; 
+  room?: string;    
   image: ImageSourcePropType;
   category?: 'My creations' | 'Simple recipes' | 'For the morning' | string;
-  type: 'cooking' | 'meditation' | 'workout' | 'audiobooks' | 'general';
-  scenarioId?: string;
-  contentId?: string;
+  type: 'cooking' | 'meditation' | 'workout' | 'audiobooks' | 'general' | 'reading' | 'yoga' | 'other';
+  scenario_id?: string;
+  scenarioId?: string; 
+  content_id?: string;
+  contentId?: string;  
   shortcuts: boolean;
   keywords?: string[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 export type UserState = 'RELAXED' | 'FOCUSED' | 'STRESSED' | 'ANXIOUS';
 
 export interface WearableData {
   deviceId: string;
+  source?: string;
   timestamp: number;
   heartRate: number;
   hrv: number;

@@ -16,6 +16,10 @@ const CategoryPill = ({ item, isActive, onPress }: CategoryPillProps) => {
   return (
     <TouchableOpacity
       onPress={() => onPress(item.id)}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: isActive }}
+      accessibilityLabel={item.name}
+      accessibilityHint={isActive ? undefined : `Show devices from ${item.name}`}
       className={`px-5 py-1 rounded-full border mr-3 justify-center ${
         isActive
           ? 'bg-[#BBE6BA] border-transparent'
@@ -23,6 +27,7 @@ const CategoryPill = ({ item, isActive, onPress }: CategoryPillProps) => {
       }`}
     >
       <Text
+        maxFontSizeMultiplier={1.2}
         className={` ${isActive ? 'text-[#548F53]' : 'text-[#354F52]'}`}
         style={{
           fontFamily: isActive ? 'Nunito_700Bold' : 'Nunito_600SemiBold',

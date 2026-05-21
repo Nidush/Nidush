@@ -1,4 +1,4 @@
-import { SCENARIOS } from '@/constants/data';
+import { Scenario } from '@/constants/data/types';
 import { MaterialIcons } from '@expo/vector-icons';
 import React, { useMemo } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
@@ -9,20 +9,22 @@ interface Step4Props {
   selected: string;
   onSelect: (id: string) => void;
   roomName: string;
+  scenarios: Scenario[];
 }
 
 export const Step4_Environment = ({
   selected,
   onSelect,
   roomName,
+  scenarios,
 }: Step4Props) => {
   const filteredScenarios = useMemo(() => {
     if (!roomName) return [];
 
     const targetRoom = roomName.toLowerCase().trim();
 
-    return SCENARIOS.filter((s) => s.room.toLowerCase().trim() === targetRoom);
-  }, [roomName]);
+    return scenarios.filter((s) => s.room?.toLowerCase().trim() === targetRoom);
+  }, [roomName, scenarios]);
 
   return (
     <StepWrapper
@@ -30,13 +32,20 @@ export const Step4_Environment = ({
       subtitle={`Select a scenario for the ${roomName || 'room'} or create a new one.`}
     >
       <Text
+        maxFontSizeMultiplier={1.2}
         className="text-2xl text-[#2F4F4F] my-3"
         style={{ fontFamily: 'Nunito_600SemiBold' }}
+        accessibilityRole="header"
       >
         Scenarios
       </Text>
 
-      <View className="flex-row flex-wrap justify-between gap-y-4">
+      <View
+        className="flex-row flex-wrap justify-between gap-y-4"
+        accessible={true}
+        accessibilityRole="radiogroup"
+        accessibilityLabel="Available scenarios"
+      >
         {filteredScenarios.map((env) => (
           <View key={env.id} className="w-[48%]">
             <ScenarioCard
@@ -50,6 +59,7 @@ export const Step4_Environment = ({
         {filteredScenarios.length === 0 && (
           <View className="w-full mb-3 p-4">
             <Text
+              maxFontSizeMultiplier={1.2}
               className="text-[#6A7D5B] text-sm text-center"
               style={{ fontFamily: 'Nunito_600SemiBold' }}
             >
@@ -62,9 +72,18 @@ export const Step4_Environment = ({
           <TouchableOpacity
             className="w-full h-full bg-[#D1E4D1] rounded-2xl justify-center items-center"
             activeOpacity={0.7}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Create new scene"
           >
-            <MaterialIcons name="add" size={48} color="#354F52" />
+            <MaterialIcons
+              name="add"
+              size={48}
+              color="#354F52"
+              importantForAccessibility="no"
+            />
             <Text
+              maxFontSizeMultiplier={1.2}
               className="text-[#354F52] text-xl mt-2"
               style={{ fontFamily: 'Nunito_600SemiBold' }}
             >

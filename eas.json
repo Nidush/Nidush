@@ -1,6 +1,7 @@
 {
   "build": {
     "preview": {
+      "channel": "preview",
       "android": {
         "buildType": "apk"
       }
@@ -11,11 +12,15 @@
       }
     },
     "preview3": {
-      "developmentClient": true
-    },
-    "preview4": {
+      "developmentClient": true,
       "distribution": "internal"
     },
-    "production": {}
+    "preview4": {
+      "distribution": "internal",
+      "channel": "preview"
+    },
+    "production": {
+      "channel": "production"
+    }
   }
 }

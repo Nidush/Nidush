@@ -18,6 +18,8 @@ const getDeviceIcon = (type: DeviceType, color: string) => {
       );
     case 'speaker':
       return <MaterialIcons name="speaker" size={20} color={color} />;
+    case 'tv':
+      return <MaterialIcons name="tv" size={20} color={color} />;
     case 'blind':
       return <MaterialCommunityIcons name="blinds" size={20} color={color} />;
     case 'diffuser':
@@ -45,6 +47,8 @@ export const DeviceSection = ({ devices }: DeviceSectionProps) => {
       <Text
         className="text-[#354F52] text-xl mb-3"
         style={{ fontFamily: 'Nunito_700Bold' }}
+        accessible
+        accessibilityRole="header"
       >
         Selected Devices
       </Text>
@@ -59,14 +63,30 @@ export const DeviceSection = ({ devices }: DeviceSectionProps) => {
             config.value.trim().startsWith('#');
           const hasDetails = !!config.value;
 
+          // Cria label de acessibilidade detalhada
+          const accessibilityText = `${realDevice.name}${
+            hasDetails
+              ? isLight && isColorValue
+                ? `, color ${config.value}, brightness ${config.brightness || '100%'}`
+                : `, value ${config.value}${realDevice.type === 'thermostat' ? ' degrees Celsius' : ''}`
+              : ''
+          }`;
+
           return (
             <View
               key={i}
               className="w-[48%] flex-row items-center px-3 py-3 rounded-xl border border-[#548f537f]"
+              accessible={true} // Diz que isto é um único bloco para ler
+              accessibilityRole="text" // Corrige o summary para text (já que é só informação)
+              accessibilityLabel={accessibilityText}
+              // REDUÇÃO DE RUÍDO: Esconde os ícones e textos internos porque a Label acima já faz todo o trabalho!
+              importantForAccessibility="no-hide-descendants" // Android
+              accessibilityElementsHidden={true} // iOS
             >
               {getDeviceIcon(realDevice.type, '#548F53')}
               <View className="ml-3 justify-center flex-1">
                 <Text
+                  maxFontSizeMultiplier={1.2}
                   className={`text-[#354F52] text-sm capitalise ${
                     hasDetails ? 'mb-0.5' : 'mb-0'
                   }`}
@@ -93,6 +113,7 @@ export const DeviceSection = ({ devices }: DeviceSectionProps) => {
                           }}
                         />
                         <Text
+                          maxFontSizeMultiplier={1.2}
                           className="text-[#548F53] text-sm"
                           style={{ fontFamily: 'Nunito_600SemiBold' }}
                         >
@@ -101,6 +122,7 @@ export const DeviceSection = ({ devices }: DeviceSectionProps) => {
                       </>
                     ) : (
                       <Text
+                        maxFontSizeMultiplier={1.2}
                         className="text-[#548F53] text-sm"
                         style={{ fontFamily: 'Nunito_600SemiBold' }}
                       >

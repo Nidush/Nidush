@@ -31,6 +31,8 @@ interface ActivityHeaderProps {
   onAddToShortcuts?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  isShortcut?: boolean;
+  isUpdatingShortcut?: boolean;
 }
 
 export const ActivityHeader = ({
@@ -44,6 +46,8 @@ export const ActivityHeader = ({
   onAddToShortcuts,
   onEdit,
   onDelete,
+  isShortcut,
+  isUpdatingShortcut,
 }: ActivityHeaderProps) => {
   const [menuVisible, setMenuVisible] = useState(false);
 
@@ -52,16 +56,30 @@ export const ActivityHeader = ({
     else router.back();
   };
 
-  const MenuItem = ({ icon, label, onPress, color = '#2F4F4F' }: any) => (
+  const MenuItem = ({
+    icon,
+    label,
+    onPress,
+    color = '#2F4F4F',
+  }: {
+    icon: React.ComponentProps<typeof MaterialIcons>['name'];
+    label: string;
+    onPress?: () => void;
+    color?: string;
+  }) => (
     <TouchableOpacity
       onPress={() => {
         setMenuVisible(false);
         onPress && onPress();
       }}
       className="flex-row items-center py-3 px-4 active:bg-gray-50"
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel={label}
     >
       <MaterialIcons name={icon} size={20} color={color} />
       <Text
+        maxFontSizeMultiplier={1.2}
         className="ml-3 text-[15px]"
         style={{ fontFamily: 'Nunito_600SemiBold', color: color }}
       >
@@ -72,7 +90,12 @@ export const ActivityHeader = ({
 
   return (
     <View className="w-full h-[450px] relative">
-      <View style={StyleSheet.absoluteFill}>
+      {/* Background blur + masked image */}
+      <View
+        style={StyleSheet.absoluteFill}
+        importantForAccessibility="no"
+        accessibilityElementsHidden={true}
+      >
         <Image
           source={imageSource}
           style={{ width: '100%', height: '100%' }}
@@ -81,8 +104,11 @@ export const ActivityHeader = ({
         />
         <View className="absolute inset-0" />
       </View>
+
       <MaskedView
         style={StyleSheet.absoluteFill}
+        importantForAccessibility="no" // Garante que a máscara também é ignorada
+        accessibilityElementsHidden={true}
         maskElement={
           <LinearGradient
             colors={['black', 'black', 'transparent']}
@@ -102,18 +128,38 @@ export const ActivityHeader = ({
         colors={['rgba(0,0,0,0.1)', 'transparent', 'rgba(0,0,0,0.8)']}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
+        importantForAccessibility="no"
       />
 
       <SafeAreaView style={StyleSheet.absoluteFill} edges={['top']}>
+        {/* Top navigation */}
         <View className="flex-row justify-between items-center px-5 pt-2 z-50">
-          <TouchableOpacity onPress={handleBackPress}>
-            <Ionicons name="chevron-back" size={28} color="white" />
+          <TouchableOpacity
+            onPress={handleBackPress}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <Ionicons
+              name="chevron-back"
+              size={28}
+              color="white"
+              importantForAccessibility="no"
+            />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setMenuVisible(true)}>
+
+          <TouchableOpacity
+            onPress={() => setMenuVisible(true)}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="Open menu"
+            accessibilityHint="Opens a menu to edit, delete, or add to shortcuts"
+          >
             <MaterialIcons name="more-vert" size={28} color="white" />
           </TouchableOpacity>
         </View>
 
+        {/* Menu Modal */}
         <Modal
           transparent
           visible={menuVisible}
@@ -127,7 +173,12 @@ export const ActivityHeader = ({
             style={StyleSheet.absoluteFill}
           />
 
-          <TouchableWithoutFeedback onPress={() => setMenuVisible(false)}>
+          <TouchableWithoutFeedback
+            onPress={() => setMenuVisible(false)}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Close menu"
+          >
             <View style={{ flex: 1 }}>
               <View
                 className="absolute top-14 right-5 bg-white rounded-xl w-52 overflow-hidden"
@@ -138,11 +189,18 @@ export const ActivityHeader = ({
                   shadowRadius: 8,
                   elevation: 10,
                 }}
+                accessibilityViewIsModal={true} // iOS: Prende o foco aqui dentro
               >
                 <View style={{ paddingTop: 5, paddingBottom: 5 }}>
                   <MenuItem
                     icon="bookmark-border"
-                    label="Add to shortcuts"
+                    label={
+                      isUpdatingShortcut
+                        ? 'A guardar shortcut...'
+                        : isShortcut
+                          ? 'Remover dos shortcuts'
+                          : 'Adicionar aos shortcuts'
+                    }
                     onPress={onAddToShortcuts}
                   />
                   <MenuItem
@@ -163,22 +221,35 @@ export const ActivityHeader = ({
           </TouchableWithoutFeedback>
         </Modal>
 
+        {/* Bottom info */}
         <View className="absolute bottom-10 px-6 w-full -z-10">
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-white text-xl tracking-wider capitalize mb-2"
             style={{ fontFamily: 'Nunito_600SemiBold' }}
+            accessible={false} // Esconde isto, pois vamos agrupar no título abaixo
           >
             {type}
           </Text>
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-white text-4xl mt-1 shadow-sm"
             style={{ fontFamily: 'Nunito_700Bold' }}
+            accessible
+            accessibilityRole="header"
+            // Junta o Tipo com o Título para uma leitura limpa
+            accessibilityLabel={`${type} ${title}`}
           >
             {title}
           </Text>
           <View className="flex-row items-center mt-6 space-x-6">
             {isActivity && duration && (
-              <View className="flex-row items-center mr-4">
+              <View
+                className="flex-row items-center mr-4"
+                accessible={true}
+                accessibilityRole="text"
+                accessibilityLabel={`${duration ? `Duration: ${duration}. ` : ''}Room: ${room}`}
+              >
                 <Ionicons name="time-outline" size={22} color="white" />
                 <Text
                   className="text-white ml-2 text-lg"
@@ -188,9 +259,14 @@ export const ActivityHeader = ({
                 </Text>
               </View>
             )}
-            <View className="flex-row items-center">
+            <View
+              className="flex-row items-center"
+              importantForAccessibility="no-hide-descendants"
+              accessibilityElementsHidden={true}
+            >
               <MaterialCommunityIcons name="door" size={22} color="white" />
               <Text
+                maxFontSizeMultiplier={1.2}
                 className="text-white ml-2 text-lg"
                 style={{ fontFamily: 'Nunito_600SemiBold' }}
               >

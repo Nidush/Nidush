@@ -153,6 +153,7 @@ const BreathingLoader = () => {
           }}
         >
           <Animated.Text
+            maxFontSizeMultiplier={1.2}
             className="text-white text-center text-2xl font-semibold leading-7"
             style={{ fontFamily: 'Nunito_600SemiBold', opacity: textOpacity }}
           >

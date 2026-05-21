@@ -5,13 +5,17 @@
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
     "format": "prettier --write .",
     "test": "jest",
-    "build": "expo export --platform web"
+    "test:e2e": "node selenium/onboarding.spec.js",
+    "build": "expo export --platform web",
+    "generate:policies": "node scripts/convert-policies.js",
+    "devices:discover": "node scripts/discover-network-devices.js",
+    "devices:watch": "node scripts/watch-device-discovery.js"
   },
   "dependencies": {
     "@expo-google-fonts/nunito": "^0.4.2",
@@ -22,11 +26,21 @@
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
     "@reduxjs/toolkit": "^2.11.2",
+    "@supabase/supabase-js": "^2.99.1",
+    "base64-arraybuffer": "^1.0.2",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
     "expo": "~54.0.30",
+    "expo-asset": "~12.0.12",
     "expo-audio": "~1.1.1",
+    "expo-auth-session": "~7.0.10",
     "expo-av": "~16.0.8",
+    "expo-background-task": "~1.0.10",
     "expo-blur": "~15.0.8",
+    "expo-build-properties": "~1.0.10",
     "expo-constants": "~18.0.12",
+    "expo-crypto": "~15.0.8",
+    "expo-dev-client": "~6.0.21",
     "expo-font": "~14.0.10",
     "expo-haptics": "~15.0.8",
     "expo-image": "~3.0.11",
@@ -39,18 +53,24 @@
     "expo-status-bar": "~3.0.9",
     "expo-symbols": "~1.0.8",
     "expo-system-ui": "~6.0.9",
+    "expo-task-manager": "~14.0.9",
+    "expo-updates": "~29.0.16",
     "expo-video": "~3.0.15",
     "expo-web-browser": "~15.0.10",
+    "express": "^5.2.1",
     "nativewind": "^4.2.1",
     "prettier-plugin-tailwindcss": "^0.5.14",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.28.0",
+    "react-native-google-cast": "^4.9.1",
+    "react-native-health-connect": "^3.5.0",
     "react-native-reanimated": "~4.1.1",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
     "react-native-svg": "15.12.1",
+    "react-native-url-polyfill": "^3.0.0",
     "react-native-web": "~0.21.0",
     "react-native-worklets": "0.5.1",
     "tailwindcss": "^3.4.19"
@@ -61,16 +81,44 @@
     "@babel/preset-typescript": "^7.28.5",
     "@testing-library/react-native": "^13.3.3",
     "@types/jest": "^29.5.14",
-    "@types/react": "^19.1.0",
-    "@types/react-native": "^0.72.8",
+    "@types/react": "~19.1.10",
     "babel-jest": "^30.2.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
+    "expo-module-scripts": "^55.0.2",
+    "expo-modules-core": "~3.0.29",
     "jest": "^29.7.0",
+    "jest-expo": "~54.0.17",
     "prettier": "^3.7.4",
     "react-native-svg-transformer": "^1.5.2",
     "react-test-renderer": "19.1.0",
+    "selenium-webdriver": "^4.43.0",
     "ts-jest": "^29.4.6",
     "typescript": "~5.9.2"
+  },
+  "description": "<p align=\"center\"><img src=\"./assets/images/Logo.png\" alt=\"Nidush Logo\" width=\"200\" /></p>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Nidush/Nidush.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Nidush/Nidush/issues"
+  },
+  "homepage": "https://github.com/Nidush/Nidush#readme",
+  "jest": {
+    "preset": "jest-expo",
+    "modulePathIgnorePatterns": [
+      "<rootDir>/selenium/"
+    ],
+    "transformIgnorePatterns": [
+      "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg)"
+    ]
+  },
+  "overrides": {
+    "postcss": "^8.5.10",
+    "@tootallnate/once": "3.0.1"
   }
 }

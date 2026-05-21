@@ -225,6 +225,8 @@ export const CONTENTS: Record<string, Content> = {
     category: 'meditation',
     duration: '60 min',
     image: require('@/assets/meditation_activities/my_creations/gratitude_flow.png'),
+    videoUrl:
+      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
   },
 
   c9: {
@@ -391,6 +393,38 @@ export const CONTENTS: Record<string, Content> = {
         text: 'Repeat the cycle.',
         description:
           'Continue this pattern for the next few minutes. Let thoughts come and go like clouds.',
+        duration: 300,
+      },
+    ],
+  },
+  c_tv_relax: {
+    id: 'c_tv_relax',
+    title: 'TV Calm Ocean Meditation',
+    description:
+      'A gentle relaxation session designed for the living room TV, pairing ocean visuals with calm music.',
+    type: 'video',
+    category: 'meditation',
+    duration: '10 min',
+    image: require('@/assets/Scenarios/moonlight_bay.png'),
+    videoUrl:
+      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
+    instructions: [
+      {
+        text: 'Turn your attention to the TV and soften your gaze.',
+        description:
+          'Let the ocean visuals fill the room while you settle into a comfortable position.',
+        duration: 60,
+      },
+      {
+        text: 'Breathe slowly with the movement of the waves.',
+        description:
+          'Inhale as the water rolls in, exhale as it rolls back out.',
+        duration: 240,
+      },
+      {
+        text: 'Let the music and visuals carry the tension away.',
+        description:
+          'Notice your shoulders, jaw, and chest relaxing with every breath.',
         duration: 300,
       },
     ],

@@ -40,6 +40,7 @@ interface ScenarioReviewCardProps {
 const getDeviceIcon = (id: string) => {
   if (id.includes('light')) return 'lightbulb';
   if (id.includes('speaker')) return 'speaker';
+  if (id.includes('tv')) return 'tv';
   if (id.includes('thermostat')) return 'thermostat';
   if (id.includes('diffuser')) return 'air';
   if (id.includes('purifier')) return 'filter-vintage';
@@ -63,12 +64,21 @@ export const ScenarioReviewCard = ({
         onPress={toggleScenario}
         activeOpacity={0.7}
         className="flex-row justify-between items-center"
+        accessible={true}
+        accessibilityRole="button"
+        accessibilityLabel={`Environment: ${environment?.title || 'Not selected'}`}
+        accessibilityState={{ expanded: isExpanded }}
+        accessibilityHint="tap to show or hide device details"
       >
-        <View className="flex-row items-center">
+        <View
+          className="flex-row items-center"
+          importantForAccessibility="no-hide-descendants"
+        >
           <View className="w-11 h-11 rounded-lg bg-[#C8E2C8] justify-center items-center mr-3">
             <MaterialIcons name="landscape" size={24} color="#354F52" />
           </View>
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-lg text-[#2F4F4F]"
             style={{ fontFamily: 'Nunito_600SemiBold' }}
           >
@@ -79,6 +89,7 @@ export const ScenarioReviewCard = ({
           name={isExpanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
           size={24}
           color="#354F52"
+          importantForAccessibility="no"
         />
       </TouchableOpacity>
 
@@ -86,9 +97,19 @@ export const ScenarioReviewCard = ({
         <View className="mt-4 border-t border-[#DDE5D7] pt-3">
           <View className="flex-row justify-between mb-4">
             {environment.playlist && (
-              <View className="flex-row items-center flex-1 mr-2">
-                <Ionicons name="musical-notes" size={16} color="#548F53" />
+              <View
+                className="flex-row items-center flex-1 mr-2"
+                accessible={true}
+                accessibilityLabel={`Playlist: ${environment.playlist}`}
+              >
+                <Ionicons
+                  name="musical-notes"
+                  size={16}
+                  color="#548F53"
+                  importantForAccessibility="no"
+                />
                 <Text
+                  maxFontSizeMultiplier={1.2}
                   className="ml-2 text-[#2F4F4F] text-sm"
                   style={{ fontFamily: 'Nunito_600SemiBold' }}
                   numberOfLines={1}
@@ -103,8 +124,10 @@ export const ScenarioReviewCard = ({
                 name={environment.focusMode ? 'moon' : 'sunny'}
                 size={12}
                 color={environment.focusMode ? '#5E35B1' : '#F9A825'}
+                importantForAccessibility="no"
               />
               <Text
+                maxFontSizeMultiplier={1.2}
                 className="ml-1 text-xs text-[#2F4F4F]"
                 style={{ fontFamily: 'Nunito_600SemiBold' }}
               >
@@ -114,8 +137,10 @@ export const ScenarioReviewCard = ({
           </View>
 
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-xs text-[#6A7D5B] mb-2 uppercase tracking-widest"
             style={{ fontFamily: 'Nunito_700Bold' }}
+            accessibilityRole="header"
           >
             Devices
           </Text>
@@ -124,14 +149,20 @@ export const ScenarioReviewCard = ({
             <View
               key={index}
               className="flex-row items-center justify-between mb-2 bg-white/60 p-2 rounded-lg"
+              accessible={true}
+              accessibilityLabel={`${device.deviceId.replace('dev_', '').replace('_', ' ')} is ${device.value ? device.value.toString() : 'On'}`}
             >
-              <View className="flex-row items-center">
+              <View
+                className="flex-row items-center"
+                importantForAccessibility="no-hide-descendants"
+              >
                 <MaterialIcons
                   name={getDeviceIcon(device.deviceId) as any}
                   size={18}
                   color="#354F52"
                 />
                 <Text
+                  maxFontSizeMultiplier={1.2}
                   className="ml-2 text-sm text-[#2F4F4F]"
                   style={{ fontFamily: 'Nunito_600SemiBold' }}
                 >
@@ -142,8 +173,10 @@ export const ScenarioReviewCard = ({
                 </Text>
               </View>
               <Text
+                maxFontSizeMultiplier={1.2}
                 className="text-sm text-[#548F53]"
                 style={{ fontFamily: 'Nunito_700Bold' }}
+                importantForAccessibility="no"
               >
                 {device.value ? device.value.toString() : 'On'}
               </Text>

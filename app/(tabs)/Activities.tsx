@@ -3,6 +3,7 @@ import { FabMenu } from '@/components/activitiesScenarios/FabMenu';
 import { FilterBar } from '@/components/activitiesScenarios/FilterBar';
 import { HeaderSection } from '@/components/activitiesScenarios/HeaderSection';
 import { useBiometrics } from '@/context/BiometricsContext';
+import { supabase } from '@/utils/supabase';
 import {
   Nunito_400Regular,
   Nunito_600SemiBold,
@@ -10,19 +11,38 @@ import {
   useFonts,
 } from '@expo-google-fonts/nunito';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
-import { Platform, ScrollView, Text, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Modal,
+  Platform,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
-  ACTIVITIES,
   Activity,
   CONTENTS,
   Scenario,
-  SCENARIOS,
 } from '@/constants/data';
+import { resolveCatalogImage } from '@/constants/data/catalogAssets';
+import {
+  fetchActivityTemplates,
+  fetchScenarioTemplates,
+  mapUserActivity,
+} from '@/utils/catalogTemplates';
+import {
+  AiActivityIdea,
+  fetchAiActivityIdeas,
+  getFunctionErrorMessage,
+  saveAiActivityIdea,
+} from '@/utils/aiActivities';
 import { getDynamicRecommendations } from '@/utils/recommendationEngine';
 
 const UnifiedActivitiesScreen = () => {
@@ -34,16 +54,140 @@ const UnifiedActivitiesScreen = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [myActivities, setMyActivities] = useState<Activity[]>([]);
+  const [activityTemplates, setActivityTemplates] = useState<Activity[]>([]);
+  const [scenarioTemplates, setScenarioTemplates] = useState<Scenario[]>([]);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isAiModalVisible, setIsAiModalVisible] = useState(false);
+  const [isGeneratingAiIdeas, setIsGeneratingAiIdeas] = useState(false);
+  const [isSavingAiIdeaId, setIsSavingAiIdeaId] = useState<string | null>(null);
+  const [aiIdeas, setAiIdeas] = useState<AiActivityIdea[]>([]);
+  const [aiRecommendedIdeas, setAiRecommendedIdeas] = useState<AiActivityIdea[]>([]);
+  const [isLoadingAiRecommendations, setIsLoadingAiRecommendations] = useState(false);
+  const [isSavingAiRecommendationId, setIsSavingAiRecommendationId] = useState<string | null>(null);
+
+  const isLoadingRef = useRef(false);
+  const PAGE_SIZE = 10;
+
+  // Debounce search query
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
+  const loadTemplates = useCallback(async () => {
+    try {
+      const [activities, scenarios] = await Promise.all([
+        fetchActivityTemplates(),
+        fetchScenarioTemplates(),
+      ]);
+      setActivityTemplates(activities);
+      setScenarioTemplates(scenarios);
+    } catch (error) {
+      console.error('Failed to load activity/scenario templates:', error);
+      setActivityTemplates([]);
+      setScenarioTemplates([]);
+    }
+  }, []);
+
+  const loadActivities = useCallback(async (isNextPage = false) => {
+    if (isLoadingRef.current) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setMyActivities([]);
+      return;
+    }
+
+    const { data: homeAssoc } = await supabase
+      .from('user_homes')
+      .select('home_id')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    isLoadingRef.current = true;
+    const currentPage = isNextPage ? page + 1 : 0;
+    const start = currentPage * PAGE_SIZE;
+    const end = start + PAGE_SIZE - 1;
+
+    console.log(`[API] Página ${currentPage}: A pedir do item ${start} ao ${end}...`);
+
+    let query = supabase
+      .from('activities')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(start, end);
+
+    if (homeAssoc?.home_id) {
+      query = query.eq('home_id', homeAssoc.home_id);
+    } else {
+      query = query.eq('user_id', user.id);
+    }
+
+
+    if (debouncedSearchQuery) {
+      query = query.ilike('title', `%${debouncedSearchQuery}%`);
+    }
+
+    const { data, error, count } = await query;
+
+    if (!error && data) {
+      const mapped = data.map(mapUserActivity);
+
+      if (isNextPage) {
+        setMyActivities(prev => [...prev, ...mapped]);
+      } else {
+        setMyActivities(mapped);
+      }
+
+      setPage(currentPage);
+      if (count !== null) {
+        setHasMore(start + mapped.length < count);
+      }
+    } else {
+      if (!isNextPage) setMyActivities([]);
+    }
+    isLoadingRef.current = false;
+  }, [debouncedSearchQuery, page]);
 
   useFocusEffect(
     useCallback(() => {
-      const loadActivities = async () => {
-        const stored = await AsyncStorage.getItem('@myActivities');
-        if (stored) setMyActivities(JSON.parse(stored));
-      };
+      loadTemplates();
       loadActivities();
-    }, []),
+    }, [debouncedSearchQuery, loadTemplates])
+  );
+
+  const loadAiRecommendations = useCallback(async () => {
+    if (viewMode !== 'activities') {
+      setAiRecommendedIdeas([]);
+      return;
+    }
+
+    setIsLoadingAiRecommendations(true);
+    try {
+      const ideas = await fetchAiActivityIdeas({
+        mood: currentState,
+        activeFilter,
+        prompt: searchQuery,
+        source: 'activities-recommended',
+      });
+
+      setAiRecommendedIdeas(ideas.slice(0, 5));
+    } catch (error) {
+      console.warn('Failed to load AI activity recommendations:', error);
+      setAiRecommendedIdeas([]);
+    } finally {
+      setIsLoadingAiRecommendations(false);
+    }
+  }, [activeFilter, currentState, searchQuery, viewMode]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadAiRecommendations();
+    }, [loadAiRecommendations]),
   );
 
   let [fontsLoaded] = useFonts({
@@ -62,17 +206,30 @@ const UnifiedActivitiesScreen = () => {
   };
 
   const getActivityTime = (activity: Activity) => {
-    if (activity.contentId && CONTENTS[activity.contentId]) {
-      return CONTENTS[activity.contentId].duration;
+    const cId = activity.content_id || activity.contentId;
+    if (cId && CONTENTS[cId]) {
+      return CONTENTS[cId].duration;
     }
     return undefined;
   };
 
   const processedData = useMemo(() => {
-    const baseData =
-      viewMode === 'activities' ? [...myActivities, ...ACTIVITIES] : SCENARIOS;
+    const dedupeById = (items: (Activity | Scenario)[]) => {
+      const seen = new Set<string | number>();
+      return items.filter((item) => {
+        const key = String(item.id);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    };
 
-    const filteredBase = baseData.filter((item) => {
+    const userActivityData = viewMode === 'activities' ? dedupeById(myActivities) : [];
+    const catalogData = dedupeById(
+      viewMode === 'activities' ? activityTemplates : scenarioTemplates,
+    );
+
+    const matchesActiveView = (item: Activity | Scenario) => {
       const matchesSearch = item.title
         .toLowerCase()
         .includes(searchQuery.toLowerCase());
@@ -82,19 +239,29 @@ const UnifiedActivitiesScreen = () => {
       if (viewMode === 'activities' && isActivity(item)) {
         matchesFilter = item.type?.toLowerCase() === activeFilter.toLowerCase();
       } else {
-        matchesFilter = item.room === activeFilter;
+        matchesFilter = ((item as Scenario).room || item.room_id)?.toLowerCase() === activeFilter.toLowerCase();
       }
       return matchesFilter && matchesSearch;
-    });
+    };
 
-    const myCreationsList = filteredBase.filter(
-      (item) => item.category === 'My creations',
-    );
-    const appPool = filteredBase.filter(
-      (item) => item.category !== 'My creations',
+    const filteredUserActivities = userActivityData.filter(matchesActiveView);
+    const filteredCatalog = catalogData.filter(matchesActiveView);
+
+    const myCreationsList =
+      viewMode === 'activities'
+        ? filteredUserActivities
+        : filteredCatalog.filter((item) => item.category === 'My creations');
+
+    const appPool =
+      viewMode === 'activities'
+        ? filteredCatalog
+        : filteredCatalog.filter((item) => item.category !== 'My creations');
+
+    const recommendedPool = appPool.filter(
+      (item) => item.category !== 'Simple recipes',
     );
 
-    const recommendedList = getDynamicRecommendations(appPool, currentState);
+    const recommendedList = getDynamicRecommendations(recommendedPool, currentState);
 
     const simpleRecipesList = appPool.filter(
       (item) => item.category === 'Simple recipes',
@@ -104,9 +271,9 @@ const UnifiedActivitiesScreen = () => {
       myCreations: myCreationsList,
       recommended: recommendedList,
       simpleRecipes: simpleRecipesList,
-      isEmpty: filteredBase.length === 0,
+      isEmpty: filteredUserActivities.length + filteredCatalog.length === 0,
     };
-  }, [viewMode, activeFilter, searchQuery, myActivities, currentState]);
+  }, [viewMode, activeFilter, searchQuery, myActivities, activityTemplates, scenarioTemplates, currentState]);
 
   const handleViewModeChange = (mode: 'activities' | 'scenarios') => {
     setViewMode(mode);
@@ -114,11 +281,104 @@ const UnifiedActivitiesScreen = () => {
     setSearchQuery('');
   };
 
+  const generateAiIdeas = useCallback(async () => {
+    setIsAiModalVisible(true);
+    setIsGeneratingAiIdeas(true);
+
+    try {
+      const ideas = await fetchAiActivityIdeas({
+        mood: currentState,
+        activeFilter,
+        prompt: searchQuery,
+        source: 'activities-ai-modal',
+      });
+
+      setAiIdeas(ideas);
+    } catch (error: any) {
+      console.error('Failed to generate AI activity ideas:', error);
+      const message = await getFunctionErrorMessage(error);
+      Alert.alert(
+        'Could not generate ideas',
+        message,
+      );
+      setAiIdeas([]);
+    } finally {
+      setIsGeneratingAiIdeas(false);
+    }
+  }, [activeFilter, currentState, searchQuery]);
+
+  const saveAiIdea = async (idea: AiActivityIdea) => {
+    if (isSavingAiIdeaId) return;
+
+    setIsSavingAiIdeaId(idea.id);
+
+    try {
+      const mappedActivity = await saveAiActivityIdea(idea);
+      setMyActivities((current) => [mappedActivity, ...current]);
+      setAiIdeas((current) => current.filter((item) => item.id !== idea.id));
+      setIsAiModalVisible(false);
+    } catch (error: any) {
+      console.error('Failed to save AI activity:', error);
+      Alert.alert('Could not save activity', error.message || 'Please try again.');
+    } finally {
+      setIsSavingAiIdeaId(null);
+    }
+  };
+
+  const saveAiRecommendation = async (idea: AiActivityIdea) => {
+    if (isSavingAiRecommendationId) return;
+
+    setIsSavingAiRecommendationId(idea.id);
+
+    try {
+      const mappedActivity = await saveAiActivityIdea(idea);
+      setMyActivities((current) => [mappedActivity, ...current]);
+      setAiRecommendedIdeas((current) => current.filter((item) => item.id !== idea.id));
+      router.push({
+        pathname: '/activity-details',
+        params: {
+          id: mappedActivity.id,
+          isNew: 'true',
+        },
+      });
+    } catch (error: any) {
+      console.error('Failed to save AI recommendation:', error);
+      Alert.alert('Could not save activity', error.message || 'Please try again.');
+    } finally {
+      setIsSavingAiRecommendationId(null);
+    }
+  };
+
+  const recommendedData = useMemo(() => {
+    if (viewMode === 'activities' && aiRecommendedIdeas.length > 0) {
+      return aiRecommendedIdeas.map((idea) => ({
+        id: idea.id,
+        title: idea.title,
+        image: resolveCatalogImage(idea.image),
+        time: isSavingAiRecommendationId === idea.id ? 'Saving...' : `${idea.durationMinutes} min`,
+        room: idea.roomName,
+        onPress: () => saveAiRecommendation(idea),
+      }));
+    }
+
+    return processedData.recommended.slice(0, 5).map((item) => ({
+      ...item,
+      time: isActivity(item) ? getActivityTime(item) : undefined,
+      room: item.room || (item as any).room_id,
+    }));
+  }, [aiRecommendedIdeas, isSavingAiRecommendationId, processedData.recommended, saveAiRecommendation, viewMode]);
+
   if (!fontsLoaded) return null;
 
   return (
-    <SafeAreaView className="flex-1 bg-[#F0F2EB]" edges={['top']}>
+    <SafeAreaView
+      className="flex-1 bg-[#F0F2EB]"
+      edges={['top']}
+      accessibilityLanguage="en-US"
+    >
       <ScrollView
+        scrollEventThrottle={16}
+        importantForAccessibility={isMenuOpen ? 'no-hide-descendants' : 'auto'}
         contentContainerStyle={{
           paddingTop: Platform.OS === 'ios' ? 20 : 10,
           paddingBottom: 120,
@@ -139,12 +399,18 @@ const UnifiedActivitiesScreen = () => {
         />
 
         {processedData.isEmpty ? (
-          <View className="mt-10 px-8 items-center">
+          <View
+            className="mt-10 px-8 items-center"
+            accessible={true}
+            accessibilityLabel={`No ${viewMode} found matching "${activeFilter}"`}
+          >
             <Ionicons
               name="search-outline"
               size={40}
               color="#8E8E93"
               style={{ marginBottom: 10 }}
+              importantForAccessibility="no"
+              accessibilityElementsHidden={true}
             />
             <Text
               className="text-center text-[#8E8E93] text-[16px]"
@@ -161,19 +427,24 @@ const UnifiedActivitiesScreen = () => {
                 data={processedData.myCreations.map((item) => ({
                   ...item,
                   time: isActivity(item) ? getActivityTime(item) : undefined,
+                  room: item.room || (item as any).room_id,
                 }))}
                 showTime={viewMode === 'activities'}
+                onEndReached={() => {
+                  if (viewMode === 'activities' && hasMore && !isLoadingRef.current) {
+                    loadActivities(true);
+                  }
+                }}
+
               />
             )}
 
-            {processedData.recommended.length > 0 && (
+            {(recommendedData.length > 0 || isLoadingAiRecommendations) && (
               <CarouselSection
-                title="Recommended"
-                data={processedData.recommended.slice(0, 5).map((item) => ({
-                  ...item,
-                  time: isActivity(item) ? getActivityTime(item) : undefined,
-                }))}
+                title={viewMode === 'activities' ? 'AI recommended' : 'Recommended'}
+                data={recommendedData}
                 showTime={viewMode === 'activities'}
+                isLoadingMore={isLoadingAiRecommendations}
               />
             )}
 
@@ -185,6 +456,7 @@ const UnifiedActivitiesScreen = () => {
                   data={processedData.simpleRecipes.map((item) => ({
                     ...item,
                     time: isActivity(item) ? getActivityTime(item) : undefined,
+                    room: item.room || (item as any).room_id,
                   }))}
                   showTime={true}
                 />
@@ -192,7 +464,149 @@ const UnifiedActivitiesScreen = () => {
           </>
         )}
       </ScrollView>
-      <FabMenu isOpen={isMenuOpen} setIsOpen={setIsMenuOpen} />
+      <FabMenu
+        isOpen={isMenuOpen}
+        setIsOpen={setIsMenuOpen}
+        onAiActivityPress={generateAiIdeas}
+      />
+
+      <Modal
+        visible={isAiModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsAiModalVisible(false)}
+      >
+        <View className="flex-1 justify-end bg-black/45">
+          <View className="bg-[#F8FAF4] rounded-t-[34px] max-h-[86%] pt-5 pb-7">
+            <View className="items-center mb-4">
+              <View className="w-12 h-1.5 rounded-full bg-[#D6DED2]" />
+            </View>
+
+            <View className="px-5 mb-4 flex-row items-start justify-between">
+              <View className="flex-1 pr-4">
+                <Text
+                  className="text-[#354F52] text-[28px]"
+                  style={{ fontFamily: 'Nunito_700Bold' }}
+                >
+                  AI activity ideas
+                </Text>
+                <Text
+                  className="text-[#6C7A74] text-sm mt-1"
+                  style={{ fontFamily: 'Nunito_600SemiBold' }}
+                >
+                  Gemini is using your rooms, devices, and recent activities.
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIsAiModalVisible(false)}
+                className="w-10 h-10 rounded-full bg-white items-center justify-center"
+                accessibilityRole="button"
+                accessibilityLabel="Close AI ideas"
+              >
+                <Ionicons name="close" size={22} color="#354F52" />
+              </TouchableOpacity>
+            </View>
+
+            {isGeneratingAiIdeas ? (
+              <View className="min-h-[360px] items-center justify-center px-8">
+                <ActivityIndicator color="#548F53" size="large" />
+                <Text
+                  className="text-[#354F52] text-base mt-4 text-center"
+                  style={{ fontFamily: 'Nunito_700Bold' }}
+                >
+                  Creating ideas for your home...
+                </Text>
+              </View>
+            ) : (
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 18 }}
+              >
+                {aiIdeas.map((idea) => (
+                  <View
+                    key={idea.id}
+                    className="bg-white rounded-[28px] overflow-hidden mb-4 border border-[#E3E9DF]"
+                  >
+                    <Image
+                      source={resolveCatalogImage(idea.image)}
+                      className="w-full h-[150px]"
+                      resizeMode="cover"
+                    />
+
+                    <View className="p-5">
+                      <View className="flex-row items-start justify-between mb-2">
+                        <View className="flex-1 pr-3">
+                          <Text
+                            className="text-[#354F52] text-xl"
+                            style={{ fontFamily: 'Nunito_700Bold' }}
+                          >
+                            {idea.title}
+                          </Text>
+                          <Text
+                            className="text-[#6C7A74] text-sm mt-1"
+                            style={{ fontFamily: 'Nunito_600SemiBold' }}
+                          >
+                            {idea.roomName} · {idea.durationMinutes} min · {idea.type}
+                          </Text>
+                        </View>
+                        <View className="bg-[#E7F1E3] rounded-full px-3 py-2">
+                          <Ionicons name="sparkles-outline" size={18} color="#548F53" />
+                        </View>
+                      </View>
+
+                      <Text
+                        className="text-[#354F52] text-sm leading-5 mb-3"
+                        style={{ fontFamily: 'Nunito_400Regular' }}
+                      >
+                        {idea.description}
+                      </Text>
+
+                      <Text
+                        className="text-[#6C7A74] text-xs mb-4"
+                        style={{ fontFamily: 'Nunito_600SemiBold' }}
+                      >
+                        {idea.reason}
+                      </Text>
+
+                      <TouchableOpacity
+                        onPress={() => saveAiIdea(idea)}
+                        disabled={isSavingAiIdeaId !== null}
+                        className="bg-[#548F53] rounded-full py-4 items-center flex-row justify-center"
+                      >
+                        {isSavingAiIdeaId === idea.id ? (
+                          <ActivityIndicator color="white" size="small" />
+                        ) : (
+                          <>
+                            <Ionicons name="add-circle-outline" size={20} color="white" />
+                            <Text
+                              className="text-white text-base ml-2"
+                              style={{ fontFamily: 'Nunito_700Bold' }}
+                            >
+                              Save activity
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+
+                {aiIdeas.length === 0 && (
+                  <View className="items-center py-12 px-8">
+                    <Ionicons name="sparkles-outline" size={34} color="#7A8C85" />
+                    <Text
+                      className="text-[#7A8C85] text-center mt-3"
+                      style={{ fontFamily: 'Nunito_600SemiBold' }}
+                    >
+                      No ideas yet. Try again in a moment.
+                    </Text>
+                  </View>
+                )}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };

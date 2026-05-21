@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
+  AccessibilityInfo,
   Modal,
   Platform,
   Text,
@@ -14,7 +15,6 @@ interface CustomAlertProps {
   visible: boolean;
   title: string;
   message: string;
-  // Nova prop para decidir o ícone (opcional, default é 'info')
   type?: 'success' | 'error' | 'warning' | 'info';
   onClose: () => void;
   onConfirm?: () => void;
@@ -27,29 +27,33 @@ export const CustomAlert = ({
   visible,
   title,
   message,
-  type = 'info', // Valor por defeito
+  type = 'info',
   onClose,
   onConfirm,
   confirmText = 'OK',
   cancelText = 'Cancel',
   isDestructive = false,
 }: CustomAlertProps) => {
-  // Função para escolher o ícone e a cor baseada no tipo
   const getHeaderConfig = () => {
     switch (type) {
       case 'success':
-        return { icon: 'checkmark-circle', color: '#548F53' }; // Verde
+        return { icon: 'checkmark-circle', color: '#548F53' };
       case 'error':
-        return { icon: 'alert-circle', color: '#D32F2F' }; // Vermelho
+        return { icon: 'alert-circle', color: '#D32F2F' };
       case 'warning':
-        return { icon: 'warning', color: '#FFA000' }; // Laranja
+        return { icon: 'warning', color: '#FFA000' };
       case 'info':
       default:
-        return { icon: 'information-circle', color: '#548F53' }; // Verde/Azul
+        return { icon: 'information-circle', color: '#548F53' };
     }
   };
 
   const headerConfig = getHeaderConfig();
+  useEffect(() => {
+    if (visible) {
+      AccessibilityInfo.announceForAccessibility(`Alert: ${title}. ${message}`);
+    }
+  }, [visible, title, message]);
 
   return (
     <Modal
@@ -58,22 +62,31 @@ export const CustomAlert = ({
       animationType="fade"
       onRequestClose={onClose}
     >
-      {/* SUBSTITUIÇÃO: Fundo preto semi-transparente pelo BlurView */}
       <BlurView
         intensity={Platform.OS === 'android' ? 10 : 10}
-        tint="dark" // 'dark' mantém o aspeto escurecido mas com blur
+        tint="dark"
         experimentalBlurMethod="dimezisBlurView"
         className="flex-1 justify-center items-center px-6"
+        accessibilityViewIsModal={true}
       >
-        {/* Deteta toque fora para fechar */}
-        <TouchableWithoutFeedback onPress={onClose}>
+        <TouchableWithoutFeedback
+          onPress={onClose}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss alert"
+        >
           <View className="absolute inset-0" />
         </TouchableWithoutFeedback>
 
-        {/* Cartão Branco */}
-        <View className="bg-white w-full rounded-3xl p-6 items-center shadow-lg">
-          {/* NOVO: Ícone no topo */}
-          <View className="mb-4">
+        <View
+          accessibilityRole="alert"
+          className="bg-white w-full rounded-3xl p-6 items-center shadow-lg"
+        >
+          <View
+            className="mb-4"
+            importantForAccessibility="no"
+            accessibilityElementsHidden={true}
+          >
             <Ionicons
               name={headerConfig.icon as any}
               size={48}
@@ -82,27 +95,32 @@ export const CustomAlert = ({
           </View>
 
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-2xl text-[#354F52] mb-2 text-center"
             style={{ fontFamily: 'Nunito_700Bold' }}
+            accessibilityRole="header"
           >
             {title}
           </Text>
 
           <Text
+            maxFontSizeMultiplier={1.2}
             className="text-base text-[#354F52] text-center mb-6 leading-5"
             style={{ fontFamily: 'Nunito_400Regular' }}
           >
             {message}
           </Text>
 
-          {/* Botões */}
           <View className="flex-row w-full space-x-3 gap-3">
             {onConfirm && (
               <TouchableOpacity
                 onPress={onClose}
+                accessible
+                accessibilityRole="button"
                 className="flex-1 py-3 items-center"
               >
                 <Text
+                  maxFontSizeMultiplier={1.2}
                   className="text-[#548F53] text-lg"
                   style={{ fontFamily: 'Nunito_700Bold' }}
                 >
@@ -111,17 +129,20 @@ export const CustomAlert = ({
               </TouchableOpacity>
             )}
 
-            {/* Botão Confirmar */}
             <TouchableOpacity
               onPress={() => {
                 if (onConfirm) onConfirm();
                 onClose();
               }}
-              // Se for destrutivo (ex: apagar), podes querer mudar a cor para vermelho aqui também
+              accessibilityRole="button"
+              accessibilityHint={
+                isDestructive ? 'This action cannot be undone' : ''
+              }
               className={`flex-1 py-3 rounded-full items-center bg-[#548F53]`}
             >
               <Text
-                className={`text-lg text-white`}
+                maxFontSizeMultiplier={1.2}
+                className="text-lg text-white"
                 style={{ fontFamily: 'Nunito_700Bold' }}
               >
                 {confirmText}
