@@ -92,6 +92,47 @@ export default function NewActivityFlow() {
   const [scenarioTemplates, setScenarioTemplates] = useState<Scenario[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
+  const linkRoomTvDevices = async (activityId: number, homeId: number, roomId: number | null) => {
+    if (!roomId) return;
+
+    try {
+      const { data: tvDevices, error: devicesError } = await supabase
+        .from('devices')
+        .select('id')
+        .eq('home_id', homeId)
+        .eq('room_id', roomId)
+        .in('type', ['tv', 'display']);
+
+      if (devicesError) throw devicesError;
+      if (!tvDevices?.length) return;
+
+      const { data: existingLinks, error: existingError } = await supabase
+        .from('activity_devices')
+        .select('device_id')
+        .eq('activity_id', activityId);
+
+      if (existingError) throw existingError;
+
+      const linkedDeviceIds = new Set((existingLinks || []).map((link) => link.device_id));
+      const linksToInsert = tvDevices
+        .filter((device) => !linkedDeviceIds.has(device.id))
+        .map((device) => ({
+          activity_id: activityId,
+          device_id: device.id,
+        }));
+
+      if (linksToInsert.length === 0) return;
+
+      const { error: insertError } = await supabase
+        .from('activity_devices')
+        .insert(linksToInsert);
+
+      if (insertError) throw insertError;
+    } catch (error) {
+      console.warn('Could not auto-link room TV devices to activity:', error);
+    }
+  };
+
   useEffect(() => {
     if (!editId) return;
 
@@ -297,22 +338,33 @@ export default function NewActivityFlow() {
 
       // 2. Resolve room_id string to database room integer ID
       let dbRoomId = null;
+      let currentHomeId: number | null = null;
       if (room_id) {
         const { data: homeAssoc } = await supabase
           .from('user_homes')
           .select('home_id')
           .eq('user_id', user.id)
           .maybeSingle();
-        
-        if (homeAssoc?.home_id) {
+
+        currentHomeId = homeAssoc?.home_id ?? null;
+
+        if (currentHomeId) {
           const { data: roomData } = await supabase
             .from('rooms')
             .select('id')
-            .eq('home_id', homeAssoc.home_id)
+            .eq('home_id', currentHomeId)
             .eq('name', room_id)
             .maybeSingle();
           dbRoomId = roomData?.id || null;
         }
+      } else {
+        const { data: homeAssoc } = await supabase
+          .from('user_homes')
+          .select('home_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        currentHomeId = homeAssoc?.home_id ?? null;
       }
 
       // 3. Tentar inserir/atualizar na DB
@@ -325,6 +377,7 @@ export default function NewActivityFlow() {
         content_id: selectedContentId || null,
         scenario_id: selectedScenarioId ? parseInt(selectedScenarioId.toString().replace(/\D/g, '')) : 1,
         room_id: dbRoomId,
+        home_id: currentHomeId,
       };
 
       const { data, error } = isEditMode && editId
@@ -351,6 +404,10 @@ export default function NewActivityFlow() {
         console.error('Erro no Supabase:', error);
         alert('Erro ao guardar na Base de Dados: ' + error.message);
         return;
+      }
+
+      if (data?.id && currentHomeId) {
+        await linkRoomTvDevices(Number(data.id), currentHomeId, dbRoomId);
       }
 
       // 3. Trigger Notification

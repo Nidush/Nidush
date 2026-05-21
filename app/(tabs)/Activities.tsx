@@ -78,6 +78,12 @@ const UnifiedActivitiesScreen = () => {
       return;
     }
 
+    const { data: homeAssoc } = await supabase
+      .from('user_homes')
+      .select('home_id')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
     isLoadingRef.current = true;
     const currentPage = isNextPage ? page + 1 : 0;
     const start = currentPage * PAGE_SIZE;
@@ -88,9 +94,14 @@ const UnifiedActivitiesScreen = () => {
     let query = supabase
       .from('activities')
       .select('*', { count: 'exact' })
-      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .range(start, end);
+
+    if (homeAssoc?.home_id) {
+      query = query.eq('home_id', homeAssoc.home_id);
+    } else {
+      query = query.eq('user_id', user.id);
+    }
 
 
     if (debouncedSearchQuery) {

@@ -40,6 +40,8 @@ interface DeviceCardProps {
   item: Device;
   onToggle: () => void;
   onUpdateLevel: (level: number) => void;
+  onPress?: () => void;
+  onAdjustingChange?: (isAdjusting: boolean) => void;
 }
 
 const GetDeviceIcon = ({ type, size = 40, color, isFilled }: IconProps) => {
@@ -200,13 +202,20 @@ const GetDeviceIcon = ({ type, size = 40, color, isFilled }: IconProps) => {
   }
 };
 
-const DeviceCard = ({ item, onToggle, onUpdateLevel }: DeviceCardProps) => {
+const DeviceCard = ({
+  item,
+  onToggle,
+  onUpdateLevel,
+  onPress,
+  onAdjustingChange,
+}: DeviceCardProps) => {
   const isOn = item.status === 'On';
   const isDimmable = item.type === 'light';
 
   const [level, setLevel] = useState(item.level ?? 100);
 
   const stateRef = useRef({ isOn, isDimmable, level });
+  const dragStartLevelRef = useRef(level);
 
   useEffect(() => {
     stateRef.current = { isOn, isDimmable, level };
@@ -217,18 +226,36 @@ const DeviceCard = ({ item, onToggle, onUpdateLevel }: DeviceCardProps) => {
       onMoveShouldSetPanResponder: (_, { dx, dy }) => {
         const { isOn, isDimmable } = stateRef.current;
         return (
-          isOn && isDimmable && Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 5
+          isOn && isDimmable && Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8
+        );
+      },
+      onMoveShouldSetPanResponderCapture: (_, { dx, dy }) => {
+        const { isOn, isDimmable } = stateRef.current;
+        return (
+          isOn && isDimmable && Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8
         );
       },
       onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        dragStartLevelRef.current = stateRef.current.level;
+        onAdjustingChange?.(true);
+      },
 
       onPanResponderMove: (_, gestureState) => {
-        const adjustment = -gestureState.dy / 25;
-        setLevel((prev) => Math.max(0, Math.min(100, prev + adjustment)));
+        const nextLevel = Math.max(
+          0,
+          Math.min(100, dragStartLevelRef.current - gestureState.dy / 1.4),
+        );
+        stateRef.current.level = nextLevel;
+        setLevel(nextLevel);
       },
 
       onPanResponderRelease: () => {
-        onUpdateLevel(stateRef.current.level);
+        onUpdateLevel(Math.round(stateRef.current.level));
+        onAdjustingChange?.(false);
+      },
+      onPanResponderTerminate: () => {
+        onAdjustingChange?.(false);
       },
     }),
   ).current;
@@ -251,6 +278,16 @@ const DeviceCard = ({ item, onToggle, onUpdateLevel }: DeviceCardProps) => {
     <View
       className={`w-[48%] ${containerBg} ${borderStyle} rounded-2xl h-44 mb-4 overflow-hidden relative`}
       {...panResponder.panHandlers}
+      onTouchStart={() => {
+        if (isOn && isDimmable) {
+          onAdjustingChange?.(true);
+        }
+      }}
+      onTouchEnd={() => {
+        if (isOn && isDimmable) {
+          onAdjustingChange?.(false);
+        }
+      }}
       accessible={false}
     >
       <View
@@ -313,7 +350,11 @@ const DeviceCard = ({ item, onToggle, onUpdateLevel }: DeviceCardProps) => {
           style={{ height: `${level}%` }}
         />
       )}
-      <View className="flex-1 p-4 justify-between z-10 bg-transparent">
+      <TouchableOpacity
+        className="flex-1 p-4 justify-between z-10 bg-transparent"
+        activeOpacity={0.96}
+        onPress={onPress}
+      >
         <View
           className="flex-row justify-between items-start "
         >
@@ -328,24 +369,26 @@ const DeviceCard = ({ item, onToggle, onUpdateLevel }: DeviceCardProps) => {
             />
           </View>
 
-          <TouchableOpacity
-            onPress={(e) => {
-              e.stopPropagation();
-              onToggle();
-            }}
-            className={`w-12 h-12 rounded-full border items-center justify-center 
-              ${isOn ? 'bg-[#548F53] border-transparent' : 'border-[#548f537f] bg-transparent'}`}
-            accessibilityRole="button"
-            accessibilityLabel={`${isOn ? 'Turn off' : 'Turn on'} ${item.name}`}
-            accessibilityHint={isOn ? 'Double tap to turn off.' : 'Double tap to turn on.'}
-          >
-            <MaterialIcons
-              name="power-settings-new"
-              size={25}
-              color={isOn ? '#FFFFFF' : '#354F52'}
-              accessible={false}
-            />
-          </TouchableOpacity>
+          <View className="items-end">
+            <TouchableOpacity
+              onPress={(e) => {
+                e.stopPropagation();
+                onToggle();
+              }}
+              className={`w-12 h-12 rounded-full border items-center justify-center 
+                ${isOn ? 'bg-[#548F53] border-transparent' : 'border-[#548f537f] bg-transparent'}`}
+              accessibilityRole="button"
+              accessibilityLabel={`${isOn ? 'Turn off' : 'Turn on'} ${item.name}`}
+              accessibilityHint={isOn ? 'Double tap to turn off.' : 'Double tap to turn on.'}
+            >
+              <MaterialIcons
+                name="power-settings-new"
+                size={25}
+                color={isOn ? '#FFFFFF' : '#354F52'}
+                accessible={false}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View
@@ -368,7 +411,7 @@ const DeviceCard = ({ item, onToggle, onUpdateLevel }: DeviceCardProps) => {
             {isOn ? (isDimmable ? `${Math.round(level)}%` : 'On') : 'Off'}
           </Text>
         </View>
-      </View>
+      </TouchableOpacity>
     </View>
   );
 };

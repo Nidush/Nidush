@@ -173,14 +173,19 @@ export default function Index() {
         setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'Utilizador');
         
         let [
+          homeAssocResult,
           activitiesResult,
           shortcutsResult,
           userResult,
         ] = await Promise.all([
           supabase
+            .from('user_homes')
+            .select('home_id')
+            .eq('user_id', user.id)
+            .maybeSingle(),
+          supabase
             .from('activities')
             .select('*')
-            .eq('user_id', user.id)
             .order('created_at', { ascending: false }),
           supabase
             .from('shortcuts')
@@ -193,6 +198,20 @@ export default function Index() {
             .eq('auth_uid', user.id)
             .maybeSingle(),
         ]);
+
+        if (homeAssocResult.data?.home_id) {
+          activitiesResult = await supabase
+            .from('activities')
+            .select('*')
+            .eq('home_id', homeAssocResult.data.home_id)
+            .order('created_at', { ascending: false });
+        } else {
+          activitiesResult = await supabase
+            .from('activities')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
+        }
 
         if ((!userResult.data || userResult.error) && user.email) {
           userResult = await supabase

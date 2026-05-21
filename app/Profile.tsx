@@ -202,7 +202,8 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
   const refreshConnectedDevices = async (userId: string, homeId: number | string | null) => {
     setIsRefreshingDevices(true);
     try {
-      await loadConnectedDevices(userId, homeId);
+      const resolvedHomeId = homeId ?? (await getCurrentUserHomeId(userId));
+      await loadConnectedDevices(userId, resolvedHomeId);
     } finally {
       setIsRefreshingDevices(false);
     }
