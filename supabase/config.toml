@@ -26,6 +26,9 @@ verify_jwt = false
 [functions.request-device-discovery]
 verify_jwt = true
 
+[functions.generate-activity-ideas]
+verify_jwt = true
+
 [functions.claim-device-discovery]
 verify_jwt = false
 

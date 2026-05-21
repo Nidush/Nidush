@@ -1,0 +1,542 @@
+import { createClient } from '@supabase/supabase-js'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Max-Age': '86400',
+}
+
+const ACTIVITY_TYPES = ['Cooking', 'Meditation', 'Workout', 'Audiobooks', 'Yoga', 'Reading', 'other'] as const
+const IMAGE_KEYS = [
+  'activities_for_you/sunrise_flow.png',
+  'activities_for_you/evening_read.png',
+  'activities_for_you/stretching.png',
+  'meditation_content/video_sessions/morning_zen.png',
+  'meditation_activities/recommended/visualization_for_success.png',
+  'cooking_activities/recommended/eggs_benedict.png',
+  'cooking_activities/recommended/brownies.png',
+  'Scenarios/cinema_night.png',
+  'Scenarios/morning_brew.png',
+  'Scenarios/forest_bathing.png',
+] as const
+
+type ActivityType = typeof ACTIVITY_TYPES[number]
+
+type RoomRow = {
+  id: number
+  name: string
+}
+
+type DeviceRow = {
+  id: number
+  name: string
+  type: string | null
+  room_id: number | null
+  status: string | null
+  connectivity_status?: string | null
+}
+
+type GeminiIdea = {
+  title?: unknown
+  description?: unknown
+  type?: unknown
+  roomId?: unknown
+  roomName?: unknown
+  durationMinutes?: unknown
+  image?: unknown
+  reason?: unknown
+  devicePlan?: unknown
+  contentTitle?: unknown
+  contentType?: unknown
+  contentCategory?: unknown
+  instructions?: unknown
+  ingredients?: unknown
+}
+
+const clampText = (value: unknown, fallback: string, maxLength: number) => {
+  const text = String(value ?? '').replace(/\s+/g, ' ').trim()
+  return (text || fallback).slice(0, maxLength)
+}
+
+const normalizeType = (value: unknown): ActivityType => {
+  const raw = String(value ?? '').toLowerCase()
+  if (raw.includes('cook')) return 'Cooking'
+  if (raw.includes('meditat') || raw.includes('breath')) return 'Meditation'
+  if (raw.includes('workout') || raw.includes('fitness') || raw.includes('stretch')) return 'Workout'
+  if (raw.includes('audio') || raw.includes('book')) return 'Audiobooks'
+  if (raw.includes('yoga')) return 'Yoga'
+  if (raw.includes('read')) return 'Reading'
+  return 'other'
+}
+
+const normalizeImage = (value: unknown) => {
+  const image = String(value ?? '')
+  return IMAGE_KEYS.includes(image as typeof IMAGE_KEYS[number])
+    ? image
+    : 'activities_for_you/sunrise_flow.png'
+}
+
+const slugify = (value: unknown) =>
+  String(value ?? 'activity')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 42) || 'activity'
+
+const normalizeContentType = (activityType: ActivityType, value: unknown) => {
+  const raw = String(value ?? '').toLowerCase()
+  if (['video', 'recipe', 'audio', 'workout', 'exercise'].includes(raw)) return raw
+  if (activityType === 'Cooking') return 'recipe'
+  if (activityType === 'Audiobooks' || activityType === 'Reading' || activityType === 'Meditation') return 'audio'
+  if (activityType === 'Workout' || activityType === 'Yoga') return 'exercise'
+  return 'audio'
+}
+
+const normalizeContentCategory = (activityType: ActivityType, value: unknown) => {
+  const raw = String(value ?? '').toLowerCase()
+  if (raw) return raw.slice(0, 40)
+  if (activityType === 'Cooking') return 'cooking'
+  if (activityType === 'Audiobooks' || activityType === 'Reading') return 'audiobook'
+  if (activityType === 'Workout' || activityType === 'Yoga') return 'workout'
+  if (activityType === 'Meditation') return 'meditation'
+  return 'general'
+}
+
+const normalizeInstructions = (value: unknown, activityType: ActivityType) => {
+  if (Array.isArray(value)) {
+    const steps = value
+      .slice(0, 8)
+      .map((step) => {
+        if (typeof step === 'string') return clampText(step, '', 160)
+        if (typeof step === 'object' && step !== null) {
+          const record = step as Record<string, unknown>
+          const text = clampText(record.text ?? record.instruction ?? record.name, '', 160)
+          const duration = Number(record.duration ?? record.seconds)
+          return Number.isFinite(duration) && duration > 0
+            ? { text, duration: Math.min(Math.round(duration), 3600) }
+            : text
+        }
+        return ''
+      })
+      .filter(Boolean)
+
+    if (steps.length > 0) return steps
+  }
+
+  if (activityType === 'Cooking') {
+    return [
+      'Prepare all ingredients before turning on the heat.',
+      'Follow the recipe steps calmly and keep the workspace clear.',
+      'Plate the dish and reset the kitchen devices when finished.',
+    ]
+  }
+
+  if (activityType === 'Workout' || activityType === 'Yoga') {
+    return [
+      { text: 'Warm up with gentle mobility.', duration: 180 },
+      { text: 'Move through the main sequence at a steady pace.', duration: 600 },
+      { text: 'Cool down and breathe slowly.', duration: 180 },
+    ]
+  }
+
+  return [
+    { text: 'Settle into the room and remove distractions.', duration: 60 },
+    { text: 'Follow the guided focus moment.', duration: 420 },
+    { text: 'Close the activity with one small intention.', duration: 60 },
+  ]
+}
+
+const normalizeIngredients = (value: unknown, activityType: ActivityType) => {
+  if (activityType !== 'Cooking') return []
+
+  if (Array.isArray(value)) {
+    const ingredients = value
+      .slice(0, 10)
+      .map((ingredient) => {
+        if (typeof ingredient === 'string') {
+          return { item: clampText(ingredient, '', 70), amount: 'to taste' }
+        }
+        if (typeof ingredient === 'object' && ingredient !== null) {
+          const record = ingredient as Record<string, unknown>
+          return {
+            item: clampText(record.item ?? record.name, '', 70),
+            amount: clampText(record.amount ?? record.quantity, 'to taste', 50),
+          }
+        }
+        return null
+      })
+      .filter((ingredient): ingredient is { item: string; amount: string } => Boolean(ingredient?.item))
+
+    if (ingredients.length > 0) return ingredients
+  }
+
+  return [
+    { item: 'Main ingredient', amount: '1 portion' },
+    { item: 'Olive oil', amount: '1 tbsp' },
+    { item: 'Salt and herbs', amount: 'to taste' },
+  ]
+}
+
+const parseJsonObject = (text: string) => {
+  const trimmed = text
+    .trim()
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```$/i, '')
+    .trim()
+
+  try {
+    return JSON.parse(trimmed)
+  } catch {
+    const start = trimmed.indexOf('{')
+    const end = trimmed.lastIndexOf('}')
+    if (start >= 0 && end > start) {
+      return JSON.parse(trimmed.slice(start, end + 1))
+    }
+    throw new Error('Gemini did not return valid JSON.')
+  }
+}
+
+const findRoom = (rooms: RoomRow[], roomName: unknown) => {
+  if (rooms.length === 0) return null
+
+  const normalized = String(roomName ?? '').trim().toLowerCase()
+  const direct = rooms.find((room) => room.name.toLowerCase() === normalized)
+  if (direct) return direct
+
+  const partial = rooms.find((room) => normalized.includes(room.name.toLowerCase()))
+  return partial ?? rooms[0]
+}
+
+const fallbackIdeas = (rooms: RoomRow[]) => {
+  const livingRoom = rooms.find((room) => /living|sala/i.test(room.name)) ?? rooms[0]
+  const kitchen = rooms.find((room) => /kitchen|cozinha/i.test(room.name)) ?? rooms[0]
+  const bedroom = rooms.find((room) => /bed|quarto/i.test(room.name)) ?? rooms[0]
+
+  return [
+    {
+      title: 'Calm Reset',
+      description: 'A short reset with soft breathing, low lights, and a quiet room transition.',
+      type: 'Meditation',
+      roomName: livingRoom?.name,
+      durationMinutes: 10,
+      image: 'meditation_content/video_sessions/morning_zen.png',
+      reason: 'A simple recovery moment for your current home setup.',
+      devicePlan: ['Dim lights', 'Use nearby speaker if available'],
+      contentTitle: 'Calm Reset Guide',
+      contentType: 'audio',
+      contentCategory: 'meditation',
+      instructions: [
+        { text: 'Sit comfortably and soften your shoulders.', duration: 60 },
+        { text: 'Breathe in for four counts and out for six counts.', duration: 420 },
+        { text: 'Open your eyes and set one small intention.', duration: 60 },
+      ],
+      ingredients: [],
+    },
+    {
+      title: 'Kitchen Focus Prep',
+      description: 'A practical cooking prep session with light music and one focused recipe step at a time.',
+      type: 'Cooking',
+      roomName: kitchen?.name,
+      durationMinutes: 25,
+      image: 'cooking_activities/recommended/eggs_benedict.png',
+      reason: 'Good for turning kitchen devices into a guided routine.',
+      devicePlan: ['Turn on kitchen lights', 'Keep speaker available'],
+      contentTitle: 'Kitchen Focus Prep Recipe',
+      contentType: 'recipe',
+      contentCategory: 'cooking',
+      ingredients: [
+        { item: 'Eggs or protein', amount: '2 portions' },
+        { item: 'Bread or base', amount: '2 slices' },
+        { item: 'Fresh herbs', amount: '1 handful' },
+      ],
+      instructions: [
+        'Prepare ingredients and clear the counter.',
+        'Cook the main component slowly and keep the heat steady.',
+        'Plate everything and finish with herbs.',
+      ],
+    },
+    {
+      title: 'Evening Wind Down',
+      description: 'A gentle reading or audio moment designed to slow the house down before sleep.',
+      type: 'Reading',
+      roomName: bedroom?.name,
+      durationMinutes: 15,
+      image: 'activities_for_you/evening_read.png',
+      reason: 'A low-friction routine for the end of the day.',
+      devicePlan: ['Lower lights', 'Keep screens optional'],
+      contentTitle: 'Evening Wind Down Reading',
+      contentType: 'audio',
+      contentCategory: 'audiobook',
+      instructions: [
+        { text: 'Choose a comfortable spot and lower the lights.', duration: 60 },
+        { text: 'Read or listen without checking the phone.', duration: 780 },
+        { text: 'Write down one sentence to remember.', duration: 60 },
+      ],
+      ingredients: [],
+    },
+  ]
+}
+
+const normalizeIdeas = (rawIdeas: GeminiIdea[], rooms: RoomRow[]) =>
+  rawIdeas.slice(0, 5).map((idea, index) => {
+    const room = findRoom(rooms, idea.roomName)
+    const title = clampText(idea.title, `AI Activity ${index + 1}`, 70)
+    const description = clampText(
+      idea.description,
+      'A personalized activity for your home.',
+      220,
+    )
+    const duration = Number(idea.durationMinutes)
+
+    return {
+      id: `ai-${Date.now()}-${index}`,
+      title,
+      description,
+      type: normalizeType(idea.type),
+      roomId: room?.id ?? (Number.isFinite(Number(idea.roomId)) ? Number(idea.roomId) : null),
+      roomName: room?.name ?? clampText(idea.roomName, 'Home', 60),
+      durationMinutes: Number.isFinite(duration) ? Math.min(Math.max(Math.round(duration), 5), 90) : 15,
+      image: normalizeImage(idea.image),
+      reason: clampText(idea.reason, 'Recommended for your current home setup.', 150),
+      devicePlan: Array.isArray(idea.devicePlan)
+        ? idea.devicePlan.slice(0, 4).map((item) => clampText(item, '', 60)).filter(Boolean)
+        : [],
+      contentTitle: clampText(idea.contentTitle, `${title} Guide`, 80),
+      contentType: normalizeContentType(normalizeType(idea.type), idea.contentType),
+      contentCategory: normalizeContentCategory(normalizeType(idea.type), idea.contentCategory),
+      instructions: normalizeInstructions(idea.instructions, normalizeType(idea.type)),
+      ingredients: normalizeIngredients(idea.ingredients, normalizeType(idea.type)),
+    }
+  })
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders })
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY') ?? Deno.env.get('GOOGLE_AI_API_KEY') ?? ''
+    const geminiModel = Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.5-flash'
+    const authHeader = req.headers.get('Authorization')
+
+    if (!authHeader) throw new Error('Missing authorization header.')
+
+    const authClient = createClient(
+      supabaseUrl,
+      anonKey,
+      { global: { headers: { Authorization: authHeader } } },
+    )
+
+    const { data: { user }, error: authError } = await authClient.auth.getUser()
+    if (authError || !user) throw new Error('Invalid session.')
+
+    const body = await req.json().catch(() => ({}))
+    const mood = clampText(body?.mood, 'RELAXED', 40)
+    const activeFilter = clampText(body?.activeFilter, 'All', 40)
+    const promptHint = clampText(body?.prompt, '', 220)
+    const localTime = clampText(body?.localTime, new Date().toISOString(), 80)
+    const source = clampText(body?.source, 'app', 40)
+    const action = clampText(body?.action, 'generate', 20)
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey)
+
+    const { data: homeAssoc, error: homeError } = await supabase
+      .from('user_homes')
+      .select('home_id')
+      .eq('user_id', user.id)
+      .limit(1)
+      .maybeSingle()
+
+    if (homeError) throw homeError
+    if (!homeAssoc?.home_id) throw new Error('No home connected to this user.')
+
+    const homeId = homeAssoc.home_id
+
+    if (action === 'save') {
+      const idea = body?.idea ?? {}
+      const normalizedIdea = normalizeIdeas([idea], [])[0]
+      const contentId = `ai_${homeId}_${user.id.slice(0, 8)}_${Date.now()}_${slugify(normalizedIdea.title)}`
+
+      const { data: createdContent, error: contentError } = await supabase
+        .from('contents')
+        .insert({
+          id: contentId,
+          title: normalizedIdea.contentTitle,
+          description: normalizedIdea.description,
+          type: normalizedIdea.contentType,
+          category: normalizedIdea.contentCategory,
+          duration: `${normalizedIdea.durationMinutes} min`,
+          image: normalizedIdea.image,
+          instructions: normalizedIdea.instructions,
+          ingredients: normalizedIdea.ingredients,
+          author: 'Nidush AI',
+        })
+        .select('id')
+        .single()
+
+      if (contentError) throw contentError
+
+      const { data: createdActivity, error: activityError } = await supabase
+        .from('activities')
+        .insert({
+          title: normalizedIdea.title,
+          description: normalizedIdea.description,
+          image: normalizedIdea.image,
+          category: 'My creations',
+          type: normalizedIdea.type,
+          content_id: createdContent.id,
+          scenario_id: null,
+          room_id: normalizedIdea.roomId,
+          home_id: homeId,
+          user_id: user.id,
+          focus_mode_enabled: false,
+          shortcuts: false,
+        })
+        .select('*, id')
+        .single()
+
+      if (activityError) throw activityError
+
+      return new Response(
+        JSON.stringify({
+          homeId,
+          content: createdContent,
+          activity: createdActivity,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
+    const [{ data: rooms }, { data: devices }, { data: recentActivities }, { data: profile }] = await Promise.all([
+      supabase
+        .from('rooms')
+        .select('id, name')
+        .eq('home_id', homeId)
+        .order('id', { ascending: true }),
+      supabase
+        .from('devices')
+        .select('id, name, type, room_id, status, connectivity_status')
+        .eq('home_id', homeId)
+        .limit(60),
+      supabase
+        .from('activities')
+        .select('title, type, room_id')
+        .eq('home_id', homeId)
+        .order('id', { ascending: false })
+        .limit(12),
+      supabase
+        .from('users')
+        .select('hobbies, first_name')
+        .eq('auth_uid', user.id)
+        .maybeSingle(),
+    ])
+
+    const safeRooms = (rooms ?? []) as RoomRow[]
+    const safeDevices = (devices ?? []) as DeviceRow[]
+    const roomById = new Map(safeRooms.map((room) => [room.id, room.name]))
+    const deviceSummary = safeDevices.map((device) => ({
+      name: device.name,
+      type: device.type,
+      room: device.room_id ? roomById.get(device.room_id) ?? 'Unknown' : 'Unassigned',
+      status: device.connectivity_status ?? device.status ?? 'unknown',
+    }))
+
+    let rawIdeas: GeminiIdea[] = []
+
+    let modelUsed = 'local-fallback'
+
+    if (geminiApiKey) {
+      try {
+        const prompt = [
+          'You are Nidush, a smart home wellbeing assistant.',
+          'Create exactly 5 personalized activity ideas for this home.',
+          'Use the real rooms and devices. Avoid duplicating recent activity titles.',
+          'Return JSON only with this shape:',
+          '{"ideas":[{"title":"string","description":"string","type":"Cooking|Meditation|Workout|Audiobooks|Yoga|Reading|other","roomName":"one of the provided room names","durationMinutes":number,"image":"one of the allowed image keys","reason":"short reason","devicePlan":["short action"],"contentTitle":"string","contentType":"recipe|audio|exercise|video","contentCategory":"cooking|meditation|workout|audiobook|general","ingredients":[{"item":"string","amount":"string"}],"instructions":[{"text":"string","duration":number}]}]}',
+          `Allowed image keys: ${IMAGE_KEYS.join(', ')}`,
+        `Current mood/state: ${mood}`,
+        `Active app filter: ${activeFilter}`,
+        `Local user time: ${localTime}`,
+        `Recommendation surface: ${source}`,
+        `User hobbies/preferences: ${JSON.stringify(profile?.hobbies ?? [])}`,
+        promptHint ? `User hint: ${promptHint}` : '',
+        `Rooms: ${JSON.stringify(safeRooms.map((room) => room.name))}`,
+        `Devices: ${JSON.stringify(deviceSummary)}`,
+        `Recent activities: ${JSON.stringify(recentActivities ?? [])}`,
+        'For cooking ideas, include concrete ingredients and ordered recipe steps.',
+        'For workout or yoga ideas, include ordered exercise steps with durations in seconds.',
+        'For meditation, reading, or audiobook ideas, include ordered guidance steps.',
+      ].filter(Boolean).join('\n')
+
+        const geminiResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': geminiApiKey,
+            },
+            body: JSON.stringify({
+              contents: [
+                {
+                  role: 'user',
+                  parts: [{ text: prompt }],
+                },
+              ],
+              generationConfig: {
+                temperature: 0.85,
+                responseMimeType: 'application/json',
+              },
+            }),
+          },
+        )
+
+        if (!geminiResponse.ok) {
+          const details = await geminiResponse.text()
+          throw new Error(`Gemini request failed: ${details}`)
+        }
+
+        const geminiData = await geminiResponse.json()
+        const text = geminiData?.candidates?.[0]?.content?.parts
+          ?.map((part: { text?: string }) => part.text ?? '')
+          .join('')
+
+        if (!text) throw new Error('Gemini returned an empty response.')
+
+        const parsed = parseJsonObject(text)
+        rawIdeas = Array.isArray(parsed?.ideas) ? parsed.ideas : []
+        modelUsed = geminiModel
+      } catch (error) {
+        console.warn('Gemini generation failed; using local fallback ideas.', error)
+        rawIdeas = fallbackIdeas(safeRooms)
+      }
+    } else {
+      rawIdeas = fallbackIdeas(safeRooms)
+    }
+
+    const normalizedIdeas = normalizeIdeas(rawIdeas, safeRooms)
+    const fallbackNormalizedIdeas = normalizeIdeas(fallbackIdeas(safeRooms), safeRooms)
+
+    return new Response(
+      JSON.stringify({
+        homeId,
+        model: normalizedIdeas.length > 0 ? modelUsed : 'local-fallback',
+        ideas: normalizedIdeas.length > 0 ? normalizedIdeas : fallbackNormalizedIdeas,
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return new Response(
+      JSON.stringify({ error: message }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    )
+  }
+})

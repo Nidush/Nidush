@@ -16,7 +16,13 @@ import { HomeHeader } from '../../components/Homepage/HomeHeader';
 import { StateWidget } from '../../components/Homepage/StateWidget';
 
 import { CONTENTS, Activity } from '@/constants/data';
+import { resolveCatalogImage } from '@/constants/data/catalogAssets';
 import { useBiometrics } from '@/context/BiometricsContext';
+import {
+  AiActivityIdea,
+  fetchAiActivityIdeas,
+  saveAiActivityIdea,
+} from '@/utils/aiActivities';
 import { getDynamicRecommendations } from '@/utils/recommendationEngine';
 import { supabase } from '@/utils/supabase';
 import {
@@ -68,6 +74,8 @@ export default function Index() {
   const [activityTemplates, setActivityTemplates] = useState<Activity[]>([]);
   const [shortcutRows, setShortcutRows] = useState<ShortcutRow[]>([]);
   const [userHobbies, setUserHobbies] = useState<string[]>([]);
+  const [aiHomeIdeas, setAiHomeIdeas] = useState<AiActivityIdea[]>([]);
+  const [isSavingAiHomeIdeaId, setIsSavingAiHomeIdeaId] = useState<string | null>(null);
   const [isEditingShortcuts, setIsEditingShortcuts] = useState(false);
   const [isSavingShortcutOrder, setIsSavingShortcutOrder] = useState(false);
   const [draggingShortcutId, setDraggingShortcutId] = useState<number | null>(null);
@@ -249,8 +257,63 @@ export default function Index() {
     }, [])
   );
 
+  const loadAiHomeIdeas = useCallback(async () => {
+    try {
+      const ideas = await fetchAiActivityIdeas({
+        mood: currentState,
+        activeFilter: 'Home',
+        prompt: userHobbies.length > 0 ? `Prioritize these hobbies: ${userHobbies.join(', ')}` : '',
+      });
+
+      setAiHomeIdeas(ideas.slice(0, 6));
+    } catch (error) {
+      console.warn('Failed to load AI home recommendations:', error);
+      setAiHomeIdeas([]);
+    }
+  }, [currentState, userHobbies]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadAiHomeIdeas();
+    }, [loadAiHomeIdeas]),
+  );
+
+  const saveHomeAiIdea = useCallback(async (idea: AiActivityIdea) => {
+    if (isSavingAiHomeIdeaId) return;
+
+    setIsSavingAiHomeIdeaId(idea.id);
+
+    try {
+      const savedActivity = await saveAiActivityIdea(idea);
+      setMyActivities((current) => [savedActivity, ...current]);
+      setAiHomeIdeas((current) => current.filter((item) => item.id !== idea.id));
+      router.push({
+        pathname: '/activity-details',
+        params: {
+          id: savedActivity.id,
+          isNew: 'true',
+        },
+      });
+    } catch (error) {
+      console.error('Failed to save AI home recommendation:', error);
+    } finally {
+      setIsSavingAiHomeIdeaId(null);
+    }
+  }, [isSavingAiHomeIdeaId]);
+
   // --- LÓGICA DO CARROSSEL (Recomendações) ---
   const dynamicActivities = useMemo(() => {
+    if (aiHomeIdeas.length > 0) {
+      return aiHomeIdeas.map((idea) => ({
+        id: idea.id,
+        title: idea.title,
+        image: resolveCatalogImage(idea.image),
+        time: isSavingAiHomeIdeaId === idea.id ? 'Saving...' : `${idea.durationMinutes} min`,
+        room: idea.roomName,
+        onPress: () => saveHomeAiIdea(idea),
+      }));
+    }
+
     const formatActivityForCarousel = (item: Activity) => {
       let duration: string | undefined = undefined;
       const cId = item.content_id || item.contentId;
@@ -296,10 +359,13 @@ export default function Index() {
       })
       .slice(0, 8)
       .map(formatActivityForCarousel);
-  }, [activityTemplates, currentState, myActivities, userHobbies]);
+  }, [activityTemplates, aiHomeIdeas, currentState, isSavingAiHomeIdeaId, myActivities, saveHomeAiIdea, userHobbies]);
 
 
-  const dynamicTitle = useMemo(() => 'Activities for you', []);
+  const dynamicTitle = useMemo(
+    () => (aiHomeIdeas.length > 0 ? 'AI activities for you' : 'Activities for you'),
+    [aiHomeIdeas.length],
+  );
 
   // --- NOVA LÓGICA DOS SHORTCUTS (USANDO 'shortcuts' NO PLURAL) ---
   const shortcuts = useMemo(() => {
