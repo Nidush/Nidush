@@ -1,0 +1,5 @@
+-- Intentionally left blank.
+-- This placeholder preserves migration history for environments where
+-- version 20260524124724 was already recorded remotely.
+-- The original generated remote schema dump was removed because it was not
+-- a safe incremental migration and broke foreign-key dependent deploys.
