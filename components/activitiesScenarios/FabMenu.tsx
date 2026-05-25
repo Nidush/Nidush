@@ -52,24 +52,6 @@ export const FabMenu = ({ isOpen, setIsOpen, onAiActivityPress }: FabMenuProps) 
           className="absolute bottom-[110px] right-[25px] items-end z-[11]"
           accessibilityViewIsModal={true}
         >
-          <TouchableOpacity
-            className="mb-4"
-            onPress={() => {
-              setIsOpen(false);
-              router.push('/new-scenario');
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Create new scenario"
-          >
-            <Text
-              maxFontSizeMultiplier={1.2}
-              className="bg-[#548F53] px-10 py-4 rounded-full text-xl text-white shadow-md overflow-hidden"
-              style={{ fontFamily: 'Nunito_600SemiBold' }}
-            >
-              Scenario
-            </Text>
-          </TouchableOpacity>
-
           {onAiActivityPress && (
             <TouchableOpacity
               className="mb-4"
@@ -89,6 +71,24 @@ export const FabMenu = ({ isOpen, setIsOpen, onAiActivityPress }: FabMenuProps) 
               </Text>
             </TouchableOpacity>
           )}
+
+          <TouchableOpacity
+            className="mb-4"
+            onPress={() => {
+              setIsOpen(false);
+              router.push('/new-scenario');
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Create new scenario"
+          >
+            <Text
+              maxFontSizeMultiplier={1.2}
+              className="bg-[#548F53] px-10 py-4 rounded-full text-xl text-white shadow-md overflow-hidden"
+              style={{ fontFamily: 'Nunito_600SemiBold' }}
+            >
+              Scenario
+            </Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             className="mb-4"

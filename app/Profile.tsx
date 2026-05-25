@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, Modal, ScrollView, Switch, Text, TouchableOpacity, View, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { pickImage } from '../utils/imagePicker';
@@ -33,13 +33,10 @@ export default function Profile() {
   const { isAuthenticated, login, logout, userProfile } = useSpotify();
   const {
     data: biometricData,
-    currentState,
   } = useBiometrics();
   const {
-    notifications,
     unreadCount,
     markAllAsRead,
-    clearAll,
     refreshNotifications,
     notificationsEnabled,
     setNotificationsEnabled,
@@ -69,17 +66,6 @@ export default function Profile() {
   const [healthConnectStatus, setHealthConnectStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
 
 const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
-  const notificationStats = useMemo(() => {
-    const importantCount = notifications.filter((item) => !item.read && item.type !== 'system').length;
-    const latest = notifications[0];
-
-    return {
-      total: notifications.length,
-      unread: unreadCount,
-      important: importantCount,
-      latest,
-    };
-  }, [notifications, unreadCount]);
 
   const getWearableSourceLabel = (source?: string) => {
     if (!source || source === 'health_connect') return 'Health Connect';
@@ -100,9 +86,6 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
         minute: '2-digit',
       })
     : null;
-  const currentStateLabel =
-    currentState.charAt(0) + currentState.slice(1).toLowerCase();
-
   const parseHobbies = (value: unknown) => {
     if (!value) return [];
 
@@ -718,16 +701,6 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
           >
             {userName}
           </Text>
-          {joinCode && (
-            <View className="bg-[#E8EDDF] px-4 py-1.5 rounded-full mt-2 border border-[#C8D2C8]">
-              <Text
-                className="text-[#4A5D4E] text-sm"
-                style={{ fontFamily: 'Nunito_700Bold' }}
-              >
-                Join Code: <Text className="text-[#5B8C51] tracking-widest">{joinCode}</Text>
-              </Text>
-            </View>
-          )}
         </View>
 
         {/* Hobbies */}
@@ -965,54 +938,6 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
               {healthConnectStatus === 'connected' ? 'Manage Apps & Data' : 'Open Health Connect'}
             </Text>
           </TouchableOpacity>
-
-          <View className="bg-white/60 rounded-2xl p-4 mt-4 border border-[#E8EDDF]">
-            <View className="flex-row items-center justify-between mb-3">
-              <View>
-                <Text
-                  maxFontSizeMultiplier={1.2}
-                  className="text-[#4A5D4E] text-base"
-                  style={{ fontFamily: 'Nunito_700Bold' }}
-                >
-                  Heart rate
-                </Text>
-                <Text
-                  maxFontSizeMultiplier={1.2}
-                  className="text-gray-500 text-xs mt-0.5"
-                  style={{ fontFamily: 'Nunito_400Regular' }}
-                >
-                  Current: {latestHeartRateLabel} · {currentState.toLowerCase()}
-                </Text>
-              </View>
-              <MaterialIcons name="monitor-heart" size={24} color="#5B8C51" />
-            </View>
-            <View className="bg-[#F5F7F0] rounded-2xl p-3 border border-[#D1D9C5]">
-              <Text
-                maxFontSizeMultiplier={1.2}
-                className="text-[#71806F] text-xs"
-                style={{ fontFamily: 'Nunito_600SemiBold' }}
-              >
-                Nidush analysis
-              </Text>
-              <Text
-                maxFontSizeMultiplier={1.2}
-                className="text-[#4A5D4E] text-lg mt-1"
-                style={{ fontFamily: 'Nunito_700Bold' }}
-              >
-                {biometricData?.heartRate
-                  ? `${currentStateLabel} from ${latestHeartRateLabel}`
-                  : 'Waiting for today\'s watch reading'}
-              </Text>
-              <Text
-                maxFontSizeMultiplier={1.2}
-                className="text-gray-500 text-xs mt-1"
-                style={{ fontFamily: 'Nunito_400Regular' }}
-              >
-                Source: {latestWearableSource}
-                {latestWearableTime ? ` · ${latestWearableTime}` : ''}
-              </Text>
-            </View>
-          </View>
         </View>
 
         {/* Menu Principal */}
@@ -1239,12 +1164,6 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
               </TouchableOpacity>
             </View>
 
-            <View className="flex-row justify-between mb-5">
-              <NotificationStat label="Unread" value={notificationStats.unread} />
-              <NotificationStat label="Important" value={notificationStats.important} />
-              <NotificationStat label="Total" value={notificationStats.total} />
-            </View>
-
             <View className="bg-[#F5F7F0] rounded-3xl p-4 mb-4 border border-[#D1D9C5]">
               <View className="flex-row justify-between items-center">
                 <View className="flex-1 pr-4">
@@ -1275,34 +1194,19 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
             <View className="bg-[#F5F7F0] rounded-3xl p-4 mb-5 border border-[#D1D9C5]">
               <Text
-                className="text-sm text-[#71806F] mb-2"
-                style={{ fontFamily: 'Nunito_600SemiBold' }}
+                className="text-lg text-[#4A5D4E]"
+                style={{ fontFamily: 'Nunito_700Bold' }}
               >
-                Latest
+                {unreadCount > 0
+                  ? `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}`
+                  : 'No unread notifications'}
               </Text>
-              {notificationStats.latest ? (
-                <>
-                  <Text
-                    className="text-lg text-[#4A5D4E]"
-                    style={{ fontFamily: 'Nunito_700Bold' }}
-                  >
-                    {notificationStats.latest.title}
-                  </Text>
-                  <Text
-                    className="text-[#4A5D4E] mt-1 leading-5"
-                    style={{ fontFamily: 'Nunito_400Regular' }}
-                  >
-                    {notificationStats.latest.message}
-                  </Text>
-                </>
-              ) : (
-                <Text
-                  className="text-[#71806F]"
-                  style={{ fontFamily: 'Nunito_400Regular' }}
-                >
-                  Nothing yet. Nidush will show useful activity and system updates here.
-                </Text>
-              )}
+              <Text
+                className="text-[#71806F] mt-1"
+                style={{ fontFamily: 'Nunito_400Regular' }}
+              >
+                Keep alerts on to receive activity, state, and system updates in Nidush.
+              </Text>
             </View>
 
             <View className="gap-y-3 mb-8">
@@ -1319,17 +1223,17 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
                   className="text-white text-lg"
                   style={{ fontFamily: 'Nunito_700Bold' }}
                 >
-                  Open notification center
+                  Open notifications
                 </Text>
               </TouchableOpacity>
 
-              <View className="flex-row gap-3">
+              {unreadCount > 0 && (
                 <TouchableOpacity
                   onPress={async () => {
                     await markAllAsRead();
                     await refreshNotifications();
                   }}
-                  className="flex-1 bg-[#E8EDDF] py-3 rounded-full items-center"
+                  className="bg-[#E8EDDF] py-3 rounded-full items-center"
                   accessibilityRole="button"
                   accessibilityLabel="Mark all notifications as read"
                 >
@@ -1337,24 +1241,10 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
                     className="text-[#4A5D4E]"
                     style={{ fontFamily: 'Nunito_700Bold' }}
                   >
-                    Mark read
+                    Mark all as read
                   </Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={clearAll}
-                  className="flex-1 bg-[#FFE9E9] py-3 rounded-full items-center"
-                  accessibilityRole="button"
-                  accessibilityLabel="Clear all notifications"
-                >
-                  <Text
-                    className="text-[#C75656]"
-                    style={{ fontFamily: 'Nunito_700Bold' }}
-                  >
-                    Clear all
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              )}
             </View>
           </View>
         </View>
@@ -1593,25 +1483,6 @@ function DeviceItem({ name, status, connected, icon, testID }: any) {
           </Text>
         </View>
       </View>
-    </View>
-  );
-}
-
-function NotificationStat({ label, value }: { label: string; value: number }) {
-  return (
-    <View className="flex-1 bg-[#F5F7F0] rounded-2xl py-4 mx-1 items-center border border-[#D1D9C5]">
-      <Text
-        className="text-2xl text-[#4A5D4E]"
-        style={{ fontFamily: 'Nunito_700Bold' }}
-      >
-        {value}
-      </Text>
-      <Text
-        className="text-xs text-[#71806F] mt-1"
-        style={{ fontFamily: 'Nunito_600SemiBold' }}
-      >
-        {label}
-      </Text>
     </View>
   );
 }
