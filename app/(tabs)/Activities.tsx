@@ -2,6 +2,7 @@ import { CarouselSection } from '@/components/activitiesScenarios/CarouselSectio
 import { FabMenu } from '@/components/activitiesScenarios/FabMenu';
 import { FilterBar } from '@/components/activitiesScenarios/FilterBar';
 import { HeaderSection } from '@/components/activitiesScenarios/HeaderSection';
+import { FeedbackState } from '@/components/UI/FeedbackState';
 import { useBiometrics } from '@/context/BiometricsContext';
 import { supabase } from '@/utils/supabase';
 import {
@@ -406,26 +407,16 @@ const UnifiedActivitiesScreen = () => {
         />
 
         {processedData.isEmpty ? (
-          <View
-            className="mt-10 px-8 items-center"
-            accessible={true}
-            accessibilityLabel={`No ${viewMode} found matching "${activeFilter}"`}
-          >
-            <Ionicons
-              name="search-outline"
-              size={40}
-              color="#8E8E93"
-              style={{ marginBottom: 10 }}
-              importantForAccessibility="no"
-              accessibilityElementsHidden={true}
-            />
-            <Text
-              className="text-center text-[#8E8E93] text-[16px]"
-              style={{ fontFamily: 'Nunito_400Regular' }}
-            >
-              No {viewMode} found matching &quot;{activeFilter}&quot;.
-            </Text>
-          </View>
+          <FeedbackState
+            icon="search"
+            title={`No ${viewMode} found`}
+            message={
+              searchQuery
+                ? `Nothing matched "${searchQuery}" in ${activeFilter.toLowerCase()}. Try another keyword or clear the filters.`
+                : `There is nothing in ${activeFilter.toLowerCase()} yet. Try a different filter or create something new.`
+            }
+            compact
+          />
         ) : (
           <>
             {processedData.myCreations.length > 0 && (
@@ -599,15 +590,12 @@ const UnifiedActivitiesScreen = () => {
                 ))}
 
                 {aiIdeas.length === 0 && (
-                  <View className="items-center py-12 px-8">
-                    <Ionicons name="sparkles-outline" size={34} color="#7A8C85" />
-                    <Text
-                      className="text-[#7A8C85] text-center mt-3"
-                      style={{ fontFamily: 'Nunito_600SemiBold' }}
-                    >
-                      No ideas yet. Try again in a moment.
-                    </Text>
-                  </View>
+                  <FeedbackState
+                    icon="auto-awesome"
+                    title="No ideas just yet"
+                    message="The AI did not return suggestions this time. Give it another moment and try again."
+                    compact
+                  />
                 )}
               </ScrollView>
             )}

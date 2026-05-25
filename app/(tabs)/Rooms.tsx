@@ -29,6 +29,7 @@ import {
 import AddRoomDevice from '../../components/rooms/AddRoomDevice';
 import CategoryPill from '../../components/rooms/CategoryPill';
 import DeviceCard from '../../components/rooms/device-card';
+import { FeedbackState } from '../../components/UI/FeedbackState';
 import {
   AppDevice,
   DeviceRecord,
@@ -69,6 +70,7 @@ export default function Rooms() {
   const [, setJunctions] = useState<{ activity_id: number; device_id: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [userHomeId, setUserHomeId] = useState<number | null>(null);
   const [isAdjustingLight, setIsAdjustingLight] = useState(false);
@@ -102,6 +104,7 @@ export default function Rooms() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
+        setLoadError('Sign in again to load your rooms and devices.');
         setLoading(false);
         return;
       }
@@ -114,6 +117,7 @@ export default function Rooms() {
         .maybeSingle();
 
       if (!homeAssoc?.home_id) {
+        setLoadError('Connect this profile to a home to start organizing rooms and devices.');
         setLoading(false);
         return;
       }
@@ -154,6 +158,7 @@ export default function Rooms() {
       setRooms(loadedRooms);
       setAllDevices(mappedDevices);
       setAllActivities(loadedActivities);
+      setLoadError(null);
       setActiveRoomId((currentRoomId) => currentRoomId ?? loadedRooms[0]?.id ?? null);
 
       // Only fetch links for activities that actually belong to this home.
@@ -193,6 +198,7 @@ export default function Rooms() {
 
     } catch (error) {
       console.error('Error fetching room/device details:', error);
+      setLoadError('We could not load your smart home right now. Pull to refresh or try again in a moment.');
     } finally {
       setHasLoadedOnce(true);
       setLoading(false);
@@ -575,6 +581,14 @@ export default function Rooms() {
         </Text>
       </View>
 
+      {loadError ? (
+        <View className="mx-5 mb-4 rounded-[24px] border border-[#E7D7B7] bg-[#FFF8EA] px-4 py-3">
+          <Text className="text-[#6D5A2E] text-sm" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+            {loadError}
+          </Text>
+        </View>
+      ) : null}
+
       {/* Search Bar (Original style: bg-transparent) */}
       <View className="px-5 mb-6">
         <View className="flex-row items-center justify-center border border-[#BDC7C2] rounded-full px-4 h-12 bg-transparent">
@@ -680,23 +694,18 @@ export default function Rooms() {
         }
 
         ListEmptyComponent={
-          <View className="items-center mt-12 justify-center px-10">
-            <MaterialCommunityIcons
-              name={searchQuery ? 'selection-search' : 'home-plus'}
-              size={80}
-              color="#354F52"
-              accessible={false}
-            />
-            <Text
-              maxFontSizeMultiplier={1.2}
-              className="text-[#7A8C85] mt-5 text-lg text-center"
-              style={{ fontFamily: 'Nunito_600SemiBold' }}
-            >
-              {searchQuery
-                ? `No devices found for "${searchQuery}"`
-                : 'Your devices will live here.'}
-            </Text>
-          </View>
+          <FeedbackState
+            icon={searchQuery ? 'search' : 'home'}
+            title={searchQuery ? `No devices for "${searchQuery}"` : 'No smart devices yet'}
+            message={
+              searchQuery
+                ? 'Try a different device name or clear the search to see everything in this room.'
+                : rooms.length === 0
+                  ? 'Create or sync a room first, then add devices to make this space feel alive.'
+                  : 'Add a device manually or run discovery to start controlling this room from Nidush.'
+            }
+            compact
+          />
         }
         ListFooterComponent={
           activeRoom ? (

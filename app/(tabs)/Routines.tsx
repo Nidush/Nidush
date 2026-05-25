@@ -25,6 +25,7 @@ import { captureException, trackEvent } from '../../utils/observability';
 
 import AddRoomDevice from '../../components/rooms/AddRoomDevice';
 import RoutineCard from '../../components/routines/RoutineCard';
+import { FeedbackState } from '../../components/UI/FeedbackState';
 
 interface Routine {
   id: number;
@@ -167,6 +168,7 @@ export default function Routines() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -201,6 +203,7 @@ export default function Routines() {
         setRoutines([]);
         setRooms([]);
         setUserHomeId(null);
+        setLoadError('Sign in again to load your routines.');
         return;
       }
 
@@ -216,6 +219,7 @@ export default function Routines() {
         setRoutines([]);
         setRooms([]);
         setUserHomeId(null);
+        setLoadError('Connect this profile to a home before creating routines.');
         return;
       }
 
@@ -241,6 +245,7 @@ export default function Routines() {
       const loadedRooms = roomsResult.data || [];
       setRooms(loadedRooms);
       setNewRoutineRoomId((current) => current ?? loadedRooms[0]?.id ?? null);
+      setLoadError(null);
 
       let data: RoutineRow[] | null = routinesResult.data as RoutineRow[] | null;
       let error = routinesResult.error;
@@ -285,6 +290,7 @@ export default function Routines() {
       }
     } catch (err) {
       console.error('Error loading routines:', err);
+      setLoadError('We could not load your routines right now. Try again in a moment.');
     } finally {
       setHasLoadedOnce(true);
       setLoading(false);
@@ -599,6 +605,14 @@ export default function Routines() {
         >Routines</Text>
       </View>
 
+      {loadError ? (
+        <View className="mx-5 mb-4 rounded-[24px] border border-[#E7D7B7] bg-[#FFF8EA] px-4 py-3">
+          <Text className="text-[#6D5A2E] text-sm" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+            {loadError}
+          </Text>
+        </View>
+      ) : null}
+
       <View className="px-5 mb-6">
         <View className="flex-row items-center border border-[#BDC7C2] rounded-full px-4 min-h-[48px]">
           <MaterialIcons name="search" size={22} color="#7A8C85" style={{ marginRight: 10 }} />
@@ -658,9 +672,18 @@ export default function Routines() {
           }
           ListEmptyComponent={
             !loading ? (
-              <Text className="text-center text-[#7A8C85] mt-10" style={{ fontFamily: 'Nunito_600SemiBold' }}>
-                No routines found.
-              </Text>
+              <FeedbackState
+                icon={searchQuery ? 'search' : 'autorenew'}
+                title={searchQuery ? 'No routines match this search' : 'No routines yet'}
+                message={
+                  searchQuery
+                    ? 'Try a different room or routine name to find what you are looking for.'
+                    : rooms.length === 0
+                      ? 'Create or sync a room first, then build routines around the spaces in your home.'
+                      : 'Create your first routine to automate the atmosphere you want at the right time.'
+                }
+                compact
+              />
             ) : null
           }
           ListFooterComponent={

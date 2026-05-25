@@ -2,8 +2,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
+  Text,
   useWindowDimensions,
+  View,
 } from 'react-native';
 import { invokeFunction, supabase } from '../utils/supabase';
 import { logger } from '../utils/logger';
@@ -22,6 +25,7 @@ import HouseName from '../components/Onboarding/HouseName';
 import SpotifyConnect from '../components/Onboarding/SpotifyConnect';
 import WearableSync from '../components/Onboarding/WearableSync';
 import WelcomeUser from '../components/Onboarding/WelcomeUser';
+import { CustomAlert } from '../components/CustomAlert';
 
 export default function SetupProfile() {
   const [fontsLoaded] = useFonts({
@@ -45,6 +49,14 @@ export default function SetupProfile() {
   const [homeMode, setHomeMode] = useState<'create' | 'join'>('create');
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [alertConfig, setAlertConfig] = useState({
+    visible: false,
+    title: '',
+    message: '',
+  });
+
+  const openAlert = (title: string, message: string) =>
+    setAlertConfig({ visible: true, title, message });
 
   const loadUserData = React.useCallback(async () => {
     try {
@@ -136,16 +148,51 @@ export default function SetupProfile() {
     });
   };
 
+  const renderStep = (content: React.ReactNode) => (
+    <>
+      {content}
+      <CustomAlert
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        type="warning"
+        onClose={() => setAlertConfig((prev) => ({ ...prev, visible: false }))}
+      />
+    </>
+  );
+
   if (!fontsLoaded) return null;
-  if (loading) return null;
+  if (loading) {
+    return (
+      <View className="flex-1 bg-[#F1F3EA] justify-center items-center px-8">
+        <View className="w-20 h-20 rounded-full bg-[#E7EFE3] items-center justify-center mb-5">
+          <ActivityIndicator size="large" color="#548F53" />
+        </View>
+        <Text
+          className="text-[#354F52] text-2xl text-center"
+          style={{ fontFamily: 'Nunito_700Bold' }}
+        >
+          Preparing your home setup
+        </Text>
+        <Text
+          className="text-[#6C7A74] text-center text-sm mt-3 leading-5"
+          style={{ fontFamily: 'Nunito_400Regular' }}
+        >
+          We are checking your account and restoring your onboarding progress.
+        </Text>
+      </View>
+    );
+  }
 
   // --- Step Navigation ---
   if (currentStep === 'welcome') {
-    return <WelcomeUser userName={firstName} onFinish={() => transitionTo('house')} />;
+    return renderStep(
+      <WelcomeUser userName={firstName} onFinish={() => transitionTo('house')} />,
+    );
   }
 
   if (currentStep === 'house') {
-    return (
+    return renderStep(
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
         <HouseName 
           houseName={houseName} 
@@ -161,7 +208,7 @@ export default function SetupProfile() {
   }
 
   if (currentStep === 'wearable') {
-    return (
+    return renderStep(
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
         <WearableSync
           onNext={() => transitionTo('spotify')}
@@ -172,7 +219,7 @@ export default function SetupProfile() {
   }
 
   if (currentStep === 'spotify') {
-    return (
+    return renderStep(
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
         <SpotifyConnect
           onNext={() => transitionTo('activities')}
@@ -183,7 +230,7 @@ export default function SetupProfile() {
   }
 
   if (currentStep === 'activities') {
-    return (
+    return renderStep(
       <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
         <ActivitySelection
           onFinish={(activities) => {
@@ -196,7 +243,7 @@ export default function SetupProfile() {
   }
 
   if (currentStep === 'loading') {
-    return (
+    return renderStep(
       <FinalLoading
         onComplete={async () => {
           try {
@@ -249,7 +296,7 @@ export default function SetupProfile() {
                 // Join existing home
                 const upperCode = effectiveHouseId.toUpperCase().trim();
                 if (!upperCode) {
-                  alert('Please enter a Join Code.');
+                  openAlert('Missing join code', 'Please enter the code for the home you want to join.');
                   hasError = true;
                 } else {
                   logger.debug('Attempting to join home with join code.');
@@ -296,9 +343,15 @@ export default function SetupProfile() {
                   if (homeError || !joinedHomeId) {
                     if (homeError) logger.error('Error finding existing home:', homeError);
                     if (rpcMissing) {
-                      alert('O sistema de entrar numa casa ainda não está configurado na base de dados. Aplica a migration do join code no Supabase e tenta novamente.');
+                      openAlert(
+                        'Home join unavailable',
+                        'Joining an existing home is not ready in this environment yet. Apply the latest Supabase migrations and try again.',
+                      );
                     } else {
-                      alert('Join Code not found. Please verify the code and try again.');
+                      openAlert(
+                        'Join code not found',
+                        'We could not find a home with that code. Check the code and try again.',
+                      );
                     }
                     hasError = true;
                   } else {
@@ -359,6 +412,10 @@ export default function SetupProfile() {
             }
           } catch (e) {
             logger.error('Error completing onboarding', e);
+            openAlert(
+              'Could not finish setup',
+              'Your progress is still here. Please review your home details and try again.',
+            );
             setCurrentStep('house');
           }
         }}

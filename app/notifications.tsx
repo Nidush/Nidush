@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppNotification, useNotifications } from '@/context/NotificationsContext';
+import { FeedbackState } from '@/components/UI/FeedbackState';
 
 export default function NotificationsScreen() {
   const { notifications, markAllAsRead, clearAll, loadMore, hasMore, isLoading, refreshNotifications } = useNotifications();
@@ -94,10 +95,12 @@ export default function NotificationsScreen() {
           ) : null
         }
         ListEmptyComponent={
-          <View className="flex-1 justify-center items-center mt-20">
-            <MaterialIcons name="notifications-off" size={64} color="#D1D1D1" />
-            <Text className="text-gray-400 mt-4 text-center" style={{ fontFamily: 'Nunito_600SemiBold' }}>No notifications yet</Text>
-          </View>
+          <FeedbackState
+            icon="notifications-off"
+            title="No notifications yet"
+            message="When Nidush has updates about your home, routines, or wellbeing, they will appear here."
+            compact
+          />
         }
       />
     </SafeAreaView>
