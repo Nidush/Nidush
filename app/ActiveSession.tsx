@@ -40,7 +40,7 @@ type FormattedInstruction = {
 };
 
 export default function ActiveSession() {
-  const { id, musicStarted } = useLocalSearchParams<{ id: string; musicStarted?: string }>();
+  const { id } = useLocalSearchParams<{ id: string; musicStarted?: string }>();
   const { playPlaylist, pausePlayback, resumePlayback, currentTrack, isAuthenticated } = useSpotify();
 
   // --- 1. STATE ---
@@ -312,7 +312,7 @@ export default function ActiveSession() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, isAuthenticated, playPlaylist]);
 
   useEffect(() => {
     loadData();

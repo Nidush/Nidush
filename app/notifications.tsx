@@ -4,7 +4,6 @@ import React from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Pressable,
   RefreshControl,
   Text,
   TouchableOpacity,
@@ -14,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppNotification, useNotifications } from '@/context/NotificationsContext';
 
 export default function NotificationsScreen() {
-  const { notifications, markAsRead, markAllAsRead, clearAll, loadMore, hasMore, isLoading, refreshNotifications } = useNotifications();
+  const { notifications, markAllAsRead, clearAll, loadMore, hasMore, isLoading, refreshNotifications } = useNotifications();
   const [refreshing, setRefreshing] = React.useState(false);
 
   const onRefresh = async () => {
@@ -25,7 +24,7 @@ export default function NotificationsScreen() {
 
   React.useEffect(() => {
     return () => markAllAsRead();
-  }, []);
+  }, [markAllAsRead]);
 
   const getIcon = (type: AppNotification['type']) => {
     switch (type) {
@@ -81,7 +80,6 @@ export default function NotificationsScreen() {
         contentContainerStyle={{ padding: 20 }}
         onEndReached={() => {
           if (!hasMore || isLoading) return;
-          console.log('[UI] Chegou ao fundo da lista. A carregar mais...');
           loadMore();
         }}
         onEndReachedThreshold={0.1}

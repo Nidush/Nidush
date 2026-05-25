@@ -81,6 +81,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --non-interactive
+
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 

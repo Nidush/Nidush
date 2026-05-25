@@ -12,6 +12,7 @@ import { Animated, Easing, StyleSheet, View, Platform } from 'react-native';
 import { supabase } from '../utils/supabase';
 import { registerHealthConnectBackgroundSync } from '../utils/healthConnectBackgroundTask';
 import * as WebBrowser from 'expo-web-browser';
+import { logger } from '../utils/logger';
 import './../global.css';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -43,15 +44,15 @@ export default function RootLayout() {
       // 0. Inicializar Health Connect IMEDIATAMENTE (Nativo)
       if (Platform.OS === 'android') {
         try {
-          const { initialize, getSdkStatus, SdkAvailabilityStatus } = require('react-native-health-connect');
+          const { initialize, getSdkStatus, SdkAvailabilityStatus } = await import('react-native-health-connect');
           const status = await getSdkStatus();
           if (status === SdkAvailabilityStatus.SDK_AVAILABLE) {
             await initialize();
             await registerHealthConnectBackgroundSync();
-            console.log('Health Connect Pre-initialized');
+            logger.debug('Health Connect pre-initialized.');
           }
-        } catch (e) {
-          console.log('HC Pre-init failed', e);
+        } catch (error) {
+          logger.warn('Health Connect pre-init failed.', error);
         }
       }
 
@@ -92,7 +93,7 @@ export default function RootLayout() {
         } else {
           router.replace('/onboarding');
         }
-      } catch (e) {
+      } catch {
         router.replace('/onboarding');
       } finally {
         setIsRoutingReady(true);
@@ -136,14 +137,14 @@ export default function RootLayout() {
           ]).start(() => {
             setAnimationComplete(true);
           });
-        } catch (e) {
-          console.error('Erro na animação de splash:', e);
+        } catch (error) {
+          logger.error('Erro na animação de splash:', error);
           setAnimationComplete(true);
         }
       };
       startHandoffAnimation();
     }
-  }, [isRoutingReady, isImageLoaded, player]);
+  }, [isRoutingReady, isImageLoaded, opacityAnim, player, scaleAnim]);
 
   const splashBackgroundColor = '#F0F2EB';
 

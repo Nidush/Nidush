@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Image, Modal, ScrollView, Switch, Text, TouchableOpacity, View, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { pickImage } from '../utils/imagePicker';
@@ -24,7 +24,6 @@ import { useNotifications } from '../context/NotificationsContext';
 import { useBiometrics } from '../context/BiometricsContext';
 import { LegalContent } from '../components/legal/LegalContent';
 import {
-  HEALTH_CONNECT_HEART_RATE_PERMISSIONS,
   hasHeartRateReadPermission,
 } from '../utils/healthConnectSync';
 
@@ -157,7 +156,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     return `${source}:${slug || 'device'}`;
   };
 
-  const loadConnectedDevices = async (userId: string, homeId: number | string | null) => {
+  const loadConnectedDevices = useCallback(async (userId: string, homeId: number | string | null) => {
     const buildQuery = (selectClause: string) => {
       let query = supabase
         .from('devices')
@@ -200,7 +199,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     setHardwareError(null);
     setDiscoveredDevices(devices);
     return devices;
-  };
+  }, []);
 
   const refreshConnectedDevices = async (userId: string, homeId: number | string | null) => {
     setIsRefreshingDevices(true);
@@ -304,7 +303,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
   };
 
   // Função para sincronizar dispositivos com o Supabase
-  const syncDeviceToDB = async (name: string, type: string, source: string, externalId?: string) => {
+  const syncDeviceToDB = useCallback(async (name: string, type: string, source: string, externalId?: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Sessão não encontrada.');
 
@@ -383,7 +382,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
     if (error) throw error;
     return data;
-  };
+  }, []);
 
   useEffect(() => {
     let activeHomeChannel: ReturnType<typeof subscribeToHomeDeviceChanges> | null = null;
@@ -518,7 +517,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
           getGrantedPermissions,
           getSdkStatus,
           SdkAvailabilityStatus,
-        } = require('react-native-health-connect');
+        } = await import('react-native-health-connect');
         const status = await getSdkStatus();
         if (status !== SdkAvailabilityStatus.SDK_AVAILABLE) {
           setHealthConnectStatus('disconnected');
@@ -537,7 +536,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
         setHealthConnectStatus('connected');
         await syncDeviceToDB('Health Connect', 'heart', 'health_connect', 'android_hc');
-      } catch (e) {
+      } catch {
         setHealthConnectStatus('disconnected');
       }
     };
@@ -557,7 +556,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
         supabase.removeChannel(activeHomeChannel);
       }
     };
-  }, []);
+  }, [loadConnectedDevices, syncDeviceToDB]);
 
 
   const handleLogout = async () => {
@@ -911,7 +910,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
                   openHealthConnectDataManagement,
                   SdkAvailabilityStatus,
                   openHealthConnectSettings,
-                } = require('react-native-health-connect');
+                } = await import('react-native-health-connect');
                 const status = await getSdkStatus();
                 if (status !== SdkAvailabilityStatus.SDK_AVAILABLE) {
                   alert('Health Connect is not available or needs to be installed.');
@@ -932,7 +931,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
                     openHealthConnectSettings();
                   }
                 }
-              } catch (e) {
+              } catch {
                 alert('Could not open Health Connect settings.');
               }
             }}

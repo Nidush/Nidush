@@ -43,6 +43,7 @@ import {
   getFunctionErrorMessage,
   saveAiActivityIdea,
 } from '@/utils/aiActivities';
+import { logger } from '@/utils/logger';
 import { getDynamicRecommendations } from '@/utils/recommendationEngine';
 
 const UnifiedActivitiesScreen = () => {
@@ -88,7 +89,7 @@ const UnifiedActivitiesScreen = () => {
       setActivityTemplates(activities);
       setScenarioTemplates(scenarios);
     } catch (error) {
-      console.error('Failed to load activity/scenario templates:', error);
+      logger.error('Failed to load activity/scenario templates:', error);
       setActivityTemplates([]);
       setScenarioTemplates([]);
     }
@@ -113,7 +114,7 @@ const UnifiedActivitiesScreen = () => {
     const start = currentPage * PAGE_SIZE;
     const end = start + PAGE_SIZE - 1;
 
-    console.log(`[API] Página ${currentPage}: A pedir do item ${start} ao ${end}...`);
+    logger.debug(`[API] Página ${currentPage}: A pedir do item ${start} ao ${end}...`);
 
     let query = supabase
       .from('activities')
@@ -157,7 +158,7 @@ const UnifiedActivitiesScreen = () => {
     useCallback(() => {
       loadTemplates();
       loadActivities();
-    }, [debouncedSearchQuery, loadTemplates])
+    }, [loadActivities, loadTemplates])
   );
 
   const loadAiRecommendations = useCallback(async () => {
@@ -177,7 +178,7 @@ const UnifiedActivitiesScreen = () => {
 
       setAiRecommendedIdeas(ideas.slice(0, 5));
     } catch (error) {
-      console.warn('Failed to load AI activity recommendations:', error);
+      logger.warn('Failed to load AI activity recommendations:', error);
       setAiRecommendedIdeas([]);
     } finally {
       setIsLoadingAiRecommendations(false);
@@ -295,7 +296,7 @@ const UnifiedActivitiesScreen = () => {
 
       setAiIdeas(ideas);
     } catch (error: any) {
-      console.error('Failed to generate AI activity ideas:', error);
+      logger.error('Failed to generate AI activity ideas:', error);
       const message = await getFunctionErrorMessage(error);
       Alert.alert(
         'Could not generate ideas',
@@ -325,7 +326,7 @@ const UnifiedActivitiesScreen = () => {
     }
   };
 
-  const saveAiRecommendation = async (idea: AiActivityIdea) => {
+  const saveAiRecommendation = useCallback(async (idea: AiActivityIdea) => {
     if (isSavingAiRecommendationId) return;
 
     setIsSavingAiRecommendationId(idea.id);
@@ -342,12 +343,12 @@ const UnifiedActivitiesScreen = () => {
         },
       });
     } catch (error: any) {
-      console.error('Failed to save AI recommendation:', error);
+      logger.error('Failed to save AI recommendation:', error);
       Alert.alert('Could not save activity', error.message || 'Please try again.');
     } finally {
       setIsSavingAiRecommendationId(null);
     }
-  };
+  }, [isSavingAiRecommendationId]);
 
   const recommendedData = useMemo(() => {
     if (viewMode === 'activities' && aiRecommendedIdeas.length > 0) {
@@ -364,7 +365,7 @@ const UnifiedActivitiesScreen = () => {
     return processedData.recommended.slice(0, 5).map((item) => ({
       ...item,
       time: isActivity(item) ? getActivityTime(item) : undefined,
-      room: item.room || (item as any).room_id,
+      room: item.room || item.room_id,
     }));
   }, [aiRecommendedIdeas, isSavingAiRecommendationId, processedData.recommended, saveAiRecommendation, viewMode]);
 

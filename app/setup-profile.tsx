@@ -3,9 +3,10 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
-  Dimensions
+  useWindowDimensions,
 } from 'react-native';
 import { invokeFunction, supabase } from '../utils/supabase';
+import { logger } from '../utils/logger';
 
 import {
   Nunito_400Regular,
@@ -30,9 +31,9 @@ export default function SetupProfile() {
   });
   const router = useRouter();
   // pwd is intentionally NOT read here — passwords are managed by Supabase Auth only
+  useWindowDimensions();
 
   const [currentStep, setCurrentStep] = useState('welcome');
-  const [dims, setDims] = useState(Dimensions.get('window'));
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   // State
@@ -45,15 +46,7 @@ export default function SetupProfile() {
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const sub = Dimensions.addEventListener('change', ({ window }) =>
-      setDims(window),
-    );
-    loadUserData();
-    return () => sub.remove();
-  }, []);
-
-  const loadUserData = async () => {
+  const loadUserData = React.useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -99,11 +92,15 @@ export default function SetupProfile() {
         router.replace('/login');
       }
     } catch (e) {
-      console.error('Error loading user data:', e);
+      logger.error('Error loading user data:', e);
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    loadUserData();
+  }, [loadUserData]);
 
   const saveProgress = async (step: string, extraData = {}) => {
     try {
@@ -119,7 +116,7 @@ export default function SetupProfile() {
       };
       await AsyncStorage.setItem('@onboarding_progress', JSON.stringify(progress));
     } catch (e) {
-      console.error('Error saving progress:', e);
+      logger.error('Error saving progress:', e);
     }
   };
 
@@ -223,7 +220,7 @@ export default function SetupProfile() {
                 }
               } catch { /* use state fallback */ }
 
-              console.log('[Onboarding] homeMode (effective):', effectiveHomeMode);
+              logger.debug('[Onboarding] homeMode (effective):', effectiveHomeMode);
               let finalHomeId: number | null = null;
 
               if (effectiveHomeMode === 'create') {
@@ -231,7 +228,7 @@ export default function SetupProfile() {
                 // Gerar Join Code (6 carateres alfanuméricos maiúsculos)
                 const generatedCode = Math.random().toString(36).substring(2, 8).toUpperCase();
                 
-                console.log('-> A criar nova casa:', effectiveHouseName || 'Nidush Home', 'com o código', generatedCode);
+                logger.debug('Creating new home during onboarding:', effectiveHouseName || 'Nidush Home');
                 const { data: homeData, error: homeError } = await supabase
                   .from('homes')
                   .insert({ 
@@ -243,7 +240,7 @@ export default function SetupProfile() {
                   .single();
 
                 if (homeError) {
-                  console.error('Error creating home in public schema:', homeError);
+                  logger.error('Error creating home in public schema:', homeError);
                   hasError = true;
                 } else if (homeData) {
                   finalHomeId = homeData.id;
@@ -255,7 +252,7 @@ export default function SetupProfile() {
                   alert('Please enter a Join Code.');
                   hasError = true;
                 } else {
-                  console.log('-> A procurar casa existente com Join Code:', upperCode);
+                  logger.debug('Attempting to join home with join code.');
                   let { data: joinedHomeId, error: homeError } = await supabase
                     .rpc('join_home_by_code', { p_join_code: upperCode });
 
@@ -268,7 +265,7 @@ export default function SetupProfile() {
                   );
 
                   if (rpcMissing) {
-                    console.warn('RPC join_home_by_code not found or unavailable. Trying manage-home Edge Function fallback.', homeError);
+                    logger.warn('RPC join_home_by_code not found. Trying manage-home fallback.', homeError);
                     try {
                       const fallbackResult = await invokeFunction('manage-home', {
                         action: 'join-home',
@@ -282,7 +279,7 @@ export default function SetupProfile() {
                   }
 
                   if (homeError || !joinedHomeId) {
-                    if (homeError) console.error('Error finding existing home:', homeError);
+                    if (homeError) logger.error('Error finding existing home:', homeError);
                     if (rpcMissing) {
                       alert('O sistema de entrar numa casa ainda não está configurado na base de dados. Aplica a migration do join code no Supabase e tenta novamente.');
                     } else {
@@ -297,7 +294,7 @@ export default function SetupProfile() {
 
               if (finalHomeId && !hasError) {
                 // 2. Create User in public schema
-                console.log('-> A associar utilizador à casa ID:', finalHomeId);
+                logger.debug('Associating onboarding user to home:', finalHomeId);
                 const { error: userError } = await supabase
                   .from('users')
                   .upsert({
@@ -310,14 +307,14 @@ export default function SetupProfile() {
                   }, { onConflict: 'auth_uid' });
 
                 if (userError) {
-                  console.error('Error syncing user in public schema:', userError);
+                  logger.error('Error syncing user in public schema:', userError);
                   hasError = true;
                 }
 
                 if (!hasError) {
                   if (effectiveHomeMode === 'create') {
                     // 3. Associate creator with home as admin.
-                    console.log('[Onboarding] Assigning role: admin to home:', finalHomeId);
+                    logger.debug('[Onboarding] Assigning admin role to home:', finalHomeId);
                     const { error: assocError } = await supabase
                       .from('user_homes')
                       .upsert({
@@ -327,12 +324,12 @@ export default function SetupProfile() {
                       }, { onConflict: 'user_id,home_id' });
 
                     if (assocError) {
-                      console.error('Error associating user with home:', assocError);
+                      logger.error('Error associating user with home:', assocError);
                       hasError = true;
                     }
                   } else {
                     // The RPC/Edge Function already associates residents with existing homes.
-                    console.log('[Onboarding] User joined home as resident:', finalHomeId);
+                    logger.debug('[Onboarding] User joined home as resident:', finalHomeId);
                   }
                 }
               }
@@ -346,7 +343,7 @@ export default function SetupProfile() {
               setCurrentStep('house');
             }
           } catch (e) {
-            console.log('Error completing onboarding', e);
+            logger.error('Error completing onboarding', e);
             setCurrentStep('house');
           }
         }}

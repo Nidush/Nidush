@@ -18,7 +18,6 @@ import { DeviceSection } from '@/components/activityDetails/DeviceSection';
 import { FocusSection } from '@/components/activityDetails/FocusSection';
 import { MediaSection } from '@/components/activityDetails/MediaSection';
 import { CustomAlert } from '@/components/CustomAlert';
-import { useSpotify } from '@/context/SpotifyContext';
 
 import {
   Activity,

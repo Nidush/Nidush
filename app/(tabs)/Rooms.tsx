@@ -65,7 +65,7 @@ export default function Rooms() {
   const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
   const [allDevices, setAllDevices] = useState<Device[]>([]);
   const [allActivities, setAllActivities] = useState<ActivityItem[]>([]);
-  const [junctions, setJunctions] = useState<{ activity_id: number; device_id: number }[]>([]);
+  const [, setJunctions] = useState<{ activity_id: number; device_id: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -275,35 +275,6 @@ export default function Rooms() {
     }
   };
 
-  const handleDeleteDevice = (device: Device) => {
-    Alert.alert(
-      'Remove device',
-      `Do you want to remove "${device.name}" from your smart home?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('devices')
-                .delete()
-                .eq('id', device.id);
-
-              if (error) throw error;
-
-              setAllDevices((prev) => prev.filter((item) => item.id !== device.id));
-            } catch (err: any) {
-              console.error('Failed to delete device:', err);
-              Alert.alert('Error', 'Could not remove this device.');
-            }
-          },
-        },
-      ],
-    );
-  };
-
   const openDeviceDetails = (device: Device) => {
     setSelectedDevice(device);
     setDeviceDraftName(device.name);
@@ -472,17 +443,6 @@ export default function Rooms() {
   };
 
   // --- Manage Linked Devices Handler ---
-  const openManageDevicesModal = (activity: ActivityItem) => {
-    setSelectedActivity(activity);
-    
-    const linkedIds = junctions
-      .filter(j => j.activity_id === activity.id)
-      .map(j => j.device_id);
-
-    setTempLinkedDeviceIds(linkedIds);
-    setIsManageModalVisible(true);
-  };
-
   const toggleLinkDevice = (deviceId: number) => {
     setTempLinkedDeviceIds(prev => 
       prev.includes(deviceId) 

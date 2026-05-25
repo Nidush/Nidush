@@ -1,5 +1,3 @@
-import React from 'react';
-
 export type MediaStatus = {
   mediaInfo?: unknown;
   currentItemId?: unknown;

@@ -24,7 +24,6 @@ import {
   CastButton,
   MediaStreamType,
   type MediaStatus,
-  type MediaLoadRequest,
   type RemoteMediaClient,
   useCastSession,
 } from './googleCast';

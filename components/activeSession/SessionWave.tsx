@@ -58,7 +58,7 @@ export const SessionWave = () => {
       -1,
       true,
     );
-  }, []);
+  }, [translateX1, translateX2, translateY1, translateY2]);
 
   const animatedStyle1 = useAnimatedStyle(() => ({
     transform: [
