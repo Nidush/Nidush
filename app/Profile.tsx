@@ -683,7 +683,12 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
         showsVerticalScrollIndicator={false}
       >
         <View className="items-center my-6">
-          <TouchableOpacity onPress={handleImagePick} activeOpacity={0.8} style={{ position: 'relative' }}>
+          <TouchableOpacity
+            onPress={handleImagePick}
+            activeOpacity={0.8}
+            style={{ position: 'relative' }}
+            testID="avatar-picker-button"
+          >
             {isLoading ? (
               <View className="w-32 h-32 rounded-full bg-[#E8EDDF]" />
             ) : (
@@ -848,6 +853,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
           <TouchableOpacity
             onPress={requestAutomaticDiscovery}
             disabled={isRequestingDiscovery}
+            testID="scan-smart-devices-button"
             className={`mt-4 py-3 items-center bg-[#5B8C51] rounded-full ${isRequestingDiscovery ? 'opacity-50' : ''}`}
           >
             <Text className="text-white font-bold">
@@ -862,6 +868,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
               await refreshConnectedDevices(user.id, userHomeId);
             }}
             disabled={isRefreshingDevices}
+            testID="refresh-devices-button"
             className={`mt-3 py-2 items-center ${isRefreshingDevices ? 'opacity-50' : ''}`}
           >
             <Text className="text-[#5B8C51] font-bold">
