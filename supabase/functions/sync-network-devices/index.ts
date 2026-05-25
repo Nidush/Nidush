@@ -63,6 +63,41 @@ const normalizeConnectivity = (value?: string | null, status?: string | null) =>
   return 'unknown'
 }
 
+const PERSONAL_DEVICE_HINTS = [
+  'iphone',
+  'android',
+  'smartphone',
+  'phone',
+  'mobile',
+  'cellphone',
+  'ipad',
+  'tablet',
+  'laptop',
+  'macbook',
+  'notebook',
+  'desktop',
+  'computer',
+  ' pc ',
+]
+
+const shouldIgnoreIncomingDevice = (device: IncomingDevice) => {
+  const normalizedType = String(device.type ?? '').trim().toLowerCase()
+  if (normalizedType === 'computer') return true
+
+  const searchable = [
+    device.name,
+    device.type,
+    device.manufacturer,
+    device.model,
+    device.external_id,
+    JSON.stringify(device.metadata ?? {}),
+  ]
+    .map((value) => ` ${String(value ?? '').toLowerCase()} `)
+    .join(' ')
+
+  return PERSONAL_DEVICE_HINTS.some((hint) => searchable.includes(` ${hint} `))
+}
+
 const serializeError = (error: unknown) => {
   if (error instanceof Error) {
     return {
@@ -135,12 +170,6 @@ Deno.serve(async (req) => {
     const devices = Array.isArray(payload?.devices) ? payload.devices as IncomingDevice[] : []
 
     if (!syncToken) throw new Error('Missing device sync token.')
-    if (devices.length === 0) {
-      return new Response(
-        JSON.stringify({ synced: 0, offlineMarked: 0, ignored: 0 }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      )
-    }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey)
 
@@ -191,12 +220,17 @@ Deno.serve(async (req) => {
     const now = new Date().toISOString()
     const seenExternalIds = new Set<string>()
     const upserts = []
+    let ignored = 0
 
     for (const device of devices) {
       const externalId = String(device.external_id ?? '').trim()
       const name = String(device.name ?? '').trim()
 
       if (!externalId || !name) continue
+      if (shouldIgnoreIncomingDevice(device)) {
+        ignored += 1
+        continue
+      }
 
       const source = normalizeSource(device.source)
       const existing = existingByKey.get(`${source}::${externalId}`)
@@ -337,7 +371,7 @@ Deno.serve(async (req) => {
         syncSource,
         synced,
         offlineMarked,
-        ignored: devices.length - upserts.length,
+        ignored,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )

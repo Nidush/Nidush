@@ -13,6 +13,7 @@ import {
   Platform,
   Alert,
   Image,
+  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
@@ -146,6 +147,7 @@ export default function Routines() {
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -168,7 +170,7 @@ export default function Routines() {
         if (loadingMore || !hasMore) return;
         setLoadingMore(true);
       } else {
-        setLoading(true);
+        setLoading(!hasLoadedOnce);
       }
 
       const currentPage = isNextPage ? page + 1 : 0;
@@ -201,32 +203,29 @@ export default function Routines() {
       const homeId = userHome.home_id;
       setUserHomeId(homeId);
 
-      const { data: roomsData, error: roomsError } = await supabase
-        .from('rooms')
-        .select('id, name')
-        .eq('home_id', homeId)
-        .order('id', { ascending: true });
+      const [roomsResult, routinesResult] = await Promise.all([
+        supabase
+          .from('rooms')
+          .select('id, name')
+          .eq('home_id', homeId)
+          .order('id', { ascending: true }),
+        supabase
+          .from('routines')
+          .select(ROUTINE_SELECT, { count: 'exact' })
+          .eq('home_id', homeId)
+          .order('id', { ascending: false })
+          .range(start, end),
+      ]);
 
-      if (roomsError) throw roomsError;
+      if (roomsResult.error) throw roomsResult.error;
 
-      const loadedRooms = roomsData || [];
+      const loadedRooms = roomsResult.data || [];
       setRooms(loadedRooms);
       setNewRoutineRoomId((current) => current ?? loadedRooms[0]?.id ?? null);
 
-      let data: any[] | null = null;
-      let error: any = null;
-      let count: number | null = null;
-
-      const routinesResult = await supabase
-        .from('routines')
-        .select(ROUTINE_SELECT, { count: 'exact' })
-        .eq('home_id', homeId)
-        .order('id', { ascending: false })
-        .range(start, end);
-
-      data = routinesResult.data as any[] | null;
-      error = routinesResult.error;
-      count = routinesResult.count;
+      let data: any[] | null = routinesResult.data as any[] | null;
+      let error: any = routinesResult.error;
+      let count: number | null = routinesResult.count;
 
       if (error?.code === '42703' && /image/i.test(error.message || '')) {
         const legacyResult = await supabase
@@ -268,10 +267,11 @@ export default function Routines() {
     } catch (err) {
       console.error('Error loading routines:', err);
     } finally {
+      setHasLoadedOnce(true);
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [page, hasMore, loadingMore]);
+  }, [hasLoadedOnce, page, hasMore, loadingMore]);
 
   useFocusEffect(
     useCallback(() => {
@@ -581,23 +581,11 @@ export default function Routines() {
           <ActivityIndicator size="large" color="#548F53" />
         </View>
       ) : (
-        <ScrollView 
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
-          testID="routines-scrollview" 
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 130 }} 
-          showsVerticalScrollIndicator={false}
-        >
-          <Text
-            className="text-[#6B7C76] text-sm mb-4"
-            style={{ fontFamily: 'Nunito_600SemiBold' }}
-          >
-            Search filters the routines already loaded from your home. Long press a card to open its details.
-          </Text>
-
-          {filteredRoutines.map((item) => (
+        <FlatList
+          data={filteredRoutines}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
             <RoutineCard
-              key={item.id}
               testID={`routine-card-${item.id}`}
               title={item.title}
               days={item.days}
@@ -608,18 +596,38 @@ export default function Routines() {
               onToggle={() => toggleRoutine(item.id)}
               onLongPress={() => openRoutineDetails(item)}
             />
-          ))}
-          {filteredRoutines.length === 0 && !loading && (
-            <Text className="text-center text-[#7A8C85] mt-10" style={{ fontFamily: 'Nunito_600SemiBold' }}>
-              No routines found.
+          )}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          testID="routines-scrollview"
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 130 }}
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={6}
+          windowSize={5}
+          removeClippedSubviews={Platform.OS === 'android'}
+          ListHeaderComponent={
+            <Text
+              className="text-[#6B7C76] text-sm mb-4"
+              style={{ fontFamily: 'Nunito_600SemiBold' }}
+            >
+              Search filters the routines already loaded from your home. Long press a card to open its details.
             </Text>
-          )}
-          {loadingMore && (
-            <View className="py-4 items-center">
-              <ActivityIndicator color="#548F53" />
-            </View>
-          )}
-        </ScrollView>
+          }
+          ListEmptyComponent={
+            !loading ? (
+              <Text className="text-center text-[#7A8C85] mt-10" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                No routines found.
+              </Text>
+            ) : null
+          }
+          ListFooterComponent={
+            loadingMore ? (
+              <View className="py-4 items-center">
+                <ActivityIndicator color="#548F53" />
+              </View>
+            ) : null
+          }
+        />
       )}
 
       <View testID="add-routine-container">

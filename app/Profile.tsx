@@ -52,6 +52,9 @@ export default function Profile() {
   const [isPrivacyModalVisible, setIsPrivacyModalVisible] = useState(false);
   const [isAccountModalVisible, setIsAccountModalVisible] = useState(false);
   const [isNotificationsModalVisible, setIsNotificationsModalVisible] = useState(false);
+  const [isDeviceScanModalVisible, setIsDeviceScanModalVisible] = useState(false);
+  const [deviceScanModalTitle, setDeviceScanModalTitle] = useState('Smart device scan');
+  const [deviceScanModalMessage, setDeviceScanModalMessage] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [userHomeId, setUserHomeId] = useState<number | string | null>(null);
   const [joinCode, setJoinCode] = useState<string | null>(null);
@@ -130,6 +133,21 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
   const [isRefreshingDevices, setIsRefreshingDevices] = useState(false);
   const [isRequestingDiscovery, setIsRequestingDiscovery] = useState(false);
   const [hardwareError, setHardwareError] = useState<string | null>(null);
+  const openDeviceScanModal = (title: string, message: string) => {
+    setDeviceScanModalTitle(title);
+    setDeviceScanModalMessage(message);
+    setIsDeviceScanModalVisible(true);
+  };
+  const isDeviceCurrentlyConnected = (device: Partial<DeviceRecord>) => {
+    const connectivity = String(device.connectivity_status ?? '').toLowerCase();
+    const status = String(device.status ?? '').toLowerCase();
+
+    if (connectivity === 'offline' || status === 'offline') return false;
+    if (connectivity === 'online') return true;
+
+    return ['connected', 'on', 'online', 'playing'].includes(status);
+  };
+
   const getCurrentUserHomeId = async (userId: string) => {
     const { data, error } = await supabase
       .from('user_homes')
@@ -192,7 +210,9 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
     const rawDevices = ((data ?? []) as unknown) as DeviceRecord[];
     const devices = sortDevicesByFreshness(
-      rawDevices.filter((device) => isRealHomeDevice(device)),
+      rawDevices
+        .filter((device) => isRealHomeDevice(device))
+        .filter((device) => isDeviceCurrentlyConnected(device)),
     ) as ConnectedDevice[];
     setHardwareError(null);
     setDiscoveredDevices(devices);
@@ -212,13 +232,89 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
   const requestAutomaticDiscovery = async () => {
     setIsRequestingDiscovery(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Session not found.');
+
+      const resolvedHomeId = userHomeId ?? (await getCurrentUserHomeId(user.id));
+      if (!resolvedHomeId) throw new Error('No home connected to this user.');
+
       const { data, error } = await supabase.functions.invoke('request-device-discovery', {
         body: {},
       });
 
       if (error) throw error;
+
+      console.log('[Profile][DeviceDiscovery] Request response:', data);
+
+      const requestId = Number(data?.request?.id);
+      if (!requestId) {
+        console.log('[Profile][DeviceDiscovery] No request id returned. Refreshing current devices.');
+        await refreshConnectedDevices(user.id, resolvedHomeId);
+        return;
+      }
+
+      const startedAt = Date.now();
+      let latestStatus = String(data?.request?.status ?? 'pending').toLowerCase();
+      console.log(
+        `[Profile][DeviceDiscovery] Waiting for request ${requestId} on home ${resolvedHomeId}. Initial status: ${latestStatus}`,
+      );
+
+      while (Date.now() - startedAt < 45000) {
+        const { data: requestRow, error: requestError } = await supabase
+          .from('device_discovery_requests')
+          .select('status, error_message, result')
+          .eq('id', requestId)
+          .eq('home_id', Number(resolvedHomeId))
+          .maybeSingle();
+
+        if (requestError) throw requestError;
+
+        latestStatus = String(requestRow?.status ?? latestStatus).toLowerCase();
+        console.log(
+          `[Profile][DeviceDiscovery] Poll request ${requestId}: status=${latestStatus}`,
+          requestRow,
+        );
+
+        if (latestStatus === 'completed') {
+          console.log(`[Profile][DeviceDiscovery] Request ${requestId} completed. Refreshing devices.`);
+          const refreshedDevices = await loadConnectedDevices(user.id, resolvedHomeId);
+          const discoveredCount = Number((requestRow?.result as any)?.discovered ?? refreshedDevices.length ?? 0);
+
+          if (discoveredCount === 0 || refreshedDevices.length === 0) {
+            openDeviceScanModal(
+              'No devices found',
+              'We scanned your home network but did not find any compatible smart devices this time. Make sure the devices are turned on and connected to the same Wi-Fi, then try again.',
+            );
+          }
+          return;
+        }
+
+        if (latestStatus === 'failed') {
+          const failureMessage = requestRow?.error_message
+            ? String(requestRow.error_message)
+            : 'The smart device scan failed.';
+          openDeviceScanModal(
+            'Scan failed',
+            `${failureMessage} Please wait a moment and try again.`,
+          );
+          throw new Error(failureMessage);
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+      }
+
+      console.log(
+        `[Profile][DeviceDiscovery] Request ${requestId} is still running after 45s. Refreshing current devices.`,
+      );
+      await refreshConnectedDevices(user.id, resolvedHomeId);
+      setHardwareError('The scan is still running. Pull to refresh again in a few seconds.');
+      openDeviceScanModal(
+        'Scan still running',
+        'We started the smart device scan, but it is taking longer than expected. Please wait a few seconds and tap refresh again.',
+      );
     } catch (error: any) {
       console.error('Failed to request automatic discovery:', error);
+      setHardwareError(error?.message || 'Could not scan smart devices.');
     } finally {
       setIsRequestingDiscovery(false);
     }
@@ -1011,6 +1107,47 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
       </ScrollView>
 
       {/* Hobbies Preference Modal */}
+      <Modal
+        visible={isDeviceScanModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsDeviceScanModalVisible(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black/50 px-6">
+          <View className="bg-white w-full rounded-[32px] p-7 shadow-xl">
+            <View className="w-14 h-14 rounded-full bg-[#E8EDDF] items-center justify-center self-center mb-4">
+              <MaterialIcons name="devices" size={28} color="#5B8C51" />
+            </View>
+
+            <Text
+              className="text-2xl text-[#3A4D3F] mb-3 text-center"
+              style={{ fontFamily: 'Nunito_700Bold' }}
+            >
+              {deviceScanModalTitle}
+            </Text>
+
+            <Text
+              className="text-[#71806F] text-base text-center leading-6"
+              style={{ fontFamily: 'Nunito_400Regular' }}
+            >
+              {deviceScanModalMessage}
+            </Text>
+
+            <TouchableOpacity
+              onPress={() => setIsDeviceScanModalVisible(false)}
+              className="bg-[#5B8C51] mt-7 py-4 rounded-full items-center shadow-md"
+            >
+              <Text
+                className="text-white text-lg"
+                style={{ fontFamily: 'Nunito_700Bold' }}
+              >
+                Understood
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <Modal
         visible={isModalVisible}
         transparent

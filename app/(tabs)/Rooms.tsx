@@ -120,48 +120,53 @@ export default function Rooms() {
       const homeId = homeAssoc.home_id;
       setUserHomeId(homeId);
 
-      // 2. Fetch Rooms
-      const { data: roomsData, error: roomsErr } = await supabase
-        .from('rooms')
-        .select('id, name')
-        .eq('home_id', homeId)
-        .order('id', { ascending: true });
+      const [
+        { data: roomsData, error: roomsErr },
+        { data: devicesData, error: devicesErr },
+        { data: activitiesData, error: activitiesErr },
+      ] = await Promise.all([
+        supabase
+          .from('rooms')
+          .select('id, name')
+          .eq('home_id', homeId)
+          .order('id', { ascending: true }),
+        supabase
+          .from('devices')
+          .select('*')
+          .eq('home_id', homeId),
+        supabase
+          .from('activities')
+          .select('*')
+          .eq('home_id', homeId),
+      ]);
 
       if (roomsErr) throw roomsErr;
-      
-      const loadedRooms = roomsData || [];
-      setRooms(loadedRooms);
-
-      // Set first room as active if none is active
-      setActiveRoomId((currentRoomId) => currentRoomId ?? loadedRooms[0]?.id ?? null);
-
-      // 3. Fetch Devices
-      const { data: devicesData, error: devicesErr } = await supabase
-        .from('devices')
-        .select('*')
-        .eq('home_id', homeId);
-
       if (devicesErr) throw devicesErr;
+      if (activitiesErr) throw activitiesErr;
 
+      const loadedRooms = roomsData || [];
+      const loadedActivities = activitiesData || [];
       const mappedDevices: Device[] = (devicesData || [])
         .filter((device: DeviceRecord) => isRealHomeDevice(device))
         .map((device: DeviceRecord) => mapDeviceRecordToAppDevice(device));
+
+      setRooms(loadedRooms);
       setAllDevices(mappedDevices);
+      setAllActivities(loadedActivities);
+      setActiveRoomId((currentRoomId) => currentRoomId ?? loadedRooms[0]?.id ?? null);
 
-      // 4. Fetch Activities
-      const { data: activitiesData, error: activitiesErr } = await supabase
-        .from('activities')
-        .select('*')
-        .eq('home_id', homeId);
+      // Only fetch links for activities that actually belong to this home.
+      const activityIds = loadedActivities.map((activity) => activity.id).filter(Boolean);
+      if (activityIds.length === 0) {
+        setJunctions([]);
+        return;
+      }
 
-      if (activitiesErr) throw activitiesErr;
-      setAllActivities(activitiesData || []);
-
-      // 5. Fetch Activity Devices Junctions
       try {
         const { data: junctionsData, error: junctionsErr } = await supabase
           .from('activity_devices')
-          .select('activity_id, device_id');
+          .select('activity_id, device_id')
+          .in('activity_id', activityIds);
 
         if (junctionsErr) {
           const isMissingJunctionTable =
@@ -554,8 +559,11 @@ export default function Rooms() {
   );
 
   const filteredDevices = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+
     return roomDevices.filter((device) => {
-      const matchesSearch = device.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch =
+        normalizedQuery.length === 0 || device.name.toLowerCase().includes(normalizedQuery);
       return matchesSearch;
     });
   }, [roomDevices, searchQuery]);
