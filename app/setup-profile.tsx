@@ -236,7 +236,8 @@ export default function SetupProfile() {
                   .from('homes')
                   .insert({ 
                     name: effectiveHouseName || 'Nidush Home',
-                    join_code: generatedCode 
+                    join_code: generatedCode,
+                    creator_user_id: user.id,
                   })
                   .select('id')
                   .single();

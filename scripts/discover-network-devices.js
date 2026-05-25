@@ -5,6 +5,7 @@ require('dotenv').config();
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const HOME_DEVICE_SYNC_TOKEN = process.env.HOME_DEVICE_SYNC_TOKEN;
+const DEVICE_SYNC_SHARED_SECRET = process.env.DEVICE_SYNC_SHARED_SECRET;
 const DISCOVERY_TIMEOUT_MS = Number(process.env.DEVICE_DISCOVERY_TIMEOUT_MS || 6000);
 const SYNC_SOURCE = process.env.DEVICE_SYNC_SOURCE || 'ssdp';
 const SEARCH_TARGETS = [
@@ -178,6 +179,7 @@ const syncDevices = async (devices) => {
     headers: {
       'Content-Type': 'application/json',
       'x-device-sync-token': HOME_DEVICE_SYNC_TOKEN,
+      ...(DEVICE_SYNC_SHARED_SECRET ? { 'x-device-sync-secret': DEVICE_SYNC_SHARED_SECRET } : {}),
     },
     body: JSON.stringify({
       syncSource: SYNC_SOURCE,

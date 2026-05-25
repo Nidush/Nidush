@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const HOME_DEVICE_SYNC_TOKEN = process.env.HOME_DEVICE_SYNC_TOKEN;
+const DEVICE_SYNC_SHARED_SECRET = process.env.DEVICE_SYNC_SHARED_SECRET;
 const POLL_INTERVAL_MS = Number(process.env.DEVICE_DISCOVERY_POLL_MS || 15000);
 
 const {
@@ -21,6 +22,7 @@ const postToFunction = async (functionName, body) => {
     headers: {
       'Content-Type': 'application/json',
       'x-device-sync-token': HOME_DEVICE_SYNC_TOKEN,
+      ...(DEVICE_SYNC_SHARED_SECRET ? { 'x-device-sync-secret': DEVICE_SYNC_SHARED_SECRET } : {}),
     },
     body: JSON.stringify(body ?? {}),
   });

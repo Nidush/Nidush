@@ -1,3 +1,5 @@
+import { createClient } from '@supabase/supabase-js'
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -11,7 +13,36 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { name, email } = await req.json()
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    const authHeader = req.headers.get('Authorization')
+
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const authClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    })
+
+    const { data: { user }, error: authError } = await authClient.auth.getUser()
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Invalid session' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const payload = await req.json().catch(() => ({}))
+    const name = String(
+      payload?.name ??
+      user.user_metadata?.first_name ??
+      user.email?.split('@')[0] ??
+      'utilizador',
+    )
 
     // Pegar a chave do Resend das variáveis de ambiente do Supabase
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
@@ -20,9 +51,9 @@ Deno.serve(async (req: Request) => {
     // Quando tiveres domínio próprio, muda TEST_MODE para false.
     const TEST_MODE = true
     const VERIFIED_EMAIL = 'nidush7@gmail.com'
-    const recipient = TEST_MODE ? VERIFIED_EMAIL : email
+    const recipient = TEST_MODE ? VERIFIED_EMAIL : user.email
 
-    if (!RESEND_API_KEY) {
+    if (!RESEND_API_KEY || !recipient) {
       console.error("ERRO: RESEND_API_KEY não configurada no Supabase.")
       return new Response(JSON.stringify({ error: "Configuração de mail em falta." }), { status: 500, headers: corsHeaders })
     }
