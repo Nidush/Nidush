@@ -1,11 +1,22 @@
 import React, { createContext, useContext, useState } from 'react';
+import type { Activity } from '@/constants/data/types';
 
-const ActivityContext = createContext<any>(null);
+type ActivityContextValue = {
+  activities: Activity[];
+  addActivity: (newActivity: Activity) => void;
+};
+
+const defaultActivityContextValue: ActivityContextValue = {
+  activities: [],
+  addActivity: () => undefined,
+};
+
+const ActivityContext = createContext<ActivityContextValue>(defaultActivityContextValue);
 
 export function ActivityProvider({ children }: { children: React.ReactNode }) {
-  const [activities, setActivities] = useState<any[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
 
-  const addActivity = (newActivity: any) => {
+  const addActivity = (newActivity: Activity) => {
     setActivities((prev) => [newActivity, ...prev]);
   };
 
@@ -17,7 +28,5 @@ export function ActivityProvider({ children }: { children: React.ReactNode }) {
 }
 
 export const useActivities = () => {
-  const context = useContext(ActivityContext);
-  if (!context) return { activities: [], addActivity: () => {} };
-  return context;
+  return useContext(ActivityContext);
 };
