@@ -24,6 +24,7 @@ env:
   EXPO_NO_TELEMETRY: "1"
   EXPO_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
   EXPO_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+  SUPABASE_CLI_VERSION: 2.75.0
 
 jobs:
   app-tests:
@@ -102,7 +103,7 @@ jobs:
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v2
         with:
-          version: latest
+          version: ${{ env.SUPABASE_CLI_VERSION }}
 
       - name: Verify Supabase CLI
         run: |
@@ -162,7 +163,7 @@ jobs:
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v2
         with:
-          version: latest
+          version: ${{ env.SUPABASE_CLI_VERSION }}
 
       - name: Verify Supabase CLI
         run: |

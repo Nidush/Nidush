@@ -10,6 +10,11 @@ This repository has a dedicated GitHub Actions workflow at `.github/workflows/su
 - Production deploy on pushes to `main`, after all checks pass.
 - Manual deploy through `workflow_dispatch` when `deploy_to_supabase` is enabled.
 
+## Tooling Notes
+
+- The workflow pins `SUPABASE_CLI_VERSION` in `.github/workflows/supabase-ci-cd.yml` to avoid GitHub API rate-limit failures when resolving `latest`.
+- Update that pinned version intentionally when you want to move the CI environment to a newer Supabase CLI release.
+
 ## Required GitHub Secrets
 
 Set these in GitHub under `Settings > Secrets and variables > Actions`:
