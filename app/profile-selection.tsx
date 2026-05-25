@@ -21,6 +21,14 @@ interface Profile {
   avatarUrl: string | null;
 }
 
+type ResidentProfileRow = {
+  auth_uid: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  avatar_url: string | null;
+};
+
 export default function ProfileSelection() {
   const router = useRouter();
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -80,7 +88,7 @@ export default function ProfileSelection() {
             if (residentProfilesError) throw residentProfilesError;
 
             const profileByAuthId = new Map(
-              (residentProfiles ?? []).map((profile) => [profile.auth_uid, profile]),
+              ((residentProfiles ?? []) as ResidentProfileRow[]).map((profile) => [profile.auth_uid, profile]),
             );
 
             const mappedProfiles: Profile[] = residentIds.map((residentId) => {
@@ -104,9 +112,12 @@ export default function ProfileSelection() {
             if (isMounted) setProfiles([]);
           }
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Erro fatal:", error);
-        alert("Erro fatal no carregamento: " + (error as any).message);
+        alert(
+          "Erro fatal no carregamento: " +
+            (error instanceof Error ? error.message : 'Erro desconhecido'),
+        );
       } finally {
         if (isMounted) setIsLoading(false);
       }

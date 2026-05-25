@@ -256,10 +256,13 @@ export default function SetupProfile() {
                   let { data: joinedHomeId, error: homeError } = await supabase
                     .rpc('join_home_by_code', { p_join_code: upperCode });
 
-                  const homeErrorAny = homeError as any;
+                  const homeErrorStatus =
+                    homeError && 'status' in homeError
+                      ? Number((homeError as { status?: number }).status)
+                      : undefined;
                   const rpcMissing = homeError && (
                     homeError.code === 'PGRST202' ||
-                    homeErrorAny.status === 404 ||
+                    homeErrorStatus === 404 ||
                     String(homeError.message).toLowerCase().includes('schema cache') ||
                     String(homeError.message).toLowerCase().includes('function public.join_home_by_code')
                   );
@@ -267,14 +270,26 @@ export default function SetupProfile() {
                   if (rpcMissing) {
                     logger.warn('RPC join_home_by_code not found. Trying manage-home fallback.', homeError);
                     try {
-                      const fallbackResult = await invokeFunction('manage-home', {
+                      const fallbackResult = await invokeFunction<{ home?: { id?: number | string | null } }>('manage-home', {
                         action: 'join-home',
                         joinCode: upperCode,
                       });
                       joinedHomeId = fallbackResult?.home?.id ?? null;
                       homeError = null;
-                    } catch (fallbackError) {
-                      homeError = fallbackError as any;
+                    } catch (fallbackError: unknown) {
+                      homeError = {
+                        name: 'PostgrestError',
+                        message:
+                          fallbackError instanceof Error
+                            ? fallbackError.message
+                            : 'Fallback join failed',
+                        details: '',
+                        hint: '',
+                        code: 'EDGE_FALLBACK',
+                        toJSON() {
+                          return this;
+                        },
+                      };
                     }
                   }
 

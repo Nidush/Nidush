@@ -1,7 +1,17 @@
-export const getFriendlyErrorMessage = (error: any): string => {
+type ErrorLike = {
+    message?: string;
+    toString?: () => string;
+};
+
+export const getFriendlyErrorMessage = (error: unknown): string => {
     if (!error) return 'Ocorreu um erro inesperado.';
 
-    const message = error.message || error.toString();
+    const message =
+        error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+                ? error
+                : (error as ErrorLike).message || String(error);
 
     if (message.includes('Invalid login credentials')) {
         return 'Email ou senha incorretos. Por favor, verifique os seus dados.';

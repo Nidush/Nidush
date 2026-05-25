@@ -11,6 +11,26 @@ export interface AppNotification {
   read: boolean;
 }
 
+type NotificationRow = {
+  id: string;
+  title: string;
+  message: string;
+  type: AppNotification['type'];
+  created_at: string;
+  read: boolean;
+};
+
+type NotificationInsertResult = {
+  id: string;
+  created_at: string;
+};
+
+type ErrorWithStatus = {
+  message?: string;
+  status?: number;
+  code?: string;
+};
+
 interface NotificationsContextType {
   notifications: AppNotification[];
   unreadCount: number;
@@ -42,6 +62,16 @@ const mergeUniqueNotifications = (
   });
 
   return Array.from(byId.values()).sort((a, b) => b.timestamp - a.timestamp);
+};
+
+const isRangeExhaustedError = (error: ErrorWithStatus) => {
+  const message = String(error.message || '').toLowerCase();
+  return (
+    error.status === 416 ||
+    error.code === 'PGRST103' ||
+    message.includes('range') ||
+    message.includes('satisfiable')
+  );
 };
 
 export const NotificationsProvider = ({ children }: { children: React.ReactNode }) => {
@@ -147,14 +177,7 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
         .range(start, end);
 
       if (error) {
-        const message = String((error as any).message || '').toLowerCase();
-        const isRangeExhausted =
-          (error as any).status === 416 ||
-          error.code === 'PGRST103' ||
-          message.includes('range') ||
-          message.includes('satisfiable');
-
-        if (isNextPage && isRangeExhausted) {
+        if (isNextPage && isRangeExhaustedError(error)) {
           setHasMoreState(false);
         } else {
           console.error('Failed to load notifications from Supabase:', error);
@@ -163,7 +186,7 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
       }
       
       const pageData = (data ?? []).slice(0, PAGE_SIZE);
-      const mapped: AppNotification[] = pageData.map((n: any) => ({
+      const mapped: AppNotification[] = (pageData as NotificationRow[]).map((n) => ({
         id: n.id,
         title: n.title,
         message: n.message,
@@ -272,7 +295,15 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
     } else if (data) {
       // Fix temporary ID with actual DB UUID
       setNotifications((prev) => 
-        prev.map(n => n.id === tempId ? { ...n, id: data.id, timestamp: new Date(data.created_at).getTime() } : n)
+        prev.map((n) =>
+          n.id === tempId
+            ? {
+                ...n,
+                id: (data as NotificationInsertResult).id,
+                timestamp: new Date((data as NotificationInsertResult).created_at).getTime(),
+              }
+            : n,
+        )
       );
     }
   };

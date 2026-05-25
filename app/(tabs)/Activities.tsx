@@ -295,7 +295,7 @@ const UnifiedActivitiesScreen = () => {
       });
 
       setAiIdeas(ideas);
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Failed to generate AI activity ideas:', error);
       const message = await getFunctionErrorMessage(error);
       Alert.alert(
@@ -318,9 +318,12 @@ const UnifiedActivitiesScreen = () => {
       setMyActivities((current) => [mappedActivity, ...current]);
       setAiIdeas((current) => current.filter((item) => item.id !== idea.id));
       setIsAiModalVisible(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to save AI activity:', error);
-      Alert.alert('Could not save activity', error.message || 'Please try again.');
+      Alert.alert(
+        'Could not save activity',
+        error instanceof Error ? error.message : 'Please try again.',
+      );
     } finally {
       setIsSavingAiIdeaId(null);
     }
@@ -342,9 +345,12 @@ const UnifiedActivitiesScreen = () => {
           isNew: 'true',
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error('Failed to save AI recommendation:', error);
-      Alert.alert('Could not save activity', error.message || 'Please try again.');
+      Alert.alert(
+        'Could not save activity',
+        error instanceof Error ? error.message : 'Please try again.',
+      );
     } finally {
       setIsSavingAiRecommendationId(null);
     }
@@ -428,7 +434,7 @@ const UnifiedActivitiesScreen = () => {
                 data={processedData.myCreations.map((item) => ({
                   ...item,
                   time: isActivity(item) ? getActivityTime(item) : undefined,
-                  room: item.room || (item as any).room_id,
+                  room: item.room || item.room_id,
                 }))}
                 showTime={viewMode === 'activities'}
                 onEndReached={() => {
@@ -457,7 +463,7 @@ const UnifiedActivitiesScreen = () => {
                   data={processedData.simpleRecipes.map((item) => ({
                     ...item,
                     time: isActivity(item) ? getActivityTime(item) : undefined,
-                    room: item.room || (item as any).room_id,
+                    room: item.room || item.room_id,
                   }))}
                   showTime={true}
                 />

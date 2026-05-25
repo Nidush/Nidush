@@ -4,9 +4,18 @@ import React from 'react';
 import { ScrollView, Text, View, NativeSyntheticEvent, NativeScrollEvent, ActivityIndicator } from 'react-native';
 import { UnifiedCard } from './UnifiedCard';
 
+type CarouselItem = {
+  id: string;
+  title: string;
+  image: string | import('react-native').ImageSourcePropType;
+  time?: string;
+  room?: string;
+  onPress?: () => void;
+};
+
 interface CarouselSectionProps {
   title: string;
-  data: any[];
+  data: CarouselItem[];
   showTime?: boolean;
   onEndReached?: () => void;
   isLoadingMore?: boolean;

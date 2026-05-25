@@ -1,7 +1,13 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 
-export const StepWrapper = ({ title, subtitle, children }: any) => (
+type StepWrapperProps = {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+};
+
+export const StepWrapper = ({ title, subtitle, children }: StepWrapperProps) => (
   <View className="mt-2.5">
     <Text
       maxFontSizeMultiplier={1.2}

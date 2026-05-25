@@ -14,6 +14,9 @@ import {
   Alert,
   Image,
   FlatList,
+  ImageSourcePropType,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
@@ -30,7 +33,7 @@ interface Routine {
   time: string;
   room: string;
   active: boolean;
-  image: any;
+  image: ImageSourcePropType;
 }
 
 interface Room {
@@ -41,10 +44,25 @@ interface Room {
 interface RoutineImageOption {
   key: string;
   label: string;
-  source: any;
+  source: ImageSourcePropType;
 }
 
-const ROUTINE_IMAGES: Record<string, any> = {
+type RoutineRow = {
+  id: number;
+  name: string;
+  execution_time: string;
+  days_of_week: string | null;
+  is_active: boolean;
+  image?: string | null;
+  scenario?: {
+    id: number;
+    rooms?: {
+      name?: string | null;
+    } | null;
+  } | null;
+};
+
+const ROUTINE_IMAGES: Record<string, ImageSourcePropType> = {
   'Sunrise Awakening': require('../../assets/Scenarios/routines/sunrise_awakening.png'),
   'Gym Hour': require('../../assets/Scenarios/routines/gym_hour.png'),
   'Morning Kitchen Prep': require('../../assets/Scenarios/routines/morning_kitchen_prep.png'),
@@ -81,7 +99,7 @@ const ROUTINE_IMAGE_OPTIONS: RoutineImageOption[] = [
     source: require('../../assets/Scenarios/routines/deep_sleep_transition.png'),
   },
 ];
-const ROUTINE_IMAGE_BY_KEY = ROUTINE_IMAGE_OPTIONS.reduce<Record<string, any>>((acc, option) => {
+const ROUTINE_IMAGE_BY_KEY = ROUTINE_IMAGE_OPTIONS.reduce<Record<string, ImageSourcePropType>>((acc, option) => {
   acc[option.key] = option.source;
   return acc;
 }, {});
@@ -224,8 +242,8 @@ export default function Routines() {
       setRooms(loadedRooms);
       setNewRoutineRoomId((current) => current ?? loadedRooms[0]?.id ?? null);
 
-      let data: any[] | null = routinesResult.data as any[] | null;
-      let error: any = routinesResult.error;
+      let data: RoutineRow[] | null = routinesResult.data as RoutineRow[] | null;
+      let error = routinesResult.error;
       let count: number | null = routinesResult.count;
 
       if (error?.code === '42703' && /image/i.test(error.message || '')) {
@@ -236,7 +254,7 @@ export default function Routines() {
           .order('id', { ascending: false })
           .range(start, end);
 
-        data = legacyResult.data as any[] | null;
+        data = legacyResult.data as RoutineRow[] | null;
         error = legacyResult.error;
         count = legacyResult.count;
       }
@@ -244,7 +262,7 @@ export default function Routines() {
       if (error) throw error;
 
       if (data) {
-        const mappedRoutines: Routine[] = data.map((item: any) => ({
+        const mappedRoutines: Routine[] = data.map((item) => ({
           id: item.id,
           title: item.name,
           days: item.days_of_week || 'N/A',
@@ -328,9 +346,12 @@ export default function Routines() {
 
       setRoutines((current) => current.filter((item) => item.id !== selectedRoutine.id));
       closeRoutineDetails();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error deleting routine:', err);
-      Alert.alert('Could not remove routine', err.message || 'Please try again.');
+      Alert.alert(
+        'Could not remove routine',
+        err instanceof Error ? err.message : 'Please try again.',
+      );
       setIsDeletingRoutine(false);
     }
   };
@@ -486,12 +507,12 @@ export default function Routines() {
       ) {
         const legacyScenarioInsert = await supabase
           .from('routines')
-          .insert(legacyScenarioRoutinePayload as any)
+          .insert(legacyScenarioRoutinePayload)
           .select('id, name, execution_time, days_of_week, is_active, image')
           .single();
 
         usedLegacyScenarioColumn = true;
-        createdRoutine = legacyScenarioInsert.data as any;
+        createdRoutine = legacyScenarioInsert.data as typeof createdRoutine;
         createdRoutineError = legacyScenarioInsert.error;
       }
 
@@ -503,16 +524,17 @@ export default function Routines() {
 
         const legacyInsert = await supabase
           .from('routines')
-          .insert(payloadWithoutImage as any)
+          .insert(payloadWithoutImage)
           .select('id, name, execution_time, days_of_week, is_active')
           .single();
 
-        createdRoutine = legacyInsert.data as any;
+        createdRoutine = legacyInsert.data as typeof createdRoutine;
         createdRoutineError = legacyInsert.error;
       }
 
       if (createdRoutineError) throw createdRoutineError;
-      const savedRoutine = createdRoutine as any;
+      if (!createdRoutine) throw new Error('Routine was not returned after creation.');
+      const savedRoutine = createdRoutine;
 
       setRoutines((current) => [
         {
@@ -528,14 +550,17 @@ export default function Routines() {
       ]);
 
       closeAddRoutineModal();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error creating routine:', err);
       captureException(err, {
         area: 'routines',
         screen: 'routines',
         action: 'create-routine',
       });
-      Alert.alert('Could not create routine', err.message || 'Please try again.');
+      Alert.alert(
+        'Could not create routine',
+        err instanceof Error ? err.message : 'Please try again.',
+      );
       setIsSavingRoutine(false);
       return;
     }
@@ -552,7 +577,7 @@ export default function Routines() {
     });
   };
 
-  const handleScroll = (event: any) => {
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
     const paddingToBottom = 20;
     if (layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom) {

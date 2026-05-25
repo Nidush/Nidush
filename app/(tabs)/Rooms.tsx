@@ -50,6 +50,7 @@ interface ActivityItem {
   description: string;
   type: string;
   image: string;
+  room_id?: number | null;
 }
 
 export default function Rooms() {
@@ -246,7 +247,7 @@ export default function Rooms() {
         .eq('id', deviceId);
 
       if (error) throw error;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to toggle device status:', err);
       // Revert status on failure
       setAllDevices(prev => prev.map(d => 
@@ -324,7 +325,7 @@ export default function Rooms() {
       );
 
       closeDeviceDetails();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to update device details:', err);
       Alert.alert('Error', 'Could not save the device changes.');
       setIsSavingDeviceDetails(false);
@@ -354,7 +355,7 @@ export default function Rooms() {
 
               setAllDevices((prev) => prev.filter((device) => device.id !== deviceToDelete.id));
               closeDeviceDetails();
-            } catch (err: any) {
+            } catch (err: unknown) {
               console.error('Failed to delete device:', err);
               Alert.alert('Error', 'Could not remove this device.');
             }
@@ -434,9 +435,13 @@ export default function Rooms() {
         setNewDeviceRoomId(activeRoomId ?? rooms[0]?.id ?? null);
         Alert.alert('Success', `"${data.name}" added to the selected room.`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to add device:', err);
-      Alert.alert('Error', 'Could not create new smart device: ' + err.message);
+      Alert.alert(
+        'Error',
+        'Could not create new smart device: ' +
+          (err instanceof Error ? err.message : 'Unknown error'),
+      );
     } finally {
       setIsAdding(false);
     }
@@ -488,9 +493,13 @@ export default function Rooms() {
       setIsManageModalVisible(false);
       setSelectedActivity(null);
       Alert.alert('Success', 'Linked devices updated successfully.');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to save activity-device links:', err);
-      Alert.alert('Error', 'Failed to update linked devices: ' + err.message);
+      Alert.alert(
+        'Error',
+        'Failed to update linked devices: ' +
+          (err instanceof Error ? err.message : 'Unknown error'),
+      );
     } finally {
       setIsSavingLinks(false);
     }
@@ -514,7 +523,7 @@ export default function Rooms() {
     () =>
       activeRoomId === null
         ? allActivities
-        : allActivities.filter((activity) => (activity as any).room_id === activeRoomId),
+        : allActivities.filter((activity) => activity.room_id === activeRoomId),
     [activeRoomId, allActivities],
   );
 

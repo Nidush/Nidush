@@ -6,7 +6,7 @@ import {
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
-import { Image, Platform, StyleSheet, Text, View } from 'react-native';
+import { Image, ImageSourcePropType, Platform, StyleSheet, Text, View } from 'react-native';
 import { ReviewCard } from '../ReviewCard';
 import { ScenarioReviewCard } from '../ScenarioReviewCard';
 import { StepWrapper } from '../StepWrapper';
@@ -23,7 +23,7 @@ interface Step6Props {
     activityType: string;
     content: {
       title: string;
-      image: any;
+      image: ImageSourcePropType;
       duration: string;
       type: string;
     } | null;
@@ -37,7 +37,7 @@ interface Step6Props {
     } | null;
     activityName: string;
     description: string;
-    activityImage: any;
+    activityImage: ImageSourcePropType | string | null;
   };
   onJumpToStep: (step: number) => void;
 }
