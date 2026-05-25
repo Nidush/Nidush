@@ -14,7 +14,6 @@ Deno.serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     const authHeader = req.headers.get('Authorization')
 
@@ -29,51 +28,26 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authError } = await authClient.auth.getUser()
     if (authError || !user) throw new Error('Sessão inválida.')
 
-    const supabaseClient = createClient(
-      supabaseUrl,
-      serviceRoleKey
-    )
-
     const { action, joinCode } = await req.json()
 
     if (action === 'join-home') {
       const normalizedJoinCode = String(joinCode ?? '').trim().toUpperCase()
       if (!normalizedJoinCode) throw new Error('Código de casa obrigatório.')
 
-      // 1. Procurar a casa pelo código
-      const { data: home, error: homeError } = await supabaseClient
+      const { data: joinedHomeId, error: joinError } = await authClient
+        .rpc('join_home_by_code', { p_join_code: normalizedJoinCode })
+
+      if (joinError || !joinedHomeId) {
+        throw joinError ?? new Error('Código de casa inválido.')
+      }
+
+      const { data: home, error: homeError } = await authClient
         .from('homes')
         .select('id, name')
-        .eq('join_code', normalizedJoinCode)
-        .single()
-
-      if (homeError || !home) throw new Error('Código de casa inválido.')
-
-      await supabaseClient
-        .from('users')
-        .upsert({
-          auth_uid: user.id,
-          email: user.email,
-          first_name: user.user_metadata?.first_name ?? '',
-          last_name: user.user_metadata?.last_name ?? '',
-        }, { onConflict: 'auth_uid' })
-
-      // 2. Verificar se o utilizador já lá está
-      const { data: existing } = await supabaseClient
-        .from('user_homes')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('home_id', home.id)
+        .eq('id', joinedHomeId)
         .maybeSingle()
 
-      // 3. Adicionar utilizador
-      if (!existing) {
-        const { error: joinError } = await supabaseClient
-          .from('user_homes')
-          .insert({ user_id: user.id, home_id: home.id, role: 'resident' })
-
-        if (joinError) throw joinError
-      }
+      if (homeError || !home) throw new Error('Casa não encontrada após o join.')
 
       log.info('User joined home successfully.', {
         userId: user.id,

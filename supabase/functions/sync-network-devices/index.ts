@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { createFunctionLogger, jsonResponse } from '../_shared/observability.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -154,6 +155,7 @@ const inferRoomId = (
 }
 
 Deno.serve(async (req) => {
+  const log = createFunctionLogger('sync-network-devices', req)
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders })
   }
@@ -171,23 +173,30 @@ Deno.serve(async (req) => {
     const mode = payload?.mode === 'upsert-only' ? 'upsert-only' : 'snapshot'
     const devices = Array.isArray(payload?.devices) ? payload.devices as IncomingDevice[] : []
 
+    if (!expectedSharedSecret) throw new Error('DEVICE_SYNC_SHARED_SECRET is not configured.')
     if (!syncToken) throw new Error('Missing device sync token.')
     if (expectedSharedSecret && providedSharedSecret !== expectedSharedSecret) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      )
+      log.warn('Rejected network device sync because the shared secret was invalid.')
+      return jsonResponse({ error: 'Unauthorized', requestId: log.requestId }, 401, corsHeaders)
     }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey)
 
-    const { data: home, error: homeError } = await supabase
-      .from('homes')
-      .select('id, name')
+    const { data: homeSecret, error: homeError } = await supabase
+      .from('home_device_secrets')
+      .select('home_id')
       .eq('device_sync_token', syncToken)
       .maybeSingle()
 
-    if (homeError || !home) throw new Error('Invalid device sync token.')
+    if (homeError || !homeSecret?.home_id) throw new Error('Invalid device sync token.')
+
+    const { data: home, error: homeDetailsError } = await supabase
+      .from('homes')
+      .select('id, name')
+      .eq('id', homeSecret.home_id)
+      .maybeSingle()
+
+    if (homeDetailsError || !home) throw new Error('Home not found for sync token.')
 
     const { data: rooms, error: roomsError } = await supabase
       .from('rooms')
@@ -373,20 +382,26 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(
-      JSON.stringify({
-        homeId: home.id,
-        syncSource,
-        synced,
-        offlineMarked,
-        ignored,
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    )
+    log.info('Synchronized network devices snapshot.', {
+      homeId: home.id,
+      syncSource,
+      mode,
+      received: devices.length,
+      synced,
+      offlineMarked,
+      ignored,
+    })
+
+    return jsonResponse({
+      homeId: home.id,
+      syncSource,
+      synced,
+      offlineMarked,
+      ignored,
+    }, 200, corsHeaders)
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: serializeError(error) }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    )
+    const serializedError = serializeError(error)
+    log.error('Failed to synchronize network devices.', { error: serializedError })
+    return jsonResponse({ error: serializedError, requestId: log.requestId }, 400, corsHeaders)
   }
 })

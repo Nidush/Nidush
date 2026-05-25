@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { createFunctionLogger, jsonResponse } from '../_shared/observability.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,6 +9,7 @@ const corsHeaders = {
 }
 
 Deno.serve(async (req) => {
+  const log = createFunctionLogger('claim-device-discovery', req)
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders })
   }
@@ -19,28 +21,27 @@ Deno.serve(async (req) => {
     const token = String(req.headers.get('x-device-sync-token') ?? '').trim()
     const providedSharedSecret = String(req.headers.get('x-device-sync-secret') ?? '').trim()
 
+    if (!expectedSharedSecret) throw new Error('DEVICE_SYNC_SHARED_SECRET is not configured.')
     if (!token) throw new Error('Missing device sync token.')
     if (expectedSharedSecret && providedSharedSecret !== expectedSharedSecret) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      )
+      log.warn('Rejected device discovery claim because the shared secret was invalid.')
+      return jsonResponse({ error: 'Unauthorized', requestId: log.requestId }, 401, corsHeaders)
     }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey)
 
-    const { data: home, error: homeError } = await supabase
-      .from('homes')
-      .select('id')
+    const { data: homeSecret, error: homeError } = await supabase
+      .from('home_device_secrets')
+      .select('home_id')
       .eq('device_sync_token', token)
       .maybeSingle()
 
-    if (homeError || !home) throw new Error('Invalid device sync token.')
+    if (homeError || !homeSecret?.home_id) throw new Error('Invalid device sync token.')
 
     const { data: pendingRequest, error: pendingError } = await supabase
       .from('device_discovery_requests')
       .select('id, home_id, status, requested_at')
-      .eq('home_id', home.id)
+      .eq('home_id', homeSecret.home_id)
       .eq('status', 'pending')
       .order('requested_at', { ascending: true })
       .limit(1)
@@ -49,10 +50,7 @@ Deno.serve(async (req) => {
     if (pendingError) throw pendingError
 
     if (!pendingRequest) {
-      return new Response(
-        JSON.stringify({ request: null }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      )
+      return jsonResponse({ request: null }, 200, corsHeaders)
     }
 
     const { data: claimedRequest, error: claimError } = await supabase
@@ -68,15 +66,15 @@ Deno.serve(async (req) => {
 
     if (claimError) throw claimError
 
-    return new Response(
-      JSON.stringify({ request: claimedRequest ?? null }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    )
+    log.info('Claimed pending device discovery request.', {
+      homeId: homeSecret.home_id,
+      requestId: pendingRequest.id,
+    })
+
+    return jsonResponse({ request: claimedRequest ?? null }, 200, corsHeaders)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    return new Response(
-      JSON.stringify({ error: message }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    )
+    log.error('Failed to claim device discovery request.', { error: message })
+    return jsonResponse({ error: message, requestId: log.requestId }, 400, corsHeaders)
   }
 })
