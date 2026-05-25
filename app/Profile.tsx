@@ -8,6 +8,7 @@ import { supabase, uploadImage } from '../utils/supabase';
 import {
   DeviceRecord,
   isRealHomeDevice,
+  SmartDeviceStatus,
   sortDevicesByFreshness,
   subscribeToHomeDeviceChanges,
 } from '../utils/devices';
@@ -110,6 +111,16 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     external_id?: string | null;
     last_seen?: string | null;
     home_id?: number | string | null;
+  };
+
+  type DeviceDiscoveryResult = {
+    discovered?: number;
+  };
+
+  type DeviceDiscoveryRequestRow = {
+    status?: string | null;
+    error_message?: string | null;
+    result?: DeviceDiscoveryResult | null;
   };
 
   const [discoveredDevices, setDiscoveredDevices] = useState<ConnectedDevice[]>([]);
@@ -284,7 +295,10 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
         if (latestStatus === 'completed') {
           console.log(`[Profile][DeviceDiscovery] Request ${requestId} completed. Refreshing devices.`);
           const refreshedDevices = await loadConnectedDevices(user.id, resolvedHomeId);
-          const discoveredCount = Number((requestRow?.result as any)?.discovered ?? refreshedDevices.length ?? 0);
+          const typedRequestRow = requestRow as DeviceDiscoveryRequestRow | null;
+          const discoveredCount = Number(
+            typedRequestRow?.result?.discovered ?? refreshedDevices.length ?? 0,
+          );
 
           if (discoveredCount === 0 || refreshedDevices.length === 0) {
             trackEvent('device-discovery-completed-no-devices', {
@@ -339,9 +353,11 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
         'Scan still running',
         'We started the smart device scan, but it is taking longer than expected. Please wait a few seconds and tap refresh again.',
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to request automatic discovery:', error);
-      setHardwareError(error?.message || 'Could not scan smart devices.');
+      const errorMessage =
+        error instanceof Error ? error.message : 'Could not scan smart devices.';
+      setHardwareError(errorMessage);
       captureException(error, {
         area: 'devices',
         screen: 'profile',
@@ -1511,7 +1527,15 @@ function AccountInfoRow({
   );
 }
 
-function DeviceItem({ name, status, connected, icon, testID }: any) {
+type DeviceItemProps = {
+  name: string;
+  status: SmartDeviceStatus | string;
+  connected: boolean;
+  icon: React.ComponentProps<typeof MaterialIcons>['name'];
+  testID?: string;
+};
+
+function DeviceItem({ name, status, connected, icon, testID }: DeviceItemProps) {
   return (
     <View
       className="flex-row items-center mb-4"
@@ -1550,7 +1574,23 @@ function DeviceItem({ name, status, connected, icon, testID }: any) {
   );
 }
 
-function MenuItem({ icon, label, border = true, testID, onPress, badge }: any) {
+type MenuItemProps = {
+  icon: React.ComponentProps<typeof MaterialIcons>['name'];
+  label: string;
+  border?: boolean;
+  testID?: string;
+  onPress?: () => void;
+  badge?: number;
+};
+
+function MenuItem({
+  icon,
+  label,
+  border = true,
+  testID,
+  onPress,
+  badge,
+}: MenuItemProps) {
   const hasBadge = typeof badge === 'number' && badge > 0;
 
   return (

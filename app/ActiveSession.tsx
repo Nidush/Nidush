@@ -2,7 +2,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/utils/supabase';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, View } from 'react-native';
+import {
+  AccessibilityInfo,
+  ActivityIndicator,
+  ImageSourcePropType,
+  View,
+} from 'react-native';
 import {
   useSharedValue,
   withRepeat,
@@ -39,23 +44,94 @@ type FormattedInstruction = {
   description?: string;
 };
 
+type SessionData = {
+  title: string;
+  room: string;
+  playlistName: string;
+  image?: ImageSourcePropType;
+  instructions: FormattedInstruction[];
+  type: 'audio' | 'video' | 'mixed';
+  videoUrl?: string;
+  devices: ScenarioDeviceState[];
+  tvDeviceName?: string;
+};
+
+type StoredActivityLike = Partial<Activity> & {
+  id: string;
+  title: string;
+  description?: string;
+  room_id?: string | number | null;
+  room?: string;
+  content_id?: string | null;
+  scenario_id?: string | number | null;
+  devices?: ScenarioDeviceState[];
+  playlist_id?: string | null;
+  image?: ImageSourcePropType;
+  type?: string;
+};
+
+type ContentRow = {
+  title?: string | null;
+  type?: string | null;
+  instructions?: unknown;
+  video_url?: string | null;
+};
+
+const isStoredActivityLike = (value: unknown): value is StoredActivityLike =>
+  Boolean(
+    value &&
+      typeof value === 'object' &&
+      'id' in value &&
+      'title' in value,
+  );
+
+const parseArrayValue = <T,>(value: unknown): T[] => {
+  if (!value) return [];
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? (parsed as T[]) : [parsed as T];
+    } catch {
+      return [value as T];
+    }
+  }
+
+  return Array.isArray(value) ? (value as T[]) : [value as T];
+};
+
+const getActivityType = (item: Partial<Activity> | Partial<Scenario>) =>
+  String(('type' in item ? item.type : '') ?? '').toLowerCase();
+
+const getActivityRoom = (item: StoredActivityLike | Activity | Scenario) =>
+  item.room ?? (typeof item.room_id === 'string' ? item.room_id : 'Living Room');
+
+const getScenarioId = (item: StoredActivityLike | Activity | Scenario) =>
+  'scenario_id' in item ? item.scenario_id : undefined;
+
+const getContentId = (item: StoredActivityLike | Activity | Scenario) =>
+  'content_id' in item ? item.content_id : undefined;
+
+const getPlaylistId = (item: StoredActivityLike | Activity | Scenario) =>
+  'playlist_id' in item ? item.playlist_id : undefined;
+
+const getItemDevices = (item: StoredActivityLike | Activity | Scenario) =>
+  ('devices' in item && Array.isArray(item.devices) ? item.devices : []) as ScenarioDeviceState[];
+
+const getNumericRoomId = (item: StoredActivityLike | Activity | Scenario) => {
+  if (typeof item.room_id === 'number') return item.room_id;
+
+  const parsed = Number(item.room_id);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 export default function ActiveSession() {
   const { id } = useLocalSearchParams<{ id: string; musicStarted?: string }>();
   const { playPlaylist, pausePlayback, resumePlayback, currentTrack, isAuthenticated } = useSpotify();
 
   // --- 1. STATE ---
   const [loading, setLoading] = useState(true);
-  const [sessionData, setSessionData] = useState<{
-    title: string;
-    room: string;
-    playlistName: string;
-    image?: any;
-    instructions: FormattedInstruction[];
-    type: 'audio' | 'video' | 'mixed';
-    videoUrl?: string;
-    devices: ScenarioDeviceState[];
-    tvDeviceName?: string;
-  } | null>(null);
+  const [sessionData, setSessionData] = useState<SessionData | null>(null);
 
   const [isActive, setIsActive] = useState(true);
   const [isMusicPlaying, setIsMusicPlaying] = useState(true);
@@ -72,12 +148,14 @@ export default function ActiveSession() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      let foundItem: Activity | Scenario | null | undefined =
+      let foundItem: Activity | Scenario | StoredActivityLike | null | undefined =
         await fetchActivityTemplateById(id);
       if (!foundItem) {
         const stored = await AsyncStorage.getItem('@myActivities');
-        if (stored)
-          foundItem = JSON.parse(stored).find((a: any) => a.id === id);
+        if (stored) {
+          const parsedStored = parseArrayValue<unknown>(stored).filter(isStoredActivityLike);
+          foundItem = parsedStored.find((activity) => activity.id === id);
+        }
       }
       if (!foundItem) foundItem = await fetchScenarioTemplateById(id);
 
@@ -103,26 +181,12 @@ export default function ActiveSession() {
       let playlistName = 'Relaxing Music';
       let contentType: 'audio' | 'video' | 'mixed' = 'audio';
       let videoUrl: string | undefined = undefined;
-      let contentData: any = null;
+      let contentData: ContentRow | null = null;
       let relatedScenario: Scenario | null = null;
       let connectedTvName: string | undefined = undefined;
 
-      // Helper: parse JSON safely
-      const safeParse = (value: any): any[] => {
-        if (!value) return [];
-        if (typeof value === 'string') {
-          try {
-            const parsed = JSON.parse(value);
-            return Array.isArray(parsed) ? parsed : [parsed];
-          } catch {
-            return [value];
-          }
-        }
-        return Array.isArray(value) ? value : [value];
-      };
-
-      const contentId = (foundItem as any).content_id;
-      const localContent = contentId ? CONTENTS[contentId as any] : null;
+      const contentId = getContentId(foundItem);
+      const localContent = contentId ? CONTENTS[String(contentId)] : null;
 
       if (foundItem && contentId) {
         // Fetch content from Supabase
@@ -138,7 +202,7 @@ export default function ActiveSession() {
           playlistName = contentData.title || localContent?.title || playlistName;
           if (contentData.type === 'video' || localContent?.type === 'video') {
             contentType = 'video';
-            videoUrl = localContent?.videoUrl || contentData.video_url;
+            videoUrl = localContent?.videoUrl || contentData.video_url || undefined;
           }
         } else {
           // Fallback to local CONTENTS
@@ -152,7 +216,7 @@ export default function ActiveSession() {
         }
       }
 
-      const sId = (foundItem as any).scenario_id;
+      const sId = getScenarioId(foundItem);
       relatedScenario = sId ? await fetchScenarioTemplateById(sId) : null;
       if (contentType !== 'video' && relatedScenario?.playlist) {
         playlistName = relatedScenario.playlist;
@@ -175,9 +239,7 @@ export default function ActiveSession() {
         if (homeAssoc?.home_id) {
           tvQuery = tvQuery.eq('home_id', homeAssoc.home_id);
 
-          const activityRoomId = typeof (foundItem as any).room_id === 'number'
-            ? (foundItem as any).room_id
-            : Number((foundItem as any).room_id);
+          const activityRoomId = getNumericRoomId(foundItem);
 
           if (Number.isFinite(activityRoomId)) {
             tvQuery = tvQuery.eq('room_id', activityRoomId);
@@ -191,7 +253,7 @@ export default function ActiveSession() {
         connectedTvName = tvDevice?.name;
       }
 
-      const rawInstructions = safeParse(
+      const rawInstructions = parseArrayValue<FormattedInstruction | string>(
         contentData?.instructions ||
         localContent?.instructions ||
         []
@@ -213,23 +275,23 @@ export default function ActiveSession() {
 
       setSessionData({
         title: foundItem.title || 'Session',
-        room: (foundItem as any).room_id || (foundItem as any).room || 'Living Room',
+        room: getActivityRoom(foundItem),
         playlistName: playlistName,
         image: foundItem.image,
         instructions: formattedInstructions,
         type: contentType,
         videoUrl: videoUrl,
-        devices: relatedScenario?.devices || (foundItem as any).devices || [],
+        devices: relatedScenario?.devices || getItemDevices(foundItem),
         tvDeviceName: connectedTvName,
       });
 
       // Tocar música no Spotify só em sessões sem vídeo.
       if (isAuthenticated && contentType !== 'video') {
-        let pId = (foundItem as any).playlist_id;
+        let pId = getPlaylistId(foundItem);
         
         if (!pId) {
-          const type = (foundItem as any).type?.toLowerCase() || '';
-          let sId = (foundItem as any).scenario_id;
+          const type = getActivityType(foundItem);
+          let sId = getScenarioId(foundItem);
           
           if (!sId || sId === 'null') {
              // Tentar mapear o tipo para um cenário padrão local
@@ -261,7 +323,7 @@ export default function ActiveSession() {
           if (!pId) pId = '37i9dQZF1DX76W9kuv1Z0g';
         }
         
-        const sessionDevices = relatedScenario?.devices || (foundItem as any).devices || [];
+        const sessionDevices = relatedScenario?.devices || getItemDevices(foundItem);
         const hasScenarioTv = sessionDevices.some((config: ScenarioDeviceState) => {
           const device = SMART_HOME_DEVICES[config.deviceId];
           return device?.type === 'tv';
@@ -269,7 +331,7 @@ export default function ActiveSession() {
         const shouldPreferTv =
           hasScenarioTv &&
           ['meditation', 'yoga', 'general', 'other'].includes(
-            String((foundItem as any).type || '').toLowerCase(),
+            getActivityType(foundItem),
           );
         const tvPlaybackOptions = shouldPreferTv
           ? {
@@ -290,7 +352,7 @@ export default function ActiveSession() {
           playPlaylist(pId, tvPlaybackOptions);
         } else {
           // Fallback por tipo de atividade
-          const type = (foundItem as any).type?.toLowerCase();
+          const type = getActivityType(foundItem);
           const fallbacks: Record<string, string> = {
             workout: '37i9dQZF1DX76W9kuv1Z0g',
             cooking: '37i9dQZF1DXdbChS9879u9',
@@ -366,7 +428,7 @@ export default function ActiveSession() {
 
   useEffect(() => {
     if (isVideoSession) return;
-    let interval: any = null;
+    let interval: ReturnType<typeof setInterval> | null = null;
     const currentStep = sessionData?.instructions[currentStepIndex];
     const isTimedStep = currentStep?.duration !== undefined;
 
@@ -375,7 +437,9 @@ export default function ActiveSession() {
     } else if (isActive && isTimedStep && secondsLeft === 0) {
       handleNextStep();
     }
-    return () => clearInterval(interval);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [
     isActive,
     secondsLeft,

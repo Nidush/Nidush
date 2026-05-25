@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
+  ImageSourcePropType,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -52,6 +53,83 @@ type ShortcutRow = {
   user_id: string | null;
 };
 
+type ScenarioRow = {
+  id: number | string;
+  name: string;
+  description: string | null;
+  playlist_id: string | null;
+  playlist_name?: string | null;
+};
+
+type ContentRow = {
+  id: string;
+  title: string;
+  type: string;
+  category: string;
+  description: string;
+  duration: string;
+  image?: string | null;
+  instructions?: unknown;
+  ingredients?: unknown;
+  video_url?: string | null;
+  author?: string | null;
+};
+
+type DisplayInstruction = string | { text: string; duration?: number };
+
+const isActivityItem = (item: Activity | Scenario): item is Activity => 'type' in item;
+
+const parseUnknownArray = (value: unknown): unknown[] => {
+  if (!value) return [];
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return Array.isArray(value) ? value : [];
+};
+
+const toInstructionText = (value: unknown): string => {
+  if (typeof value === 'string') return value;
+  if (value && typeof value === 'object' && 'text' in value) {
+    return String((value as { text?: unknown }).text ?? '');
+  }
+  return '';
+};
+
+const normalizeIngredients = (value: unknown): Content['ingredients'] => {
+  const parsed = parseUnknownArray(value);
+
+  return parsed.map((entry) => {
+    if (entry && typeof entry === 'object' && 'item' in entry) {
+      return {
+        item: String((entry as { item?: unknown }).item ?? ''),
+        amount: String((entry as { amount?: unknown }).amount ?? ''),
+      };
+    }
+
+    const text = String(entry ?? '');
+    const spaceIdx = text.indexOf(' ');
+    if (spaceIdx === -1) return { item: text, amount: '' };
+    return { amount: text.slice(0, spaceIdx), item: text.slice(spaceIdx + 1) };
+  });
+};
+
+const getItemRoomLabel = (item: Activity | Scenario) =>
+  item.room ?? item.room_id ?? '';
+
+const getItemTypeLabel = (item: Activity | Scenario) =>
+  isActivityItem(item) ? item.type : 'Scenario';
+
+const getItemTypeKey = (item: Activity | Scenario) =>
+  (isActivityItem(item) ? item.type : '').toLowerCase();
+
+const getItemDevices = (item: Activity | Scenario) =>
+  ('devices' in item && Array.isArray(item.devices) ? item.devices : []) as ScenarioDeviceState[];
+
 export default function ActivityDetails() {
   const { id, isNew } = useLocalSearchParams<{ id: string; isNew?: string }>();
 
@@ -64,7 +142,7 @@ export default function ActivityDetails() {
   const [toastMessage, setToastMessage] = useState('');
   const [isUpdatingShortcut, setIsUpdatingShortcut] = useState(false);
 
-  const isActivity = mainItem ? 'type' in mainItem : false;
+  const isActivity = mainItem ? isActivityItem(mainItem) : false;
 
   const [alertConfig, setAlertConfig] = useState<AlertConfigState>({
     visible: false,
@@ -144,7 +222,7 @@ export default function ActivityDetails() {
                   .from('scenarios')
                   .select('*')
                   .eq('id', foundActivity.scenario_id)
-                  .maybeSingle();
+                  .maybeSingle<ScenarioRow>();
 
                 if (scenData) {
                   scen = {
@@ -167,12 +245,13 @@ export default function ActivityDetails() {
 
         const contentPromise = foundActivity.content_id
           ? (async () => {
-              const localContent = CONTENTS[foundActivity.content_id as any];
+              const localContent = CONTENTS[String(foundActivity.content_id)];
               const { data: contentRows, error: contentError } = await supabase
                 .from('contents')
                 .select('*')
                 .eq('id', foundActivity.content_id)
-                .limit(1);
+                .limit(1)
+                .returns<ContentRow[]>();
 
               if (contentRows && contentRows.length > 0 && !contentError) {
                 const contentData = contentRows[0];
@@ -382,12 +461,12 @@ export default function ActivityDetails() {
       } else {
         setTimeout(() => setShowToast(false), 3000);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to update shortcuts:', error);
       setAlertConfig({
         visible: true,
         title: 'Shortcuts',
-        message: error?.message
+        message: error instanceof Error
           ? `Could not update shortcuts: ${error.message}`
           : 'Could not update shortcuts. Please try again.',
         confirmText: 'OK',
@@ -467,14 +546,14 @@ export default function ActivityDetails() {
 
   const imgObj = mainItem.image || relatedContent?.image;
   const isNumeric = typeof imgObj === 'string' && /^\d+$/.test(imgObj);
-  const imageSource = isNumeric
+  const imageSource: ImageSourcePropType = isNumeric
     ? { uri: `https://picsum.photos/seed/${imgObj}/400/600` }
-    : typeof imgObj === 'string'
+      : typeof imgObj === 'string'
       ? { uri: imgObj }
       : imgObj || { uri: 'https://picsum.photos/400/600' };
 
   const devicesToShow: ScenarioDeviceState[] =
-    relatedScenario?.devices || (mainItem as Scenario).devices || [];
+    relatedScenario?.devices || getItemDevices(mainItem);
 
   const activeSpeakerConfig = devicesToShow.find((config) => {
     const device = SMART_HOME_DEVICES[config.deviceId];
@@ -486,32 +565,12 @@ export default function ActivityDetails() {
     : 'Playlist will be played';
 
   // Helper: parse JSON safely (handles strings, arrays, objects)
-  const safeParse = (value: any): any => {
-    if (!value) return [];
-    if (typeof value === 'string') {
-      try { return JSON.parse(value); } catch { return []; }
-    }
-    return value;
-  };
-
-  // Instructions: can be JSON string (from API), array of strings, or array of {text, duration}
-  const rawInstructions = safeParse(relatedContent?.instructions);
-  const instructions: any[] = Array.isArray(rawInstructions)
-    ? rawInstructions.map((s: any) => typeof s === 'string' ? s : s?.text || '')
-    : [];
-
-  // Ingredients: API format is ["400g Pasta", "100g Bacon"], ContentSection expects [{item, amount}]
-  const rawIngredients = safeParse(relatedContent?.ingredients);
-  const ingredients = relatedContent?.type === 'recipe' && Array.isArray(rawIngredients)
-    ? rawIngredients.map((s: any) => {
-        if (typeof s === 'object' && s?.item) return s; // Already {item, amount} format
-        // API format: "400g Pasta" → split on first space
-        const str = String(s);
-        const spaceIdx = str.indexOf(' ');
-        if (spaceIdx === -1) return { item: str, amount: '' };
-        return { amount: str.slice(0, spaceIdx), item: str.slice(spaceIdx + 1) };
-      })
-    : [];
+  const rawInstructions = parseUnknownArray(relatedContent?.instructions);
+  const instructions: DisplayInstruction[] = rawInstructions.map(toInstructionText);
+  const ingredients =
+    relatedContent?.type === 'recipe'
+      ? normalizeIngredients(relatedContent.ingredients)
+      : [];
 
   const displayTime = isActivity
     ? relatedContent?.duration || null
@@ -536,9 +595,9 @@ export default function ActivityDetails() {
       >
         <ActivityHeader
           imageSource={imageSource}
-          type={isActivity ? (mainItem as Activity).type : 'Scenario'}
+          type={getItemTypeLabel(mainItem)}
           title={mainItem.title}
-          room={(mainItem as any).room_id || (mainItem as any).room}
+          room={getItemRoomLabel(mainItem)}
           duration={displayTime}
           isActivity={isActivity}
           onBack={handleCustomBack}
@@ -572,12 +631,12 @@ export default function ActivityDetails() {
           <FocusSection enabled={focusEnabled} onToggle={setFocusEnabled} />
           <MediaSection
             isVisible={
-              !!(relatedScenario?.playlist || relatedContent?.videoUrl || ['workout', 'cooking', 'meditation'].includes((mainItem as any).type?.toLowerCase()))
+              !!(relatedScenario?.playlist || relatedContent?.videoUrl || ['workout', 'cooking', 'meditation'].includes(getItemTypeKey(mainItem)))
             }
             title={relatedScenario?.playlist || relatedContent?.title || (
-              (mainItem as any).type?.toLowerCase() === 'workout' ? 'Workout Beats' :
-              (mainItem as any).type?.toLowerCase() === 'cooking' ? 'Cooking Vibes' :
-              (mainItem as any).type?.toLowerCase() === 'meditation' ? 'Nature Sounds' : 'Recommended Music'
+              getItemTypeKey(mainItem) === 'workout' ? 'Workout Beats' :
+              getItemTypeKey(mainItem) === 'cooking' ? 'Cooking Vibes' :
+              getItemTypeKey(mainItem) === 'meditation' ? 'Nature Sounds' : 'Recommended Music'
             )}
             subtitle={audioStatusText}
           />

@@ -10,6 +10,7 @@ import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
   Image,
+  ImageSourcePropType,
   Modal,
   Platform,
   StyleSheet,
@@ -21,7 +22,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface ActivityHeaderProps {
-  imageSource: any;
+  imageSource: ImageSourcePropType;
   type: string;
   title: string;
   room: string;
