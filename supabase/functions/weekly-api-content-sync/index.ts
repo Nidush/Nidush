@@ -166,6 +166,13 @@ Deno.serve(async (req: Request) => {
   try {
     const expectedSecret = Deno.env.get('API_CONTENT_SYNC_SECRET') || Deno.env.get('CRON_SECRET')
     const providedSecret = req.headers.get('x-cron-secret') || req.headers.get('authorization')?.replace(/^Bearer\s+/i, '')
+    if (!expectedSecret) {
+      return new Response(JSON.stringify({ error: 'Cron secret not configured' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     if (expectedSecret && providedSecret !== expectedSecret) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,

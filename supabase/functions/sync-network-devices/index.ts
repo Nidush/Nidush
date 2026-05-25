@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-device-sync-token',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-device-sync-token, x-device-sync-secret',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Max-Age': '86400',
 }
@@ -161,15 +161,23 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const expectedSharedSecret = Deno.env.get('DEVICE_SYNC_SHARED_SECRET') ?? ''
 
     const tokenFromHeader = req.headers.get('x-device-sync-token')
     const payload = await req.json()
-    const syncToken = String(tokenFromHeader ?? payload?.syncToken ?? '').trim()
+    const syncToken = String(tokenFromHeader ?? '').trim()
+    const providedSharedSecret = String(req.headers.get('x-device-sync-secret') ?? '').trim()
     const syncSource = String(payload?.syncSource ?? 'ssdp').trim().toLowerCase()
     const mode = payload?.mode === 'upsert-only' ? 'upsert-only' : 'snapshot'
     const devices = Array.isArray(payload?.devices) ? payload.devices as IncomingDevice[] : []
 
     if (!syncToken) throw new Error('Missing device sync token.')
+    if (expectedSharedSecret && providedSharedSecret !== expectedSharedSecret) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey)
 

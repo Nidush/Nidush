@@ -5,23 +5,28 @@ import { Platform } from 'react-native';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL as string;
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string;
+const shouldLogSupabaseTraffic = typeof __DEV__ !== 'undefined' && __DEV__;
 
 const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const url = input instanceof Request ? input.url : input.toString();
   const method = init?.method || (input instanceof Request ? input.method : 'GET');
   
-  console.log(`%c[SUPABASE REQUEST] %c${method} %c${url}`, 
-    'color: #5C8D58; font-weight: bold', 
-    'color: #3E545C; font-weight: bold', 
-    'color: #888'
-  );
+  if (shouldLogSupabaseTraffic) {
+    console.log(`%c[SUPABASE REQUEST] %c${method} %c${url}`,
+      'color: #5C8D58; font-weight: bold',
+      'color: #3E545C; font-weight: bold',
+      'color: #888'
+    );
+  }
 
   const response = await fetch(input, init);
 
-  console.log(`%c[SUPABASE RESPONSE] %c${response.status} ${response.statusText}`, 
-    'color: #5C8D58; font-weight: bold', 
-    response.ok ? 'color: #2e7d32' : 'color: #d32f2f'
-  );
+  if (shouldLogSupabaseTraffic) {
+    console.log(`%c[SUPABASE RESPONSE] %c${response.status} ${response.statusText}`,
+      'color: #5C8D58; font-weight: bold',
+      response.ok ? 'color: #2e7d32' : 'color: #d32f2f'
+    );
+  }
 
   return response;
 };
@@ -47,6 +52,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 export const apiLog = (method: string, table: string, data?: any) => {
+  if (!shouldLogSupabaseTraffic) return;
   console.log(`%c[DEBUG] %c${method} on ${table}`, 'color: #5C8D58; font-weight: bold', 'color: #3E545C', data || '');
 };
 
@@ -87,12 +93,16 @@ const decodeBase64ToArrayBuffer = (base64: string): ArrayBuffer => {
   return arraybuffer;
 };
 
-export const uploadImage = async (base64OrUri: string, bucketName: string = 'activities'): Promise<string | null> => {
+export const uploadImage = async (
+  base64OrUri: string,
+  bucketName: string = 'activities',
+  filePathOverride?: string,
+): Promise<string | null> => {
   if (!base64OrUri || base64OrUri.startsWith('http')) return base64OrUri;
 
   try {
     const fileName = `${Date.now()}.jpg`;
-    const filePath = `${fileName}`;
+    const filePath = filePathOverride?.trim() || fileName;
 
     let uploadData: any;
     let contentType = 'image/jpeg';
@@ -144,4 +154,3 @@ export const invokeFunction = async (functionName: string, body: any) => {
   apiLog('FUNCTION SUCCESS', functionName, data);
   return data;
 };
-

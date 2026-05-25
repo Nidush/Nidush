@@ -458,7 +458,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
           connectedDevices,
         ] = await Promise.all([
           finalHomeId
-            ? supabase.from('homes').select('name, join_code, device_sync_token').eq('id', finalHomeId).maybeSingle()
+            ? supabase.from('homes').select('name, join_code').eq('id', finalHomeId).maybeSingle()
             : Promise.resolve({ data: null }),
           supabase
             .from('activities')
@@ -571,20 +571,27 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
     setAvatarUrl(typeof base64OrUri === 'string' ? base64OrUri : null);
 
-    const publicUrl = await uploadImage(base64OrUri, 'avatars');
-    if (publicUrl) {
-      const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      alert('Sessão inválida. Faz login novamente.');
+      return;
+    }
 
+    const avatarPath = `${user.id}/${Date.now()}.jpg`;
+    const publicUrl = await uploadImage(base64OrUri, 'avatars', avatarPath);
+    if (publicUrl) {
       await supabase.auth.updateUser({
         data: { avatar_url: publicUrl }
       });
 
-      if (user) {
-        const { error: dbError } = await supabase.from('users').update({ avatar_url: publicUrl }).eq('email', user.email);
-        if (dbError) {
-          console.error("Erro a atualizar tabela users:", dbError);
-          alert("A foto foi guardada no auth, mas falhou ao guardar na tabela publica users (erro RLS): " + dbError.message);
-        }
+      const { error: dbError } = await supabase
+        .from('users')
+        .update({ avatar_url: publicUrl })
+        .eq('auth_uid', user.id);
+
+      if (dbError) {
+        console.error("Erro a atualizar tabela users:", dbError);
+        alert("A foto foi guardada no auth, mas falhou ao guardar na tabela publica users (erro RLS): " + dbError.message);
       }
 
       setAvatarUrl(publicUrl);

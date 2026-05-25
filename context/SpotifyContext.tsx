@@ -166,29 +166,8 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const loadSavedToken = async () => {
     setIsLoading(true);
     try {
-      let savedToken = await AsyncStorage.getItem('@spotify_token');
+      const savedToken = await AsyncStorage.getItem('@spotify_token');
 
-      // Se não houver token local, tentamos ir buscar à BD (Supabase)
-      if (!savedToken) {
-        console.log('[Spotify] No local token, checking Supabase...');
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: dbUser } = await supabase
-            .from('users')
-            .select('spotify_token')
-            .eq('auth_uid', user.id)
-            .maybeSingle();
-
-          if (dbUser?.spotify_token) {
-            console.log('[Spotify] Token found in Supabase, restoring locally...');
-            const tokenFromDb: string = dbUser.spotify_token;
-            savedToken = tokenFromDb;
-            await AsyncStorage.setItem('@spotify_token', tokenFromDb);
-          }
-        }
-      }
-
-      // 2. Finalmente, se temos um token (seja local ou da BD), validamos
       if (savedToken && typeof savedToken === 'string') {
         const tokenStr: string = savedToken;
         setToken(tokenStr);
@@ -212,11 +191,10 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
         await supabase
           .from('users')
           .update({
-            spotify_token: newToken,
             spotify_connected: true
           })
           .eq('auth_uid', user.id);
-        console.log('[Spotify] Token sincronizado com o Supabase com sucesso.');
+        console.log('[Spotify] Estado de ligação sincronizado com o Supabase.');
       }
     } catch (e) {
       console.error('[Spotify] Erro ao sincronizar com Supabase:', e);
@@ -281,7 +259,7 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (user) {
         await supabase
           .from('users')
-          .update({ spotify_token: null, spotify_connected: false })
+          .update({ spotify_connected: false })
           .eq('auth_uid', user.id);
       }
     } catch (e) {
