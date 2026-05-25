@@ -13,6 +13,12 @@ import { supabase } from '../utils/supabase';
 import { registerHealthConnectBackgroundSync } from '../utils/healthConnectBackgroundTask';
 import * as WebBrowser from 'expo-web-browser';
 import { logger } from '../utils/logger';
+import {
+  installGlobalErrorHandlers,
+  setObservabilityContext,
+  setObservabilityUser,
+  trackEvent,
+} from '../utils/observability';
 import './../global.css';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -34,6 +40,10 @@ export default function RootLayout() {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    installGlobalErrorHandlers();
+    setObservabilityContext({
+      releaseChannel: process.env.EXPO_PUBLIC_APP_ENV || 'development',
+    });
     setIsReady(true);
   }, []);
 
@@ -62,6 +72,7 @@ export default function RootLayout() {
         setIsConsentVisible(legalConsent !== 'accepted');
 
         const { data: { user } } = await supabase.auth.getUser();
+        setObservabilityUser(user?.id);
         
         if (user) {
           const { data: homeAssoc } = await supabase
@@ -74,10 +85,20 @@ export default function RootLayout() {
             
           if (homeAssoc?.home_id) {
             await AsyncStorage.setItem('@viewedOnboarding', 'true');
+            trackEvent('restored-authenticated-session', {
+              area: 'routing',
+              screen: 'root-layout',
+              userId: user.id,
+            });
             router.replace('/(tabs)');
             return;
           } else {
             // Logged in but no home? Go to setup-profile
+            trackEvent('redirected-to-setup-profile', {
+              area: 'routing',
+              screen: 'root-layout',
+              userId: user.id,
+            });
             router.replace('/setup-profile');
             return;
           }
@@ -89,11 +110,25 @@ export default function RootLayout() {
           // If they already viewed it, they can go to login or see onboarding again.
           // For a better UX, if they already saw onboarding but are not logged in,
           // we send them to login or onboarding. Let's send to onboarding as it has the 'Skip' to signup/login.
+          trackEvent('redirected-to-onboarding', {
+            area: 'routing',
+            screen: 'root-layout',
+            metadata: { viewedOnboarding: true },
+          });
           router.replace('/onboarding');
         } else {
+          trackEvent('redirected-to-onboarding', {
+            area: 'routing',
+            screen: 'root-layout',
+            metadata: { viewedOnboarding: false },
+          });
           router.replace('/onboarding');
         }
       } catch {
+        trackEvent('fallback-onboarding-route', {
+          area: 'routing',
+          screen: 'root-layout',
+        }, 'warn');
         router.replace('/onboarding');
       } finally {
         setIsRoutingReady(true);

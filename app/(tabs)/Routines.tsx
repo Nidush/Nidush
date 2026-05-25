@@ -18,6 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { supabase } from '../../utils/supabase';
+import { captureException, trackEvent } from '../../utils/observability';
 
 import AddRoomDevice from '../../components/rooms/AddRoomDevice';
 import RoutineCard from '../../components/routines/RoutineCard';
@@ -529,9 +530,26 @@ export default function Routines() {
       closeAddRoutineModal();
     } catch (err: any) {
       console.error('Error creating routine:', err);
+      captureException(err, {
+        area: 'routines',
+        screen: 'routines',
+        action: 'create-routine',
+      });
       Alert.alert('Could not create routine', err.message || 'Please try again.');
       setIsSavingRoutine(false);
+      return;
     }
+
+    trackEvent('routine-created', {
+      area: 'routines',
+      screen: 'routines',
+      action: 'create-routine',
+      metadata: {
+        roomId: newRoutineRoomId,
+        days: newRoutineDays,
+        imageKey: newRoutineImageKey,
+      },
+    });
   };
 
   const handleScroll = (event: any) => {

@@ -26,6 +26,7 @@ import { LegalContent } from '../components/legal/LegalContent';
 import {
   hasHeartRateReadPermission,
 } from '../utils/healthConnectSync';
+import { captureException, trackEvent } from '../utils/observability';
 
 export default function Profile() {
   const router = useRouter();
@@ -141,6 +142,11 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
     if (error) {
       console.error('Erro a obter casa do utilizador para devices:', error);
+      captureException(error, {
+        area: 'devices',
+        screen: 'profile',
+        action: 'load-user-home-id',
+      });
       return null;
     }
 
@@ -187,6 +193,12 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     if (error) {
       console.error('Erro a carregar devices da BD:', error);
       setHardwareError('Could not load smart home devices.');
+      captureException(error, {
+        area: 'devices',
+        screen: 'profile',
+        action: 'load-connected-devices',
+        metadata: { userId, homeId },
+      });
       return [];
     }
 
@@ -213,6 +225,11 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
   const requestAutomaticDiscovery = async () => {
     setIsRequestingDiscovery(true);
+    trackEvent('requested-device-discovery', {
+      area: 'devices',
+      screen: 'profile',
+      action: 'request-scan',
+    });
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Session not found.');
@@ -232,6 +249,13 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
       if (!requestId) {
         console.log('[Profile][DeviceDiscovery] No request id returned. Refreshing current devices.');
         await refreshConnectedDevices(user.id, resolvedHomeId);
+        trackEvent('device-discovery-reused-existing-sync', {
+          area: 'devices',
+          screen: 'profile',
+          action: 'request-scan',
+          userId: user.id,
+          metadata: { homeId: resolvedHomeId },
+        });
         return;
       }
 
@@ -263,6 +287,13 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
           const discoveredCount = Number((requestRow?.result as any)?.discovered ?? refreshedDevices.length ?? 0);
 
           if (discoveredCount === 0 || refreshedDevices.length === 0) {
+            trackEvent('device-discovery-completed-no-devices', {
+              area: 'devices',
+              screen: 'profile',
+              action: 'poll-scan',
+              userId: user.id,
+              metadata: { requestId, homeId: resolvedHomeId },
+            });
             openDeviceScanModal(
               'No devices found',
               'We scanned your home network but did not find any compatible smart devices this time. Make sure the devices are turned on and connected to the same Wi-Fi, then try again.',
@@ -275,6 +306,13 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
           const failureMessage = requestRow?.error_message
             ? String(requestRow.error_message)
             : 'The smart device scan failed.';
+          captureException(new Error(failureMessage), {
+            area: 'devices',
+            screen: 'profile',
+            action: 'poll-scan',
+            userId: user.id,
+            metadata: { requestId, homeId: resolvedHomeId, status: latestStatus },
+          });
           openDeviceScanModal(
             'Scan failed',
             `${failureMessage} Please wait a moment and try again.`,
@@ -290,6 +328,13 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
       );
       await refreshConnectedDevices(user.id, resolvedHomeId);
       setHardwareError('The scan is still running. Pull to refresh again in a few seconds.');
+      trackEvent('device-discovery-timeout-refresh', {
+        area: 'devices',
+        screen: 'profile',
+        action: 'poll-scan',
+        userId: user.id,
+        metadata: { requestId, homeId: resolvedHomeId },
+      });
       openDeviceScanModal(
         'Scan still running',
         'We started the smart device scan, but it is taking longer than expected. Please wait a few seconds and tap refresh again.',
@@ -297,6 +342,11 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     } catch (error: any) {
       console.error('Failed to request automatic discovery:', error);
       setHardwareError(error?.message || 'Could not scan smart devices.');
+      captureException(error, {
+        area: 'devices',
+        screen: 'profile',
+        action: 'request-scan',
+      });
     } finally {
       setIsRequestingDiscovery(false);
     }

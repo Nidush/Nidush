@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { createFunctionLogger, jsonResponse } from '../_shared/observability.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,6 +9,7 @@ const corsHeaders = {
 }
 
 Deno.serve(async (req) => {
+  const log = createFunctionLogger('manage-home', req)
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders })
 
   try {
@@ -73,20 +75,19 @@ Deno.serve(async (req) => {
         if (joinError) throw joinError
       }
 
-      return new Response(JSON.stringify({ message: "Sucesso!", home }), { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
-        status: 200 
+      log.info('User joined home successfully.', {
+        userId: user.id,
+        homeId: home.id,
+        action,
       })
+      return jsonResponse({ message: "Sucesso!", home, requestId: log.requestId }, 200, corsHeaders)
     }
 
     throw new Error('Ação inválida.')
 
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-
-    return new Response(JSON.stringify({ error: message }), { 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
-      status: 400 
-    })
+    log.error('Failed to manage home request.', { error: message })
+    return jsonResponse({ error: message, requestId: log.requestId }, 400, corsHeaders)
   }
 })

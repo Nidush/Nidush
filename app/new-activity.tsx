@@ -13,6 +13,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNotifications } from '@/context/NotificationsContext';
 import { fetchScenarioTemplates } from '@/utils/catalogTemplates';
+import { captureException, trackEvent } from '@/utils/observability';
 import {
   AccessibilityInfo,
   Keyboard,
@@ -402,6 +403,11 @@ export default function NewActivityFlow() {
 
       if (error) {
         console.error('Erro no Supabase:', error);
+        captureException(error, {
+          area: 'activities',
+          screen: 'new-activity',
+          action: isEditMode ? 'update-activity' : 'create-activity',
+        });
         alert('Erro ao guardar na Base de Dados: ' + error.message);
         return;
       }
@@ -418,6 +424,13 @@ export default function NewActivityFlow() {
           : `Great job! "${activityName || 'Untitled Activity'}" has been added to your creations.`,
         'creation'
       );
+      trackEvent(isEditMode ? 'activity-updated' : 'activity-created', {
+        area: 'activities',
+        screen: 'new-activity',
+        action: isEditMode ? 'update-activity' : 'create-activity',
+        userId: user.id,
+        metadata: { activityId: data.id, roomId: dbRoomId, homeId: currentHomeId },
+      });
 
       // Se tudo correu bem, avançar para os detalhes usando o ID gerado pelo Supabase
       router.push({
@@ -429,6 +442,11 @@ export default function NewActivityFlow() {
       });
     } catch (e) {
       console.error('Erro ao salvar:', e);
+      captureException(e, {
+        area: 'activities',
+        screen: 'new-activity',
+        action: isEditMode ? 'update-activity' : 'create-activity',
+      });
       alert('Ocorreu um erro ao salvar a tua atividade.');
     } finally {
       setIsSaving(false);

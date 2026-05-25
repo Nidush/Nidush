@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { createFunctionLogger } from '../_shared/observability.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,6 +9,7 @@ const corsHeaders = {
 }
 
 Deno.serve(async (req: Request) => {
+  const log = createFunctionLogger('welcome-user', req)
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders })
   }
@@ -54,7 +56,10 @@ Deno.serve(async (req: Request) => {
     const recipient = TEST_MODE ? VERIFIED_EMAIL : user.email
 
     if (!RESEND_API_KEY || !recipient) {
-      console.error("ERRO: RESEND_API_KEY não configurada no Supabase.")
+      log.error('Missing email configuration.', {
+        hasResendKey: Boolean(RESEND_API_KEY),
+        hasRecipient: Boolean(recipient),
+      })
       return new Response(JSON.stringify({ error: "Configuração de mail em falta." }), { status: 500, headers: corsHeaders })
     }
 
@@ -104,12 +109,17 @@ Deno.serve(async (req: Request) => {
     const resData = await res.json()
 
     if (!res.ok) {
-      console.error("Erro retornado pelo Resend:", resData)
+      log.error('Resend returned an error.', { resendResponse: resData })
       return new Response(
         JSON.stringify({ error: "Falha ao enviar email pelo Resend", details: resData }),
         { status: res.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    log.info('Welcome email request sent.', {
+      userId: user.id,
+      testMode: TEST_MODE,
+    })
 
     return new Response(
       JSON.stringify({ message: "Email enviado!", id: resData.id }),
@@ -118,6 +128,7 @@ Deno.serve(async (req: Request) => {
 
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
+    log.error('Failed to send welcome email.', { error: message })
 
     return new Response(
       JSON.stringify({ error: message }),
