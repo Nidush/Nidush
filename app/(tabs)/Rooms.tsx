@@ -2,7 +2,6 @@ import { MaterialCommunityIcons, MaterialIcons, Ionicons } from '@expo/vector-ic
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -29,6 +28,7 @@ import {
 import AddRoomDevice from '../../components/rooms/AddRoomDevice';
 import CategoryPill from '../../components/rooms/CategoryPill';
 import DeviceCard from '../../components/rooms/device-card';
+import { FeedbackState } from '../../components/UI/FeedbackState';
 import {
   AppDevice,
   DeviceRecord,
@@ -50,6 +50,7 @@ interface ActivityItem {
   description: string;
   type: string;
   image: string;
+  room_id?: number | null;
 }
 
 export default function Rooms() {
@@ -65,9 +66,12 @@ export default function Rooms() {
   const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
   const [allDevices, setAllDevices] = useState<Device[]>([]);
   const [allActivities, setAllActivities] = useState<ActivityItem[]>([]);
-  const [junctions, setJunctions] = useState<{ activity_id: number; device_id: number }[]>([]);
+  const [, setJunctions] = useState<{ activity_id: number; device_id: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [feedbackTone, setFeedbackTone] = useState<'error' | 'success' | 'info'>('info');
   const [searchQuery, setSearchQuery] = useState('');
   const [userHomeId, setUserHomeId] = useState<number | null>(null);
   const [isAdjustingLight, setIsAdjustingLight] = useState(false);
@@ -90,6 +94,11 @@ export default function Rooms() {
   const [tempLinkedDeviceIds, setTempLinkedDeviceIds] = useState<number[]>([]);
   const [isSavingLinks, setIsSavingLinks] = useState(false);
 
+  const showFeedback = useCallback((message: string, tone: 'error' | 'success' | 'info' = 'info') => {
+    setFeedbackMessage(message);
+    setFeedbackTone(tone);
+  }, []);
+
   // --- Load Data from Database ---
   const loadDatabaseData = useCallback(async (options?: { showLoader?: boolean }) => {
     const showLoader = options?.showLoader ?? !hasLoadedOnce;
@@ -101,6 +110,7 @@ export default function Rooms() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
+        setLoadError('Sign in again to load your rooms and devices.');
         setLoading(false);
         return;
       }
@@ -113,6 +123,7 @@ export default function Rooms() {
         .maybeSingle();
 
       if (!homeAssoc?.home_id) {
+        setLoadError('Connect this profile to a home to start organizing rooms and devices.');
         setLoading(false);
         return;
       }
@@ -120,48 +131,54 @@ export default function Rooms() {
       const homeId = homeAssoc.home_id;
       setUserHomeId(homeId);
 
-      // 2. Fetch Rooms
-      const { data: roomsData, error: roomsErr } = await supabase
-        .from('rooms')
-        .select('id, name')
-        .eq('home_id', homeId)
-        .order('id', { ascending: true });
+      const [
+        { data: roomsData, error: roomsErr },
+        { data: devicesData, error: devicesErr },
+        { data: activitiesData, error: activitiesErr },
+      ] = await Promise.all([
+        supabase
+          .from('rooms')
+          .select('id, name')
+          .eq('home_id', homeId)
+          .order('id', { ascending: true }),
+        supabase
+          .from('devices')
+          .select('*')
+          .eq('home_id', homeId),
+        supabase
+          .from('activities')
+          .select('*')
+          .eq('home_id', homeId),
+      ]);
 
       if (roomsErr) throw roomsErr;
-      
-      const loadedRooms = roomsData || [];
-      setRooms(loadedRooms);
-
-      // Set first room as active if none is active
-      setActiveRoomId((currentRoomId) => currentRoomId ?? loadedRooms[0]?.id ?? null);
-
-      // 3. Fetch Devices
-      const { data: devicesData, error: devicesErr } = await supabase
-        .from('devices')
-        .select('*')
-        .eq('home_id', homeId);
-
       if (devicesErr) throw devicesErr;
+      if (activitiesErr) throw activitiesErr;
 
+      const loadedRooms = roomsData || [];
+      const loadedActivities = activitiesData || [];
       const mappedDevices: Device[] = (devicesData || [])
         .filter((device: DeviceRecord) => isRealHomeDevice(device))
         .map((device: DeviceRecord) => mapDeviceRecordToAppDevice(device));
+
+      setRooms(loadedRooms);
       setAllDevices(mappedDevices);
+      setAllActivities(loadedActivities);
+      setLoadError(null);
+      setActiveRoomId((currentRoomId) => currentRoomId ?? loadedRooms[0]?.id ?? null);
 
-      // 4. Fetch Activities
-      const { data: activitiesData, error: activitiesErr } = await supabase
-        .from('activities')
-        .select('*')
-        .eq('home_id', homeId);
+      // Only fetch links for activities that actually belong to this home.
+      const activityIds = loadedActivities.map((activity) => activity.id).filter(Boolean);
+      if (activityIds.length === 0) {
+        setJunctions([]);
+        return;
+      }
 
-      if (activitiesErr) throw activitiesErr;
-      setAllActivities(activitiesData || []);
-
-      // 5. Fetch Activity Devices Junctions
       try {
         const { data: junctionsData, error: junctionsErr } = await supabase
           .from('activity_devices')
-          .select('activity_id, device_id');
+          .select('activity_id, device_id')
+          .in('activity_id', activityIds);
 
         if (junctionsErr) {
           const isMissingJunctionTable =
@@ -187,6 +204,7 @@ export default function Rooms() {
 
     } catch (error) {
       console.error('Error fetching room/device details:', error);
+      setLoadError('We could not load your smart home right now. Pull to refresh or try again in a moment.');
     } finally {
       setHasLoadedOnce(true);
       setLoading(false);
@@ -241,13 +259,13 @@ export default function Rooms() {
         .eq('id', deviceId);
 
       if (error) throw error;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to toggle device status:', err);
       // Revert status on failure
       setAllDevices(prev => prev.map(d => 
         d.id === deviceId ? { ...d, status: device.status } : d
       ));
-      Alert.alert('Control Error', 'Could not sync device status to server.');
+      showFeedback('Could not sync device status to the server.', 'error');
     }
   };
 
@@ -270,35 +288,6 @@ export default function Rooms() {
     }
   };
 
-  const handleDeleteDevice = (device: Device) => {
-    Alert.alert(
-      'Remove device',
-      `Do you want to remove "${device.name}" from your smart home?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('devices')
-                .delete()
-                .eq('id', device.id);
-
-              if (error) throw error;
-
-              setAllDevices((prev) => prev.filter((item) => item.id !== device.id));
-            } catch (err: any) {
-              console.error('Failed to delete device:', err);
-              Alert.alert('Error', 'Could not remove this device.');
-            }
-          },
-        },
-      ],
-    );
-  };
-
   const openDeviceDetails = (device: Device) => {
     setSelectedDevice(device);
     setDeviceDraftName(device.name);
@@ -316,12 +305,12 @@ export default function Rooms() {
     if (!selectedDevice) return;
 
     if (!deviceDraftName.trim()) {
-      Alert.alert('Error', 'Please enter a device name.');
+      showFeedback('Please enter a device name.', 'error');
       return;
     }
 
     if (!deviceDraftRoomId) {
-      Alert.alert('Error', 'Choose a room for this device.');
+      showFeedback('Choose a room for this device.', 'error');
       return;
     }
 
@@ -348,9 +337,9 @@ export default function Rooms() {
       );
 
       closeDeviceDetails();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to update device details:', err);
-      Alert.alert('Error', 'Could not save the device changes.');
+      showFeedback('Could not save the device changes.', 'error');
       setIsSavingDeviceDetails(false);
     }
   };
@@ -359,44 +348,34 @@ export default function Rooms() {
     if (!selectedDevice) return;
 
     const deviceToDelete = selectedDevice;
-    Alert.alert(
-      'Remove device',
-      `Do you want to remove "${deviceToDelete.name}" from your smart home?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('devices')
-                .delete()
-                .eq('id', deviceToDelete.id);
+    (async () => {
+      try {
+        const { error } = await supabase
+          .from('devices')
+          .delete()
+          .eq('id', deviceToDelete.id);
 
-              if (error) throw error;
+        if (error) throw error;
 
-              setAllDevices((prev) => prev.filter((device) => device.id !== deviceToDelete.id));
-              closeDeviceDetails();
-            } catch (err: any) {
-              console.error('Failed to delete device:', err);
-              Alert.alert('Error', 'Could not remove this device.');
-            }
-          },
-        },
-      ],
-    );
+        setAllDevices((prev) => prev.filter((device) => device.id !== deviceToDelete.id));
+        closeDeviceDetails();
+        showFeedback(`Removed "${deviceToDelete.name}" from your smart home.`, 'success');
+      } catch (err: unknown) {
+        console.error('Failed to delete device:', err);
+        showFeedback('Could not remove this device.', 'error');
+      }
+    })();
   };
 
   // --- Add Device Handler ---
   const handleAddDevice = async () => {
     if (!newDeviceName.trim()) {
-      Alert.alert('Error', 'Please enter a device name.');
+      showFeedback('Please enter a device name.', 'error');
       return;
     }
 
     if (!newDeviceRoomId || !userHomeId) {
-      Alert.alert('Error', 'Choose a room for this device first.');
+      showFeedback('Choose a room for this device first.', 'error');
       return;
     }
 
@@ -456,28 +435,21 @@ export default function Rooms() {
         setIsAddDeviceModalVisible(false);
         setNewDeviceName('');
         setNewDeviceRoomId(activeRoomId ?? rooms[0]?.id ?? null);
-        Alert.alert('Success', `"${data.name}" added to the selected room.`);
+        showFeedback(`"${data.name}" was added to the selected room.`, 'success');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to add device:', err);
-      Alert.alert('Error', 'Could not create new smart device: ' + err.message);
+      showFeedback(
+        'Could not create new smart device: ' +
+          (err instanceof Error ? err.message : 'Unknown error'),
+        'error',
+      );
     } finally {
       setIsAdding(false);
     }
   };
 
   // --- Manage Linked Devices Handler ---
-  const openManageDevicesModal = (activity: ActivityItem) => {
-    setSelectedActivity(activity);
-    
-    const linkedIds = junctions
-      .filter(j => j.activity_id === activity.id)
-      .map(j => j.device_id);
-
-    setTempLinkedDeviceIds(linkedIds);
-    setIsManageModalVisible(true);
-  };
-
   const toggleLinkDevice = (deviceId: number) => {
     setTempLinkedDeviceIds(prev => 
       prev.includes(deviceId) 
@@ -522,10 +494,14 @@ export default function Rooms() {
 
       setIsManageModalVisible(false);
       setSelectedActivity(null);
-      Alert.alert('Success', 'Linked devices updated successfully.');
-    } catch (err: any) {
+      showFeedback('Linked devices updated successfully.', 'success');
+    } catch (err: unknown) {
       console.error('Failed to save activity-device links:', err);
-      Alert.alert('Error', 'Failed to update linked devices: ' + err.message);
+      showFeedback(
+        'Failed to update linked devices: ' +
+          (err instanceof Error ? err.message : 'Unknown error'),
+        'error',
+      );
     } finally {
       setIsSavingLinks(false);
     }
@@ -549,13 +525,16 @@ export default function Rooms() {
     () =>
       activeRoomId === null
         ? allActivities
-        : allActivities.filter((activity) => (activity as any).room_id === activeRoomId),
+        : allActivities.filter((activity) => activity.room_id === activeRoomId),
     [activeRoomId, allActivities],
   );
 
   const filteredDevices = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+
     return roomDevices.filter((device) => {
-      const matchesSearch = device.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch =
+        normalizedQuery.length === 0 || device.name.toLowerCase().includes(normalizedQuery);
       return matchesSearch;
     });
   }, [roomDevices, searchQuery]);
@@ -597,6 +576,39 @@ export default function Rooms() {
           Rooms
         </Text>
       </View>
+
+      {loadError ? (
+        <View className="mx-5 mb-4 rounded-[24px] border border-[#E7D7B7] bg-[#FFF8EA] px-4 py-3">
+          <Text className="text-[#6D5A2E] text-sm" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+            {loadError}
+          </Text>
+        </View>
+      ) : null}
+
+      {feedbackMessage ? (
+        <View
+          className={`mx-5 mb-4 rounded-[24px] px-4 py-3 ${
+            feedbackTone === 'error'
+              ? 'border border-[#E7C2BF] bg-[#FDEEEE]'
+              : feedbackTone === 'success'
+                ? 'border border-[#CFE2C8] bg-[#EEF8EB]'
+                : 'border border-[#D8DFD5] bg-white/80'
+          }`}
+        >
+          <Text
+            className={`text-sm ${
+              feedbackTone === 'error'
+                ? 'text-[#8A3D35]'
+                : feedbackTone === 'success'
+                  ? 'text-[#426A3F]'
+                  : 'text-[#4E6059]'
+            }`}
+            style={{ fontFamily: 'Nunito_600SemiBold' }}
+          >
+            {feedbackMessage}
+          </Text>
+        </View>
+      ) : null}
 
       {/* Search Bar (Original style: bg-transparent) */}
       <View className="px-5 mb-6">
@@ -703,23 +715,18 @@ export default function Rooms() {
         }
 
         ListEmptyComponent={
-          <View className="items-center mt-12 justify-center px-10">
-            <MaterialCommunityIcons
-              name={searchQuery ? 'selection-search' : 'home-plus'}
-              size={80}
-              color="#354F52"
-              accessible={false}
-            />
-            <Text
-              maxFontSizeMultiplier={1.2}
-              className="text-[#7A8C85] mt-5 text-lg text-center"
-              style={{ fontFamily: 'Nunito_600SemiBold' }}
-            >
-              {searchQuery
-                ? `No devices found for "${searchQuery}"`
-                : 'Your devices will live here.'}
-            </Text>
-          </View>
+          <FeedbackState
+            icon={searchQuery ? 'search' : 'home'}
+            title={searchQuery ? `No devices for "${searchQuery}"` : 'No smart devices yet'}
+            message={
+              searchQuery
+                ? 'Try a different device name or clear the search to see everything in this room.'
+                : rooms.length === 0
+                  ? 'Create or sync a room first, then add devices to make this space feel alive.'
+                  : 'Add a device manually or run discovery to start controlling this room from Nidush.'
+            }
+            compact
+          />
         }
         ListFooterComponent={
           activeRoom ? (

@@ -82,6 +82,23 @@ const SEEDED_DEVICE_NAMES = new Set([
   'Water Heater',
 ]);
 
+const PERSONAL_DEVICE_HINTS = [
+  'iphone',
+  'android',
+  'smartphone',
+  'phone',
+  'mobile',
+  'cellphone',
+  'ipad',
+  'tablet',
+  'laptop',
+  'macbook',
+  'notebook',
+  'desktop',
+  'computer',
+  'pc',
+];
+
 const TYPE_ALIASES: Record<string, SmartDeviceType> = {
   light: 'light',
   lamp: 'light',
@@ -121,8 +138,25 @@ export const isRealHomeDevice = (device: Partial<DeviceRecord>) => {
   const source = device.source?.toLowerCase();
   const name = device.name?.trim();
   const externalId = device.external_id?.trim();
+  const normalizedType = normalizeDeviceType(device.type);
+  const searchable = [
+    device.name,
+    device.type,
+    device.model,
+    device.external_id,
+  ]
+    .map((value) => String(value ?? '').toLowerCase())
+    .join(' ');
 
   if (discoveryMethod === 'mock' || source === 'seeded_mock') {
+    return false;
+  }
+
+  if (source === 'network' && normalizedType === 'computer') {
+    return false;
+  }
+
+  if (source === 'network' && PERSONAL_DEVICE_HINTS.some((hint) => searchable.includes(hint))) {
     return false;
   }
 

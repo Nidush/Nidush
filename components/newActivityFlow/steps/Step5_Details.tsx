@@ -1,7 +1,6 @@
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import React from 'react';
-import { Image, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, ImageSourcePropType, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { StepWrapper } from '../StepWrapper';
 import { pickImage } from '../../../utils/imagePicker';
 
@@ -10,9 +9,9 @@ interface Step5Props {
   setName: (t: string) => void;
   desc: string;
   setDesc: (t: string) => void;
-  image: any;
-  setImage: (img: any) => void;
-  defaultImage: any;
+  image: string | ImageSourcePropType | null;
+  setImage: (img: string | ImageSourcePropType | null) => void;
+  defaultImage: string | ImageSourcePropType | null;
 }
 
 export const Step5_Details = ({
@@ -37,7 +36,9 @@ export const Step5_Details = ({
 
   const hasChangedImage = image !== defaultImage;
 
-  const imageSource = typeof image === 'string' ? { uri: image } : image;
+  const imageSource = image
+    ? (typeof image === 'string' ? { uri: image } : image)
+    : undefined;
 
   return (
     <StepWrapper

@@ -1,3 +1,6 @@
+import { createClient } from '@supabase/supabase-js'
+import { createFunctionLogger } from '../_shared/observability.ts'
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -6,12 +9,42 @@ const corsHeaders = {
 }
 
 Deno.serve(async (req: Request) => {
+  const log = createFunctionLogger('welcome-user', req)
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders })
   }
 
   try {
-    const { name, email } = await req.json()
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    const authHeader = req.headers.get('Authorization')
+
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const authClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    })
+
+    const { data: { user }, error: authError } = await authClient.auth.getUser()
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Invalid session' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const payload = await req.json().catch(() => ({}))
+    const name = String(
+      payload?.name ??
+      user.user_metadata?.first_name ??
+      user.email?.split('@')[0] ??
+      'utilizador',
+    )
 
     // Pegar a chave do Resend das variáveis de ambiente do Supabase
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
@@ -20,10 +53,13 @@ Deno.serve(async (req: Request) => {
     // Quando tiveres domínio próprio, muda TEST_MODE para false.
     const TEST_MODE = true
     const VERIFIED_EMAIL = 'nidush7@gmail.com'
-    const recipient = TEST_MODE ? VERIFIED_EMAIL : email
+    const recipient = TEST_MODE ? VERIFIED_EMAIL : user.email
 
-    if (!RESEND_API_KEY) {
-      console.error("ERRO: RESEND_API_KEY não configurada no Supabase.")
+    if (!RESEND_API_KEY || !recipient) {
+      log.error('Missing email configuration.', {
+        hasResendKey: Boolean(RESEND_API_KEY),
+        hasRecipient: Boolean(recipient),
+      })
       return new Response(JSON.stringify({ error: "Configuração de mail em falta." }), { status: 500, headers: corsHeaders })
     }
 
@@ -73,12 +109,17 @@ Deno.serve(async (req: Request) => {
     const resData = await res.json()
 
     if (!res.ok) {
-      console.error("Erro retornado pelo Resend:", resData)
+      log.error('Resend returned an error.', { resendResponse: resData })
       return new Response(
         JSON.stringify({ error: "Falha ao enviar email pelo Resend", details: resData }),
         { status: res.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    log.info('Welcome email request sent.', {
+      userId: user.id,
+      testMode: TEST_MODE,
+    })
 
     return new Response(
       JSON.stringify({ message: "Email enviado!", id: resData.id }),
@@ -87,6 +128,7 @@ Deno.serve(async (req: Request) => {
 
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
+    log.error('Failed to send welcome email.', { error: message })
 
     return new Response(
       JSON.stringify({ error: message }),

@@ -1,4 +1,4 @@
-import { Activity, Scenario } from '@/constants/data/types';
+import { Activity, Scenario, ScenarioDeviceState } from '@/constants/data/types';
 import { resolveCatalogImage } from '@/constants/data/catalogAssets';
 import { supabase } from '@/utils/supabase';
 
@@ -27,7 +27,7 @@ type ScenarioTemplateRow = {
   playlist_id: string | null;
   focus_mode: boolean | null;
   shortcuts: boolean | null;
-  devices: any[] | null;
+  devices: ScenarioDeviceState[] | null;
   keywords: string[] | null;
 };
 

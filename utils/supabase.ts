@@ -2,26 +2,32 @@ import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import { Platform } from 'react-native';
+import { logger } from './logger';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL as string;
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string;
+const shouldLogSupabaseTraffic = typeof __DEV__ !== 'undefined' && __DEV__;
 
 const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const url = input instanceof Request ? input.url : input.toString();
   const method = init?.method || (input instanceof Request ? input.method : 'GET');
   
-  console.log(`%c[SUPABASE REQUEST] %c${method} %c${url}`, 
-    'color: #5C8D58; font-weight: bold', 
-    'color: #3E545C; font-weight: bold', 
-    'color: #888'
-  );
+  if (shouldLogSupabaseTraffic) {
+    logger.debug(`%c[SUPABASE REQUEST] %c${method} %c${url}`,
+      'color: #5C8D58; font-weight: bold',
+      'color: #3E545C; font-weight: bold',
+      'color: #888'
+    );
+  }
 
   const response = await fetch(input, init);
 
-  console.log(`%c[SUPABASE RESPONSE] %c${response.status} ${response.statusText}`, 
-    'color: #5C8D58; font-weight: bold', 
-    response.ok ? 'color: #2e7d32' : 'color: #d32f2f'
-  );
+  if (shouldLogSupabaseTraffic) {
+    logger.debug(`%c[SUPABASE RESPONSE] %c${response.status} ${response.statusText}`,
+      'color: #5C8D58; font-weight: bold',
+      response.ok ? 'color: #2e7d32' : 'color: #d32f2f'
+    );
+  }
 
   return response;
 };
@@ -33,6 +39,10 @@ const customStorage = Platform.OS === 'web'
       removeItem: (key: string) => { if (typeof window !== 'undefined') window.localStorage.removeItem(key); },
     }
   : AsyncStorage;
+
+type LogPayload = Record<string, unknown> | string | number | boolean | null;
+
+type FunctionInvokeBody = Record<string, unknown> | undefined;
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
@@ -46,8 +56,9 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   }
 });
 
-export const apiLog = (method: string, table: string, data?: any) => {
-  console.log(`%c[DEBUG] %c${method} on ${table}`, 'color: #5C8D58; font-weight: bold', 'color: #3E545C', data || '');
+export const apiLog = (method: string, table: string, data?: LogPayload) => {
+  if (!shouldLogSupabaseTraffic) return;
+  logger.debug(`%c[DEBUG] %c${method} on ${table}`, 'color: #5C8D58; font-weight: bold', 'color: #3E545C', data || '');
 };
 
 const decodeBase64ToArrayBuffer = (base64: string): ArrayBuffer => {
@@ -87,14 +98,18 @@ const decodeBase64ToArrayBuffer = (base64: string): ArrayBuffer => {
   return arraybuffer;
 };
 
-export const uploadImage = async (base64OrUri: string, bucketName: string = 'activities'): Promise<string | null> => {
+export const uploadImage = async (
+  base64OrUri: string,
+  bucketName: string = 'activities',
+  filePathOverride?: string,
+): Promise<string | null> => {
   if (!base64OrUri || base64OrUri.startsWith('http')) return base64OrUri;
 
   try {
     const fileName = `${Date.now()}.jpg`;
-    const filePath = `${fileName}`;
+    const filePath = filePathOverride?.trim() || fileName;
 
-    let uploadData: any;
+    let uploadData: ArrayBuffer | Blob;
     let contentType = 'image/jpeg';
 
     if (base64OrUri.startsWith('data:')) {
@@ -114,7 +129,7 @@ export const uploadImage = async (base64OrUri: string, bucketName: string = 'act
       });
 
     if (error) {
-      apiLog('UPLOAD ERROR', bucketName, error);
+      apiLog('UPLOAD ERROR', bucketName, { message: error.message });
       return null;
     }
 
@@ -125,15 +140,18 @@ export const uploadImage = async (base64OrUri: string, bucketName: string = 'act
     apiLog('UPLOAD SUCCESS', bucketName, { publicUrl });
     return publicUrl;
   } catch (error) {
-    console.error('Error in uploadImage utility:', error);
+    logger.error('Error in uploadImage utility:', error);
     return null;
   }
 };
 
-export const invokeFunction = async (functionName: string, body: any) => {
+export const invokeFunction = async <TResponse = unknown>(
+  functionName: string,
+  body?: FunctionInvokeBody,
+): Promise<TResponse> => {
   apiLog('FUNCTION CALL', functionName, body);
   const { data, error } = await supabase.functions.invoke(functionName, {
-    body: body,
+    body,
   });
 
   if (error) {
@@ -142,6 +160,5 @@ export const invokeFunction = async (functionName: string, body: any) => {
   }
 
   apiLog('FUNCTION SUCCESS', functionName, data);
-  return data;
+  return data as TResponse;
 };
-

@@ -12,10 +12,10 @@ minimum_password_length = 12
 password_requirements = "lower_upper_letters_digits_symbols"
 
 [functions.welcome-user]
-verify_jwt = false
+verify_jwt = true
 
 [functions.manage-home]
-verify_jwt = false
+verify_jwt = true
 
 [functions.weekly-api-content-sync]
 verify_jwt = false

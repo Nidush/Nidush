@@ -3,7 +3,7 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useVideoPlayer, VideoView } from 'expo-video';
+import { useVideoPlayer, VideoView, type VideoSource } from 'expo-video';
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -32,7 +32,17 @@ SplashScreen.preventAutoHideAsync();
 const SLIDE_DURATION = 10000;
 const WELCOME_VIDEO = require('../assets/videos/nidush_video1.mp4');
 
-const SLIDES = [
+type BlurColors = readonly [string, string, string];
+type OnboardingSlide = {
+  id: string;
+  title: string;
+  description: string;
+  video: VideoSource;
+  blurColors: BlurColors;
+  isLast?: boolean;
+};
+
+const SLIDES: OnboardingSlide[] = [
   {
     id: '1',
     title: 'Your home,\nyour safe space',
@@ -107,6 +117,7 @@ const SLIDES = [
     ],
   },
 ];
+type ScreenDimensions = ReturnType<typeof Dimensions.get>;
 
 const VideoSlide = memo(
   ({
@@ -114,9 +125,9 @@ const VideoSlide = memo(
     isActive,
     dims,
   }: {
-    videoSource: any;
+    videoSource: VideoSource;
     isActive: boolean;
-    dims: any;
+    dims: ScreenDimensions;
   }) => {
     const player = useVideoPlayer(videoSource, (p) => {
       p.loop = true;
@@ -162,7 +173,12 @@ const AnimatedIndicator = ({
   currentIndex,
   duration,
   isPlaying,
-}: any) => {
+}: {
+  index: number;
+  currentIndex: number;
+  duration: number;
+  isPlaying: boolean;
+}) => {
   const widthAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -313,7 +329,7 @@ export default function Onboarding() {
 
   if (!fontsLoaded) return null;
 
-  const renderItem = ({ item, index }: any) => (
+  const renderItem = ({ item, index }: { item: OnboardingSlide; index: number }) => (
     <View
       accessible
       accessibilityLabel={`Slide ${index + 1}. ${item.title}`}

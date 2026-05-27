@@ -1,0 +1,75 @@
+name: AI Validation
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/ai-validation.yml"
+      - "app/(tabs)/Activities.tsx"
+      - "app/(tabs)/index.tsx"
+      - "package.json"
+      - "package-lock.json"
+      - "utils/aiActivities.ts"
+      - "utils/recommendationEngine.ts"
+      - "utils/devices.ts"
+      - "supabase/functions/generate-activity-ideas/**"
+  push:
+    branches: ["**"]
+    paths:
+      - ".github/workflows/ai-validation.yml"
+      - "app/(tabs)/Activities.tsx"
+      - "app/(tabs)/index.tsx"
+      - "package.json"
+      - "package-lock.json"
+      - "utils/aiActivities.ts"
+      - "utils/recommendationEngine.ts"
+      - "utils/devices.ts"
+      - "supabase/functions/generate-activity-ideas/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPO_NO_TELEMETRY: "1"
+  EXPO_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+  EXPO_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+
+jobs:
+  ai-validation:
+    name: AI validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: latest
+
+      - name: Compile TypeScript
+        run: npx tsc --noEmit
+
+      - name: Lint AI edge function
+        run: deno lint supabase/functions/generate-activity-ideas
+
+      - name: Type-check AI edge function
+        run: deno check supabase/functions/generate-activity-ideas/index.ts
+
+      - name: Run AI logic tests
+        run: deno test supabase/functions/generate-activity-ideas

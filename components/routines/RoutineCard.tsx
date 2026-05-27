@@ -1,8 +1,8 @@
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
-import React from 'react';
-import { Image, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { memo } from 'react';
+import { Image, ImageSourcePropType, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 interface RoutineCardProps {
   title: string;
@@ -10,7 +10,7 @@ interface RoutineCardProps {
   time: string;
   room: string;
   isActive: boolean;
-  image: any;
+  image: ImageSourcePropType;
   onToggle: () => void;
   onLongPress?: () => void;
   testID?: string;
@@ -101,4 +101,4 @@ const RoutineCard = ({ title, days, time, room, isActive, image, onToggle, onLon
   );
 };
 
-export default RoutineCard;
+export default memo(RoutineCard);

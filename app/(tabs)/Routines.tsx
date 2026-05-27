@@ -11,15 +11,20 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   Image,
+  FlatList,
+  ImageSourcePropType,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { supabase } from '../../utils/supabase';
+import { captureException, trackEvent } from '../../utils/observability';
 
 import AddRoomDevice from '../../components/rooms/AddRoomDevice';
 import RoutineCard from '../../components/routines/RoutineCard';
+import { FeedbackState } from '../../components/UI/FeedbackState';
 
 interface Routine {
   id: number;
@@ -28,7 +33,7 @@ interface Routine {
   time: string;
   room: string;
   active: boolean;
-  image: any;
+  image: ImageSourcePropType;
 }
 
 interface Room {
@@ -39,10 +44,25 @@ interface Room {
 interface RoutineImageOption {
   key: string;
   label: string;
-  source: any;
+  source: ImageSourcePropType;
 }
 
-const ROUTINE_IMAGES: Record<string, any> = {
+type RoutineRow = {
+  id: number;
+  name: string;
+  execution_time: string;
+  days_of_week: string | null;
+  is_active: boolean;
+  image?: string | null;
+  scenario?: {
+    id: number;
+    rooms?: {
+      name?: string | null;
+    } | null;
+  } | null;
+};
+
+const ROUTINE_IMAGES: Record<string, ImageSourcePropType> = {
   'Sunrise Awakening': require('../../assets/Scenarios/routines/sunrise_awakening.png'),
   'Gym Hour': require('../../assets/Scenarios/routines/gym_hour.png'),
   'Morning Kitchen Prep': require('../../assets/Scenarios/routines/morning_kitchen_prep.png'),
@@ -79,7 +99,7 @@ const ROUTINE_IMAGE_OPTIONS: RoutineImageOption[] = [
     source: require('../../assets/Scenarios/routines/deep_sleep_transition.png'),
   },
 ];
-const ROUTINE_IMAGE_BY_KEY = ROUTINE_IMAGE_OPTIONS.reduce<Record<string, any>>((acc, option) => {
+const ROUTINE_IMAGE_BY_KEY = ROUTINE_IMAGE_OPTIONS.reduce<Record<string, ImageSourcePropType>>((acc, option) => {
   acc[option.key] = option.source;
   return acc;
 }, {});
@@ -146,6 +166,10 @@ export default function Routines() {
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [feedbackTone, setFeedbackTone] = useState<'error' | 'success' | 'info'>('info');
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -162,13 +186,18 @@ export default function Routines() {
   const [selectedRoutine, setSelectedRoutine] = useState<Routine | null>(null);
   const [isDeletingRoutine, setIsDeletingRoutine] = useState(false);
 
+  const showFeedback = useCallback((message: string, tone: 'error' | 'success' | 'info' = 'info') => {
+    setFeedbackMessage(message);
+    setFeedbackTone(tone);
+  }, []);
+
   const loadRoutines = useCallback(async (isNextPage = false) => {
     try {
       if (isNextPage) {
         if (loadingMore || !hasMore) return;
         setLoadingMore(true);
       } else {
-        setLoading(true);
+        setLoading(!hasLoadedOnce);
       }
 
       const currentPage = isNextPage ? page + 1 : 0;
@@ -180,6 +209,7 @@ export default function Routines() {
         setRoutines([]);
         setRooms([]);
         setUserHomeId(null);
+        setLoadError('Sign in again to load your routines.');
         return;
       }
 
@@ -195,38 +225,37 @@ export default function Routines() {
         setRoutines([]);
         setRooms([]);
         setUserHomeId(null);
+        setLoadError('Connect this profile to a home before creating routines.');
         return;
       }
 
       const homeId = userHome.home_id;
       setUserHomeId(homeId);
 
-      const { data: roomsData, error: roomsError } = await supabase
-        .from('rooms')
-        .select('id, name')
-        .eq('home_id', homeId)
-        .order('id', { ascending: true });
+      const [roomsResult, routinesResult] = await Promise.all([
+        supabase
+          .from('rooms')
+          .select('id, name')
+          .eq('home_id', homeId)
+          .order('id', { ascending: true }),
+        supabase
+          .from('routines')
+          .select(ROUTINE_SELECT, { count: 'exact' })
+          .eq('home_id', homeId)
+          .order('id', { ascending: false })
+          .range(start, end),
+      ]);
 
-      if (roomsError) throw roomsError;
+      if (roomsResult.error) throw roomsResult.error;
 
-      const loadedRooms = roomsData || [];
+      const loadedRooms = roomsResult.data || [];
       setRooms(loadedRooms);
       setNewRoutineRoomId((current) => current ?? loadedRooms[0]?.id ?? null);
+      setLoadError(null);
 
-      let data: any[] | null = null;
-      let error: any = null;
-      let count: number | null = null;
-
-      const routinesResult = await supabase
-        .from('routines')
-        .select(ROUTINE_SELECT, { count: 'exact' })
-        .eq('home_id', homeId)
-        .order('id', { ascending: false })
-        .range(start, end);
-
-      data = routinesResult.data as any[] | null;
-      error = routinesResult.error;
-      count = routinesResult.count;
+      let data: RoutineRow[] | null = routinesResult.data as RoutineRow[] | null;
+      let error = routinesResult.error;
+      let count: number | null = routinesResult.count;
 
       if (error?.code === '42703' && /image/i.test(error.message || '')) {
         const legacyResult = await supabase
@@ -236,7 +265,7 @@ export default function Routines() {
           .order('id', { ascending: false })
           .range(start, end);
 
-        data = legacyResult.data as any[] | null;
+        data = legacyResult.data as RoutineRow[] | null;
         error = legacyResult.error;
         count = legacyResult.count;
       }
@@ -244,7 +273,7 @@ export default function Routines() {
       if (error) throw error;
 
       if (data) {
-        const mappedRoutines: Routine[] = data.map((item: any) => ({
+        const mappedRoutines: Routine[] = data.map((item) => ({
           id: item.id,
           title: item.name,
           days: item.days_of_week || 'N/A',
@@ -267,11 +296,13 @@ export default function Routines() {
       }
     } catch (err) {
       console.error('Error loading routines:', err);
+      setLoadError('We could not load your routines right now. Try again in a moment.');
     } finally {
+      setHasLoadedOnce(true);
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [page, hasMore, loadingMore]);
+  }, [hasLoadedOnce, page, hasMore, loadingMore]);
 
   useFocusEffect(
     useCallback(() => {
@@ -327,9 +358,12 @@ export default function Routines() {
 
       setRoutines((current) => current.filter((item) => item.id !== selectedRoutine.id));
       closeRoutineDetails();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error deleting routine:', err);
-      Alert.alert('Could not remove routine', err.message || 'Please try again.');
+      showFeedback(
+        err instanceof Error ? err.message : 'Could not remove routine. Please try again.',
+        'error',
+      );
       setIsDeletingRoutine(false);
     }
   };
@@ -349,7 +383,7 @@ export default function Routines() {
 
   const openAddRoutineModal = () => {
     if (rooms.length === 0) {
-      Alert.alert('No rooms yet', 'Create or sync a room first so we can attach this routine to your home.');
+      showFeedback('Create or sync a room first so we can attach this routine to your home.', 'error');
       return;
     }
 
@@ -368,28 +402,28 @@ export default function Routines() {
 
   const handleCreateRoutine = async () => {
     if (!newRoutineName.trim()) {
-      Alert.alert('Missing name', 'Give your routine a name first.');
+      showFeedback('Give your routine a name first.', 'error');
       return;
     }
 
     if (!newRoutineRoomId) {
-      Alert.alert('Missing room', 'Choose the room for this routine.');
+      showFeedback('Choose the room for this routine.', 'error');
       return;
     }
 
     if (newRoutineDays.length === 0) {
-      Alert.alert('Missing days', 'Choose at least one day for this routine.');
+      showFeedback('Choose at least one day for this routine.', 'error');
       return;
     }
 
     if (!userHomeId) {
-      Alert.alert('Missing home', 'We could not find your home right now.');
+      showFeedback('We could not find your home right now.', 'error');
       return;
     }
 
     const executionTime = toDatabaseTime(newRoutineTime);
     if (!executionTime) {
-      Alert.alert('Invalid time', 'Use the HH:MM format, for example 07:30.');
+      showFeedback('Use the HH:MM format, for example 07:30.', 'error');
       return;
     }
 
@@ -485,12 +519,12 @@ export default function Routines() {
       ) {
         const legacyScenarioInsert = await supabase
           .from('routines')
-          .insert(legacyScenarioRoutinePayload as any)
+          .insert(legacyScenarioRoutinePayload)
           .select('id, name, execution_time, days_of_week, is_active, image')
           .single();
 
         usedLegacyScenarioColumn = true;
-        createdRoutine = legacyScenarioInsert.data as any;
+        createdRoutine = legacyScenarioInsert.data as typeof createdRoutine;
         createdRoutineError = legacyScenarioInsert.error;
       }
 
@@ -502,16 +536,17 @@ export default function Routines() {
 
         const legacyInsert = await supabase
           .from('routines')
-          .insert(payloadWithoutImage as any)
+          .insert(payloadWithoutImage)
           .select('id, name, execution_time, days_of_week, is_active')
           .single();
 
-        createdRoutine = legacyInsert.data as any;
+        createdRoutine = legacyInsert.data as typeof createdRoutine;
         createdRoutineError = legacyInsert.error;
       }
 
       if (createdRoutineError) throw createdRoutineError;
-      const savedRoutine = createdRoutine as any;
+      if (!createdRoutine) throw new Error('Routine was not returned after creation.');
+      const savedRoutine = createdRoutine;
 
       setRoutines((current) => [
         {
@@ -527,14 +562,35 @@ export default function Routines() {
       ]);
 
       closeAddRoutineModal();
-    } catch (err: any) {
+      showFeedback(`"${savedRoutine.name}" is now part of your routines.`, 'success');
+    } catch (err: unknown) {
       console.error('Error creating routine:', err);
-      Alert.alert('Could not create routine', err.message || 'Please try again.');
+      captureException(err, {
+        area: 'routines',
+        screen: 'routines',
+        action: 'create-routine',
+      });
+      showFeedback(
+        err instanceof Error ? err.message : 'Could not create routine. Please try again.',
+        'error',
+      );
       setIsSavingRoutine(false);
+      return;
     }
+
+    trackEvent('routine-created', {
+      area: 'routines',
+      screen: 'routines',
+      action: 'create-routine',
+      metadata: {
+        roomId: newRoutineRoomId,
+        days: newRoutineDays,
+        imageKey: newRoutineImageKey,
+      },
+    });
   };
 
-  const handleScroll = (event: any) => {
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
     const paddingToBottom = 20;
     if (layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom) {
@@ -555,6 +611,39 @@ export default function Routines() {
           maxFontSizeMultiplier={1.3}
         >Routines</Text>
       </View>
+
+      {loadError ? (
+        <View className="mx-5 mb-4 rounded-[24px] border border-[#E7D7B7] bg-[#FFF8EA] px-4 py-3">
+          <Text className="text-[#6D5A2E] text-sm" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+            {loadError}
+          </Text>
+        </View>
+      ) : null}
+
+      {feedbackMessage ? (
+        <View
+          className={`mx-5 mb-4 rounded-[24px] px-4 py-3 ${
+            feedbackTone === 'error'
+              ? 'border border-[#E7C2BF] bg-[#FDEEEE]'
+              : feedbackTone === 'success'
+                ? 'border border-[#CFE2C8] bg-[#EEF8EB]'
+                : 'border border-[#D8DFD5] bg-white/80'
+          }`}
+        >
+          <Text
+            className={`text-sm ${
+              feedbackTone === 'error'
+                ? 'text-[#8A3D35]'
+                : feedbackTone === 'success'
+                  ? 'text-[#426A3F]'
+                  : 'text-[#4E6059]'
+            }`}
+            style={{ fontFamily: 'Nunito_600SemiBold' }}
+          >
+            {feedbackMessage}
+          </Text>
+        </View>
+      ) : null}
 
       <View className="px-5 mb-6">
         <View className="flex-row items-center border border-[#BDC7C2] rounded-full px-4 min-h-[48px]">
@@ -581,23 +670,11 @@ export default function Routines() {
           <ActivityIndicator size="large" color="#548F53" />
         </View>
       ) : (
-        <ScrollView 
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
-          testID="routines-scrollview" 
-          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 130 }} 
-          showsVerticalScrollIndicator={false}
-        >
-          <Text
-            className="text-[#6B7C76] text-sm mb-4"
-            style={{ fontFamily: 'Nunito_600SemiBold' }}
-          >
-            Search filters the routines already loaded from your home. Long press a card to open its details.
-          </Text>
-
-          {filteredRoutines.map((item) => (
+        <FlatList
+          data={filteredRoutines}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
             <RoutineCard
-              key={item.id}
               testID={`routine-card-${item.id}`}
               title={item.title}
               days={item.days}
@@ -608,18 +685,47 @@ export default function Routines() {
               onToggle={() => toggleRoutine(item.id)}
               onLongPress={() => openRoutineDetails(item)}
             />
-          ))}
-          {filteredRoutines.length === 0 && !loading && (
-            <Text className="text-center text-[#7A8C85] mt-10" style={{ fontFamily: 'Nunito_600SemiBold' }}>
-              No routines found.
+          )}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          testID="routines-scrollview"
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 130 }}
+          showsVerticalScrollIndicator={false}
+          initialNumToRender={6}
+          windowSize={5}
+          removeClippedSubviews={Platform.OS === 'android'}
+          ListHeaderComponent={
+            <Text
+              className="text-[#6B7C76] text-sm mb-4"
+              style={{ fontFamily: 'Nunito_600SemiBold' }}
+            >
+              Search filters the routines already loaded from your home. Long press a card to open its details.
             </Text>
-          )}
-          {loadingMore && (
-            <View className="py-4 items-center">
-              <ActivityIndicator color="#548F53" />
-            </View>
-          )}
-        </ScrollView>
+          }
+          ListEmptyComponent={
+            !loading ? (
+              <FeedbackState
+                icon={searchQuery ? 'search' : 'autorenew'}
+                title={searchQuery ? 'No routines match this search' : 'No routines yet'}
+                message={
+                  searchQuery
+                    ? 'Try a different room or routine name to find what you are looking for.'
+                    : rooms.length === 0
+                      ? 'Create or sync a room first, then build routines around the spaces in your home.'
+                      : 'Create your first routine to automate the atmosphere you want at the right time.'
+                }
+                compact
+              />
+            ) : null
+          }
+          ListFooterComponent={
+            loadingMore ? (
+              <View className="py-4 items-center">
+                <ActivityIndicator color="#548F53" />
+              </View>
+            ) : null
+          }
+        />
       )}
 
       <View testID="add-routine-container">

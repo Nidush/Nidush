@@ -45,6 +45,19 @@ type ShortcutLayout = {
   height: number;
 };
 
+type CarouselActivity = Activity & {
+  time?: string;
+  room?: string;
+  onPress?: () => void;
+};
+
+const getContentDuration = (contentId: string | undefined) => {
+  if (!contentId) return undefined;
+  return CONTENTS[contentId]?.duration;
+};
+
+const getActivityRoomLabel = (item: Activity) => item.room || item.room_id;
+
 const parseHobbies = (value: unknown) => {
   if (!value) return [];
 
@@ -314,20 +327,13 @@ export default function Index() {
       }));
     }
 
-    const formatActivityForCarousel = (item: Activity) => {
-      let duration: string | undefined = undefined;
-      const cId = item.content_id || item.contentId;
-      if (cId && (CONTENTS as any)[cId]) {
-        const contentData = (CONTENTS as any)[cId];
-        if (contentData) {
-          duration = contentData.duration;
-        }
-      }
+    const formatActivityForCarousel = (item: Activity): CarouselActivity => {
+      const duration = getContentDuration(item.content_id || item.contentId);
 
       return {
         ...item,
         time: duration,
-        room: item.room || (item as any).room_id,
+        room: getActivityRoomLabel(item),
       };
     };
 
@@ -390,18 +396,14 @@ export default function Index() {
       )
       .map((item) => {
       // Tentar encontrar a duração no CONTENTS
-      let duration = undefined;
-      const cId = item.content_id || item.contentId;
-      if (cId && (CONTENTS as any)[cId]) {
-        duration = (CONTENTS as any)[cId].duration;
-      }
+      const duration = getContentDuration(item.content_id || item.contentId);
 
       return {
         shortcutId: activityShortcutMap.get(String(item.id))!.shortcutId,
         displayorder: activityShortcutMap.get(String(item.id))!.displayorder,
         id: item.id,
         title: item.title,
-        room: item.room || item.room_id,
+        room: getActivityRoomLabel(item),
         image: item.image,
         time: duration,
         // Adicionamos type activity para ajudar na lógica se precisares

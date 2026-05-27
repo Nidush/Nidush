@@ -24,11 +24,13 @@ env:
   EXPO_NO_TELEMETRY: "1"
   EXPO_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
   EXPO_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+  SUPABASE_CLI_VERSION: 2.75.0
 
 jobs:
   app-tests:
     name: App tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -55,9 +57,56 @@ jobs:
       - name: Build web app
         run: npm run build
 
+      - name: Smoke check exported web app
+        run: test -f dist/index.html
+
+  android-build-check:
+    name: Android debug build
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Expo app config
+        run: npx expo config --type public
+
+      - name: Generate native Android project
+        run: npx expo prebuild --platform android --non-interactive
+
+      - name: Make Gradle executable
+        run: chmod +x android/gradlew
+
+      - name: Assemble Android debug build
+        working-directory: android
+        run: ./gradlew assembleDebug -x lint -x test
+
+      - name: Smoke check Android artifact
+        run: test -f android/app/build/outputs/apk/debug/app-debug.apk
+
   supabase-tests:
     name: Supabase tests
     runs-on: ubuntu-latest
+    timeout-minutes: 25
 
     steps:
       - name: Checkout repository
@@ -66,7 +115,7 @@ jobs:
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v2
         with:
-          version: latest
+          version: ${{ env.SUPABASE_CLI_VERSION }}
 
       - name: Verify Supabase CLI
         run: |
@@ -108,7 +157,7 @@ jobs:
   deploy-supabase:
     name: Deploy Supabase
     runs-on: ubuntu-latest
-    needs: [app-tests, supabase-tests]
+    needs: [app-tests, android-build-check, supabase-tests]
     environment: production
     if: >-
       github.event_name == 'push' && github.ref == 'refs/heads/main' ||
@@ -118,6 +167,7 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      DEVICE_SYNC_SHARED_SECRET: ${{ secrets.DEVICE_SYNC_SHARED_SECRET }}
 
     steps:
       - name: Checkout repository
@@ -126,7 +176,7 @@ jobs:
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v2
         with:
-          version: latest
+          version: ${{ env.SUPABASE_CLI_VERSION }}
 
       - name: Verify Supabase CLI
         run: |
@@ -136,7 +186,7 @@ jobs:
       - name: Check Supabase secrets
         run: |
           missing=0
-          for name in SUPABASE_ACCESS_TOKEN SUPABASE_PROJECT_REF SUPABASE_DB_PASSWORD; do
+          for name in SUPABASE_ACCESS_TOKEN SUPABASE_PROJECT_REF SUPABASE_DB_PASSWORD DEVICE_SYNC_SHARED_SECRET; do
             if [ -z "${!name}" ]; then
               echo "::error::$name is not configured in GitHub Secrets"
               missing=1
@@ -153,5 +203,19 @@ jobs:
       - name: Deploy database migrations
         run: supabase db push --yes --password "$SUPABASE_DB_PASSWORD"
 
+      - name: Sync Supabase runtime secrets
+        run: |
+          supabase secrets set \
+            DEVICE_SYNC_SHARED_SECRET="$DEVICE_SYNC_SHARED_SECRET" \
+            --project-ref "$SUPABASE_PROJECT_REF"
+
       - name: Deploy Edge Functions
         run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF"
+
+      - name: Smoke check deployed migrations
+        run: |
+          supabase migration list | grep 20260525153000
+
+      - name: Smoke check deployed Edge Functions
+        run: |
+          supabase functions list | grep -E "welcome-user|manage-home|request-device-discovery|claim-device-discovery|complete-device-discovery|sync-network-devices"

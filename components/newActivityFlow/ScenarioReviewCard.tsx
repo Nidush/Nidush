@@ -37,7 +37,7 @@ interface ScenarioReviewCardProps {
   onEdit: () => void;
 }
 
-const getDeviceIcon = (id: string) => {
+const getDeviceIcon = (id: string): React.ComponentProps<typeof MaterialIcons>['name'] => {
   if (id.includes('light')) return 'lightbulb';
   if (id.includes('speaker')) return 'speaker';
   if (id.includes('tv')) return 'tv';
@@ -157,7 +157,7 @@ export const ScenarioReviewCard = ({
                 importantForAccessibility="no-hide-descendants"
               >
                 <MaterialIcons
-                  name={getDeviceIcon(device.deviceId) as any}
+                  name={getDeviceIcon(device.deviceId)}
                   size={18}
                   color="#354F52"
                 />

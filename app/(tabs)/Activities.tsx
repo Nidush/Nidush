@@ -2,6 +2,7 @@ import { CarouselSection } from '@/components/activitiesScenarios/CarouselSectio
 import { FabMenu } from '@/components/activitiesScenarios/FabMenu';
 import { FilterBar } from '@/components/activitiesScenarios/FilterBar';
 import { HeaderSection } from '@/components/activitiesScenarios/HeaderSection';
+import { FeedbackState } from '@/components/UI/FeedbackState';
 import { useBiometrics } from '@/context/BiometricsContext';
 import { supabase } from '@/utils/supabase';
 import {
@@ -43,6 +44,7 @@ import {
   getFunctionErrorMessage,
   saveAiActivityIdea,
 } from '@/utils/aiActivities';
+import { logger } from '@/utils/logger';
 import { getDynamicRecommendations } from '@/utils/recommendationEngine';
 
 const UnifiedActivitiesScreen = () => {
@@ -88,7 +90,7 @@ const UnifiedActivitiesScreen = () => {
       setActivityTemplates(activities);
       setScenarioTemplates(scenarios);
     } catch (error) {
-      console.error('Failed to load activity/scenario templates:', error);
+      logger.error('Failed to load activity/scenario templates:', error);
       setActivityTemplates([]);
       setScenarioTemplates([]);
     }
@@ -113,7 +115,7 @@ const UnifiedActivitiesScreen = () => {
     const start = currentPage * PAGE_SIZE;
     const end = start + PAGE_SIZE - 1;
 
-    console.log(`[API] Página ${currentPage}: A pedir do item ${start} ao ${end}...`);
+    logger.debug(`[API] Página ${currentPage}: A pedir do item ${start} ao ${end}...`);
 
     let query = supabase
       .from('activities')
@@ -157,7 +159,7 @@ const UnifiedActivitiesScreen = () => {
     useCallback(() => {
       loadTemplates();
       loadActivities();
-    }, [debouncedSearchQuery, loadTemplates])
+    }, [loadActivities, loadTemplates])
   );
 
   const loadAiRecommendations = useCallback(async () => {
@@ -177,7 +179,7 @@ const UnifiedActivitiesScreen = () => {
 
       setAiRecommendedIdeas(ideas.slice(0, 5));
     } catch (error) {
-      console.warn('Failed to load AI activity recommendations:', error);
+      logger.warn('Failed to load AI activity recommendations:', error);
       setAiRecommendedIdeas([]);
     } finally {
       setIsLoadingAiRecommendations(false);
@@ -294,8 +296,8 @@ const UnifiedActivitiesScreen = () => {
       });
 
       setAiIdeas(ideas);
-    } catch (error: any) {
-      console.error('Failed to generate AI activity ideas:', error);
+    } catch (error: unknown) {
+      logger.error('Failed to generate AI activity ideas:', error);
       const message = await getFunctionErrorMessage(error);
       Alert.alert(
         'Could not generate ideas',
@@ -317,15 +319,18 @@ const UnifiedActivitiesScreen = () => {
       setMyActivities((current) => [mappedActivity, ...current]);
       setAiIdeas((current) => current.filter((item) => item.id !== idea.id));
       setIsAiModalVisible(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to save AI activity:', error);
-      Alert.alert('Could not save activity', error.message || 'Please try again.');
+      Alert.alert(
+        'Could not save activity',
+        error instanceof Error ? error.message : 'Please try again.',
+      );
     } finally {
       setIsSavingAiIdeaId(null);
     }
   };
 
-  const saveAiRecommendation = async (idea: AiActivityIdea) => {
+  const saveAiRecommendation = useCallback(async (idea: AiActivityIdea) => {
     if (isSavingAiRecommendationId) return;
 
     setIsSavingAiRecommendationId(idea.id);
@@ -341,13 +346,16 @@ const UnifiedActivitiesScreen = () => {
           isNew: 'true',
         },
       });
-    } catch (error: any) {
-      console.error('Failed to save AI recommendation:', error);
-      Alert.alert('Could not save activity', error.message || 'Please try again.');
+    } catch (error: unknown) {
+      logger.error('Failed to save AI recommendation:', error);
+      Alert.alert(
+        'Could not save activity',
+        error instanceof Error ? error.message : 'Please try again.',
+      );
     } finally {
       setIsSavingAiRecommendationId(null);
     }
-  };
+  }, [isSavingAiRecommendationId]);
 
   const recommendedData = useMemo(() => {
     if (viewMode === 'activities' && aiRecommendedIdeas.length > 0) {
@@ -364,7 +372,7 @@ const UnifiedActivitiesScreen = () => {
     return processedData.recommended.slice(0, 5).map((item) => ({
       ...item,
       time: isActivity(item) ? getActivityTime(item) : undefined,
-      room: item.room || (item as any).room_id,
+      room: item.room || item.room_id,
     }));
   }, [aiRecommendedIdeas, isSavingAiRecommendationId, processedData.recommended, saveAiRecommendation, viewMode]);
 
@@ -399,26 +407,16 @@ const UnifiedActivitiesScreen = () => {
         />
 
         {processedData.isEmpty ? (
-          <View
-            className="mt-10 px-8 items-center"
-            accessible={true}
-            accessibilityLabel={`No ${viewMode} found matching "${activeFilter}"`}
-          >
-            <Ionicons
-              name="search-outline"
-              size={40}
-              color="#8E8E93"
-              style={{ marginBottom: 10 }}
-              importantForAccessibility="no"
-              accessibilityElementsHidden={true}
-            />
-            <Text
-              className="text-center text-[#8E8E93] text-[16px]"
-              style={{ fontFamily: 'Nunito_400Regular' }}
-            >
-              No {viewMode} found matching &quot;{activeFilter}&quot;.
-            </Text>
-          </View>
+          <FeedbackState
+            icon="search"
+            title={`No ${viewMode} found`}
+            message={
+              searchQuery
+                ? `Nothing matched "${searchQuery}" in ${activeFilter.toLowerCase()}. Try another keyword or clear the filters.`
+                : `There is nothing in ${activeFilter.toLowerCase()} yet. Try a different filter or create something new.`
+            }
+            compact
+          />
         ) : (
           <>
             {processedData.myCreations.length > 0 && (
@@ -427,7 +425,7 @@ const UnifiedActivitiesScreen = () => {
                 data={processedData.myCreations.map((item) => ({
                   ...item,
                   time: isActivity(item) ? getActivityTime(item) : undefined,
-                  room: item.room || (item as any).room_id,
+                  room: item.room || item.room_id,
                 }))}
                 showTime={viewMode === 'activities'}
                 onEndReached={() => {
@@ -456,7 +454,7 @@ const UnifiedActivitiesScreen = () => {
                   data={processedData.simpleRecipes.map((item) => ({
                     ...item,
                     time: isActivity(item) ? getActivityTime(item) : undefined,
-                    room: item.room || (item as any).room_id,
+                    room: item.room || item.room_id,
                   }))}
                   showTime={true}
                 />
@@ -592,15 +590,12 @@ const UnifiedActivitiesScreen = () => {
                 ))}
 
                 {aiIdeas.length === 0 && (
-                  <View className="items-center py-12 px-8">
-                    <Ionicons name="sparkles-outline" size={34} color="#7A8C85" />
-                    <Text
-                      className="text-[#7A8C85] text-center mt-3"
-                      style={{ fontFamily: 'Nunito_600SemiBold' }}
-                    >
-                      No ideas yet. Try again in a moment.
-                    </Text>
-                  </View>
+                  <FeedbackState
+                    icon="auto-awesome"
+                    title="No ideas just yet"
+                    message="The AI did not return suggestions this time. Give it another moment and try again."
+                    compact
+                  />
                 )}
               </ScrollView>
             )}

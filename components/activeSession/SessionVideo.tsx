@@ -11,6 +11,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Image,
+  ImageSourcePropType,
   Linking,
   NativeModules,
   StyleSheet,
@@ -24,14 +25,13 @@ import {
   CastButton,
   MediaStreamType,
   type MediaStatus,
-  type MediaLoadRequest,
   type RemoteMediaClient,
   useCastSession,
 } from './googleCast';
 
 interface SessionVideoProps {
   videoUrl?: string;
-  poster?: any;
+  poster?: ImageSourcePropType | string;
 }
 
 type CastPlaybackState = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
@@ -74,7 +74,7 @@ const createCastMediaInfo = ({
 }: {
   url: string;
   title: string;
-  poster?: any;
+  poster?: ImageSourcePropType | string;
 }) => ({
   contentId: url,
   contentUrl: url,
@@ -151,7 +151,7 @@ const CastControls = ({
 }: {
   mediaUrl: string;
   title: string;
-  poster?: any;
+  poster?: ImageSourcePropType | string;
 }) => {
   const castSession = useCastSession();
   const castClient = castSession?.getClient() ?? null;
@@ -612,7 +612,7 @@ const DirectVideoPlayer = ({
   title,
 }: {
   playbackUrl: string;
-  poster?: any;
+  poster?: ImageSourcePropType | string;
   title: string;
 }) => {
   const [hasFirstFrame, setHasFirstFrame] = useState(false);
@@ -693,7 +693,7 @@ const YouTubeFallback = ({
   poster,
 }: {
   videoUrl: string;
-  poster?: any;
+  poster?: ImageSourcePropType | string;
 }) => {
   const posterSource = useMemo(() => resolveCatalogImage(poster), [poster]);
 
