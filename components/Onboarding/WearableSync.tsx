@@ -162,7 +162,7 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
                       } = await import('react-native-health-connect');
                       const status = await getSdkStatus();
                       if (status !== SdkAvailabilityStatus.SDK_AVAILABLE) {
-                        alert('Health Connect is not available or needs to be installed.');
+                        logger.warn('Health Connect is not available or needs to be installed.');
                         onNext();
                         return;
                       }
@@ -171,7 +171,7 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
                       if (initialized) {
                         try {
                           openHealthConnectSettings();
-                          alert('Please enable Nidush heart rate permissions in Health Connect settings.');
+                          logger.info('Opened Health Connect settings for onboarding permissions.');
                         } catch (permissionError) {
                           logger.warn('Health Connect settings open failed:', permissionError);
                         }

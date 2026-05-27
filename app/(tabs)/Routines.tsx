@@ -11,7 +11,6 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
-  Alert,
   Image,
   FlatList,
   ImageSourcePropType,
@@ -169,6 +168,8 @@ export default function Routines() {
   const [loading, setLoading] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [feedbackTone, setFeedbackTone] = useState<'error' | 'success' | 'info'>('info');
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -184,6 +185,11 @@ export default function Routines() {
   const [isSavingRoutine, setIsSavingRoutine] = useState(false);
   const [selectedRoutine, setSelectedRoutine] = useState<Routine | null>(null);
   const [isDeletingRoutine, setIsDeletingRoutine] = useState(false);
+
+  const showFeedback = useCallback((message: string, tone: 'error' | 'success' | 'info' = 'info') => {
+    setFeedbackMessage(message);
+    setFeedbackTone(tone);
+  }, []);
 
   const loadRoutines = useCallback(async (isNextPage = false) => {
     try {
@@ -354,9 +360,9 @@ export default function Routines() {
       closeRoutineDetails();
     } catch (err: unknown) {
       console.error('Error deleting routine:', err);
-      Alert.alert(
-        'Could not remove routine',
-        err instanceof Error ? err.message : 'Please try again.',
+      showFeedback(
+        err instanceof Error ? err.message : 'Could not remove routine. Please try again.',
+        'error',
       );
       setIsDeletingRoutine(false);
     }
@@ -377,7 +383,7 @@ export default function Routines() {
 
   const openAddRoutineModal = () => {
     if (rooms.length === 0) {
-      Alert.alert('No rooms yet', 'Create or sync a room first so we can attach this routine to your home.');
+      showFeedback('Create or sync a room first so we can attach this routine to your home.', 'error');
       return;
     }
 
@@ -396,28 +402,28 @@ export default function Routines() {
 
   const handleCreateRoutine = async () => {
     if (!newRoutineName.trim()) {
-      Alert.alert('Missing name', 'Give your routine a name first.');
+      showFeedback('Give your routine a name first.', 'error');
       return;
     }
 
     if (!newRoutineRoomId) {
-      Alert.alert('Missing room', 'Choose the room for this routine.');
+      showFeedback('Choose the room for this routine.', 'error');
       return;
     }
 
     if (newRoutineDays.length === 0) {
-      Alert.alert('Missing days', 'Choose at least one day for this routine.');
+      showFeedback('Choose at least one day for this routine.', 'error');
       return;
     }
 
     if (!userHomeId) {
-      Alert.alert('Missing home', 'We could not find your home right now.');
+      showFeedback('We could not find your home right now.', 'error');
       return;
     }
 
     const executionTime = toDatabaseTime(newRoutineTime);
     if (!executionTime) {
-      Alert.alert('Invalid time', 'Use the HH:MM format, for example 07:30.');
+      showFeedback('Use the HH:MM format, for example 07:30.', 'error');
       return;
     }
 
@@ -556,6 +562,7 @@ export default function Routines() {
       ]);
 
       closeAddRoutineModal();
+      showFeedback(`"${savedRoutine.name}" is now part of your routines.`, 'success');
     } catch (err: unknown) {
       console.error('Error creating routine:', err);
       captureException(err, {
@@ -563,9 +570,9 @@ export default function Routines() {
         screen: 'routines',
         action: 'create-routine',
       });
-      Alert.alert(
-        'Could not create routine',
-        err instanceof Error ? err.message : 'Please try again.',
+      showFeedback(
+        err instanceof Error ? err.message : 'Could not create routine. Please try again.',
+        'error',
       );
       setIsSavingRoutine(false);
       return;
@@ -609,6 +616,31 @@ export default function Routines() {
         <View className="mx-5 mb-4 rounded-[24px] border border-[#E7D7B7] bg-[#FFF8EA] px-4 py-3">
           <Text className="text-[#6D5A2E] text-sm" style={{ fontFamily: 'Nunito_600SemiBold' }}>
             {loadError}
+          </Text>
+        </View>
+      ) : null}
+
+      {feedbackMessage ? (
+        <View
+          className={`mx-5 mb-4 rounded-[24px] px-4 py-3 ${
+            feedbackTone === 'error'
+              ? 'border border-[#E7C2BF] bg-[#FDEEEE]'
+              : feedbackTone === 'success'
+                ? 'border border-[#CFE2C8] bg-[#EEF8EB]'
+                : 'border border-[#D8DFD5] bg-white/80'
+          }`}
+        >
+          <Text
+            className={`text-sm ${
+              feedbackTone === 'error'
+                ? 'text-[#8A3D35]'
+                : feedbackTone === 'success'
+                  ? 'text-[#426A3F]'
+                  : 'text-[#4E6059]'
+            }`}
+            style={{ fontFamily: 'Nunito_600SemiBold' }}
+          >
+            {feedbackMessage}
           </Text>
         </View>
       ) : null}

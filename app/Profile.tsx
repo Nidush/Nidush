@@ -638,7 +638,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      alert('Sessão inválida. Faz login novamente.');
+      router.replace('/login');
       return;
     }
 
@@ -656,13 +656,11 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
       if (dbError) {
         console.error("Erro a atualizar tabela users:", dbError);
-        alert("A foto foi guardada no auth, mas falhou ao guardar na tabela publica users (erro RLS): " + dbError.message);
       }
 
       setAvatarUrl(publicUrl);
-      alert('Foto de perfil atualizada com sucesso!');
     } else {
-      alert('Erro ao fazer upload da foto de perfil.');
+      console.warn('Profile image upload did not complete.');
     }
   };
 
@@ -694,7 +692,6 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
       if (error) {
         console.error("Erro ao guardar hobbies:", error);
-        alert("Erro ao gravar hobbies: " + error.message);
       } else {
         setSelectedHobbies(parseHobbies(data?.hobbies));
         setIsModalVisible(false);
@@ -986,7 +983,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
                 } = await import('react-native-health-connect');
                 const status = await getSdkStatus();
                 if (status !== SdkAvailabilityStatus.SDK_AVAILABLE) {
-                  alert('Health Connect is not available or needs to be installed.');
+                  console.warn('Health Connect is not available or needs to be installed.');
                   return;
                 }
 
@@ -994,7 +991,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
                 if (initialized) {
                   if (healthConnectStatus !== 'connected') {
                     openHealthConnectSettings();
-                    alert('Please enable Nidush heart rate permissions in Health Connect settings.');
+                    console.info('Opened Health Connect settings for permission review.');
                     return;
                   }
 
@@ -1005,7 +1002,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
                   }
                 }
               } catch {
-                alert('Could not open Health Connect settings.');
+                console.warn('Could not open Health Connect settings.');
               }
             }}
           >

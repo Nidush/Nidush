@@ -45,7 +45,7 @@ export default function ProfileSelection() {
         const user = session?.user;
 
         if (!user) {
-          alert("Sessão não encontrada! Faz login novamente.");
+          router.replace('/login');
           return;
         }
 
@@ -60,7 +60,7 @@ export default function ProfileSelection() {
         if (assocError) throw assocError;
 
         if (!homeAssocs || homeAssocs.length === 0) {
-          alert("O teu utilizador não tem uma casa associada!");
+          if (isMounted) setProfiles([]);
         } else {
           const activeHomeId = homeAssocs[0].home_id;
           if (user.user_metadata?.first_name) setHostName(user.user_metadata.first_name);
@@ -108,16 +108,13 @@ export default function ProfileSelection() {
 
             if (isMounted) setProfiles(mappedProfiles);
           } else {
-            alert("Não foram encontrados residentes na casa com ID: " + activeHomeId);
+            console.warn('No residents found for home:', activeHomeId);
             if (isMounted) setProfiles([]);
           }
         }
       } catch (error: unknown) {
         console.error("Erro fatal:", error);
-        alert(
-          "Erro fatal no carregamento: " +
-            (error instanceof Error ? error.message : 'Erro desconhecido'),
-        );
+        if (isMounted) setProfiles([]);
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -128,7 +125,7 @@ export default function ProfileSelection() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [router]);
 
   return (
     <SafeAreaView

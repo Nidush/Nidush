@@ -179,7 +179,6 @@ export default function NewActivityFlow() {
 
       if (error || !data) {
         console.error('Failed to load activity for edit:', error);
-        alert('Não foi possível carregar a atividade para edição.');
         router.back();
         return;
       }
@@ -440,7 +439,6 @@ export default function NewActivityFlow() {
           screen: 'new-activity',
           action: isEditMode ? 'update-activity' : 'create-activity',
         });
-        alert('Erro ao guardar na Base de Dados: ' + error.message);
         return;
       }
 
@@ -479,7 +477,6 @@ export default function NewActivityFlow() {
         screen: 'new-activity',
         action: isEditMode ? 'update-activity' : 'create-activity',
       });
-      alert('Ocorreu um erro ao salvar a tua atividade.');
     } finally {
       setIsSaving(false);
     }

@@ -2,7 +2,6 @@ import { MaterialCommunityIcons, MaterialIcons, Ionicons } from '@expo/vector-ic
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -71,6 +70,8 @@ export default function Rooms() {
   const [loading, setLoading] = useState(true);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [feedbackTone, setFeedbackTone] = useState<'error' | 'success' | 'info'>('info');
   const [searchQuery, setSearchQuery] = useState('');
   const [userHomeId, setUserHomeId] = useState<number | null>(null);
   const [isAdjustingLight, setIsAdjustingLight] = useState(false);
@@ -92,6 +93,11 @@ export default function Rooms() {
   const [selectedActivity, setSelectedActivity] = useState<ActivityItem | null>(null);
   const [tempLinkedDeviceIds, setTempLinkedDeviceIds] = useState<number[]>([]);
   const [isSavingLinks, setIsSavingLinks] = useState(false);
+
+  const showFeedback = useCallback((message: string, tone: 'error' | 'success' | 'info' = 'info') => {
+    setFeedbackMessage(message);
+    setFeedbackTone(tone);
+  }, []);
 
   // --- Load Data from Database ---
   const loadDatabaseData = useCallback(async (options?: { showLoader?: boolean }) => {
@@ -259,7 +265,7 @@ export default function Rooms() {
       setAllDevices(prev => prev.map(d => 
         d.id === deviceId ? { ...d, status: device.status } : d
       ));
-      Alert.alert('Control Error', 'Could not sync device status to server.');
+      showFeedback('Could not sync device status to the server.', 'error');
     }
   };
 
@@ -299,12 +305,12 @@ export default function Rooms() {
     if (!selectedDevice) return;
 
     if (!deviceDraftName.trim()) {
-      Alert.alert('Error', 'Please enter a device name.');
+      showFeedback('Please enter a device name.', 'error');
       return;
     }
 
     if (!deviceDraftRoomId) {
-      Alert.alert('Error', 'Choose a room for this device.');
+      showFeedback('Choose a room for this device.', 'error');
       return;
     }
 
@@ -333,7 +339,7 @@ export default function Rooms() {
       closeDeviceDetails();
     } catch (err: unknown) {
       console.error('Failed to update device details:', err);
-      Alert.alert('Error', 'Could not save the device changes.');
+      showFeedback('Could not save the device changes.', 'error');
       setIsSavingDeviceDetails(false);
     }
   };
@@ -342,44 +348,34 @@ export default function Rooms() {
     if (!selectedDevice) return;
 
     const deviceToDelete = selectedDevice;
-    Alert.alert(
-      'Remove device',
-      `Do you want to remove "${deviceToDelete.name}" from your smart home?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('devices')
-                .delete()
-                .eq('id', deviceToDelete.id);
+    (async () => {
+      try {
+        const { error } = await supabase
+          .from('devices')
+          .delete()
+          .eq('id', deviceToDelete.id);
 
-              if (error) throw error;
+        if (error) throw error;
 
-              setAllDevices((prev) => prev.filter((device) => device.id !== deviceToDelete.id));
-              closeDeviceDetails();
-            } catch (err: unknown) {
-              console.error('Failed to delete device:', err);
-              Alert.alert('Error', 'Could not remove this device.');
-            }
-          },
-        },
-      ],
-    );
+        setAllDevices((prev) => prev.filter((device) => device.id !== deviceToDelete.id));
+        closeDeviceDetails();
+        showFeedback(`Removed "${deviceToDelete.name}" from your smart home.`, 'success');
+      } catch (err: unknown) {
+        console.error('Failed to delete device:', err);
+        showFeedback('Could not remove this device.', 'error');
+      }
+    })();
   };
 
   // --- Add Device Handler ---
   const handleAddDevice = async () => {
     if (!newDeviceName.trim()) {
-      Alert.alert('Error', 'Please enter a device name.');
+      showFeedback('Please enter a device name.', 'error');
       return;
     }
 
     if (!newDeviceRoomId || !userHomeId) {
-      Alert.alert('Error', 'Choose a room for this device first.');
+      showFeedback('Choose a room for this device first.', 'error');
       return;
     }
 
@@ -439,14 +435,14 @@ export default function Rooms() {
         setIsAddDeviceModalVisible(false);
         setNewDeviceName('');
         setNewDeviceRoomId(activeRoomId ?? rooms[0]?.id ?? null);
-        Alert.alert('Success', `"${data.name}" added to the selected room.`);
+        showFeedback(`"${data.name}" was added to the selected room.`, 'success');
       }
     } catch (err: unknown) {
       console.error('Failed to add device:', err);
-      Alert.alert(
-        'Error',
+      showFeedback(
         'Could not create new smart device: ' +
           (err instanceof Error ? err.message : 'Unknown error'),
+        'error',
       );
     } finally {
       setIsAdding(false);
@@ -498,13 +494,13 @@ export default function Rooms() {
 
       setIsManageModalVisible(false);
       setSelectedActivity(null);
-      Alert.alert('Success', 'Linked devices updated successfully.');
+      showFeedback('Linked devices updated successfully.', 'success');
     } catch (err: unknown) {
       console.error('Failed to save activity-device links:', err);
-      Alert.alert(
-        'Error',
+      showFeedback(
         'Failed to update linked devices: ' +
           (err instanceof Error ? err.message : 'Unknown error'),
+        'error',
       );
     } finally {
       setIsSavingLinks(false);
@@ -585,6 +581,31 @@ export default function Rooms() {
         <View className="mx-5 mb-4 rounded-[24px] border border-[#E7D7B7] bg-[#FFF8EA] px-4 py-3">
           <Text className="text-[#6D5A2E] text-sm" style={{ fontFamily: 'Nunito_600SemiBold' }}>
             {loadError}
+          </Text>
+        </View>
+      ) : null}
+
+      {feedbackMessage ? (
+        <View
+          className={`mx-5 mb-4 rounded-[24px] px-4 py-3 ${
+            feedbackTone === 'error'
+              ? 'border border-[#E7C2BF] bg-[#FDEEEE]'
+              : feedbackTone === 'success'
+                ? 'border border-[#CFE2C8] bg-[#EEF8EB]'
+                : 'border border-[#D8DFD5] bg-white/80'
+          }`}
+        >
+          <Text
+            className={`text-sm ${
+              feedbackTone === 'error'
+                ? 'text-[#8A3D35]'
+                : feedbackTone === 'success'
+                  ? 'text-[#426A3F]'
+                  : 'text-[#4E6059]'
+            }`}
+            style={{ fontFamily: 'Nunito_600SemiBold' }}
+          >
+            {feedbackMessage}
           </Text>
         </View>
       ) : null}
