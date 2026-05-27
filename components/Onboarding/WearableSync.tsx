@@ -2,11 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, Image, Dimensions, Animated, Easing, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icons } from '../../assets/assets'; 
-
-import {
-  HEALTH_CONNECT_HEART_RATE_PERMISSIONS,
-  hasHeartRateReadPermission,
-} from '../../utils/healthConnectSync';
+import { logger } from '../../utils/logger';
 
 import {
   useFonts,
@@ -161,13 +157,12 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
                       const {
                         getSdkStatus,
                         initialize,
-                        requestPermission,
                         SdkAvailabilityStatus,
                         openHealthConnectSettings,
-                      } = require('react-native-health-connect');
+                      } = await import('react-native-health-connect');
                       const status = await getSdkStatus();
                       if (status !== SdkAvailabilityStatus.SDK_AVAILABLE) {
-                        alert('Health Connect is not available or needs to be installed.');
+                        logger.warn('Health Connect is not available or needs to be installed.');
                         onNext();
                         return;
                       }
@@ -176,14 +171,14 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
                       if (initialized) {
                         try {
                           openHealthConnectSettings();
-                          alert('Please enable Nidush heart rate permissions in Health Connect settings.');
+                          logger.info('Opened Health Connect settings for onboarding permissions.');
                         } catch (permissionError) {
-                          console.warn('Health Connect settings open failed:', permissionError);
+                          logger.warn('Health Connect settings open failed:', permissionError);
                         }
                       }
                       onNext();
                     } catch (error) {
-                      console.error('Health Connect error:', error);
+                      logger.error('Health Connect error:', error);
                       onNext();
                     }
                   }}

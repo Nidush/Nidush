@@ -1,9 +1,10 @@
 import * as ImagePicker from 'expo-image-picker';
+import { logger } from './logger';
 
 export const pickImage = async (): Promise<string | null> => {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) {
-    alert('Gallery permission is required');
+    logger.warn('Gallery permission was denied.');
     return null;
   }
 

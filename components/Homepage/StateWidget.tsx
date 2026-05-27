@@ -2,7 +2,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
-import { Image, Platform, StyleSheet, Text, View } from 'react-native';
+import { Image, ImageSourcePropType, Platform, StyleSheet, Text, View } from 'react-native';
 
 import { UserState } from '@/constants/data/types';
 import { useBiometrics } from '@/context/BiometricsContext';
@@ -14,7 +14,7 @@ const STATE_STYLES: Record<
     icon: keyof typeof MaterialIcons.glyphMap;
     label: string;
     phrase: string;
-    bgImage: any;
+    bgImage: ImageSourcePropType;
   }
 > = {
   RELAXED: {

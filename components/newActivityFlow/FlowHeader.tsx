@@ -3,7 +3,14 @@ import { router } from 'expo-router';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
-export const FlowHeader = ({ title, step, totalSteps, onBack }: any) => (
+type FlowHeaderProps = {
+  title: string;
+  step: number;
+  totalSteps: number;
+  onBack: () => void;
+};
+
+export const FlowHeader = ({ title, step, totalSteps, onBack }: FlowHeaderProps) => (
   <View>
     <View className="flex-row justify-between items-center h-[60px] mt-2">
       <TouchableOpacity

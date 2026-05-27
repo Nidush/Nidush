@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Image, Modal, ScrollView, Switch, Text, TouchableOpacity, View, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { pickImage } from '../utils/imagePicker';
@@ -8,6 +8,7 @@ import { supabase, uploadImage } from '../utils/supabase';
 import {
   DeviceRecord,
   isRealHomeDevice,
+  SmartDeviceStatus,
   sortDevicesByFreshness,
   subscribeToHomeDeviceChanges,
 } from '../utils/devices';
@@ -24,9 +25,9 @@ import { useNotifications } from '../context/NotificationsContext';
 import { useBiometrics } from '../context/BiometricsContext';
 import { LegalContent } from '../components/legal/LegalContent';
 import {
-  HEALTH_CONNECT_HEART_RATE_PERMISSIONS,
   hasHeartRateReadPermission,
 } from '../utils/healthConnectSync';
+import { captureException, trackEvent } from '../utils/observability';
 
 export default function Profile() {
   const router = useRouter();
@@ -112,6 +113,16 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     home_id?: number | string | null;
   };
 
+  type DeviceDiscoveryResult = {
+    discovered?: number;
+  };
+
+  type DeviceDiscoveryRequestRow = {
+    status?: string | null;
+    error_message?: string | null;
+    result?: DeviceDiscoveryResult | null;
+  };
+
   const [discoveredDevices, setDiscoveredDevices] = useState<ConnectedDevice[]>([]);
   const [isRefreshingDevices, setIsRefreshingDevices] = useState(false);
   const [isRequestingDiscovery, setIsRequestingDiscovery] = useState(false);
@@ -142,6 +153,11 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
     if (error) {
       console.error('Erro a obter casa do utilizador para devices:', error);
+      captureException(error, {
+        area: 'devices',
+        screen: 'profile',
+        action: 'load-user-home-id',
+      });
       return null;
     }
 
@@ -157,7 +173,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     return `${source}:${slug || 'device'}`;
   };
 
-  const loadConnectedDevices = async (userId: string, homeId: number | string | null) => {
+  const loadConnectedDevices = useCallback(async (userId: string, homeId: number | string | null) => {
     const buildQuery = (selectClause: string) => {
       let query = supabase
         .from('devices')
@@ -188,6 +204,12 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     if (error) {
       console.error('Erro a carregar devices da BD:', error);
       setHardwareError('Could not load smart home devices.');
+      captureException(error, {
+        area: 'devices',
+        screen: 'profile',
+        action: 'load-connected-devices',
+        metadata: { userId, homeId },
+      });
       return [];
     }
 
@@ -200,7 +222,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     setHardwareError(null);
     setDiscoveredDevices(devices);
     return devices;
-  };
+  }, []);
 
   const refreshConnectedDevices = async (userId: string, homeId: number | string | null) => {
     setIsRefreshingDevices(true);
@@ -214,6 +236,11 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
   const requestAutomaticDiscovery = async () => {
     setIsRequestingDiscovery(true);
+    trackEvent('requested-device-discovery', {
+      area: 'devices',
+      screen: 'profile',
+      action: 'request-scan',
+    });
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Session not found.');
@@ -233,6 +260,13 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
       if (!requestId) {
         console.log('[Profile][DeviceDiscovery] No request id returned. Refreshing current devices.');
         await refreshConnectedDevices(user.id, resolvedHomeId);
+        trackEvent('device-discovery-reused-existing-sync', {
+          area: 'devices',
+          screen: 'profile',
+          action: 'request-scan',
+          userId: user.id,
+          metadata: { homeId: resolvedHomeId },
+        });
         return;
       }
 
@@ -261,9 +295,19 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
         if (latestStatus === 'completed') {
           console.log(`[Profile][DeviceDiscovery] Request ${requestId} completed. Refreshing devices.`);
           const refreshedDevices = await loadConnectedDevices(user.id, resolvedHomeId);
-          const discoveredCount = Number((requestRow?.result as any)?.discovered ?? refreshedDevices.length ?? 0);
+          const typedRequestRow = requestRow as DeviceDiscoveryRequestRow | null;
+          const discoveredCount = Number(
+            typedRequestRow?.result?.discovered ?? refreshedDevices.length ?? 0,
+          );
 
           if (discoveredCount === 0 || refreshedDevices.length === 0) {
+            trackEvent('device-discovery-completed-no-devices', {
+              area: 'devices',
+              screen: 'profile',
+              action: 'poll-scan',
+              userId: user.id,
+              metadata: { requestId, homeId: resolvedHomeId },
+            });
             openDeviceScanModal(
               'No devices found',
               'We scanned your home network but did not find any compatible smart devices this time. Make sure the devices are turned on and connected to the same Wi-Fi, then try again.',
@@ -276,6 +320,13 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
           const failureMessage = requestRow?.error_message
             ? String(requestRow.error_message)
             : 'The smart device scan failed.';
+          captureException(new Error(failureMessage), {
+            area: 'devices',
+            screen: 'profile',
+            action: 'poll-scan',
+            userId: user.id,
+            metadata: { requestId, homeId: resolvedHomeId, status: latestStatus },
+          });
           openDeviceScanModal(
             'Scan failed',
             `${failureMessage} Please wait a moment and try again.`,
@@ -291,20 +342,34 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
       );
       await refreshConnectedDevices(user.id, resolvedHomeId);
       setHardwareError('The scan is still running. Pull to refresh again in a few seconds.');
+      trackEvent('device-discovery-timeout-refresh', {
+        area: 'devices',
+        screen: 'profile',
+        action: 'poll-scan',
+        userId: user.id,
+        metadata: { requestId, homeId: resolvedHomeId },
+      });
       openDeviceScanModal(
         'Scan still running',
         'We started the smart device scan, but it is taking longer than expected. Please wait a few seconds and tap refresh again.',
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to request automatic discovery:', error);
-      setHardwareError(error?.message || 'Could not scan smart devices.');
+      const errorMessage =
+        error instanceof Error ? error.message : 'Could not scan smart devices.';
+      setHardwareError(errorMessage);
+      captureException(error, {
+        area: 'devices',
+        screen: 'profile',
+        action: 'request-scan',
+      });
     } finally {
       setIsRequestingDiscovery(false);
     }
   };
 
   // Função para sincronizar dispositivos com o Supabase
-  const syncDeviceToDB = async (name: string, type: string, source: string, externalId?: string) => {
+  const syncDeviceToDB = useCallback(async (name: string, type: string, source: string, externalId?: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Sessão não encontrada.');
 
@@ -383,7 +448,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
     if (error) throw error;
     return data;
-  };
+  }, []);
 
   useEffect(() => {
     let activeHomeChannel: ReturnType<typeof subscribeToHomeDeviceChanges> | null = null;
@@ -518,7 +583,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
           getGrantedPermissions,
           getSdkStatus,
           SdkAvailabilityStatus,
-        } = require('react-native-health-connect');
+        } = await import('react-native-health-connect');
         const status = await getSdkStatus();
         if (status !== SdkAvailabilityStatus.SDK_AVAILABLE) {
           setHealthConnectStatus('disconnected');
@@ -537,7 +602,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
         setHealthConnectStatus('connected');
         await syncDeviceToDB('Health Connect', 'heart', 'health_connect', 'android_hc');
-      } catch (e) {
+      } catch {
         setHealthConnectStatus('disconnected');
       }
     };
@@ -557,7 +622,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
         supabase.removeChannel(activeHomeChannel);
       }
     };
-  }, []);
+  }, [loadConnectedDevices, syncDeviceToDB]);
 
 
   const handleLogout = async () => {
@@ -573,7 +638,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
-      alert('Sessão inválida. Faz login novamente.');
+      router.replace('/login');
       return;
     }
 
@@ -591,13 +656,11 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
       if (dbError) {
         console.error("Erro a atualizar tabela users:", dbError);
-        alert("A foto foi guardada no auth, mas falhou ao guardar na tabela publica users (erro RLS): " + dbError.message);
       }
 
       setAvatarUrl(publicUrl);
-      alert('Foto de perfil atualizada com sucesso!');
     } else {
-      alert('Erro ao fazer upload da foto de perfil.');
+      console.warn('Profile image upload did not complete.');
     }
   };
 
@@ -629,7 +692,6 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
       if (error) {
         console.error("Erro ao guardar hobbies:", error);
-        alert("Erro ao gravar hobbies: " + error.message);
       } else {
         setSelectedHobbies(parseHobbies(data?.hobbies));
         setIsModalVisible(false);
@@ -684,7 +746,12 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
         showsVerticalScrollIndicator={false}
       >
         <View className="items-center my-6">
-          <TouchableOpacity onPress={handleImagePick} activeOpacity={0.8} style={{ position: 'relative' }}>
+          <TouchableOpacity
+            onPress={handleImagePick}
+            activeOpacity={0.8}
+            style={{ position: 'relative' }}
+            testID="avatar-picker-button"
+          >
             {isLoading ? (
               <View className="w-32 h-32 rounded-full bg-[#E8EDDF]" />
             ) : (
@@ -849,6 +916,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
           <TouchableOpacity
             onPress={requestAutomaticDiscovery}
             disabled={isRequestingDiscovery}
+            testID="scan-smart-devices-button"
             className={`mt-4 py-3 items-center bg-[#5B8C51] rounded-full ${isRequestingDiscovery ? 'opacity-50' : ''}`}
           >
             <Text className="text-white font-bold">
@@ -863,6 +931,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
               await refreshConnectedDevices(user.id, userHomeId);
             }}
             disabled={isRefreshingDevices}
+            testID="refresh-devices-button"
             className={`mt-3 py-2 items-center ${isRefreshingDevices ? 'opacity-50' : ''}`}
           >
             <Text className="text-[#5B8C51] font-bold">
@@ -911,10 +980,10 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
                   openHealthConnectDataManagement,
                   SdkAvailabilityStatus,
                   openHealthConnectSettings,
-                } = require('react-native-health-connect');
+                } = await import('react-native-health-connect');
                 const status = await getSdkStatus();
                 if (status !== SdkAvailabilityStatus.SDK_AVAILABLE) {
-                  alert('Health Connect is not available or needs to be installed.');
+                  console.warn('Health Connect is not available or needs to be installed.');
                   return;
                 }
 
@@ -922,7 +991,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
                 if (initialized) {
                   if (healthConnectStatus !== 'connected') {
                     openHealthConnectSettings();
-                    alert('Please enable Nidush heart rate permissions in Health Connect settings.');
+                    console.info('Opened Health Connect settings for permission review.');
                     return;
                   }
 
@@ -932,8 +1001,8 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
                     openHealthConnectSettings();
                   }
                 }
-              } catch (e) {
-                alert('Could not open Health Connect settings.');
+              } catch {
+                console.warn('Could not open Health Connect settings.');
               }
             }}
           >
@@ -1455,7 +1524,15 @@ function AccountInfoRow({
   );
 }
 
-function DeviceItem({ name, status, connected, icon, testID }: any) {
+type DeviceItemProps = {
+  name: string;
+  status: SmartDeviceStatus | string;
+  connected: boolean;
+  icon: React.ComponentProps<typeof MaterialIcons>['name'];
+  testID?: string;
+};
+
+function DeviceItem({ name, status, connected, icon, testID }: DeviceItemProps) {
   return (
     <View
       className="flex-row items-center mb-4"
@@ -1494,7 +1571,23 @@ function DeviceItem({ name, status, connected, icon, testID }: any) {
   );
 }
 
-function MenuItem({ icon, label, border = true, testID, onPress, badge }: any) {
+type MenuItemProps = {
+  icon: React.ComponentProps<typeof MaterialIcons>['name'];
+  label: string;
+  border?: boolean;
+  testID?: string;
+  onPress?: () => void;
+  badge?: number;
+};
+
+function MenuItem({
+  icon,
+  label,
+  border = true,
+  testID,
+  onPress,
+  badge,
+}: MenuItemProps) {
   const hasBadge = typeof badge === 'number' && badge > 0;
 
   return (

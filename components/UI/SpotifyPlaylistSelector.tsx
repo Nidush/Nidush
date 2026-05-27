@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
+  ImageSourcePropType,
   FlatList,
   Image,
   Text,
@@ -10,8 +11,15 @@ import {
 import { useSpotify } from '../../context/SpotifyContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
+type PlaylistItem = {
+  id: string;
+  name: string;
+  images?: { url?: string }[];
+  uri?: string;
+};
+
 interface SpotifyPlaylistSelectorProps {
-  onSelect: (playlist: any) => void;
+  onSelect: (playlist: PlaylistItem) => void;
   selectedId?: string;
 }
 
@@ -20,21 +28,21 @@ export default function SpotifyPlaylistSelector({
   selectedId,
 }: SpotifyPlaylistSelectorProps) {
   const { getUserPlaylists, isAuthenticated, login } = useSpotify();
-  const [playlists, setPlaylists] = useState<any[]>([]);
+  const [playlists, setPlaylists] = useState<PlaylistItem[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const loadPlaylists = useCallback(async () => {
+    setLoading(true);
+    const items = await getUserPlaylists();
+    setPlaylists(items);
+    setLoading(false);
+  }, [getUserPlaylists]);
 
   useEffect(() => {
     if (isAuthenticated) {
       loadPlaylists();
     }
-  }, [isAuthenticated]);
-
-  const loadPlaylists = async () => {
-    setLoading(true);
-    const items = await getUserPlaylists();
-    setPlaylists(items);
-    setLoading(false);
-  };
+  }, [isAuthenticated, loadPlaylists]);
 
   if (!isAuthenticated) {
     return (
@@ -80,10 +88,18 @@ export default function SpotifyPlaylistSelector({
               className={`mr-4 w-32 items-center`}
             >
               <View className={`p-1 rounded-2xl ${isSelected ? 'bg-[#1DB954]' : 'bg-transparent'}`}>
+                {(() => {
+                  const imageSource: ImageSourcePropType = {
+                    uri: item.images?.[0]?.url || 'https://via.placeholder.com/150',
+                  };
+
+                  return (
                 <Image
-                  source={{ uri: item.images?.[0]?.url || 'https://via.placeholder.com/150' }}
+                  source={imageSource}
                   className="w-28 h-28 rounded-xl"
                 />
+                  );
+                })()}
               </View>
               <Text
                 numberOfLines={1}

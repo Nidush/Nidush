@@ -73,7 +73,7 @@ export default function SignUp() {
     setErrorMsg('');
 
     apiLog('POST', 'auth/signUp', { email });
-    const { data, error } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
 
       email,
       password,

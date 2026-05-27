@@ -11,8 +11,8 @@ const {
   syncDevices,
 } = require('./discover-network-devices');
 
-if (!SUPABASE_URL || !HOME_DEVICE_SYNC_TOKEN) {
-  console.error('Missing EXPO_PUBLIC_SUPABASE_URL or HOME_DEVICE_SYNC_TOKEN.');
+if (!SUPABASE_URL || !HOME_DEVICE_SYNC_TOKEN || !DEVICE_SYNC_SHARED_SECRET) {
+  console.error('Missing EXPO_PUBLIC_SUPABASE_URL, HOME_DEVICE_SYNC_TOKEN, or DEVICE_SYNC_SHARED_SECRET.');
   process.exit(1);
 }
 
@@ -22,7 +22,7 @@ const postToFunction = async (functionName, body) => {
     headers: {
       'Content-Type': 'application/json',
       'x-device-sync-token': HOME_DEVICE_SYNC_TOKEN,
-      ...(DEVICE_SYNC_SHARED_SECRET ? { 'x-device-sync-secret': DEVICE_SYNC_SHARED_SECRET } : {}),
+      'x-device-sync-secret': DEVICE_SYNC_SHARED_SECRET,
     },
     body: JSON.stringify(body ?? {}),
   });

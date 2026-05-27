@@ -1,6 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import React from 'react';
-import { Image, Text, TouchableOpacity, View } from 'react-native';
+import { Image, ImageSourcePropType, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   SharedValue,
   useAnimatedStyle,
@@ -14,7 +14,7 @@ interface SessionControlsProps {
   isLastStep: boolean;
   playlistName: string;
   room: string;
-  image: any;
+  image: ImageSourcePropType | string | null | undefined;
   progress: SharedValue<number>;
   onToggleSession: () => void;
   onToggleMusic: () => void;

@@ -13,6 +13,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNotifications } from '@/context/NotificationsContext';
 import { fetchScenarioTemplates } from '@/utils/catalogTemplates';
+import { captureException, trackEvent } from '@/utils/observability';
 import {
   AccessibilityInfo,
   Keyboard,
@@ -22,6 +23,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ImageSourcePropType,
 } from 'react-native';
 import {
   SafeAreaProvider,
@@ -64,6 +66,37 @@ const scenarioIdToTemplateId = (value: unknown) => {
   return raw.startsWith('s') ? raw : `s${raw}`;
 };
 
+type ContentRow = {
+  id: string;
+  title: string;
+  type: string;
+  category: string;
+  description: string;
+  duration: string;
+  image?: string | null;
+  instructions?: unknown;
+  ingredients?: unknown;
+  video_url?: string | null;
+  author?: string | null;
+};
+
+const normalizeContentInstructions = (value: unknown): Content['instructions'] => {
+  if (!Array.isArray(value)) return undefined;
+  return value as Content['instructions'];
+};
+
+const normalizeContentIngredients = (value: unknown): Content['ingredients'] => {
+  if (!Array.isArray(value)) return undefined;
+  return value as Content['ingredients'];
+};
+
+const getImageUri = (value: ImageSourcePropType | string | null) =>
+  typeof value === 'string'
+    ? value
+    : value && typeof value === 'object' && 'uri' in value
+      ? value.uri
+      : undefined;
+
 export default function NewActivityFlow() {
   let [fontsLoaded] = useFonts({
     Nunito_700Bold,
@@ -81,13 +114,13 @@ export default function NewActivityFlow() {
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
 
-  const [activityType, setActivityType] = useState<Activity['type']>('' as any);
+  const [activityType, setActivityType] = useState<Activity['type']>('other');
   const [selectedContentId, setSelectedContentId] = useState('');
   const [room_id, setRoomId] = useState('');
   const [selectedScenarioId, setSelectedScenarioId] = useState('');
   const [activityName, setActivityName] = useState('');
   const [description, setDescription] = useState('');
-  const [activityImage, setActivityImage] = useState<any>(null);
+  const [activityImage, setActivityImage] = useState<ImageSourcePropType | string | null>(null);
   const [dbContent, setDbContent] = useState<Content[]>([]);
   const [scenarioTemplates, setScenarioTemplates] = useState<Scenario[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -146,7 +179,6 @@ export default function NewActivityFlow() {
 
       if (error || !data) {
         console.error('Failed to load activity for edit:', error);
-        alert('Não foi possível carregar a atividade para edição.');
         router.back();
         return;
       }
@@ -170,7 +202,7 @@ export default function NewActivityFlow() {
         .select('*');
       
       if (data && !error) {
-        setDbContent(data.map((c: any) => {
+        setDbContent((data as ContentRow[]).map((c) => {
           const localContent = CONTENTS[c.id as keyof typeof CONTENTS];
 
           return {
@@ -181,9 +213,9 @@ export default function NewActivityFlow() {
             description: c.description || localContent?.description,
             duration: c.duration || localContent?.duration,
             image: resolveCatalogImage(c.image || localContent?.image),
-            instructions: c.instructions || localContent?.instructions,
-            ingredients: c.ingredients || localContent?.ingredients,
-            videoUrl: localContent?.videoUrl || c.video_url,
+            instructions: normalizeContentInstructions(c.instructions) || localContent?.instructions,
+            ingredients: normalizeContentIngredients(c.ingredients) || localContent?.ingredients,
+            videoUrl: localContent?.videoUrl || c.video_url || undefined,
             author: c.author || localContent?.author,
           };
         }));
@@ -317,7 +349,7 @@ export default function NewActivityFlow() {
       if (!user) throw new Error("Utilizador não autenticado!");
 
       // 1. Upload da imagem para o Storage (se for uma nova imagem local)
-      let imageUrl = finalImage?.uri || finalImage;
+      let imageUrl = getImageUri(finalImage) || finalImage;
       if (typeof imageUrl === 'string' && (imageUrl.startsWith('data:') || imageUrl.startsWith('file:') || imageUrl.startsWith('blob:'))) {
         const uploadedUrl = await uploadImage(imageUrl);
         if (uploadedUrl) imageUrl = uploadedUrl;
@@ -402,7 +434,11 @@ export default function NewActivityFlow() {
 
       if (error) {
         console.error('Erro no Supabase:', error);
-        alert('Erro ao guardar na Base de Dados: ' + error.message);
+        captureException(error, {
+          area: 'activities',
+          screen: 'new-activity',
+          action: isEditMode ? 'update-activity' : 'create-activity',
+        });
         return;
       }
 
@@ -418,6 +454,13 @@ export default function NewActivityFlow() {
           : `Great job! "${activityName || 'Untitled Activity'}" has been added to your creations.`,
         'creation'
       );
+      trackEvent(isEditMode ? 'activity-updated' : 'activity-created', {
+        area: 'activities',
+        screen: 'new-activity',
+        action: isEditMode ? 'update-activity' : 'create-activity',
+        userId: user.id,
+        metadata: { activityId: data.id, roomId: dbRoomId, homeId: currentHomeId },
+      });
 
       // Se tudo correu bem, avançar para os detalhes usando o ID gerado pelo Supabase
       router.push({
@@ -429,7 +472,11 @@ export default function NewActivityFlow() {
       });
     } catch (e) {
       console.error('Erro ao salvar:', e);
-      alert('Ocorreu um erro ao salvar a tua atividade.');
+      captureException(e, {
+        area: 'activities',
+        screen: 'new-activity',
+        action: isEditMode ? 'update-activity' : 'create-activity',
+      });
     } finally {
       setIsSaving(false);
     }

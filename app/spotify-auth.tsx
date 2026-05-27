@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function SpotifyAuthCatcher() {
@@ -16,7 +16,7 @@ export default function SpotifyAuthCatcher() {
       }
     };
     handleRedirect();
-  }, []);
+  }, [router]);
 
   return null;
 }

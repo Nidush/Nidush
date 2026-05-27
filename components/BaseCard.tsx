@@ -3,6 +3,7 @@ import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import {
+  DimensionValue,
   Image,
   ImageSourcePropType,
   Platform,
@@ -16,7 +17,7 @@ interface BaseCardProps {
   time: string;
   room?: string;
   image: ImageSourcePropType;
-  width?: number | string;
+  width?: DimensionValue | number;
   height?: number;
 }
 
@@ -32,7 +33,7 @@ export const BaseCard = ({
       accessible
       accessibilityLabel={`Card: ${title}. Time: ${time}${room ? `, Room: ${room}` : ''}`}
       className="relative rounded-2xl overflow-hidden bg-gray-900 mb-4"
-      style={{ width: width as any, aspectRatio: 1 }}
+      style={{ width, aspectRatio: 1 }}
     >
       <View style={StyleSheet.absoluteFill}>
         <Image

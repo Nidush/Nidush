@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { createFunctionLogger, jsonResponse } from '../_shared/observability.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,6 +9,7 @@ const corsHeaders = {
 }
 
 Deno.serve(async (req) => {
+  const log = createFunctionLogger('complete-device-discovery', req)
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders })
   }
@@ -19,12 +21,11 @@ Deno.serve(async (req) => {
     const token = String(req.headers.get('x-device-sync-token') ?? '').trim()
     const providedSharedSecret = String(req.headers.get('x-device-sync-secret') ?? '').trim()
 
+    if (!expectedSharedSecret) throw new Error('DEVICE_SYNC_SHARED_SECRET is not configured.')
     if (!token) throw new Error('Missing device sync token.')
     if (expectedSharedSecret && providedSharedSecret !== expectedSharedSecret) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      )
+      log.warn('Rejected device discovery completion because the shared secret was invalid.')
+      return jsonResponse({ error: 'Unauthorized', requestId: log.requestId }, 401, corsHeaders)
     }
 
     const payload = await req.json()
@@ -37,13 +38,13 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey)
 
-    const { data: home, error: homeError } = await supabase
-      .from('homes')
-      .select('id')
+    const { data: homeSecret, error: homeError } = await supabase
+      .from('home_device_secrets')
+      .select('home_id')
       .eq('device_sync_token', token)
       .maybeSingle()
 
-    if (homeError || !home) throw new Error('Invalid device sync token.')
+    if (homeError || !homeSecret?.home_id) throw new Error('Invalid device sync token.')
 
     const { error: updateError } = await supabase
       .from('device_discovery_requests')
@@ -54,19 +55,20 @@ Deno.serve(async (req) => {
         error_message: errorMessage,
       })
       .eq('id', requestId)
-      .eq('home_id', home.id)
+      .eq('home_id', homeSecret.home_id)
 
     if (updateError) throw updateError
 
-    return new Response(
-      JSON.stringify({ completed: true }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    )
+    log.info('Completed device discovery request.', {
+      homeId: homeSecret.home_id,
+      requestId,
+      success,
+    })
+
+    return jsonResponse({ completed: true }, 200, corsHeaders)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    return new Response(
-      JSON.stringify({ error: message }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    )
+    log.error('Failed to complete device discovery request.', { error: message })
+    return jsonResponse({ error: message, requestId: log.requestId }, 400, corsHeaders)
   }
 })

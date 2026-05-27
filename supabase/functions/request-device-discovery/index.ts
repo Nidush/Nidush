@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { createFunctionLogger, jsonResponse } from '../_shared/observability.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,6 +9,7 @@ const corsHeaders = {
 }
 
 Deno.serve(async (req) => {
+  const log = createFunctionLogger('request-device-discovery', req)
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders })
   }
@@ -54,14 +56,16 @@ Deno.serve(async (req) => {
     if (existingError) throw existingError
 
     if (existingOpenRequest) {
-      return new Response(
-        JSON.stringify({
+      log.info('Reused existing open discovery request.', {
+        userId: user.id,
+        homeId: homeAssoc.home_id,
+        requestId: existingOpenRequest.id,
+      })
+      return jsonResponse({
           queued: false,
           reused: true,
           request: existingOpenRequest,
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      )
+        }, 200, corsHeaders)
     }
 
     const { data: createdRequest, error: createError } = await supabase
@@ -76,20 +80,20 @@ Deno.serve(async (req) => {
       .single()
 
     if (createError) throw createError
+    log.info('Queued new device discovery request.', {
+      userId: user.id,
+      homeId: homeAssoc.home_id,
+      requestId: createdRequest.id,
+    })
 
-    return new Response(
-      JSON.stringify({
+    return jsonResponse({
         queued: true,
         reused: false,
         request: createdRequest,
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    )
+      }, 200, corsHeaders)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    return new Response(
-      JSON.stringify({ error: message }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    )
+    log.error('Failed to queue device discovery request.', { error: message })
+    return jsonResponse({ error: message, requestId: log.requestId }, 400, corsHeaders)
   }
 })

@@ -66,18 +66,28 @@ export const saveAiActivityIdea = async (idea: AiActivityIdea): Promise<Activity
   };
 };
 
-export const getFunctionErrorMessage = async (error: any) => {
-  const response = error?.context || error?.response;
+type FunctionErrorLike = {
+  message?: string;
+  context?: { json?: () => Promise<unknown> };
+  response?: { json?: () => Promise<unknown> };
+};
+
+export const getFunctionErrorMessage = async (error: unknown) => {
+  const normalizedError = error as FunctionErrorLike | undefined;
+  const response = normalizedError?.context || normalizedError?.response;
 
   if (response && typeof response.json === 'function') {
     try {
       const body = await response.json();
-      if (body?.error) return String(body.error);
-      if (body?.message) return String(body.message);
+      if (body && typeof body === 'object') {
+        const typedBody = body as { error?: unknown; message?: unknown };
+        if (typedBody.error) return String(typedBody.error);
+        if (typedBody.message) return String(typedBody.message);
+      }
     } catch {
       // Fall through to the generic message.
     }
   }
 
-  return error?.message || 'Check that the Gemini function is deployed and configured.';
+  return normalizedError?.message || 'Check that the Gemini function is deployed and configured.';
 };

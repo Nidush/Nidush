@@ -29,6 +29,7 @@ export default function SpotifyConnect({
 }) {
   const { login, isAuthenticated, userProfile } = useSpotify();
   const [isConnecting, setIsConnecting] = useState(false);
+  const hasAutoAdvanced = useRef(false);
 
   const [fontsLoaded] = useFonts({
     Nunito_400Regular: Nunito_400Regular,
@@ -58,7 +59,16 @@ export default function SpotifyConnect({
     ).start();
   }, [rotateAnim]);
 
-  // (Auto-advance removed per user request)
+  useEffect(() => {
+    if (!isAuthenticated || hasAutoAdvanced.current) return;
+
+    hasAutoAdvanced.current = true;
+    const timeout = setTimeout(() => {
+      onNext();
+    }, 500);
+
+    return () => clearTimeout(timeout);
+  }, [isAuthenticated, onNext]);
 
   if (!fontsLoaded) return null;
 
@@ -186,7 +196,7 @@ export default function SpotifyConnect({
                   : "Connect your Spotify account to play your favorite playlists automatically with each scenario."}
               >
                 {isAuthenticated 
-                  ? "Your account is connected. We'll use your music profile to tailor your experience."
+                  ? "Your account is connected. We'll use your music profile to tailor your experience and continue automatically."
                   : "Connect your Spotify account to play your favorite playlists automatically with each scenario."}
               </Text>
 

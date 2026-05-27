@@ -7,8 +7,30 @@ import {
 const HEALTH_CONNECT_BACKGROUND_TASK = 'nidush-health-connect-background-sync';
 
 // Dynamically require to avoid crashes when the native modules are not linked/present (e.g. in Expo Go, tests, or web)
-let TaskManager: any = null;
-let BackgroundTask: any = null;
+type TaskManagerModule = {
+  defineTask?: (
+    taskName: string,
+    task: () => Promise<number> | number,
+  ) => void;
+};
+
+type BackgroundTaskModule = {
+  BackgroundTaskResult?: {
+    Failed?: number;
+    Success?: number;
+  };
+  BackgroundTaskStatus?: {
+    Available?: number;
+  };
+  getStatusAsync?: () => Promise<number>;
+  registerTaskAsync?: (
+    taskName: string,
+    options: { minimumInterval: number },
+  ) => Promise<void>;
+};
+
+let TaskManager: TaskManagerModule | null = null;
+let BackgroundTask: BackgroundTaskModule | null = null;
 
 if (Platform.OS === 'android') {
   try {
@@ -44,6 +66,15 @@ export const registerHealthConnectBackgroundSync = async () => {
   }
 
   try {
+    if (
+      !BackgroundTask.getStatusAsync ||
+      !BackgroundTask.registerTaskAsync ||
+      !BackgroundTask.BackgroundTaskStatus
+    ) {
+      console.warn('[HealthConnect] Background sync unavailable: missing BackgroundTask methods.');
+      return;
+    }
+
     const status = await BackgroundTask.getStatusAsync();
     if (status !== BackgroundTask.BackgroundTaskStatus.Available) {
       console.warn('[HealthConnect] background sync unavailable via BackgroundTask status:', status);

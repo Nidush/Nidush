@@ -23,6 +23,11 @@ interface CustomAlertProps {
   isDestructive?: boolean;
 }
 
+type AlertHeaderConfig = {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  color: string;
+};
+
 export const CustomAlert = ({
   visible,
   title,
@@ -34,7 +39,7 @@ export const CustomAlert = ({
   cancelText = 'Cancel',
   isDestructive = false,
 }: CustomAlertProps) => {
-  const getHeaderConfig = () => {
+  const getHeaderConfig = (): AlertHeaderConfig => {
     switch (type) {
       case 'success':
         return { icon: 'checkmark-circle', color: '#548F53' };
@@ -49,6 +54,7 @@ export const CustomAlert = ({
   };
 
   const headerConfig = getHeaderConfig();
+  const iconName: React.ComponentProps<typeof Ionicons>['name'] = headerConfig.icon;
   useEffect(() => {
     if (visible) {
       AccessibilityInfo.announceForAccessibility(`Alert: ${title}. ${message}`);
@@ -88,7 +94,7 @@ export const CustomAlert = ({
             accessibilityElementsHidden={true}
           >
             <Ionicons
-              name={headerConfig.icon as any}
+              name={iconName}
               size={48}
               color={headerConfig.color}
             />
