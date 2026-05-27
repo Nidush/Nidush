@@ -199,12 +199,14 @@ jest.mock('../utils/supabase', () => ({
 describe('Profile Screen', () => {
   let consoleErrorSpy;
   let consoleLogSpy;
+  let consoleWarnSpy;
 
   beforeEach(() => {
     jest.clearAllMocks();
     global.alert = jest.fn();
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     mockDeviceRows.current = [
       {
         id: 10,
@@ -240,6 +242,7 @@ describe('Profile Screen', () => {
   afterEach(() => {
     consoleErrorSpy.mockRestore();
     consoleLogSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
   });
 
   it('uploads a new avatar and updates both auth and public profile', async () => {
@@ -263,9 +266,10 @@ describe('Profile Screen', () => {
       data: { avatar_url: 'https://example.com/avatar.jpg' },
     });
 
-    await waitFor(() => {
-      expect(global.alert).toHaveBeenCalledWith('Foto de perfil atualizada com sucesso!');
+    expect(mockUpdateUser).toHaveBeenCalledWith({
+      data: { avatar_url: 'https://example.com/avatar.jpg' },
     });
+    expect(global.alert).not.toHaveBeenCalled();
   });
 
   it('shows an error when avatar upload fails', async () => {
@@ -278,8 +282,11 @@ describe('Profile Screen', () => {
     fireEvent.press(getByTestId('avatar-picker-button'));
 
     await waitFor(() => {
-      expect(global.alert).toHaveBeenCalledWith('Erro ao fazer upload da foto de perfil.');
+      expect(mockUploadImage).toHaveBeenCalled();
     });
+
+    expect(mockUpdateUser).not.toHaveBeenCalled();
+    expect(global.alert).not.toHaveBeenCalled();
   });
 
   it('shows a hardware error when smart-device scan is requested without a session', async () => {

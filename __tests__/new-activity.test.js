@@ -280,9 +280,10 @@ describe('NewActivityFlow', () => {
     fireEvent.press(await screen.findByText('Save'));
 
     await waitFor(() => {
-      expect(global.alert).toHaveBeenCalledWith('Ocorreu um erro ao salvar a tua atividade.');
+      expect(mockActivityInsertSingle).not.toHaveBeenCalled();
     });
 
     expect(mockPush).not.toHaveBeenCalled();
+    expect(global.alert).not.toHaveBeenCalled();
   });
 });

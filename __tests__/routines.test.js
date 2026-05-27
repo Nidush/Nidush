@@ -3,7 +3,6 @@ import { fireEvent, render, waitFor } from '@testing-library/react-native';
 
 import Routines from '../app/(tabs)/Routines';
 
-const mockAlert = jest.fn();
 const mockGetUser = jest.fn();
 const mockRoutineInsertSingle = jest.fn();
 const mockScenarioMaybeSingle = jest.fn();
@@ -163,8 +162,6 @@ describe('Routines Screen', () => {
       },
       error: null,
     });
-    mockAlert.mockReset();
-    jest.spyOn(require('react-native').Alert, 'alert').mockImplementation(mockAlert);
   });
 
   afterEach(() => {
@@ -179,15 +176,6 @@ describe('Routines Screen', () => {
 
     fireEvent.press(screen.getByTestId('open-add-routine-button'));
 
-    if (
-      mockAlert.mock.calls.some(
-        (call) => call[0] === 'No rooms yet',
-      )
-    ) {
-      mockAlert.mockClear();
-      fireEvent.press(screen.getByTestId('open-add-routine-button'));
-    }
-
     await screen.findByText('Add Routine');
   };
 
@@ -197,10 +185,7 @@ describe('Routines Screen', () => {
     await openRoutineModal(screen);
     fireEvent.press(await screen.findByText('Save Routine'));
 
-    expect(mockAlert).toHaveBeenCalledWith(
-      'Missing name',
-      'Give your routine a name first.',
-    );
+    expect(await screen.findByText('Give your routine a name first.')).toBeTruthy();
   });
 
   it('creates a routine successfully with the default selections', async () => {
