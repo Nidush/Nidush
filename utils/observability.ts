@@ -23,6 +23,7 @@ const runtimeContext: Record<string, unknown> = {
   platform: Platform.OS,
   sessionId,
 };
+let hasObservabilityConsent = Platform.OS !== 'web';
 
 const formatError = (error: unknown) => {
   if (error instanceof Error) {
@@ -70,11 +71,17 @@ export const setObservabilityContext = (context: Record<string, unknown>) => {
   Object.assign(runtimeContext, sanitizeForLogs(context));
 };
 
+export const setObservabilityConsent = (hasConsent: boolean) => {
+  hasObservabilityConsent = Platform.OS === 'web' ? hasConsent : true;
+};
+
 export const trackEvent = (
   name: string,
   context: ObservabilityContext = {},
   level: ObservabilityLevel = 'info',
 ) => {
+  if (Platform.OS === 'web' && !hasObservabilityConsent) return;
+
   emit(level, name, {
     kind: 'event',
     area: context.area,

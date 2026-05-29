@@ -9,6 +9,13 @@ const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL as string;
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string;
 const shouldLogSupabaseTraffic = typeof __DEV__ !== 'undefined' && __DEV__;
 
+const webStorage =
+  typeof window !== 'undefined' && window.sessionStorage
+    ? window.sessionStorage
+    : typeof window !== 'undefined' && window.localStorage
+      ? window.localStorage
+      : null;
+
 const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const url = input instanceof Request ? input.url : input.toString();
   const method = init?.method || (input instanceof Request ? input.method : 'GET');
@@ -35,9 +42,9 @@ const customFetch = async (input: RequestInfo | URL, init?: RequestInit): Promis
 
 const customStorage = Platform.OS === 'web' 
   ? {
-      getItem: (key: string) => typeof window !== 'undefined' ? window.localStorage.getItem(key) : null,
-      setItem: (key: string, value: string) => { if (typeof window !== 'undefined') window.localStorage.setItem(key, value); },
-      removeItem: (key: string) => { if (typeof window !== 'undefined') window.localStorage.removeItem(key); },
+      getItem: (key: string) => webStorage?.getItem(key) ?? null,
+      setItem: (key: string, value: string) => { webStorage?.setItem(key, value); },
+      removeItem: (key: string) => { webStorage?.removeItem(key); },
     }
   : AsyncStorage;
 

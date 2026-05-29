@@ -16,6 +16,7 @@ import { logger } from '../utils/logger';
 import {
   installGlobalErrorHandlers,
   setObservabilityContext,
+  setObservabilityConsent,
   setObservabilityUser,
   trackEvent,
 } from '../utils/observability';
@@ -75,6 +76,7 @@ export default function RootLayout() {
         const viewed = await AsyncStorage.getItem('@viewedOnboarding');
         const legalConsent = await AsyncStorage.getItem(LEGAL_CONSENT_KEY);
         setIsConsentVisible(legalConsent !== 'accepted');
+        setObservabilityConsent(legalConsent === 'accepted');
 
         const user = await getSessionUser();
         setObservabilityUser(user?.id);
@@ -144,6 +146,7 @@ export default function RootLayout() {
 
   const handleAcceptLegalConsent = async () => {
     await AsyncStorage.setItem(LEGAL_CONSENT_KEY, 'accepted');
+    setObservabilityConsent(true);
     try {
       const user = await getSessionUser();
       if (user) {

@@ -1,6 +1,7 @@
 import {
   captureException,
   setObservabilityContext,
+  setObservabilityConsent,
   setObservabilityUser,
   trackEvent,
 } from '../utils/observability';
@@ -12,6 +13,7 @@ describe('observability', () => {
   beforeEach(() => {
     infoSpy = jest.spyOn(console, 'info').mockImplementation(() => {});
     errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    setObservabilityConsent(true);
   });
 
   afterEach(() => {
