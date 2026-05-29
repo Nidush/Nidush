@@ -1,7 +1,9 @@
 import React from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 
 import SignUp from '../app/signup';
+import { LEGAL_CONSENT_KEY } from '../components/legal/LegalContent';
 
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
@@ -40,6 +42,7 @@ jest.mock('../utils/supabase', () => ({
 describe('SignUp Screen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    AsyncStorage.setItem(LEGAL_CONSENT_KEY, 'accepted');
     mockSignUp.mockResolvedValue({ error: null });
     mockInvokeFunction.mockResolvedValue({ ok: true });
   });

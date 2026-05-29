@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Image, Modal, ScrollView, Switch, Text, TouchableOpacity, View, AppState } from 'react-native';
+import { AppState, Image, Modal, ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { pickImage } from '../utils/imagePicker';
 import { supabase, uploadImage } from '../utils/supabase';
@@ -27,6 +27,7 @@ import { LegalContent } from '../components/legal/LegalContent';
 import {
   hasHeartRateReadPermission,
 } from '../utils/healthConnectSync';
+import { LEGAL_POLICY_VERSION, setStoredHealthConsent } from '../utils/legal';
 import { captureException, trackEvent } from '../utils/observability';
 
 export default function Profile() {
@@ -51,6 +52,8 @@ export default function Profile() {
   const [isAccountModalVisible, setIsAccountModalVisible] = useState(false);
   const [isNotificationsModalVisible, setIsNotificationsModalVisible] = useState(false);
   const [isDeviceScanModalVisible, setIsDeviceScanModalVisible] = useState(false);
+  const [isExportingData, setIsExportingData] = useState(false);
+  const [dataExportJson, setDataExportJson] = useState('');
   const [deviceScanModalTitle, setDeviceScanModalTitle] = useState('Smart device scan');
   const [deviceScanModalMessage, setDeviceScanModalMessage] = useState('');
   const [userEmail, setUserEmail] = useState('');
@@ -700,6 +703,32 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     }
   };
 
+  const handleExportData = async () => {
+    setIsExportingData(true);
+    try {
+      const { data, error } = await supabase.rpc('export_my_data');
+
+      if (error) {
+        throw error;
+      }
+
+      setDataExportJson(JSON.stringify(data ?? {}, null, 2));
+    } catch (error) {
+      console.error('Erro ao exportar dados do utilizador:', error);
+      setDataExportJson(
+        JSON.stringify(
+          {
+            error: 'Could not generate your data export right now.',
+          },
+          null,
+          2,
+        ),
+      );
+    } finally {
+      setIsExportingData(false);
+    }
+  };
+
 
 
   const [fontsLoaded] = useFonts({
@@ -989,6 +1018,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
                 const initialized = await initialize();
                 if (initialized) {
+                  await setStoredHealthConsent(true);
                   if (healthConnectStatus !== 'connected') {
                     openHealthConnectSettings();
                     console.info('Opened Health Connect settings for permission review.');
@@ -1348,6 +1378,52 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} className="mb-4">
+              <View className="bg-[#F5F7F0] border border-[#D1D9C5] rounded-[24px] p-4 mb-5">
+                <Text
+                  className="text-lg text-[#3A4D3F]"
+                  style={{ fontFamily: 'Nunito_700Bold' }}
+                >
+                  Data Portability
+                </Text>
+                <Text
+                  className="text-[#71806F] mt-2 leading-6"
+                  style={{ fontFamily: 'Nunito_400Regular' }}
+                >
+                  Generate a structured JSON export of your profile, preferences, activities, devices, notifications, and consent history.
+                </Text>
+                <Text
+                  className="text-[#71806F] mt-2 text-xs"
+                  style={{ fontFamily: 'Nunito_600SemiBold' }}
+                >
+                  Policy version: {LEGAL_POLICY_VERSION}
+                </Text>
+
+                <TouchableOpacity
+                  onPress={handleExportData}
+                  disabled={isExportingData}
+                  className={`mt-4 py-3 rounded-full items-center ${isExportingData ? 'bg-[#A7B5A4]' : 'bg-[#5B8C51]'}`}
+                >
+                  <Text
+                    className="text-white text-base"
+                    style={{ fontFamily: 'Nunito_700Bold' }}
+                  >
+                    {isExportingData ? 'Generating export...' : 'Generate data export'}
+                  </Text>
+                </TouchableOpacity>
+
+                {dataExportJson ? (
+                  <View className="mt-4 bg-[#1F2D2F] rounded-[20px] p-4">
+                    <Text
+                      selectable
+                      className="text-[#E8F0E4] text-xs leading-5"
+                      style={{ fontFamily: 'Nunito_400Regular' }}
+                    >
+                      {dataExportJson}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
               <LegalContent />
             </ScrollView>
 

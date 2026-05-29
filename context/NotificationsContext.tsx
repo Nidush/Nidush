@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from '../utils/supabase';
+import { getSessionUser, supabase } from '../utils/supabase';
 
 export interface AppNotification {
   id: string;
@@ -122,7 +122,7 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getSessionUser();
       if (user) {
         setUserId(user.id);
         setHasMoreState(false);
@@ -230,7 +230,7 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
   };
 
   const ensurePublicUser = async (uid: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getSessionUser();
     if (!user) return false;
 
     const { error } = await supabase

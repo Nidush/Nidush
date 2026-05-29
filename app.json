@@ -26,15 +26,13 @@
         "foregroundImage": "./assets/images/Icon-Padded.png"
       },
       "edgeToEdgeEnabled": true,
-      "permissions": [
-        "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS",
-        "android.permission.health.READ_HEART_RATE",
-        "android.permission.health.READ_RESTING_HEART_RATE",
-        "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND",
-        "android.permission.health.READ_STEPS",
-        "android.permission.health.READ_TOTAL_CALORIES_BURNED"
-      ],
+        "permissions": [
+          "android.permission.RECORD_AUDIO",
+          "android.permission.MODIFY_AUDIO_SETTINGS",
+          "android.permission.health.READ_HEART_RATE",
+          "android.permission.health.READ_RESTING_HEART_RATE",
+          "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
+        ],
       "intentFilters": [
         {
           "action": "VIEW_PERMISSION_USAGE",
@@ -82,14 +80,6 @@
             {
               "accessType": "read",
               "recordType": "BackgroundAccessPermission"
-            },
-            {
-              "accessType": "read",
-              "recordType": "Steps"
-            },
-            {
-              "accessType": "read",
-              "recordType": "TotalCaloriesBurned"
             }
           ]
         }

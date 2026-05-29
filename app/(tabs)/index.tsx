@@ -24,7 +24,7 @@ import {
   saveAiActivityIdea,
 } from '@/utils/aiActivities';
 import { getDynamicRecommendations } from '@/utils/recommendationEngine';
-import { supabase } from '@/utils/supabase';
+import { getSessionUser, supabase } from '@/utils/supabase';
 import {
   fetchActivityTemplates,
   mapUserActivity,
@@ -99,8 +99,7 @@ export default function Index() {
   // O userName deve ser atualizado quando ganhamos foco também
   const fetchUserName = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const user = session?.user;
+      const user = await getSessionUser();
       
       if (user) {
         setAvatarUrl(user.user_metadata?.avatar_url || null);
@@ -118,30 +117,8 @@ export default function Index() {
           const hooks = raw.replace(/[\[\]"]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
           setUserHobbies(Array.from(new Set(hooks)));
         }
-
       } else {
-        // Tentar getUser() se session for null
-        const { data: { user: verifiedUser } } = await supabase.auth.getUser();
-        if (verifiedUser) {
-          setAvatarUrl(verifiedUser.user_metadata?.avatar_url || null);
-          setUserName(verifiedUser.user_metadata?.first_name || verifiedUser.email?.split('@')[0] || 'Utilizador');
-          
-          const { data: dbUser } = await supabase
-            .from('users')
-            .select('hobbies')
-            .eq('email', verifiedUser.email)
-            .maybeSingle();
-            
-          if (dbUser?.hobbies) {
-            const raw = Array.isArray(dbUser.hobbies) ? dbUser.hobbies.join(',') : String(dbUser.hobbies);
-            const hooks = raw.replace(/[\[\]"]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
-            setUserHobbies(Array.from(new Set(hooks)));
-          }
-
-
-        } else {
-          setUserName('Visitante');
-        }
+        setUserName('Visitante');
       }
 
     } catch (e) {
@@ -172,13 +149,7 @@ export default function Index() {
   useFocusEffect(
     useCallback(() => {
       const loadActivities = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        let user = session?.user ?? null;
-
-        if (!user) {
-          const { data: { user: verifiedUser } } = await supabase.auth.getUser();
-          user = verifiedUser ?? null;
-        }
+        const user = await getSessionUser();
 
         if (!user) {
           setMyActivities([]); // Importante: Limpar se não houver user

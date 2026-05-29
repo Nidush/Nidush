@@ -22,7 +22,7 @@ const privacySections = [
   {
     title: 'Local Storage',
     content:
-      'Nidush uses local app storage for essential settings such as onboarding state, legal consent, preferences, and session-related app data. This is the app equivalent of essential cookies.',
+      'Nidush uses app storage for essential settings such as onboarding state, legal consent, preferences, and session-related app data. On web, session-related data is kept in browser session storage instead of longer-lived local storage whenever possible.',
   },
   {
     title: 'How We Use Data',
