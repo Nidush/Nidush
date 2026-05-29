@@ -19,6 +19,7 @@ import {
   setObservabilityUser,
   trackEvent,
 } from '../utils/observability';
+import { recordLegalPolicyConsents } from '../utils/legal';
 import './../global.css';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -140,6 +141,14 @@ export default function RootLayout() {
 
   const handleAcceptLegalConsent = async () => {
     await AsyncStorage.setItem(LEGAL_CONSENT_KEY, 'accepted');
+    try {
+      const user = await getSessionUser();
+      if (user) {
+        await recordLegalPolicyConsents('legal_modal');
+      }
+    } catch (error) {
+      logger.warn('Could not sync legal consent to backend.', error);
+    }
     setIsConsentVisible(false);
   };
 

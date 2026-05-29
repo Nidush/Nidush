@@ -28,8 +28,7 @@ import WearableSync from '../components/Onboarding/WearableSync';
 import WelcomeUser from '../components/Onboarding/WelcomeUser';
 import { CustomAlert } from '../components/CustomAlert';
 import { LEGAL_CONSENT_KEY } from '../components/legal/LegalContent';
-
-const ONBOARDING_CONSENTS_KEY = '@nidush_onboarding_consents_v1';
+import { ONBOARDING_CONSENTS_KEY, persistStoredOnboardingConsents } from '../utils/legal';
 
 export default function SetupProfile() {
   const [fontsLoaded] = useFonts({
@@ -535,6 +534,7 @@ export default function SetupProfile() {
             }
 
             if (!hasError) {
+              await persistStoredOnboardingConsents();
               await AsyncStorage.setItem('@viewedOnboarding', 'true');
               await AsyncStorage.removeItem('@onboarding_progress');
               await AsyncStorage.removeItem(ONBOARDING_CONSENTS_KEY);
