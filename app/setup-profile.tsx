@@ -28,7 +28,11 @@ import WearableSync from '../components/Onboarding/WearableSync';
 import WelcomeUser from '../components/Onboarding/WelcomeUser';
 import { CustomAlert } from '../components/CustomAlert';
 import { LEGAL_CONSENT_KEY } from '../components/legal/LegalContent';
-import { ONBOARDING_CONSENTS_KEY, persistStoredOnboardingConsents } from '../utils/legal';
+import {
+  ONBOARDING_CONSENTS_KEY,
+  persistStoredOnboardingConsents,
+  setStoredHealthConsent,
+} from '../utils/legal';
 
 export default function SetupProfile() {
   const [fontsLoaded] = useFonts({
@@ -273,6 +277,7 @@ export default function SetupProfile() {
           secondaryLabel="Skip for now"
           note="Review this before opening the Health Connect step."
           onPrimary={async () => {
+            await setStoredHealthConsent(true);
             const nextConsents = await persistConsents({
               ...consents,
               health: true,

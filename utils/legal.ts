@@ -4,6 +4,7 @@ import { logger } from './logger';
 
 export const LEGAL_POLICY_VERSION = '2026-05-29';
 export const ONBOARDING_CONSENTS_KEY = '@nidush_onboarding_consents_v1';
+export const HEALTH_DATA_CONSENT_KEY = '@nidush_health_data_consent_v1';
 
 export type ConsentType =
   | 'privacy_policy'
@@ -34,6 +35,20 @@ export const recordLegalPolicyConsents = async (source: string) => {
   ]);
 };
 
+export const setStoredHealthConsent = async (accepted: boolean) => {
+  if (accepted) {
+    await AsyncStorage.setItem(HEALTH_DATA_CONSENT_KEY, 'accepted');
+    return;
+  }
+
+  await AsyncStorage.removeItem(HEALTH_DATA_CONSENT_KEY);
+};
+
+export const hasStoredHealthConsent = async () => {
+  const stored = await AsyncStorage.getItem(HEALTH_DATA_CONSENT_KEY);
+  return stored === 'accepted';
+};
+
 export const persistStoredOnboardingConsents = async () => {
   try {
     const stored = await AsyncStorage.getItem(ONBOARDING_CONSENTS_KEY);
@@ -52,6 +67,7 @@ export const persistStoredOnboardingConsents = async () => {
     }
 
     if (parsed.health) {
+      await setStoredHealthConsent(true);
       writes.push(recordUserConsent('health_data', 'onboarding_health_consent'));
     }
 

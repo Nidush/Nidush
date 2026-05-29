@@ -27,7 +27,7 @@ import { LegalContent } from '../components/legal/LegalContent';
 import {
   hasHeartRateReadPermission,
 } from '../utils/healthConnectSync';
-import { LEGAL_POLICY_VERSION } from '../utils/legal';
+import { LEGAL_POLICY_VERSION, setStoredHealthConsent } from '../utils/legal';
 import { captureException, trackEvent } from '../utils/observability';
 
 export default function Profile() {
@@ -1018,6 +1018,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
                 const initialized = await initialize();
                 if (initialized) {
+                  await setStoredHealthConsent(true);
                   if (healthConnectStatus !== 'connected') {
                     openHealthConnectSettings();
                     console.info('Opened Health Connect settings for permission review.');

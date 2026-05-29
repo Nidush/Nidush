@@ -19,7 +19,7 @@ import {
   setObservabilityUser,
   trackEvent,
 } from '../utils/observability';
-import { recordLegalPolicyConsents } from '../utils/legal';
+import { hasStoredHealthConsent, recordLegalPolicyConsents } from '../utils/legal';
 import './../global.css';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -56,12 +56,15 @@ export default function RootLayout() {
       // 0. Inicializar Health Connect IMEDIATAMENTE (Nativo)
       if (Platform.OS === 'android') {
         try {
-          const { initialize, getSdkStatus, SdkAvailabilityStatus } = await import('react-native-health-connect');
-          const status = await getSdkStatus();
-          if (status === SdkAvailabilityStatus.SDK_AVAILABLE) {
-            await initialize();
-            await registerHealthConnectBackgroundSync();
-            logger.debug('Health Connect pre-initialized.');
+          const hasHealthConsent = await hasStoredHealthConsent();
+          if (hasHealthConsent) {
+            const { initialize, getSdkStatus, SdkAvailabilityStatus } = await import('react-native-health-connect');
+            const status = await getSdkStatus();
+            if (status === SdkAvailabilityStatus.SDK_AVAILABLE) {
+              await initialize();
+              await registerHealthConnectBackgroundSync();
+              logger.debug('Health Connect initialized after stored health consent.');
+            }
           }
         } catch (error) {
           logger.warn('Health Connect pre-init failed.', error);
