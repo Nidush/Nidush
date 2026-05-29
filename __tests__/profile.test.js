@@ -69,6 +69,10 @@ jest.mock('../components/legal/LegalContent', () => ({
   LegalContent: () => null,
 }));
 
+jest.mock('../utils/legal', () => ({
+  LEGAL_POLICY_VERSION: '2026-05-29',
+}));
+
 jest.mock('../utils/healthConnectSync', () => ({
   hasHeartRateReadPermission: jest.fn(() => false),
 }));
