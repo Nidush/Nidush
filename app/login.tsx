@@ -229,7 +229,7 @@ export default function Login() {
 
               <View className="flex-row justify-center mt-[20px] mb-20">
                 <Text style={{ fontFamily: 'Nunito_400Regular' }} className="text-[#3E545C] text-[15px]">Don&apos;t have an account? </Text>
-                <TouchableOpacity onPress={() => router.push('/signup')}>
+                <TouchableOpacity onPress={() => router.push('/pre-signup-consent')}>
                   <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-[#5C8D58] text-[15px]">Sign Up</Text>
                 </TouchableOpacity>
               </View>

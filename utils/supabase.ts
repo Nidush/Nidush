@@ -1,6 +1,7 @@
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
+import { processLock } from '@supabase/auth-js';
 import { Platform } from 'react-native';
 import { logger } from './logger';
 
@@ -50,11 +51,65 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+    lock: processLock,
   },
   global: {
     fetch: customFetch as typeof fetch,
   }
 });
+
+const isInvalidRefreshTokenMessage = (message: string) => {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('invalid refresh token') ||
+    normalized.includes('refresh token') && normalized.includes('already used')
+  );
+};
+
+export const isInvalidRefreshTokenError = (error: unknown) => {
+  if (!error) return false;
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : String((error as { message?: unknown }).message || error);
+
+  return isInvalidRefreshTokenMessage(message);
+};
+
+export const clearLocalSupabaseSession = async () => {
+  try {
+    await supabase.auth.signOut({ scope: 'local' });
+  } catch (error) {
+    logger.warn('Failed to clear local Supabase session.', error);
+  }
+};
+
+export const getSessionUser = async () => {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+
+    if (error) {
+      if (isInvalidRefreshTokenError(error)) {
+        logger.warn('Supabase session refresh token became invalid. Clearing local session.');
+        await clearLocalSupabaseSession();
+        return null;
+      }
+      throw error;
+    }
+
+    return data.session?.user ?? null;
+  } catch (error) {
+    if (isInvalidRefreshTokenError(error)) {
+      logger.warn('Supabase session refresh token was already used. Clearing local session.');
+      await clearLocalSupabaseSession();
+      return null;
+    }
+
+    throw error;
+  }
+};
 
 export const apiLog = (method: string, table: string, data?: LogPayload) => {
   if (!shouldLogSupabaseTraffic) return;
