@@ -9,6 +9,7 @@ const mockUploadImage = jest.fn();
 const mockGetUser = jest.fn();
 const mockUpdateUser = jest.fn();
 const mockInvoke = jest.fn();
+const mockSignOut = jest.fn();
 const mockRemoveChannel = jest.fn();
 const mockDeviceRows = { current: [] };
 const mockDiscoveryRequestRow = { current: { data: null, error: null } };
@@ -100,9 +101,21 @@ jest.mock('../utils/supabase', () => ({
     auth: {
       getUser: (...args) => mockGetUser(...args),
       updateUser: (...args) => mockUpdateUser(...args),
-      signOut: jest.fn(),
+      signOut: (...args) => mockSignOut(...args),
     },
     from: jest.fn((table) => {
+      const createEqChain = (result) => {
+        const chain = {
+          eq: jest.fn(() => chain),
+          order: jest.fn(() => chain),
+          limit: jest.fn(() => chain),
+          maybeSingle: jest.fn(async () => result),
+          single: jest.fn(async () => result),
+          select: jest.fn(() => chain),
+        };
+        return chain;
+      };
+
       if (table === 'users') {
         return {
           select: jest.fn(() => ({
@@ -167,11 +180,38 @@ jest.mock('../utils/supabase', () => ({
       }
 
       if (table === 'devices') {
+        const existingDeviceLookup = createEqChain({ data: null, error: null });
+        const deviceListResult = {
+          data: mockDeviceRows.current,
+          error: null,
+        };
+        const deviceListChain = {
+          eq: jest.fn(async () => deviceListResult),
+        };
         return {
-          select: jest.fn(() => ({
-            order: jest.fn(() => ({
-              eq: jest.fn(async () => ({
-                data: mockDeviceRows.current,
+          select: jest.fn((columns) => {
+            if (columns === 'id') {
+              return existingDeviceLookup;
+            }
+
+            return {
+              order: jest.fn(() => deviceListChain),
+            };
+          }),
+          update: jest.fn(() => ({
+            eq: jest.fn(() => ({
+              select: jest.fn(() => ({
+                single: jest.fn(async () => ({
+                  data: mockDeviceRows.current[0] ?? null,
+                  error: null,
+                })),
+              })),
+            })),
+          })),
+          insert: jest.fn(() => ({
+            select: jest.fn(() => ({
+              single: jest.fn(async () => ({
+                data: mockDeviceRows.current[0] ?? null,
                 error: null,
               })),
             })),
@@ -241,6 +281,7 @@ describe('Profile Screen', () => {
     mockUpdateUser.mockResolvedValue({ error: null });
     mockUploadImage.mockResolvedValue('https://example.com/avatar.jpg');
     mockInvoke.mockResolvedValue({ data: {}, error: null });
+    mockSignOut.mockResolvedValue({ error: null });
   });
 
   afterEach(() => {
@@ -344,5 +385,27 @@ describe('Profile Screen', () => {
         'We scanned your home network but did not find any compatible smart devices this time. Make sure the devices are turned on and connected to the same Wi-Fi, then try again.',
       ),
     ).toBeTruthy();
+  });
+
+  it('deletes the account after explicit confirmation', async () => {
+    mockInvoke.mockResolvedValueOnce({
+      data: { success: true },
+      error: null,
+    });
+
+    const { getByTestId, findByText } = render(<Profile />);
+
+    await findByText('Laura Rossi');
+    fireEvent.press(getByTestId('menu-privacy'));
+    fireEvent.press(getByTestId('open-delete-account-button'));
+    fireEvent.changeText(getByTestId('delete-account-confirm-input'), 'DELETE');
+    fireEvent.press(getByTestId('confirm-delete-account-button'));
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith('delete-account', { body: {} });
+    });
+
+    expect(mockSignOut).toHaveBeenCalledWith({ scope: 'local' });
+    expect(mockReplace).toHaveBeenCalledWith('/login');
   });
 });

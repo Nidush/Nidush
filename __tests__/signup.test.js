@@ -43,7 +43,7 @@ describe('SignUp Screen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     AsyncStorage.setItem(LEGAL_CONSENT_KEY, 'accepted');
-    mockSignUp.mockResolvedValue({ error: null });
+    mockSignUp.mockResolvedValue({ data: { session: null }, error: null });
     mockInvokeFunction.mockResolvedValue({ ok: true });
   });
 
@@ -73,7 +73,7 @@ describe('SignUp Screen', () => {
     expect(mockSignUp).not.toHaveBeenCalled();
   });
 
-  it('signs up successfully and redirects to login', async () => {
+  it('signs up successfully and redirects to login when email verification is still required', async () => {
     const { getByTestId, getByText } = render(<SignUp />);
 
     fireEvent.changeText(getByTestId('first-name-input'), 'Laura');
@@ -107,6 +107,25 @@ describe('SignUp Screen', () => {
         pathname: '/login',
         params: { registeredEmail: 'laura@example.com' },
       });
+    });
+  });
+
+  it('continues directly to setup-profile when signup returns an active session', async () => {
+    mockSignUp.mockResolvedValueOnce({
+      data: { session: { access_token: 'token' } },
+      error: null,
+    });
+
+    const { getByTestId, getByText } = render(<SignUp />);
+
+    fireEvent.changeText(getByTestId('first-name-input'), 'Laura');
+    fireEvent.changeText(getByTestId('last-name-input'), 'Rossi');
+    fireEvent.changeText(getByTestId('email-input'), 'laura@example.com');
+    fireEvent.changeText(getByTestId('password-input'), 'StrongPass123!');
+    fireEvent.press(getByText('Join Nidush'));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/setup-profile');
     });
   });
 });

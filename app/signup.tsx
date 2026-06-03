@@ -89,7 +89,7 @@ export default function SignUp() {
     setErrorMsg('');
 
     apiLog('POST', 'auth/signUp', { email });
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
 
       email,
       password,
@@ -118,12 +118,18 @@ export default function SignUp() {
       console.log('Erro ao enviar email de boas-vindas:', fnError);
     }
 
-    // Signup bem sucedido, limpar progresso anterior se existir e redirecionar para o login
+    // Signup bem sucedido, limpar progresso anterior se existir
     try {
       await AsyncStorage.removeItem('@onboarding_progress');
     } catch (e) {
       console.log('Erro ao limpar progresso:', e);
     }
+
+    if (data.session) {
+      router.replace('/setup-profile');
+      return;
+    }
+
     router.replace({ pathname: '/login', params: { registeredEmail: email } });
 
   };

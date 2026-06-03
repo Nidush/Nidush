@@ -23,6 +23,7 @@ import {
   fetchAiActivityIdeas,
   saveAiActivityIdea,
 } from '@/utils/aiActivities';
+import { isAiAutoInvocationEnabled } from '@/utils/aiConfig';
 import { getDynamicRecommendations } from '@/utils/recommendationEngine';
 import { getSessionUser, supabase } from '@/utils/supabase';
 import {
@@ -242,6 +243,11 @@ export default function Index() {
   );
 
   const loadAiHomeIdeas = useCallback(async () => {
+    if (!isAiAutoInvocationEnabled) {
+      setAiHomeIdeas([]);
+      return;
+    }
+
     try {
       const ideas = await fetchAiActivityIdeas({
         mood: currentState,

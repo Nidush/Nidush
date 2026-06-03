@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { AppState, Image, Modal, ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { AppState, Image, Modal, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { pickImage } from '../utils/imagePicker';
 import { supabase, uploadImage } from '../utils/supabase';
@@ -52,8 +52,12 @@ export default function Profile() {
   const [isAccountModalVisible, setIsAccountModalVisible] = useState(false);
   const [isNotificationsModalVisible, setIsNotificationsModalVisible] = useState(false);
   const [isDeviceScanModalVisible, setIsDeviceScanModalVisible] = useState(false);
+  const [isDeleteAccountModalVisible, setIsDeleteAccountModalVisible] = useState(false);
   const [isExportingData, setIsExportingData] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [dataExportJson, setDataExportJson] = useState('');
+  const [deleteAccountConfirmation, setDeleteAccountConfirmation] = useState('');
+  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
   const [deviceScanModalTitle, setDeviceScanModalTitle] = useState('Smart device scan');
   const [deviceScanModalMessage, setDeviceScanModalMessage] = useState('');
   const [userEmail, setUserEmail] = useState('');
@@ -729,6 +733,52 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     }
   };
 
+  const openDeleteAccountModal = () => {
+    setDeleteAccountError(null);
+    setDeleteAccountConfirmation('');
+    setIsDeleteAccountModalVisible(true);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteAccountConfirmation.trim().toUpperCase() !== 'DELETE') {
+      setDeleteAccountError('Type DELETE to confirm account deletion.');
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    setDeleteAccountError(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-account', {
+        body: {},
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.error) {
+        throw new Error(String(data.error));
+      }
+
+      await supabase.auth.signOut({ scope: 'local' });
+      setIsDeleteAccountModalVisible(false);
+      setIsPrivacyModalVisible(false);
+      router.replace('/login');
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Could not delete your account right now.';
+      setDeleteAccountError(message);
+      captureException(error, {
+        area: 'privacy',
+        screen: 'profile',
+        action: 'delete-account',
+      });
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  };
+
 
 
   const [fontsLoaded] = useFonts({
@@ -1364,7 +1414,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
         onRequestClose={() => setIsPrivacyModalVisible(false)}
       >
         <View className="flex-1 justify-end bg-black/50">
-          <View className="bg-white w-full rounded-t-[40px] px-8 pt-8 pb-16 shadow-2xl h-[76%]">
+          <View className="bg-white w-full rounded-t-[40px] px-8 pt-8 pb-12 shadow-2xl h-[86%]">
             <View className="flex-row justify-between items-center mb-6">
               <Text
                 className="text-2xl text-[#3A4D3F]"
@@ -1377,7 +1427,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} className="mb-4">
+            <ScrollView showsVerticalScrollIndicator={false} className="mb-3">
               <View className="bg-[#F5F7F0] border border-[#D1D9C5] rounded-[24px] p-4 mb-5">
                 <Text
                   className="text-lg text-[#3A4D3F]"
@@ -1424,6 +1474,40 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
                 ) : null}
               </View>
 
+              <View className="bg-[#FFF4F1] border border-[#E6B8AC] rounded-[24px] p-4 mb-5">
+                <Text
+                  className="text-lg text-[#8A3D2B]"
+                  style={{ fontFamily: 'Nunito_700Bold' }}
+                >
+                  Delete account
+                </Text>
+                <Text
+                  className="text-[#8A5B50] mt-2 leading-6"
+                  style={{ fontFamily: 'Nunito_400Regular' }}
+                >
+                  Permanently remove your profile, preferences, activities, routines, devices, notifications, consents, and active session from Nidush.
+                </Text>
+                <Text
+                  className="text-[#8A5B50] mt-2 text-xs"
+                  style={{ fontFamily: 'Nunito_600SemiBold' }}
+                >
+                  If you are the only admin in a shared home, Nidush will transfer admin access to the oldest remaining member when possible.
+                </Text>
+
+                <TouchableOpacity
+                  onPress={openDeleteAccountModal}
+                  className="mt-4 py-3 rounded-full items-center bg-[#C95F44]"
+                  testID="open-delete-account-button"
+                >
+                  <Text
+                    className="text-white text-base"
+                    style={{ fontFamily: 'Nunito_700Bold' }}
+                  >
+                    Delete my account
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               <LegalContent />
             </ScrollView>
 
@@ -1437,6 +1521,80 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
               >
                 Close
               </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={isDeleteAccountModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsDeleteAccountModalVisible(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black/50 px-6">
+          <View className="bg-white w-full rounded-[32px] p-7 shadow-xl">
+            <View className="w-14 h-14 rounded-full bg-[#FFF4F1] items-center justify-center self-center mb-4">
+              <MaterialIcons name="delete-forever" size={28} color="#C95F44" />
+            </View>
+
+            <Text
+              className="text-2xl text-[#3A2E2A] mb-3 text-center"
+              style={{ fontFamily: 'Nunito_700Bold' }}
+            >
+              Confirm account deletion
+            </Text>
+
+            <Text
+              className="text-[#7A665E] text-base text-center leading-6"
+              style={{ fontFamily: 'Nunito_400Regular' }}
+            >
+              This action is permanent. Type DELETE to confirm that Nidush should erase your account and personal app data.
+            </Text>
+
+            <TextInput
+              value={deleteAccountConfirmation}
+              onChangeText={(value) => {
+                setDeleteAccountConfirmation(value);
+                if (deleteAccountError) setDeleteAccountError(null);
+              }}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              placeholder="Type DELETE"
+              placeholderTextColor="#A28F87"
+              className="mt-5 border border-[#E6B8AC] rounded-2xl px-4 py-3 text-[#3A2E2A]"
+              testID="delete-account-confirm-input"
+            />
+
+            {deleteAccountError ? (
+              <Text
+                className="text-[#C95F44] mt-3 text-sm"
+                style={{ fontFamily: 'Nunito_600SemiBold' }}
+              >
+                {deleteAccountError}
+              </Text>
+            ) : null}
+
+            <TouchableOpacity
+              onPress={handleDeleteAccount}
+              disabled={isDeletingAccount}
+              className={`mt-6 py-4 rounded-full items-center shadow-md ${isDeletingAccount ? 'bg-[#D9A79A]' : 'bg-[#C95F44]'}`}
+              testID="confirm-delete-account-button"
+            >
+              <Text
+                className="text-white text-lg"
+                style={{ fontFamily: 'Nunito_700Bold' }}
+              >
+                {isDeletingAccount ? 'Deleting account...' : 'Permanently delete'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setIsDeleteAccountModalVisible(false)}
+              disabled={isDeletingAccount}
+              className="mt-4 py-2 items-center"
+            >
+              <Text className="text-gray-400 text-lg">Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>

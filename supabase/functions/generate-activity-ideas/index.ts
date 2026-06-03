@@ -4,7 +4,9 @@ import {
   type GeminiIdea,
   type RoomRow,
   type UserState,
+  clampPositiveInteger,
   clampText,
+  evaluateRateLimit,
   fallbackIdeas,
   getMoodDirective,
   normalizeIdeas,
@@ -28,6 +30,37 @@ type DeviceRow = {
   connectivity_status?: string | null
 }
 
+const parseBooleanEnv = (value: string | undefined, fallback: boolean) => {
+  if (typeof value !== 'string') return fallback
+
+  switch (value.trim().toLowerCase()) {
+    case '1':
+    case 'true':
+    case 'yes':
+    case 'on':
+      return true
+    case '0':
+    case 'false':
+    case 'no':
+    case 'off':
+      return false
+    default:
+      return fallback
+  }
+}
+
+class HttpError extends Error {
+  status: number
+  payload: Record<string, unknown>
+
+  constructor(status: number, message: string, payload: Record<string, unknown> = {}) {
+    super(message)
+    this.name = 'HttpError'
+    this.status = status
+    this.payload = payload
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders })
@@ -39,6 +72,10 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY') ?? Deno.env.get('GOOGLE_AI_API_KEY') ?? ''
     const geminiModel = Deno.env.get('GEMINI_MODEL') ?? 'gemini-2.5-flash'
+    const geminiEnabled = parseBooleanEnv(Deno.env.get('ENABLE_GEMINI_API'), true)
+    const aiRateLimitEnabled = parseBooleanEnv(Deno.env.get('ENABLE_AI_RATE_LIMIT'), true)
+    const maxRequestsPerHour = clampPositiveInteger(Deno.env.get('AI_IDEAS_MAX_REQUESTS_PER_HOUR'), 10, 1, 500)
+    const minSecondsBetweenRequests = clampPositiveInteger(Deno.env.get('AI_IDEAS_MIN_SECONDS_BETWEEN_REQUESTS'), 30, 1, 3600)
     const authHeader = req.headers.get('Authorization')
 
     if (!authHeader) throw new Error('Missing authorization header.')
@@ -129,6 +166,65 @@ Deno.serve(async (req) => {
       )
     }
 
+    if (aiRateLimitEnabled) {
+      const oneHourAgoIso = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+
+      const [{ count: recentRequestCount, error: countError }, { data: lastRequest, error: lastError }] = await Promise.all([
+        supabase
+          .from('ai_generation_requests')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .gte('created_at', oneHourAgoIso),
+        supabase
+          .from('ai_generation_requests')
+          .select('created_at')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ])
+
+      if (countError) throw countError
+      if (lastError) throw lastError
+
+      const rateLimitDecision = evaluateRateLimit({
+        recentRequestCount: recentRequestCount ?? 0,
+        maxRequestsPerHour,
+        minSecondsBetweenRequests,
+        lastRequestAt: lastRequest?.created_at,
+      })
+
+      if (!rateLimitDecision.allowed) {
+        throw new HttpError(
+          429,
+          rateLimitDecision.reason === 'hourly_quota'
+            ? `Hourly AI limit reached. Try again in about ${Math.ceil(rateLimitDecision.retryAfterSeconds / 60)} minutes.`
+            : `Please wait ${rateLimitDecision.retryAfterSeconds} seconds before requesting more AI ideas.`,
+          {
+            code: 'ai_rate_limit_exceeded',
+            retryAfterSeconds: rateLimitDecision.retryAfterSeconds,
+            reason: rateLimitDecision.reason,
+            limits: {
+              maxRequestsPerHour,
+              minSecondsBetweenRequests,
+            },
+          },
+        )
+      }
+
+      const { error: insertRateLogError } = await supabase
+        .from('ai_generation_requests')
+        .insert({
+          user_id: user.id,
+          home_id: homeId,
+          source,
+          request_action: action,
+          model_requested: geminiEnabled && geminiApiKey ? geminiModel : 'local-fallback',
+        })
+
+      if (insertRateLogError) throw insertRateLogError
+    }
+
     const [{ data: rooms }, { data: devices }, { data: recentActivities }, { data: profile }] = await Promise.all([
       supabase
         .from('rooms')
@@ -168,7 +264,7 @@ Deno.serve(async (req) => {
     let modelUsed = 'local-fallback'
     const moodDirective = getMoodDirective(mood)
 
-    if (geminiApiKey) {
+    if (geminiEnabled && geminiApiKey) {
       try {
         const prompt = [
           'You are Nidush, a smart home wellbeing assistant.',
@@ -252,10 +348,12 @@ Deno.serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   } catch (error) {
+    const status = error instanceof HttpError ? error.status : 400
     const message = error instanceof Error ? error.message : String(error)
+    const extraPayload = error instanceof HttpError ? error.payload : {}
     return new Response(
-      JSON.stringify({ error: message }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      JSON.stringify({ error: message, ...extraPayload }),
+      { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   }
 })

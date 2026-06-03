@@ -178,6 +178,7 @@ EXPO_PUBLIC_SUPABASE_URL=
 EXPO_PUBLIC_SUPABASE_ANON_KEY=
 EXPO_PUBLIC_SPOTIFY_CLIENT_ID=
 EXPO_PUBLIC_SPOTIFY_SCHEME=
+EXPO_PUBLIC_ENABLE_AI_AUTO_CALLS=true
 API_NINJAS_KEY=
 PORT=3000
 ```
@@ -187,6 +188,7 @@ Important:
 - Do not commit `.env`.
 - Public Expo variables must start with `EXPO_PUBLIC_`.
 - Secret API keys used by Edge Functions must also be stored in Supabase secrets.
+- `EXPO_PUBLIC_ENABLE_AI_AUTO_CALLS=false` disables the automatic AI recommendation calls on screen load/focus. In development it defaults to `true`; in production builds it now defaults to `false` unless you explicitly enable it.
 
 ### 4. Start The App
 
@@ -286,8 +288,26 @@ Set required secrets:
 ```bash
 supabase secrets set API_NINJAS_KEY="your-api-ninjas-key"
 supabase secrets set GEMINI_API_KEY="your-gemini-api-key"
+supabase secrets set ENABLE_GEMINI_API="true"
+supabase secrets set ENABLE_AI_RATE_LIMIT="true"
+supabase secrets set AI_IDEAS_MAX_REQUESTS_PER_HOUR="10"
+supabase secrets set AI_IDEAS_MIN_SECONDS_BETWEEN_REQUESTS="30"
 supabase secrets set RESEND_API_KEY="your-resend-key"
 ```
+
+If you want production to avoid calling Gemini altogether while keeping the local fallback ideas, set:
+
+```bash
+supabase secrets set ENABLE_GEMINI_API="false"
+```
+
+The AI idea generator now also supports server-side rate limiting:
+
+- `ENABLE_AI_RATE_LIMIT=true`: turns the limiter on.
+- `AI_IDEAS_MAX_REQUESTS_PER_HOUR=10`: maximum generations per user in a rolling 1-hour window.
+- `AI_IDEAS_MIN_SECONDS_BETWEEN_REQUESTS=30`: cooldown between consecutive generations from the same user.
+
+When the limit is exceeded, the function returns HTTP `429` and tells the app how long to wait.
 
 Optional cron protection:
 
