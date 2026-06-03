@@ -1,6 +1,12 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import React from 'react';
-import { Image, ImageSourcePropType, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Image,
+  ImageSourcePropType,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import Animated, {
   SharedValue,
   useAnimatedStyle,
@@ -20,6 +26,7 @@ interface SessionControlsProps {
   onToggleMusic: () => void;
   onNextStep: () => void;
   currentTrack?: { title: string; artist: string } | null;
+  showPauseButton?: boolean;
 }
 
 export const SessionControls = ({
@@ -34,6 +41,7 @@ export const SessionControls = ({
   onToggleMusic,
   onNextStep,
   currentTrack,
+  showPauseButton = true,
 }: SessionControlsProps) => {
   const animatedProgressStyle = useAnimatedStyle(() => ({
     width: `${progress.value}%`,
@@ -46,10 +54,8 @@ export const SessionControls = ({
 
   return (
     <View className="bg-[#F1F4EE] px-10 pb-8">
-      {/* ÁREA CENTRAL: Timer OU Botão Next */}
       <View className="items-center mb-6 h-20 justify-center">
         {isManualStep ? (
-          // --- MODO MANUAL: MOSTRA O BOTÃO ---
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={onNextStep}
@@ -153,27 +159,29 @@ export const SessionControls = ({
       </View>
 
       {/* Botão Grande (Pause/Resume Sessão) */}
-      <TouchableOpacity
-        onPress={onToggleSession}
-        className="bg-[#548F53] py-4 rounded-full items-center w-52 self-center shadow-lg flex-row justify-center"
-        accessible={true}
-        accessibilityRole="button"
-        accessibilityLabel={isActive ? 'Pause session' : 'Resume session'}
-      >
-        <Text
-          maxFontSizeMultiplier={1.2}
-          className="text-white text-2xl mr-3"
-          style={{ fontFamily: 'Nunito_700Bold' }}
+      {showPauseButton && (
+        <TouchableOpacity
+          onPress={onToggleSession}
+          className="bg-[#548F53] py-4 rounded-full items-center w-52 self-center shadow-lg flex-row justify-center"
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel={isActive ? 'Pause session' : 'Resume session'}
         >
-          {isActive ? 'Pause' : 'Play'}
-        </Text>
-        <MaterialIcons
-          name={isActive ? 'pause' : 'play-arrow'}
-          size={28}
-          color="white"
-          importantForAccessibility="no"
-        />
-      </TouchableOpacity>
+          <Text
+            maxFontSizeMultiplier={1.2}
+            className="text-white text-2xl mr-3"
+            style={{ fontFamily: 'Nunito_700Bold' }}
+          >
+            {isActive ? 'Pause' : 'Play'}
+          </Text>
+          <MaterialIcons
+            name={isActive ? 'pause' : 'play-arrow'}
+            size={28}
+            color="white"
+            importantForAccessibility="no"
+          />
+        </TouchableOpacity>
+      )}
     </View>
   );
 };

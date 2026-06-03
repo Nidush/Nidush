@@ -1,5 +1,5 @@
+import { apiLog, supabase } from '@/utils/supabase';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase, apiLog } from '@/utils/supabase';
 
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -77,7 +77,8 @@ type ContentRow = {
 
 type DisplayInstruction = string | { text: string; duration?: number };
 
-const isActivityItem = (item: Activity | Scenario): item is Activity => 'type' in item;
+const isActivityItem = (item: Activity | Scenario): item is Activity =>
+  'type' in item;
 
 const parseUnknownArray = (value: unknown): unknown[] => {
   if (!value) return [];
@@ -128,7 +129,9 @@ const getItemTypeKey = (item: Activity | Scenario) =>
   (isActivityItem(item) ? item.type : '').toLowerCase();
 
 const getItemDevices = (item: Activity | Scenario) =>
-  ('devices' in item && Array.isArray(item.devices) ? item.devices : []) as ScenarioDeviceState[];
+  ('devices' in item && Array.isArray(item.devices)
+    ? item.devices
+    : []) as ScenarioDeviceState[];
 
 export default function ActivityDetails() {
   const { id, isNew } = useLocalSearchParams<{ id: string; isNew?: string }>();
@@ -156,7 +159,7 @@ export default function ActivityDetails() {
 
   useEffect(() => {
     if (isNew === 'true') {
-      setToastMessage('Atividade criada com sucesso!');
+      setToastMessage('Activity created successfully!');
       setShowToast(true);
       AccessibilityInfo.announceForAccessibility(
         'Atividade criada com sucesso!',
@@ -181,7 +184,6 @@ export default function ActivityDetails() {
           .eq('id', id)
           .single();
 
-          
         if (data && !error) {
           foundActivity = mapUserActivity(data);
         }
@@ -193,7 +195,9 @@ export default function ActivityDetails() {
             return foundActivity.shortcuts;
           }
 
-          const { data: { user } } = await supabase.auth.getUser();
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
           const activityId = Number(foundActivity.id);
 
           if (user && Number.isFinite(activityId)) {
@@ -214,10 +218,15 @@ export default function ActivityDetails() {
 
         const scenarioPromise = foundActivity.scenario_id
           ? (async () => {
-              let scen = await fetchScenarioTemplateById(foundActivity.scenario_id!);
+              let scen = await fetchScenarioTemplateById(
+                foundActivity.scenario_id!,
+              );
 
               if (!scen) {
-                console.log('[ActivityDetails] Fetching scenario from DB:', foundActivity.scenario_id);
+                console.log(
+                  '[ActivityDetails] Fetching scenario from DB:',
+                  foundActivity.scenario_id,
+                );
                 const { data: scenData } = await supabase
                   .from('scenarios')
                   .select('*')
@@ -229,12 +238,14 @@ export default function ActivityDetails() {
                     id: scenData.id.toString(),
                     title: scenData.name,
                     description: scenData.description || '',
-                    playlist: scenData.playlist_id ? 'Spotify Music' : (scenData.playlist_name || 'No music'),
+                    playlist: scenData.playlist_id
+                      ? 'Spotify Music'
+                      : scenData.playlist_name || 'No music',
                     playlist_id: scenData.playlist_id,
                     focusMode: false, // Default fallback
                     shortcuts: false,
                     devices: [], // Fallback
-                    image: { uri: 'https://picsum.photos/200' } // Fallback
+                    image: { uri: 'https://picsum.photos/200' }, // Fallback
                   } as Scenario;
                 }
               }
@@ -262,9 +273,13 @@ export default function ActivityDetails() {
                   category: contentData.category,
                   description: contentData.description,
                   duration: contentData.duration,
-                  image: resolveCatalogImage(contentData.image || localContent?.image),
-                  instructions: contentData.instructions || localContent?.instructions,
-                  ingredients: contentData.ingredients || localContent?.ingredients,
+                  image: resolveCatalogImage(
+                    contentData.image || localContent?.image,
+                  ),
+                  instructions:
+                    contentData.instructions || localContent?.instructions,
+                  ingredients:
+                    contentData.ingredients || localContent?.ingredients,
                   videoUrl: localContent?.videoUrl || contentData.video_url,
                   author: contentData.author || localContent?.author,
                 } as Content;
@@ -279,7 +294,10 @@ export default function ActivityDetails() {
           scenarioPromise,
           contentPromise,
         ]);
-        const activityWithShortcut = { ...foundActivity, shortcuts: shortcutValue };
+        const activityWithShortcut = {
+          ...foundActivity,
+          shortcuts: shortcutValue,
+        };
 
         setMainItem(activityWithShortcut);
         setRelatedScenario(scen);
@@ -374,7 +392,9 @@ export default function ActivityDetails() {
 
     try {
       setIsUpdatingShortcut(true);
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
       apiLog(nextShortcutValue ? 'INSERT' : 'DELETE', 'shortcuts', {
@@ -404,7 +424,8 @@ export default function ActivityDetails() {
           if (orderError) throw orderError;
 
           const nextDisplayOrder =
-            ((orderRows?.[0] as Pick<ShortcutRow, 'displayorder'> | undefined)?.displayorder ?? 0) + 1;
+            ((orderRows?.[0] as Pick<ShortcutRow, 'displayorder'> | undefined)
+              ?.displayorder ?? 0) + 1;
 
           const { error: insertError } = await supabase
             .from('shortcuts')
@@ -441,19 +462,22 @@ export default function ActivityDetails() {
         .maybeSingle();
 
       if (mirrorError) {
-        console.warn('Shortcut saved, but activities.shortcuts mirror was not updated:', mirrorError);
+        console.warn(
+          'Shortcut saved, but activities.shortcuts mirror was not updated:',
+          mirrorError,
+        );
       }
 
       setShowToast(true);
       setToastMessage(
         nextShortcutValue
-          ? 'Atividade adicionada aos shortcuts.'
-          : 'Atividade removida dos shortcuts.',
+          ? 'Activity added to shortcuts.'
+          : 'Activity removed from shortcuts.',
       );
       AccessibilityInfo.announceForAccessibility(
         nextShortcutValue
-          ? 'Atividade adicionada aos shortcuts.'
-          : 'Atividade removida dos shortcuts.',
+          ? 'Activity added to shortcuts.'
+          : 'Activity removed from shortcuts.',
       );
 
       if (nextShortcutValue) {
@@ -466,9 +490,10 @@ export default function ActivityDetails() {
       setAlertConfig({
         visible: true,
         title: 'Shortcuts',
-        message: error instanceof Error
-          ? `Could not update shortcuts: ${error.message}`
-          : 'Could not update shortcuts. Please try again.',
+        message:
+          error instanceof Error
+            ? `Could not update shortcuts: ${error.message}`
+            : 'Could not update shortcuts. Please try again.',
         confirmText: 'OK',
         cancelText: '',
         isDestructive: false,
@@ -512,12 +537,13 @@ export default function ActivityDetails() {
         try {
           // Deletar a atividade na nuvem do Supabase
           apiLog('DELETE', 'activities', { id });
-          const { error } = await supabase.from('activities').delete().eq('id', id);
-
-
+          const { error } = await supabase
+            .from('activities')
+            .delete()
+            .eq('id', id);
 
           if (error) throw error;
-          
+
           router.navigate('/Activities');
         } catch (e) {
           console.log('Error while trying to delete', e);
@@ -540,7 +566,9 @@ export default function ActivityDetails() {
   if (!mainItem)
     return (
       <View className="flex-1 justify-center items-center bg-[#F0F2EB]">
-        <Text maxFontSizeMultiplier={1.2}  accessibilityRole="header">Item not found</Text>
+        <Text maxFontSizeMultiplier={1.2} accessibilityRole="header">
+          Item not found
+        </Text>
       </View>
     );
 
@@ -548,7 +576,7 @@ export default function ActivityDetails() {
   const isNumeric = typeof imgObj === 'string' && /^\d+$/.test(imgObj);
   const imageSource: ImageSourcePropType = isNumeric
     ? { uri: `https://picsum.photos/seed/${imgObj}/400/600` }
-      : typeof imgObj === 'string'
+    : typeof imgObj === 'string'
       ? { uri: imgObj }
       : imgObj || { uri: 'https://picsum.photos/400/600' };
 
@@ -566,15 +594,14 @@ export default function ActivityDetails() {
 
   // Helper: parse JSON safely (handles strings, arrays, objects)
   const rawInstructions = parseUnknownArray(relatedContent?.instructions);
-  const instructions: DisplayInstruction[] = rawInstructions.map(toInstructionText);
+  const instructions: DisplayInstruction[] =
+    rawInstructions.map(toInstructionText);
   const ingredients =
     relatedContent?.type === 'recipe'
       ? normalizeIngredients(relatedContent.ingredients)
       : [];
 
-  const displayTime = isActivity
-    ? relatedContent?.duration || null
-    : null;
+  const displayTime = isActivity ? relatedContent?.duration || null : null;
 
   return (
     <View
@@ -631,13 +658,25 @@ export default function ActivityDetails() {
           <FocusSection enabled={focusEnabled} onToggle={setFocusEnabled} />
           <MediaSection
             isVisible={
-              !!(relatedScenario?.playlist || relatedContent?.videoUrl || ['workout', 'cooking', 'meditation'].includes(getItemTypeKey(mainItem)))
+              !!(
+                relatedScenario?.playlist ||
+                relatedContent?.videoUrl ||
+                ['workout', 'cooking', 'meditation'].includes(
+                  getItemTypeKey(mainItem),
+                )
+              )
             }
-            title={relatedScenario?.playlist || relatedContent?.title || (
-              getItemTypeKey(mainItem) === 'workout' ? 'Workout Beats' :
-              getItemTypeKey(mainItem) === 'cooking' ? 'Cooking Vibes' :
-              getItemTypeKey(mainItem) === 'meditation' ? 'Nature Sounds' : 'Recommended Music'
-            )}
+            title={
+              relatedScenario?.playlist ||
+              relatedContent?.title ||
+              (getItemTypeKey(mainItem) === 'workout'
+                ? 'Workout Beats'
+                : getItemTypeKey(mainItem) === 'cooking'
+                  ? 'Cooking Vibes'
+                  : getItemTypeKey(mainItem) === 'meditation'
+                    ? 'Nature Sounds'
+                    : 'Recommended Music')
+            }
             subtitle={audioStatusText}
           />
           <ContentSection
@@ -695,7 +734,7 @@ export default function ActivityDetails() {
             <Ionicons name="checkmark" size={24} color="white" />
           </View>
           <View className="flex-1">
-            <Text 
+            <Text
               maxFontSizeMultiplier={1.2}
               className="text-[#2F4F4F] text-lg"
               style={{ fontFamily: 'Nunito_700Bold' }}

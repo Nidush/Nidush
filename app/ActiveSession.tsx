@@ -1,5 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/utils/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -16,12 +16,13 @@ import {
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CookingVisuals } from '@/components/activeSession/CookingVisuals';
 import { ExitModal } from '@/components/activeSession/ExitModal';
+import { MeditationVisuals } from '@/components/activeSession/MeditationVisuals';
 import { SessionControls } from '@/components/activeSession/SessionControls';
 import { SessionHeader } from '@/components/activeSession/SessionHeader';
 import { SessionVideo } from '@/components/activeSession/SessionVideo';
-import { SessionVisuals } from '@/components/activeSession/SessionVisuals';
-import { SessionWave } from '@/components/activeSession/SessionWave';
+import { WorkoutVisuals } from '@/components/activeSession/WorkoutVisuals';
 import { useSpotify } from '@/context/SpotifyContext';
 
 import {
@@ -54,6 +55,8 @@ type SessionData = {
   videoUrl?: string;
   devices: ScenarioDeviceState[];
   tvDeviceName?: string;
+  activityType: string;
+  ingredients?: any[];
 };
 
 type StoredActivityLike = Partial<Activity> & {
@@ -75,14 +78,12 @@ type ContentRow = {
   type?: string | null;
   instructions?: unknown;
   video_url?: string | null;
+  ingredients?: unknown;
 };
 
 const isStoredActivityLike = (value: unknown): value is StoredActivityLike =>
   Boolean(
-    value &&
-      typeof value === 'object' &&
-      'id' in value &&
-      'title' in value,
+    value && typeof value === 'object' && 'id' in value && 'title' in value,
   );
 
 const parseArrayValue = <T,>(value: unknown): T[] => {
@@ -104,19 +105,17 @@ const getActivityType = (item: Partial<Activity> | Partial<Scenario>) =>
   String(('type' in item ? item.type : '') ?? '').toLowerCase();
 
 const getActivityRoom = (item: StoredActivityLike | Activity | Scenario) =>
-  item.room ?? (typeof item.room_id === 'string' ? item.room_id : 'Living Room');
+  item.room ??
+  (typeof item.room_id === 'string' ? item.room_id : 'Living Room');
 
-const getScenarioId = (item: StoredActivityLike | Activity | Scenario) =>
-  'scenario_id' in item ? item.scenario_id : undefined;
-
-const getContentId = (item: StoredActivityLike | Activity | Scenario) =>
-  'content_id' in item ? item.content_id : undefined;
-
-const getPlaylistId = (item: StoredActivityLike | Activity | Scenario) =>
-  'playlist_id' in item ? item.playlist_id : undefined;
+const getScenarioId = (item: any) => item.scenario_id ?? item.scenarioId;
+const getContentId = (item: any) => item.content_id ?? item.contentId;
+const getPlaylistId = (item: any) => item.playlist_id ?? item.playlistId;
 
 const getItemDevices = (item: StoredActivityLike | Activity | Scenario) =>
-  ('devices' in item && Array.isArray(item.devices) ? item.devices : []) as ScenarioDeviceState[];
+  ('devices' in item && Array.isArray(item.devices)
+    ? item.devices
+    : []) as ScenarioDeviceState[];
 
 const getNumericRoomId = (item: StoredActivityLike | Activity | Scenario) => {
   if (typeof item.room_id === 'number') return item.room_id;
@@ -127,7 +126,13 @@ const getNumericRoomId = (item: StoredActivityLike | Activity | Scenario) => {
 
 export default function ActiveSession() {
   const { id } = useLocalSearchParams<{ id: string; musicStarted?: string }>();
-  const { playPlaylist, pausePlayback, resumePlayback, currentTrack, isAuthenticated } = useSpotify();
+  const {
+    playPlaylist,
+    pausePlayback,
+    resumePlayback,
+    currentTrack,
+    isAuthenticated,
+  } = useSpotify();
 
   // --- 1. STATE ---
   const [loading, setLoading] = useState(true);
@@ -148,18 +153,23 @@ export default function ActiveSession() {
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      let foundItem: Activity | Scenario | StoredActivityLike | null | undefined =
-        await fetchActivityTemplateById(id);
+      let foundItem:
+        | Activity
+        | Scenario
+        | StoredActivityLike
+        | null
+        | undefined = await fetchActivityTemplateById(id);
       if (!foundItem) {
         const stored = await AsyncStorage.getItem('@myActivities');
         if (stored) {
-          const parsedStored = parseArrayValue<unknown>(stored).filter(isStoredActivityLike);
+          const parsedStored =
+            parseArrayValue<unknown>(stored).filter(isStoredActivityLike);
           foundItem = parsedStored.find((activity) => activity.id === id);
         }
       }
       if (!foundItem) foundItem = await fetchScenarioTemplateById(id);
 
-       // Se não encontrou localmente, tentar no Supabase (atividades criadas pelo user)
+      // Se não encontrou localmente, tentar no Supabase (atividades criadas pelo user)
       if (!foundItem) {
         const { data, error } = await supabase
           .from('activities')
@@ -196,13 +206,16 @@ export default function ActiveSession() {
           .eq('id', contentId)
           .limit(1);
 
-        contentData = contentRows && contentRows.length > 0 ? contentRows[0] : null;
+        contentData =
+          contentRows && contentRows.length > 0 ? contentRows[0] : null;
 
         if (contentData) {
-          playlistName = contentData.title || localContent?.title || playlistName;
+          playlistName =
+            contentData.title || localContent?.title || playlistName;
           if (contentData.type === 'video' || localContent?.type === 'video') {
             contentType = 'video';
-            videoUrl = localContent?.videoUrl || contentData.video_url || undefined;
+            videoUrl =
+              localContent?.videoUrl || contentData.video_url || undefined;
           }
         } else {
           // Fallback to local CONTENTS
@@ -222,7 +235,9 @@ export default function ActiveSession() {
         playlistName = relatedScenario.playlist;
       }
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (user) {
         const { data: homeAssoc } = await supabase
           .from('user_homes')
@@ -254,9 +269,7 @@ export default function ActiveSession() {
       }
 
       const rawInstructions = parseArrayValue<FormattedInstruction | string>(
-        contentData?.instructions ||
-        localContent?.instructions ||
-        []
+        contentData?.instructions || localContent?.instructions || [],
       );
 
       const formattedInstructions = rawInstructions.map((step) => {
@@ -272,7 +285,16 @@ export default function ActiveSession() {
           description: undefined,
         });
       }
+      // 1. Criamos um fallback robusto para procurar ingredientes em todo o lado
+      const robustIngredients =
+        contentData?.ingredients ??
+        (foundItem as any)?.content?.ingredients ??
+        (foundItem as any)?.contents?.ingredients ??
+        (foundItem as any)?.ingredients ??
+        localContent?.ingredients ??
+        [];
 
+      // 2. Atualizamos o estado da sessão com os ingredientes extraídos
       setSessionData({
         title: foundItem.title || 'Session',
         room: getActivityRoom(foundItem),
@@ -283,26 +305,30 @@ export default function ActiveSession() {
         videoUrl: videoUrl,
         devices: relatedScenario?.devices || getItemDevices(foundItem),
         tvDeviceName: connectedTvName,
+        activityType: getActivityType(foundItem),
+        ingredients: parseArrayValue<any>(robustIngredients),
       });
 
       // Tocar música no Spotify só em sessões sem vídeo.
       if (isAuthenticated && contentType !== 'video') {
         let pId = getPlaylistId(foundItem);
-        
+
         if (!pId) {
           const type = getActivityType(foundItem);
           let sId = getScenarioId(foundItem);
-          
+
           if (!sId || sId === 'null') {
-             // Tentar mapear o tipo para um cenário padrão local
-             if (type === 'workout') sId = '1';
-             else if (type === 'cooking') sId = '2';
-             else if (type === 'meditation') sId = '3';
-             else sId = '1';
+            // Tentar mapear o tipo para um cenário padrão local
+            if (type === 'workout') sId = '1';
+            else if (type === 'cooking') sId = '2';
+            else if (type === 'meditation') sId = '3';
+            else sId = '1';
           }
 
-          console.log(`[Spotify] Traduzindo tipo "${type}" para cenário: ${sId}`);
-          
+          console.log(
+            `[Spotify] Traduzindo tipo "${type}" para cenário: ${sId}`,
+          );
+
           // 1. Tentar catálogo de cenários
           const templateScenarioId = normalizeScenarioTemplateId(sId);
           const templateScenario = templateScenarioId
@@ -322,12 +348,15 @@ export default function ActiveSession() {
           // 3. Fallback Final (Workout)
           if (!pId) pId = '37i9dQZF1DX76W9kuv1Z0g';
         }
-        
-        const sessionDevices = relatedScenario?.devices || getItemDevices(foundItem);
-        const hasScenarioTv = sessionDevices.some((config: ScenarioDeviceState) => {
-          const device = SMART_HOME_DEVICES[config.deviceId];
-          return device?.type === 'tv';
-        });
+
+        const sessionDevices =
+          relatedScenario?.devices || getItemDevices(foundItem);
+        const hasScenarioTv = sessionDevices.some(
+          (config: ScenarioDeviceState) => {
+            const device = SMART_HOME_DEVICES[config.deviceId];
+            return device?.type === 'tv';
+          },
+        );
         const shouldPreferTv =
           hasScenarioTv &&
           ['meditation', 'yoga', 'general', 'other'].includes(
@@ -348,7 +377,10 @@ export default function ActiveSession() {
           : undefined;
 
         if (pId) {
-          console.log('[Spotify] A iniciar música no momento do Exercício:', pId);
+          console.log(
+            '[Spotify] A iniciar música no momento do Exercício:',
+            pId,
+          );
           playPlaylist(pId, tvPlaybackOptions);
         } else {
           // Fallback por tipo de atividade
@@ -356,7 +388,7 @@ export default function ActiveSession() {
           const fallbacks: Record<string, string> = {
             workout: '37i9dQZF1DX76W9kuv1Z0g',
             cooking: '37i9dQZF1DXdbChS9879u9',
-            meditation: '37i9dQZF1DWZ0XmS6AnY9s'
+            meditation: '37i9dQZF1DWZ0XmS6AnY9s',
           };
           if (fallbacks[type]) {
             console.log('[Spotify] A usar fallback no Exercício:', type);
@@ -497,11 +529,14 @@ export default function ActiveSession() {
     );
   }
 
+  // ... validações existentes ...
   const currentStep = sessionData.instructions[currentStepIndex];
-
   if (!currentStep && !isVideoSession) return null;
-
   const isLastStep = currentStepIndex === sessionData.instructions.length - 1;
+
+  // Variáveis auxiliares para legibilidade do fluxo condicional
+  const isCooking = sessionData.activityType === 'cooking';
+  const isWorkout = sessionData.activityType === 'workout';
 
   return (
     <SafeAreaView className="flex-1 bg-[#F1F4EE]" accessibilityLanguage="en-US">
@@ -530,14 +565,28 @@ export default function ActiveSession() {
         />
       ) : (
         <>
-          <SessionVisuals
-            text={currentStep.text}
-            stepIndex={currentStepIndex}
-            pulseScale={pulseScale}
-            contentOpacity={contentOpacity}
-          />
-
-          <SessionWave />
+          {/* Interfaces Dinâmicas por Tipo de Atividade */}
+          {isCooking ? (
+            <CookingVisuals
+              step={currentStep}
+              ingredients={sessionData.ingredients ?? []}
+              stepIndex={currentStepIndex}
+              contentOpacity={contentOpacity}
+            />
+          ) : isWorkout ? (
+            <WorkoutVisuals
+              step={currentStep}
+              stepIndex={currentStepIndex}
+              contentOpacity={contentOpacity}
+            />
+          ) : (
+            <MeditationVisuals
+              step={currentStep}
+              stepIndex={currentStepIndex}
+              pulseScale={pulseScale}
+              contentOpacity={contentOpacity}
+            />
+          )}
 
           <SessionControls
             isActive={isActive}
@@ -553,6 +602,7 @@ export default function ActiveSession() {
             onToggleSession={handleToggleSession}
             onToggleMusic={handleToggleMusic}
             currentTrack={currentTrack}
+            showPauseButton={!isCooking && !isWorkout}
           />
         </>
       )}
