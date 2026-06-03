@@ -36,6 +36,7 @@ import { resolveCatalogImage } from '@/constants/data/catalogAssets';
 import {
   fetchActivityTemplates,
   fetchScenarioTemplates,
+  fetchUserScenarios,
   mapUserActivity,
 } from '@/utils/catalogTemplates';
 import {
@@ -44,6 +45,7 @@ import {
   getFunctionErrorMessage,
   saveAiActivityIdea,
 } from '@/utils/aiActivities';
+import { isAiAutoInvocationEnabled } from '@/utils/aiConfig';
 import { logger } from '@/utils/logger';
 import { getDynamicRecommendations } from '@/utils/recommendationEngine';
 
@@ -83,12 +85,13 @@ const UnifiedActivitiesScreen = () => {
 
   const loadTemplates = useCallback(async () => {
     try {
-      const [activities, scenarios] = await Promise.all([
+      const [activities, scenarios, userScenarios] = await Promise.all([
         fetchActivityTemplates(),
         fetchScenarioTemplates(),
+        fetchUserScenarios().catch(() => []),
       ]);
       setActivityTemplates(activities);
-      setScenarioTemplates(scenarios);
+      setScenarioTemplates([...userScenarios, ...scenarios]);
     } catch (error) {
       logger.error('Failed to load activity/scenario templates:', error);
       setActivityTemplates([]);
@@ -164,6 +167,11 @@ const UnifiedActivitiesScreen = () => {
 
   const loadAiRecommendations = useCallback(async () => {
     if (viewMode !== 'activities') {
+      setAiRecommendedIdeas([]);
+      return;
+    }
+
+    if (!isAiAutoInvocationEnabled) {
       setAiRecommendedIdeas([]);
       return;
     }

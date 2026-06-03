@@ -36,6 +36,7 @@ import {
   mapDeviceRecordToAppDevice,
   subscribeToHomeDeviceChanges,
 } from '../../utils/devices';
+import { createHomeRoom, ensureDefaultHomeRooms } from '../../utils/homeSetup';
 
 interface Room {
   id: number;
@@ -79,6 +80,8 @@ export default function Rooms() {
 
   // --- Add Device Modal State ---
   const [isAddDeviceModalVisible, setIsAddDeviceModalVisible] = useState(false);
+  const [isAddRoomModalVisible, setIsAddRoomModalVisible] = useState(false);
+  const [newRoomName, setNewRoomName] = useState('');
   const [newDeviceName, setNewDeviceName] = useState('');
   const [newDeviceType, setNewDeviceType] = useState<'light' | 'speaker' | 'difuser' | 'purifier'>('light');
   const [newDeviceRoomId, setNewDeviceRoomId] = useState<number | null>(null);
@@ -155,7 +158,10 @@ export default function Rooms() {
       if (devicesErr) throw devicesErr;
       if (activitiesErr) throw activitiesErr;
 
-      const loadedRooms = roomsData || [];
+      let loadedRooms = roomsData || [];
+      if (loadedRooms.length === 0) {
+        loadedRooms = await ensureDefaultHomeRooms(homeId);
+      }
       const loadedActivities = activitiesData || [];
       const mappedDevices: Device[] = (devicesData || [])
         .filter((device: DeviceRecord) => isRealHomeDevice(device))
@@ -544,7 +550,44 @@ export default function Rooms() {
     setIsAddDeviceModalVisible(true);
   };
 
-  const menuActions = [{ label: 'Device', onPress: openAddDeviceModal }];
+  const openAddRoomModal = () => {
+    setNewRoomName('');
+    setIsAddRoomModalVisible(true);
+  };
+
+  const handleAddRoom = async () => {
+    if (!newRoomName.trim()) {
+      showFeedback('Please enter a room name.', 'error');
+      return;
+    }
+
+    if (!userHomeId) {
+      showFeedback('We could not find your home right now.', 'error');
+      return;
+    }
+
+    try {
+      const createdRoom = await createHomeRoom(userHomeId, newRoomName);
+      setRooms((prev) => [...prev, createdRoom]);
+      setActiveRoomId(createdRoom.id);
+      setNewDeviceRoomId(createdRoom.id);
+      setIsAddRoomModalVisible(false);
+      setNewRoomName('');
+      showFeedback(`"${createdRoom.name}" was added to your home.`, 'success');
+    } catch (err: unknown) {
+      console.error('Failed to add room:', err);
+      showFeedback(
+        'Could not create new room: ' +
+          (err instanceof Error ? err.message : 'Unknown error'),
+        'error',
+      );
+    }
+  };
+
+  const menuActions = [
+    { label: 'Room', onPress: openAddRoomModal },
+    { label: 'Device', onPress: openAddDeviceModal },
+  ];
 
   if (!fontsLoaded || loading) {
     return (
@@ -759,6 +802,63 @@ export default function Rooms() {
 
       {/* Floating menu FAB with Add room / device actions */}
       <AddRoomDevice actions={menuActions} />
+
+      <Modal
+        visible={isAddRoomModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsAddRoomModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          className="flex-1 justify-end bg-black/40"
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 170}
+        >
+          <View className="bg-white rounded-t-[36px] p-6 pb-10">
+            <View className="flex-row justify-between items-center mb-6">
+              <Text className="text-2xl font-bold text-[#354F52]" style={{ fontFamily: 'Nunito_700Bold' }}>
+                Add new room
+              </Text>
+              <TouchableOpacity onPress={() => setIsAddRoomModalVisible(false)} hitSlop={15}>
+                <Ionicons name="close" size={24} color="#7A8C85" />
+              </TouchableOpacity>
+            </View>
+
+            <Text className="text-[#354F52] text-sm mb-2" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+              Room Name
+            </Text>
+            <TextInput
+              placeholder="e.g. Office"
+              placeholderTextColor="#6B7C76"
+              value={newRoomName}
+              onChangeText={setNewRoomName}
+              className="bg-[#F1F3EA] border border-[#BDC7C2] rounded-2xl px-4 py-3 text-base text-[#2C3A35] mb-8"
+              style={{ fontFamily: 'Nunito_600SemiBold', color: '#1F2A24' }}
+              selectionColor="#548F53"
+            />
+
+            <View className="flex-row justify-between">
+              <TouchableOpacity
+                onPress={() => setIsAddRoomModalVisible(false)}
+                className="w-[48%] py-4 bg-[#F1F3EA] rounded-full items-center"
+              >
+                <Text className="text-[#354F52] text-lg font-bold" style={{ fontFamily: 'Nunito_700Bold' }}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleAddRoom}
+                className="w-[48%] py-4 bg-[#548F53] rounded-full items-center"
+              >
+                <Text className="text-white text-lg font-bold" style={{ fontFamily: 'Nunito_700Bold' }}>
+                  Save Room
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* --- ADD NEW SMART DEVICE DIALOG MODAL --- */}
       <Modal

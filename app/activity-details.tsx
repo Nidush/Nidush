@@ -32,6 +32,7 @@ import { SMART_HOME_DEVICES } from '@/constants/devices';
 import {
   fetchActivityTemplateById,
   fetchScenarioTemplateById,
+  isUserScenarioRouteId,
   mapUserActivity,
 } from '@/utils/catalogTemplates';
 
@@ -57,8 +58,11 @@ type ScenarioRow = {
   id: number | string;
   name: string;
   description: string | null;
+  image?: string | null;
   playlist_id: string | null;
   playlist_name?: string | null;
+  focus_mode_enabled?: boolean | null;
+  rooms?: { name?: string | null } | null;
 };
 
 type ContentRow = {
@@ -131,7 +135,7 @@ const getItemDevices = (item: Activity | Scenario) =>
   ('devices' in item && Array.isArray(item.devices) ? item.devices : []) as ScenarioDeviceState[];
 
 export default function ActivityDetails() {
-  const { id, isNew } = useLocalSearchParams<{ id: string; isNew?: string }>();
+  const { id, isNew, itemType } = useLocalSearchParams<{ id: string; isNew?: string; itemType?: string }>();
 
   const [mainItem, setMainItem] = useState<Activity | Scenario | null>(null);
   const [relatedScenario, setRelatedScenario] = useState<Scenario | null>(null);
@@ -156,17 +160,18 @@ export default function ActivityDetails() {
 
   useEffect(() => {
     if (isNew === 'true') {
-      setToastMessage('Atividade criada com sucesso!');
+      const creationMessage = itemType === 'scenario'
+        ? 'Scenario created successfully!'
+        : 'Atividade criada com sucesso!';
+      setToastMessage(creationMessage);
       setShowToast(true);
-      AccessibilityInfo.announceForAccessibility(
-        'Atividade criada com sucesso!',
-      );
+      AccessibilityInfo.announceForAccessibility(creationMessage);
       const timer = setTimeout(() => {
         setShowToast(false);
       }, 5000);
       return () => clearTimeout(timer);
     }
-  }, [isNew]);
+  }, [isNew, itemType]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -226,15 +231,16 @@ export default function ActivityDetails() {
 
                 if (scenData) {
                   scen = {
-                    id: scenData.id.toString(),
+                    id: `scenario:${scenData.id}`,
                     title: scenData.name,
                     description: scenData.description || '',
                     playlist: scenData.playlist_id ? 'Spotify Music' : (scenData.playlist_name || 'No music'),
                     playlist_id: scenData.playlist_id,
-                    focusMode: false, // Default fallback
+                    focusMode: scenData.focus_mode_enabled === true,
                     shortcuts: false,
-                    devices: [], // Fallback
-                    image: { uri: 'https://picsum.photos/200' } // Fallback
+                    devices: [],
+                    room: scenData.rooms?.name || undefined,
+                    image: resolveCatalogImage(scenData.image || 'Scenarios/moonlight_bay.png'),
                   } as Scenario;
                 }
               }
@@ -291,6 +297,31 @@ export default function ActivityDetails() {
           setMainItem(foundScenario);
           setRelatedScenario(foundScenario);
           setFocusEnabled(foundScenario.focusMode);
+        } else if (isUserScenarioRouteId(id)) {
+          const { data: scenData } = await supabase
+            .from('scenarios')
+            .select('id, name, description, image, playlist_id, playlist_name, focus_mode_enabled, rooms(name)')
+            .eq('id', id.replace(/^scenario:/, ''))
+            .maybeSingle<ScenarioRow>();
+
+          if (scenData) {
+            const dbScenario: Scenario = {
+              id,
+              title: scenData.name,
+              description: scenData.description || '',
+              playlist: scenData.playlist_name || (scenData.playlist_id ? 'Spotify Music' : undefined),
+              playlist_id: scenData.playlist_id || undefined,
+              focusMode: scenData.focus_mode_enabled === true,
+              shortcuts: false,
+              devices: [],
+              room: scenData.rooms?.name || undefined,
+              image: resolveCatalogImage(scenData.image || 'Scenarios/moonlight_bay.png'),
+            };
+
+            setMainItem(dbScenario);
+            setRelatedScenario(dbScenario);
+            setFocusEnabled(dbScenario.focusMode);
+          }
         }
       }
       setLoading(false);

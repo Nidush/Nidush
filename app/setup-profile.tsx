@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { invokeFunction, supabase } from '../utils/supabase';
 import { logger } from '../utils/logger';
+import { ensureDefaultHomeRooms } from '../utils/homeSetup';
 
 import {
   Nunito_400Regular,
@@ -533,6 +534,15 @@ export default function SetupProfile() {
                   } else {
                     // The RPC/Edge Function already associates residents with existing homes.
                     logger.debug('[Onboarding] User joined home as resident:', finalHomeId);
+                  }
+                }
+
+                if (!hasError) {
+                  try {
+                    await ensureDefaultHomeRooms(finalHomeId);
+                  } catch (roomSetupError) {
+                    logger.error('Error bootstrapping default home rooms:', roomSetupError);
+                    hasError = true;
                   }
                 }
               }

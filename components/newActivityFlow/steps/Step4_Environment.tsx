@@ -1,5 +1,6 @@
 import { Scenario } from '@/constants/data/types';
 import { MaterialIcons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import React, { useMemo } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { ScenarioCard } from '../ScenarioCard';
@@ -72,6 +73,7 @@ export const Step4_Environment = ({
           <TouchableOpacity
             className="w-full h-full bg-[#D1E4D1] rounded-2xl justify-center items-center"
             activeOpacity={0.7}
+            onPress={() => router.push('/new-scenario')}
             accessible={true}
             accessibilityRole="button"
             accessibilityLabel="Create new scene"
