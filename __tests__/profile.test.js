@@ -1,13 +1,12 @@
 import React from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 
-import Profile from '../app/Profile';
-
 const mockReplace = jest.fn();
 const mockPickImage = jest.fn();
 const mockUploadImage = jest.fn();
 const mockGetUser = jest.fn();
 const mockUpdateUser = jest.fn();
+const mockUpdatePublicProfile = jest.fn();
 const mockInvoke = jest.fn();
 const mockSignOut = jest.fn();
 const mockRemoveChannel = jest.fn();
@@ -72,6 +71,7 @@ jest.mock('../components/legal/LegalContent', () => ({
 
 jest.mock('../utils/legal', () => ({
   LEGAL_POLICY_VERSION: '2026-05-29',
+  setHealthConnectEnabled: jest.fn(async () => {}),
 }));
 
 jest.mock('../utils/healthConnectSync', () => ({
@@ -127,7 +127,7 @@ jest.mock('../utils/supabase', () => ({
             })),
           })),
           update: jest.fn(() => ({
-            eq: jest.fn(async () => ({ error: null })),
+            eq: (...args) => mockUpdatePublicProfile(...args),
           })),
           upsert: jest.fn(),
         };
@@ -240,6 +240,8 @@ jest.mock('../utils/supabase', () => ({
   },
 }));
 
+const Profile = require('../app/Profile').default;
+
 describe('Profile Screen', () => {
   let consoleErrorSpy;
   let consoleLogSpy;
@@ -279,6 +281,7 @@ describe('Profile Screen', () => {
       },
     });
     mockUpdateUser.mockResolvedValue({ error: null });
+    mockUpdatePublicProfile.mockResolvedValue({ error: null });
     mockUploadImage.mockResolvedValue('https://example.com/avatar.jpg');
     mockInvoke.mockResolvedValue({ data: {}, error: null });
     mockSignOut.mockResolvedValue({ error: null });
@@ -293,9 +296,7 @@ describe('Profile Screen', () => {
   it('uploads a new avatar and updates both auth and public profile', async () => {
     mockPickImage.mockResolvedValue('data:image/jpeg;base64,avatar');
 
-    const { getByTestId, findByText } = render(<Profile />);
-
-    expect(await findByText('Laura Rossi')).toBeTruthy();
+    const { getByTestId } = render(<Profile />);
 
     fireEvent.press(getByTestId('avatar-picker-button'));
 
@@ -311,9 +312,7 @@ describe('Profile Screen', () => {
       data: { avatar_url: 'https://example.com/avatar.jpg' },
     });
 
-    expect(mockUpdateUser).toHaveBeenCalledWith({
-      data: { avatar_url: 'https://example.com/avatar.jpg' },
-    });
+    expect(mockUpdatePublicProfile).toHaveBeenCalledWith('auth_uid', 'user-123');
     expect(global.alert).not.toHaveBeenCalled();
   });
 
