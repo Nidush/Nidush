@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, Image, Dimensions, Animated, Easing, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Icons } from '../../assets/assets'; 
-import { setStoredHealthConsent } from '../../utils/legal';
 import { logger } from '../../utils/logger';
 
 import {
@@ -170,7 +169,6 @@ export default function WearableSync({ onNext, onSkip }: { onNext: () => void, o
 
                       const initialized = await initialize();
                       if (initialized) {
-                        await setStoredHealthConsent(true);
                         try {
                           openHealthConnectSettings();
                           logger.info('Opened Health Connect settings for onboarding permissions.');

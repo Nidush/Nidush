@@ -20,7 +20,7 @@ import {
   setObservabilityUser,
   trackEvent,
 } from '../utils/observability';
-import { hasStoredHealthConsent, recordLegalPolicyConsents } from '../utils/legal';
+import { hasHealthConnectEnabled, recordLegalPolicyConsents } from '../utils/legal';
 import './../global.css';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -54,17 +54,17 @@ export default function RootLayout() {
     if (!isReady) return;
 
     const checkOnboarding = async () => {
-      // 0. Inicializar Health Connect IMEDIATAMENTE (Nativo)
+      // 0. Inicializar Health Connect apenas quando a integracao ja tiver sido ativada pelo utilizador
       if (Platform.OS === 'android') {
         try {
-          const hasHealthConsent = await hasStoredHealthConsent();
-          if (hasHealthConsent) {
+          const isHealthConnectEnabled = await hasHealthConnectEnabled();
+          if (isHealthConnectEnabled) {
             const { initialize, getSdkStatus, SdkAvailabilityStatus } = await import('react-native-health-connect');
             const status = await getSdkStatus();
             if (status === SdkAvailabilityStatus.SDK_AVAILABLE) {
               await initialize();
               await registerHealthConnectBackgroundSync();
-              logger.debug('Health Connect initialized after stored health consent.');
+              logger.debug('Health Connect initialized after explicit user activation.');
             }
           }
         } catch (error) {

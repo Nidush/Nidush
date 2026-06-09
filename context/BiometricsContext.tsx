@@ -11,7 +11,7 @@ import {
   HealthConnectSyncResult,
   syncLatestHealthConnectReading,
 } from '@/utils/healthConnectSync';
-import { hasStoredHealthConsent } from '@/utils/legal';
+import { hasHealthConnectEnabled } from '@/utils/legal';
 import { supabase } from '@/utils/supabase';
 import { useSegments } from 'expo-router';
 import React, {
@@ -237,8 +237,8 @@ export const BiometricsProvider = ({
       await restoreBaselineSnapshot();
       if (!isMounted) return;
 
-      const hasHealthConsent = await hasStoredHealthConsent();
-      if (!isMounted || !hasHealthConsent) {
+      const isHealthConnectEnabled = await hasHealthConnectEnabled();
+      if (!isMounted || !isHealthConnectEnabled) {
         startFallbackSimulation();
         return;
       }

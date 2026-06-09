@@ -27,7 +27,7 @@ import { LegalContent } from '../components/legal/LegalContent';
 import {
   hasHeartRateReadPermission,
 } from '../utils/healthConnectSync';
-import { LEGAL_POLICY_VERSION, setStoredHealthConsent } from '../utils/legal';
+import { LEGAL_POLICY_VERSION, setHealthConnectEnabled } from '../utils/legal';
 import { captureException, trackEvent } from '../utils/observability';
 
 export default function Profile() {
@@ -603,13 +603,16 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
         );
 
         if (!canReadHeartRate) {
+          await setHealthConnectEnabled(false);
           setHealthConnectStatus('disconnected');
           return;
         }
 
+        await setHealthConnectEnabled(true);
         setHealthConnectStatus('connected');
         await syncDeviceToDB('Health Connect', 'heart', 'health_connect', 'android_hc');
       } catch {
+        await setHealthConnectEnabled(false);
         setHealthConnectStatus('disconnected');
       }
     };
@@ -1068,7 +1071,6 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
                 const initialized = await initialize();
                 if (initialized) {
-                  await setStoredHealthConsent(true);
                   if (healthConnectStatus !== 'connected') {
                     openHealthConnectSettings();
                     console.info('Opened Health Connect settings for permission review.');
