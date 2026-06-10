@@ -1,6 +1,10 @@
 import React from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
+);
+
 const mockReplace = jest.fn();
 const mockPickImage = jest.fn();
 const mockUploadImage = jest.fn();

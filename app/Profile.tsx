@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { AppState, Image, Modal, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -131,6 +132,61 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     result?: DeviceDiscoveryResult | null;
   };
 
+  type ProfileCacheSnapshot = {
+    userName?: string;
+    avatarUrl?: string | null;
+    userEmail?: string;
+    selectedHobbies?: string[];
+    userHomeId?: number | string | null;
+    joinCode?: string | null;
+    accountDetails?: typeof accountDetails;
+    discoveredDevices?: ConnectedDevice[];
+    cachedAt?: string;
+  };
+
+  const getProfileCacheKey = (userId: string) => `@profile_cache:v1:${userId}`;
+
+  const applyProfileCache = useCallback((snapshot: ProfileCacheSnapshot) => {
+    if (snapshot.userName) setUserName(snapshot.userName);
+    if (snapshot.avatarUrl !== undefined) setAvatarUrl(snapshot.avatarUrl);
+    if (snapshot.userEmail) setUserEmail(snapshot.userEmail);
+    if (snapshot.selectedHobbies) setSelectedHobbies(snapshot.selectedHobbies);
+    if (snapshot.userHomeId !== undefined) setUserHomeId(snapshot.userHomeId);
+    if (snapshot.joinCode !== undefined) setJoinCode(snapshot.joinCode);
+    if (snapshot.accountDetails) setAccountDetails(snapshot.accountDetails);
+    if (snapshot.discoveredDevices) setDiscoveredDevices(snapshot.discoveredDevices);
+    setIsProfileHeaderLoading(false);
+    setIsLoading(false);
+  }, []);
+
+  const writeProfileCache = useCallback(async (userId: string, snapshot: ProfileCacheSnapshot) => {
+    try {
+      await AsyncStorage.setItem(
+        getProfileCacheKey(userId),
+        JSON.stringify({
+          ...snapshot,
+          cachedAt: new Date().toISOString(),
+        }),
+      );
+    } catch (error) {
+      console.warn('Could not persist profile cache:', error);
+    }
+  }, []);
+
+  const mergeProfileCache = useCallback(async (userId: string, patch: Partial<ProfileCacheSnapshot>) => {
+    try {
+      const cacheKey = getProfileCacheKey(userId);
+      const current = await AsyncStorage.getItem(cacheKey);
+      const parsed = current ? (JSON.parse(current) as ProfileCacheSnapshot) : {};
+      await writeProfileCache(userId, {
+        ...parsed,
+        ...patch,
+      });
+    } catch (error) {
+      console.warn('Could not update profile cache:', error);
+    }
+  }, [writeProfileCache]);
+
   const [discoveredDevices, setDiscoveredDevices] = useState<ConnectedDevice[]>([]);
   const [isRefreshingDevices, setIsRefreshingDevices] = useState(false);
   const [isRequestingDiscovery, setIsRequestingDiscovery] = useState(false);
@@ -236,7 +292,8 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     setIsRefreshingDevices(true);
     try {
       const resolvedHomeId = homeId ?? (await getCurrentUserHomeId(userId));
-      await loadConnectedDevices(userId, resolvedHomeId);
+      const refreshedDevices = await loadConnectedDevices(userId, resolvedHomeId);
+      await mergeProfileCache(userId, { discoveredDevices: refreshedDevices, userHomeId: resolvedHomeId });
     } finally {
       setIsRefreshingDevices(false);
     }
@@ -465,6 +522,15 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
+          try {
+            const cachedProfile = await AsyncStorage.getItem(getProfileCacheKey(user.id));
+            if (cachedProfile) {
+              applyProfileCache(JSON.parse(cachedProfile) as ProfileCacheSnapshot);
+            }
+          } catch (error) {
+            console.warn('Could not read profile cache:', error);
+          }
+
           setAvatarUrl(user.user_metadata?.avatar_url || null);
           const first = user.user_metadata?.first_name || '';
           const last = user.user_metadata?.last_name || '';
@@ -562,23 +628,45 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
             setJoinCode(resolvedJoinCode);
           }
 
-          setAccountDetails({
+          const nextAccountDetails = {
             homeName,
             role: homeAssociation?.role || 'Resident',
             memberSince: formatProfileDate(user.created_at || userData?.created_at),
             accountCode: user.id.slice(0, 8).toUpperCase(),
             activitiesCount: activitiesCountResult.count ?? 0,
             shortcutsCount: shortcutsCountResult.count ?? 0,
-          });
+          };
+          setAccountDetails(nextAccountDetails);
           if (!resolvedJoinCode) {
             setJoinCode(null);
           }
 
           setDiscoveredDevices(connectedDevices);
 
+          await writeProfileCache(user.id, {
+            userName:
+              (first || last)
+                ? `${first} ${last}`.trim()
+                : user.email
+                  ? user.email.split('@')[0]
+                  : 'Utilizador',
+            avatarUrl: user.user_metadata?.avatar_url || null,
+            userEmail,
+            selectedHobbies: parseHobbies(userData?.hobbies),
+            userHomeId: finalHomeId,
+            joinCode: resolvedJoinCode,
+            accountDetails: nextAccountDetails,
+            discoveredDevices: connectedDevices,
+          });
+
+          if (activeHomeChannel) {
+            supabase.removeChannel(activeHomeChannel);
+            activeHomeChannel = null;
+          }
           if (finalHomeId) {
             activeHomeChannel = subscribeToHomeDeviceChanges(Number(finalHomeId), async () => {
-              await loadConnectedDevices(user.id, finalHomeId);
+              const refreshedDevices = await loadConnectedDevices(user.id, finalHomeId);
+              await mergeProfileCache(user.id, { discoveredDevices: refreshedDevices });
             });
           }
         } else {
@@ -632,6 +720,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active') {
+        fetchUser();
         checkHealthConnect();
       }
     });
@@ -679,6 +768,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
       }
 
       setAvatarUrl(publicUrl);
+      await mergeProfileCache(user.id, { avatarUrl: publicUrl });
     } else {
       console.warn('Profile image upload did not complete.');
     }
@@ -713,7 +803,9 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
       if (error) {
         console.error("Erro ao guardar hobbies:", error);
       } else {
-        setSelectedHobbies(parseHobbies(data?.hobbies));
+        const nextHobbies = parseHobbies(data?.hobbies);
+        setSelectedHobbies(nextHobbies);
+        await mergeProfileCache(user.id, { selectedHobbies: nextHobbies });
         setIsModalVisible(false);
       }
 
