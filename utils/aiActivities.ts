@@ -72,6 +72,8 @@ type FunctionErrorLike = {
   response?: { json?: () => Promise<unknown> };
 };
 
+const normalizeErrorText = (value: unknown) => String(value || '').toLowerCase();
+
 export const getFunctionErrorMessage = async (error: unknown) => {
   const normalizedError = error as FunctionErrorLike | undefined;
   const response = normalizedError?.context || normalizedError?.response;
@@ -90,4 +92,27 @@ export const getFunctionErrorMessage = async (error: unknown) => {
   }
 
   return normalizedError?.message || 'Check that the Gemini function is deployed and configured.';
+};
+
+export const isAiRateLimitError = async (error: unknown) => {
+  const message = await getFunctionErrorMessage(error);
+  const normalized = normalizeErrorText(message);
+  const fallback = normalizeErrorText((error as FunctionErrorLike | undefined)?.message);
+
+  return (
+    normalized.includes('429') ||
+    normalized.includes('rate limit') ||
+    normalized.includes('limit reached') ||
+    normalized.includes('too many requests') ||
+    fallback.includes('429') ||
+    fallback.includes('rate limit')
+  );
+};
+
+export const getNidushAiErrorMessage = async (error: unknown) => {
+  if (await isAiRateLimitError(error)) {
+    return 'Our AI guide is taking a short pause right now. Try again in about an hour.';
+  }
+
+  return 'We could not create an AI suggestion right now. Please try again in a little while.';
 };

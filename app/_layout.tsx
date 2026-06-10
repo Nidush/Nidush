@@ -214,7 +214,7 @@ export default function RootLayout() {
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="profile-selection" />
               <Stack.Screen name="activity-details" />
-              <Stack.Screen name="notifications" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="notifications" options={{ presentation: 'fullScreenModal' }} />
             </Stack>
 
             {!isAnimationComplete && (

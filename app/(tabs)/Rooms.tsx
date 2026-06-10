@@ -584,10 +584,7 @@ export default function Rooms() {
     }
   };
 
-  const menuActions = [
-    { label: 'Room', onPress: openAddRoomModal },
-    { label: 'Device', onPress: openAddDeviceModal },
-  ];
+  const menuActions = [{ label: 'Device', onPress: openAddDeviceModal }];
 
   if (!fontsLoaded || loading) {
     return (
@@ -800,7 +797,7 @@ export default function Rooms() {
         }
       />
 
-      {/* Floating menu FAB with Add room / device actions */}
+      {/* Floating menu FAB with add device action */}
       <AddRoomDevice actions={menuActions} />
 
       <Modal

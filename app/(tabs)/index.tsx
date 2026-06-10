@@ -20,10 +20,9 @@ import { resolveCatalogImage } from '@/constants/data/catalogAssets';
 import { useBiometrics } from '@/context/BiometricsContext';
 import {
   AiActivityIdea,
-  fetchAiActivityIdeas,
+  isAiRateLimitError,
   saveAiActivityIdea,
 } from '@/utils/aiActivities';
-import { isAiAutoInvocationEnabled } from '@/utils/aiConfig';
 import { getDynamicRecommendations } from '@/utils/recommendationEngine';
 import { getSessionUser, supabase } from '@/utils/supabase';
 import {
@@ -93,8 +92,8 @@ export default function Index() {
   const [isEditingShortcuts, setIsEditingShortcuts] = useState(false);
   const [isSavingShortcutOrder, setIsSavingShortcutOrder] = useState(false);
   const [draggingShortcutId, setDraggingShortcutId] = useState<number | null>(null);
-  const [shortcutLayouts, setShortcutLayouts] = useState<Record<number, ShortcutLayout>>({});
   const shortcutDragOffsets = useRef(new Map<number, Animated.ValueXY>()).current;
+  const shortcutLayoutsRef = useRef<Record<number, ShortcutLayout>>({});
 
 
   // O userName deve ser atualizado quando ganhamos foco também
@@ -242,32 +241,6 @@ export default function Index() {
     }, [])
   );
 
-  const loadAiHomeIdeas = useCallback(async () => {
-    if (!isAiAutoInvocationEnabled) {
-      setAiHomeIdeas([]);
-      return;
-    }
-
-    try {
-      const ideas = await fetchAiActivityIdeas({
-        mood: currentState,
-        activeFilter: 'Home',
-        prompt: userHobbies.length > 0 ? `Prioritize these hobbies: ${userHobbies.join(', ')}` : '',
-      });
-
-      setAiHomeIdeas(ideas.slice(0, 6));
-    } catch (error) {
-      console.warn('Failed to load AI home recommendations:', error);
-      setAiHomeIdeas([]);
-    }
-  }, [currentState, userHobbies]);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadAiHomeIdeas();
-    }, [loadAiHomeIdeas]),
-  );
-
   const saveHomeAiIdea = useCallback(async (idea: AiActivityIdea) => {
     if (isSavingAiHomeIdeaId) return;
 
@@ -285,7 +258,9 @@ export default function Index() {
         },
       });
     } catch (error) {
-      console.error('Failed to save AI home recommendation:', error);
+      if (!(await isAiRateLimitError(error))) {
+        console.error('Failed to save AI home recommendation:', error);
+      }
     } finally {
       setIsSavingAiHomeIdeaId(null);
     }
@@ -450,7 +425,7 @@ export default function Index() {
   };
 
   const handleShortcutDrop = (shortcutId: number, dx: number, dy: number) => {
-    const currentLayout = shortcutLayouts[shortcutId];
+    const currentLayout = shortcutLayoutsRef.current[shortcutId];
     if (!currentLayout) return;
 
     const dropCenter = {
@@ -460,7 +435,7 @@ export default function Index() {
 
     const closestShortcut = shortcuts.reduce<{ id: number; distance: number } | null>(
       (closest, shortcut) => {
-        const layout = shortcutLayouts[shortcut.shortcutId];
+        const layout = shortcutLayoutsRef.current[shortcut.shortcutId];
         if (!layout) return closest;
 
         const layoutCenter = {
@@ -481,6 +456,25 @@ export default function Index() {
       reorderShortcut(shortcutId, closestShortcut.id);
     }
   };
+
+  const updateShortcutLayout = useCallback(
+    (shortcutId: number, layout: ShortcutLayout) => {
+      const current = shortcutLayoutsRef.current[shortcutId];
+
+      if (
+        current &&
+        current.x === layout.x &&
+        current.y === layout.y &&
+        current.width === layout.width &&
+        current.height === layout.height
+      ) {
+        return;
+      }
+
+      shortcutLayoutsRef.current[shortcutId] = layout;
+    },
+    [],
+  );
 
   const createShortcutPanResponder = (shortcutId: number) =>
     PanResponder.create({
@@ -595,10 +589,7 @@ export default function Index() {
                   className="w-[48%] mb-4"
                   onLayout={(event) => {
                     const { x, y, width, height } = event.nativeEvent.layout;
-                    setShortcutLayouts((prev) => ({
-                      ...prev,
-                      [item.shortcutId]: { x, y, width, height },
-                    }));
+                    updateShortcutLayout(item.shortcutId, { x, y, width, height });
                   }}
                   style={{
                     transform: dragOffset.getTranslateTransform(),
