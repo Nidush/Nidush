@@ -15,34 +15,50 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     const authHeader = req.headers.get('Authorization')
-    const payload = await req.json().catch(() => ({}))
-
-    let authenticatedUser:
-      | {
-          id: string
-          email?: string | null
-          user_metadata?: { first_name?: string | null }
-        }
-      | null = null
-
-    if (authHeader) {
-      const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-      const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-      const authClient = createClient(supabaseUrl, anonKey, {
-        global: { headers: { Authorization: authHeader } },
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
-
-      const { data: { user }, error: authError } = await authClient.auth.getUser()
-      if (!authError && user) {
-        authenticatedUser = user
-      }
     }
 
-    const email = String(payload?.email ?? authenticatedUser?.email ?? '').trim()
+    if (!serviceRoleKey) {
+      return new Response(JSON.stringify({ error: 'SUPABASE_SERVICE_ROLE_KEY is not configured.' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const payload = await req.json().catch(() => ({}))
+
+    const authClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    })
+    const adminClient = createClient(supabaseUrl, serviceRoleKey)
+
+    const { data: { user }, error: authError } = await authClient.auth.getUser()
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Invalid session' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (user.app_metadata?.welcome_email_sent === true) {
+      return new Response(
+        JSON.stringify({ message: 'Welcome email already sent.' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
+      )
+    }
+
+    const email = String(user.email ?? '').trim()
     const name = String(
       payload?.name ??
-      authenticatedUser?.user_metadata?.first_name ??
+      user.user_metadata?.first_name ??
       email.split('@')[0] ??
       'utilizador',
     ).trim()
@@ -115,10 +131,24 @@ Deno.serve(async (req: Request) => {
       )
     }
 
+    const { error: metadataError } = await adminClient.auth.admin.updateUserById(user.id, {
+      app_metadata: {
+        ...(user.app_metadata ?? {}),
+        welcome_email_sent: true,
+        welcome_email_sent_at: new Date().toISOString(),
+      },
+    })
+
+    if (metadataError) {
+      log.warn('Welcome email sent but auth metadata could not be updated.', {
+        userId: user.id,
+        error: metadataError.message,
+      })
+    }
+
     log.info('Welcome email request sent.', {
-      userId: authenticatedUser?.id ?? null,
+      userId: user.id,
       testMode: TEST_MODE,
-      usedAuthenticatedUser: Boolean(authenticatedUser),
     })
 
     return new Response(

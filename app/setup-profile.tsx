@@ -73,10 +73,30 @@ export default function SetupProfile() {
   const openAlert = (title: string, message: string) =>
     setAlertConfig({ visible: true, title, message });
 
+  const triggerWelcomeEmail = React.useCallback(async (userId: string, firstNameValue: string, emailValue: string) => {
+    const storageKey = `@welcome_email_requested:${userId}`;
+    const alreadyRequested = await AsyncStorage.getItem(storageKey);
+    if (alreadyRequested === 'true') return;
+
+    try {
+      await invokeFunction('welcome-user', {
+        name: firstNameValue,
+        email: emailValue,
+      });
+      await AsyncStorage.setItem(storageKey, 'true');
+    } catch (error) {
+      logger.warn('Could not trigger welcome email during setup-profile.', error);
+    }
+  }, []);
+
   const loadUserData = React.useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        const userFirstName = user.user_metadata?.first_name || '';
+        const userLastName = user.user_metadata?.last_name || '';
+        const userEmail = user.email || '';
+
         // Double check if user is already registered with a home to bypass setup
         const { data: homeAssociation } = await supabase
           .from('user_homes')
@@ -86,15 +106,17 @@ export default function SetupProfile() {
           .limit(1)
           .maybeSingle();
 
+        await triggerWelcomeEmail(user.id, userFirstName, userEmail);
+
         if (homeAssociation?.home_id) {
           await AsyncStorage.setItem('@viewedOnboarding', 'true');
           router.replace('/(tabs)');
           return;
         }
 
-        setFirstName(user.user_metadata?.first_name || '');
-        setLastName(user.user_metadata?.last_name || '');
-        setEmail(user.email || '');
+        setFirstName(userFirstName);
+        setLastName(userLastName);
+        setEmail(userEmail);
         const legalConsent = await AsyncStorage.getItem(LEGAL_CONSENT_KEY);
         setHasAcceptedLegalConsent(legalConsent === 'accepted');
         
@@ -131,7 +153,7 @@ export default function SetupProfile() {
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, triggerWelcomeEmail]);
 
   useEffect(() => {
     loadUserData();

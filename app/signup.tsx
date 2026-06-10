@@ -107,17 +107,6 @@ export default function SignUp() {
       setErrorMsg(getFriendlyErrorMessage(error));
       return;
     }
-
-
-    try {
-      await invokeFunction('welcome-user', { 
-        name: firstName, 
-        email: email 
-      });
-    } catch (fnError) {
-      console.log('Erro ao enviar email de boas-vindas:', fnError);
-    }
-
     // Signup bem sucedido, limpar progresso anterior e qualquer flag antiga de onboarding
     try {
       await AsyncStorage.removeItem('@onboarding_progress');
