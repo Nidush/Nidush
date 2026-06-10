@@ -45,6 +45,7 @@ export default function Profile() {
   } = useNotifications();
   const [userName, setUserName] = useState('A carregar...');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isProfileHeaderLoading, setIsProfileHeaderLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedHobbies, setSelectedHobbies] = useState<string[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -461,127 +462,136 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     let activeHomeChannel: ReturnType<typeof subscribeToHomeDeviceChanges> | null = null;
 
     const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setAvatarUrl(user.user_metadata?.avatar_url || null);
-        const first = user.user_metadata?.first_name || '';
-        const last = user.user_metadata?.last_name || '';
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setAvatarUrl(user.user_metadata?.avatar_url || null);
+          const first = user.user_metadata?.first_name || '';
+          const last = user.user_metadata?.last_name || '';
 
-        if (first || last) {
-          setUserName(`${first} ${last}`.trim());
-        } else if (user.email) {
-          setUserName(user.email.split('@')[0]);
-        } else {
-          setUserName('Utilizador');
-        }
+          if (first || last) {
+            setUserName(`${first} ${last}`.trim());
+          } else if (user.email) {
+            setUserName(user.email.split('@')[0]);
+          } else {
+            setUserName('Utilizador');
+          }
 
-        const userEmail = user.email || '';
-        setUserEmail(userEmail);
-        let [
-          userDataResult,
-          homeAssociationResult,
-        ] = await Promise.all([
-          supabase
-            .from('users')
-            .select('hobbies, created_at')
-            .eq('auth_uid', user.id)
-            .maybeSingle(),
-          supabase
-            .from('user_homes')
-            .select('home_id, role, created_at')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: true })
-            .limit(1)
-            .maybeSingle(),
-        ]);
+          const userEmail = user.email || '';
+          setUserEmail(userEmail);
+          setIsProfileHeaderLoading(false);
 
-        let userData = userDataResult.data;
-        let userDataError = userDataResult.error;
+          let [
+            userDataResult,
+            homeAssociationResult,
+          ] = await Promise.all([
+            supabase
+              .from('users')
+              .select('hobbies, created_at')
+              .eq('auth_uid', user.id)
+              .maybeSingle(),
+            supabase
+              .from('user_homes')
+              .select('home_id, role, created_at')
+              .eq('user_id', user.id)
+              .order('created_at', { ascending: true })
+              .limit(1)
+              .maybeSingle(),
+          ]);
 
-        if ((!userData || userDataError) && userEmail) {
-          const fallback = await supabase
-            .from('users')
-            .select('hobbies, created_at')
-            .eq('email', userEmail)
-            .maybeSingle();
+          let userData = userDataResult.data;
+          let userDataError = userDataResult.error;
 
-          userData = fallback.data;
-          userDataError = fallback.error;
-        }
+          if ((!userData || userDataError) && userEmail) {
+            const fallback = await supabase
+              .from('users')
+              .select('hobbies, created_at')
+              .eq('email', userEmail)
+              .maybeSingle();
 
-        if (userDataError) {
-          console.error('Erro a carregar hobbies:', userDataError);
-        }
+            userData = fallback.data;
+            userDataError = fallback.error;
+          }
 
-        setSelectedHobbies(parseHobbies(userData?.hobbies));
+          if (userDataError) {
+            console.error('Erro a carregar hobbies:', userDataError);
+          }
 
-        let finalHomeId = null;
-        const homeAssociation = homeAssociationResult.data;
+          setSelectedHobbies(parseHobbies(userData?.hobbies));
 
-        if (homeAssociation) {
-          finalHomeId = homeAssociation.home_id;
-          setUserHomeId(finalHomeId);
-        }
+          let finalHomeId = null;
+          const homeAssociation = homeAssociationResult.data;
 
-        const [
-          homeDataResult,
-          activitiesCountResult,
-          shortcutsCountResult,
-          connectedDevices,
-        ] = await Promise.all([
-          finalHomeId
-            ? supabase.from('homes').select('name, join_code').eq('id', finalHomeId).maybeSingle()
-            : Promise.resolve({ data: null }),
-          supabase
-            .from('activities')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', user.id),
-          supabase
-            .from('shortcuts')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', user.id),
-          loadConnectedDevices(user.id, finalHomeId),
-        ]);
+          if (homeAssociation) {
+            finalHomeId = homeAssociation.home_id;
+            setUserHomeId(finalHomeId);
+          }
 
-        let homeData = homeDataResult.data;
-        if ('error' in homeDataResult && homeDataResult.error?.code === '42703' && finalHomeId) {
-          const legacyHomeResult = await supabase
-            .from('homes')
-            .select('name, join_code')
-            .eq('id', finalHomeId)
-            .maybeSingle();
-          homeData = legacyHomeResult.data as typeof homeData;
-        }
-        const homeName = homeData?.name || 'Not connected';
-        const resolvedJoinCode = homeData?.join_code || null;
-        if (resolvedJoinCode) {
-          setJoinCode(resolvedJoinCode);
-        }
+          const [
+            homeDataResult,
+            activitiesCountResult,
+            shortcutsCountResult,
+            connectedDevices,
+          ] = await Promise.all([
+            finalHomeId
+              ? supabase.from('homes').select('name, join_code').eq('id', finalHomeId).maybeSingle()
+              : Promise.resolve({ data: null }),
+            supabase
+              .from('activities')
+              .select('id', { count: 'exact', head: true })
+              .eq('user_id', user.id),
+            supabase
+              .from('shortcuts')
+              .select('id', { count: 'exact', head: true })
+              .eq('user_id', user.id),
+            loadConnectedDevices(user.id, finalHomeId),
+          ]);
 
-        setAccountDetails({
-          homeName,
-          role: homeAssociation?.role || 'Resident',
-          memberSince: formatProfileDate(user.created_at || userData?.created_at),
-          accountCode: user.id.slice(0, 8).toUpperCase(),
-          activitiesCount: activitiesCountResult.count ?? 0,
-          shortcutsCount: shortcutsCountResult.count ?? 0,
-        });
-        if (!resolvedJoinCode) {
-          setJoinCode(null);
-        }
+          let homeData = homeDataResult.data;
+          if ('error' in homeDataResult && homeDataResult.error?.code === '42703' && finalHomeId) {
+            const legacyHomeResult = await supabase
+              .from('homes')
+              .select('name, join_code')
+              .eq('id', finalHomeId)
+              .maybeSingle();
+            homeData = legacyHomeResult.data as typeof homeData;
+          }
+          const homeName = homeData?.name || 'Not connected';
+          const resolvedJoinCode = homeData?.join_code || null;
+          if (resolvedJoinCode) {
+            setJoinCode(resolvedJoinCode);
+          }
 
-        setDiscoveredDevices(connectedDevices);
-
-        if (finalHomeId) {
-          activeHomeChannel = subscribeToHomeDeviceChanges(Number(finalHomeId), async () => {
-            await loadConnectedDevices(user.id, finalHomeId);
+          setAccountDetails({
+            homeName,
+            role: homeAssociation?.role || 'Resident',
+            memberSince: formatProfileDate(user.created_at || userData?.created_at),
+            accountCode: user.id.slice(0, 8).toUpperCase(),
+            activitiesCount: activitiesCountResult.count ?? 0,
+            shortcutsCount: shortcutsCountResult.count ?? 0,
           });
-        }
+          if (!resolvedJoinCode) {
+            setJoinCode(null);
+          }
 
-      } else {
-        setUserName('Visitante');
+          setDiscoveredDevices(connectedDevices);
+
+          if (finalHomeId) {
+            activeHomeChannel = subscribeToHomeDeviceChanges(Number(finalHomeId), async () => {
+              await loadConnectedDevices(user.id, finalHomeId);
+            });
+          }
+        } else {
+          setUserName('Visitante');
+          setIsProfileHeaderLoading(false);
+        }
+      } catch (error) {
+        console.error('Erro a carregar perfil:', error);
+        setUserName('Utilizador');
+        setIsProfileHeaderLoading(false);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     const checkHealthConnect = async () => {
@@ -834,7 +844,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
             style={{ position: 'relative' }}
             testID="avatar-picker-button"
           >
-            {isLoading ? (
+            {isProfileHeaderLoading ? (
               <View className="w-32 h-32 rounded-full bg-[#E8EDDF]" />
             ) : (
               <Image
