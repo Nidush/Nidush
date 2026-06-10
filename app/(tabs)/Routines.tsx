@@ -163,20 +163,38 @@ const toDatabaseTime = (value: string) => {
 const resolveRoutineImage = (imageKey?: string | null, title?: string) =>
   ROUTINE_IMAGE_BY_KEY[imageKey ?? ''] || ROUTINE_IMAGES[title ?? ''] || DEFAULT_IMAGE;
 
+const routinesScreenCache: {
+  routines: Routine[];
+  rooms: Room[];
+  hasLoadedOnce: boolean;
+  loadError: string | null;
+  page: number;
+  hasMore: boolean;
+  userHomeId: number | null;
+} = {
+  routines: [],
+  rooms: [],
+  hasLoadedOnce: false,
+  loadError: null,
+  page: 0,
+  hasMore: true,
+  userHomeId: null,
+};
+
 export default function Routines() {
-  const [routines, setRoutines] = useState<Routine[]>([]);
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [routines, setRoutines] = useState<Routine[]>(routinesScreenCache.routines);
+  const [rooms, setRooms] = useState<Room[]>(routinesScreenCache.rooms);
+  const [loading, setLoading] = useState(!routinesScreenCache.hasLoadedOnce);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(routinesScreenCache.hasLoadedOnce);
+  const [loadError, setLoadError] = useState<string | null>(routinesScreenCache.loadError);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [feedbackTone, setFeedbackTone] = useState<'error' | 'success' | 'info'>('info');
   const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(routinesScreenCache.page);
+  const [hasMore, setHasMore] = useState(routinesScreenCache.hasMore);
   const PAGE_SIZE = 10;
   const [searchQuery, setSearchQuery] = useState('');
-  const [userHomeId, setUserHomeId] = useState<number | null>(null);
+  const [userHomeId, setUserHomeId] = useState<number | null>(routinesScreenCache.userHomeId);
   const [isAddRoutineModalVisible, setIsAddRoutineModalVisible] = useState(false);
   const [newRoutineName, setNewRoutineName] = useState('');
   const [newRoutineTime, setNewRoutineTime] = useState('07:30');
@@ -192,13 +210,14 @@ export default function Routines() {
     setFeedbackTone(tone);
   }, []);
 
-  const loadRoutines = useCallback(async (isNextPage = false) => {
+  const loadRoutines = useCallback(async (isNextPage = false, options?: { showLoader?: boolean }) => {
     try {
       if (isNextPage) {
         if (loadingMore || !hasMore) return;
         setLoadingMore(true);
       } else {
-        setLoading(!hasLoadedOnce);
+        const showLoader = options?.showLoader ?? !hasLoadedOnce;
+        setLoading(showLoader);
       }
 
       const currentPage = isNextPage ? page + 1 : 0;
@@ -211,6 +230,10 @@ export default function Routines() {
         setRooms([]);
         setUserHomeId(null);
         setLoadError('Sign in again to load your routines.');
+        routinesScreenCache.routines = [];
+        routinesScreenCache.rooms = [];
+        routinesScreenCache.userHomeId = null;
+        routinesScreenCache.loadError = 'Sign in again to load your routines.';
         return;
       }
 
@@ -227,11 +250,16 @@ export default function Routines() {
         setRooms([]);
         setUserHomeId(null);
         setLoadError('Connect this profile to a home before creating routines.');
+        routinesScreenCache.routines = [];
+        routinesScreenCache.rooms = [];
+        routinesScreenCache.userHomeId = null;
+        routinesScreenCache.loadError = 'Connect this profile to a home before creating routines.';
         return;
       }
 
       const homeId = userHome.home_id;
       setUserHomeId(homeId);
+      routinesScreenCache.userHomeId = homeId;
 
       const [roomsResult, routinesResult] = await Promise.all([
         supabase
@@ -254,8 +282,10 @@ export default function Routines() {
         loadedRooms = await ensureDefaultHomeRooms(homeId);
       }
       setRooms(loadedRooms);
+      routinesScreenCache.rooms = loadedRooms;
       setNewRoutineRoomId((current) => current ?? loadedRooms[0]?.id ?? null);
       setLoadError(null);
+      routinesScreenCache.loadError = null;
 
       let data: RoutineRow[] | null = routinesResult.data as RoutineRow[] | null;
       let error = routinesResult.error;
@@ -288,20 +318,30 @@ export default function Routines() {
         }));
 
         if (isNextPage) {
-          setRoutines(current => [...current, ...mappedRoutines]);
+          setRoutines(current => {
+            const next = [...current, ...mappedRoutines];
+            routinesScreenCache.routines = next;
+            return next;
+          });
         } else {
           setRoutines(mappedRoutines);
+          routinesScreenCache.routines = mappedRoutines;
         }
 
         setPage(currentPage);
+        routinesScreenCache.page = currentPage;
         if (count !== null) {
-          setHasMore(start + mappedRoutines.length < count);
+          const nextHasMore = start + mappedRoutines.length < count;
+          setHasMore(nextHasMore);
+          routinesScreenCache.hasMore = nextHasMore;
         }
       }
     } catch (err) {
       console.error('Error loading routines:', err);
       setLoadError('We could not load your routines right now. Try again in a moment.');
+      routinesScreenCache.loadError = 'We could not load your routines right now. Try again in a moment.';
     } finally {
+      routinesScreenCache.hasLoadedOnce = true;
       setHasLoadedOnce(true);
       setLoading(false);
       setLoadingMore(false);
@@ -310,7 +350,7 @@ export default function Routines() {
 
   useFocusEffect(
     useCallback(() => {
-      loadRoutines();
+      loadRoutines(false, { showLoader: !hasLoadedOnce });
     }, [loadRoutines])
   );
 

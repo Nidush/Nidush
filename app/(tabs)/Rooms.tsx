@@ -54,6 +54,24 @@ interface ActivityItem {
   room_id?: number | null;
 }
 
+const roomsScreenCache: {
+  rooms: Room[];
+  activeRoomId: number | null;
+  allDevices: Device[];
+  allActivities: ActivityItem[];
+  hasLoadedOnce: boolean;
+  loadError: string | null;
+  userHomeId: number | null;
+} = {
+  rooms: [],
+  activeRoomId: null,
+  allDevices: [],
+  allActivities: [],
+  hasLoadedOnce: false,
+  loadError: null,
+  userHomeId: null,
+};
+
 export default function Rooms() {
   // --- Fonts ---
   const [fontsLoaded] = useFonts({
@@ -63,18 +81,18 @@ export default function Rooms() {
   });
 
   // --- States ---
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
-  const [allDevices, setAllDevices] = useState<Device[]>([]);
-  const [allActivities, setAllActivities] = useState<ActivityItem[]>([]);
+  const [rooms, setRooms] = useState<Room[]>(roomsScreenCache.rooms);
+  const [activeRoomId, setActiveRoomId] = useState<number | null>(roomsScreenCache.activeRoomId);
+  const [allDevices, setAllDevices] = useState<Device[]>(roomsScreenCache.allDevices);
+  const [allActivities, setAllActivities] = useState<ActivityItem[]>(roomsScreenCache.allActivities);
   const [, setJunctions] = useState<{ activity_id: number; device_id: number }[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(!roomsScreenCache.hasLoadedOnce);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(roomsScreenCache.hasLoadedOnce);
+  const [loadError, setLoadError] = useState<string | null>(roomsScreenCache.loadError);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [feedbackTone, setFeedbackTone] = useState<'error' | 'success' | 'info'>('info');
   const [searchQuery, setSearchQuery] = useState('');
-  const [userHomeId, setUserHomeId] = useState<number | null>(null);
+  const [userHomeId, setUserHomeId] = useState<number | null>(roomsScreenCache.userHomeId);
   const [isAdjustingLight, setIsAdjustingLight] = useState(false);
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -133,6 +151,7 @@ export default function Rooms() {
       
       const homeId = homeAssoc.home_id;
       setUserHomeId(homeId);
+      roomsScreenCache.userHomeId = homeId;
 
       const [
         { data: roomsData, error: roomsErr },
@@ -171,7 +190,15 @@ export default function Rooms() {
       setAllDevices(mappedDevices);
       setAllActivities(loadedActivities);
       setLoadError(null);
-      setActiveRoomId((currentRoomId) => currentRoomId ?? loadedRooms[0]?.id ?? null);
+      setActiveRoomId((currentRoomId) => {
+        const nextRoomId = currentRoomId ?? loadedRooms[0]?.id ?? null;
+        roomsScreenCache.activeRoomId = nextRoomId;
+        return nextRoomId;
+      });
+      roomsScreenCache.rooms = loadedRooms;
+      roomsScreenCache.allDevices = mappedDevices;
+      roomsScreenCache.allActivities = loadedActivities;
+      roomsScreenCache.loadError = null;
 
       // Only fetch links for activities that actually belong to this home.
       const activityIds = loadedActivities.map((activity) => activity.id).filter(Boolean);
@@ -211,7 +238,9 @@ export default function Rooms() {
     } catch (error) {
       console.error('Error fetching room/device details:', error);
       setLoadError('We could not load your smart home right now. Pull to refresh or try again in a moment.');
+      roomsScreenCache.loadError = 'We could not load your smart home right now. Pull to refresh or try again in a moment.';
     } finally {
+      roomsScreenCache.hasLoadedOnce = true;
       setHasLoadedOnce(true);
       setLoading(false);
     }
