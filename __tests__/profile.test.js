@@ -296,8 +296,9 @@ describe('Profile Screen', () => {
   it('uploads a new avatar and updates both auth and public profile', async () => {
     mockPickImage.mockResolvedValue('data:image/jpeg;base64,avatar');
 
-    const { getByTestId } = render(<Profile />);
+    const { getByTestId, findByText } = render(<Profile />);
 
+    await findByText('Laura Rossi');
     fireEvent.press(getByTestId('avatar-picker-button'));
 
     await waitFor(() => {

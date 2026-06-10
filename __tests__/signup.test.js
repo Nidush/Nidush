@@ -96,10 +96,8 @@ describe('SignUp Screen', () => {
     });
 
     await waitFor(() => {
-      expect(mockInvokeFunction).toHaveBeenCalledWith('welcome-user', {
-        name: 'Laura',
-        email: 'laura@example.com',
-      });
+      expect(AsyncStorage.removeItem).toHaveBeenCalledWith('@onboarding_progress');
+      expect(AsyncStorage.removeItem).toHaveBeenCalledWith('@viewedOnboarding');
     });
 
     await waitFor(() => {
