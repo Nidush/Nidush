@@ -1,6 +1,7 @@
-import { MaterialIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import React, { useState, useMemo, useCallback } from 'react'; 
 import {
+  Animated,
   ScrollView,
   StatusBar,
   Text,
@@ -33,8 +34,11 @@ interface Routine {
   days: string;
   time: string;
   room: string;
+  roomId?: number | null;
+  scenarioId?: number | null;
   active: boolean;
   image: ImageSourcePropType;
+  imageKey?: string | null;
 }
 
 interface Room {
@@ -182,6 +186,7 @@ const routinesScreenCache: {
 };
 
 export default function Routines() {
+  const routinePanelTranslateX = React.useRef(new Animated.Value(900)).current;
   const [routines, setRoutines] = useState<Routine[]>(routinesScreenCache.routines);
   const [rooms, setRooms] = useState<Room[]>(routinesScreenCache.rooms);
   const [loading, setLoading] = useState(!routinesScreenCache.hasLoadedOnce);
@@ -204,6 +209,7 @@ export default function Routines() {
   const [isSavingRoutine, setIsSavingRoutine] = useState(false);
   const [selectedRoutine, setSelectedRoutine] = useState<Routine | null>(null);
   const [isDeletingRoutine, setIsDeletingRoutine] = useState(false);
+  const [isEditingRoutine, setIsEditingRoutine] = useState(false);
 
   const showFeedback = useCallback((message: string, tone: 'error' | 'success' | 'info' = 'info') => {
     setFeedbackMessage(message);
@@ -313,8 +319,11 @@ export default function Routines() {
           days: item.days_of_week || 'N/A',
           time: formatTime(item.execution_time),
           room: item.scenario?.rooms?.name || 'Unknown',
+          roomId: loadedRooms.find((room) => room.name === (item.scenario?.rooms?.name || ''))?.id ?? null,
+          scenarioId: item.scenario?.id ?? null,
           active: item.is_active,
           image: resolveRoutineImage(item.image, item.name),
+          imageKey: item.image ?? null,
         }));
 
         if (isNextPage) {
@@ -384,8 +393,15 @@ export default function Routines() {
   };
 
   const closeRoutineDetails = () => {
-    setSelectedRoutine(null);
-    setIsDeletingRoutine(false);
+    Animated.timing(routinePanelTranslateX, {
+      toValue: 900,
+      duration: 220,
+      useNativeDriver: true,
+    }).start(() => {
+      setSelectedRoutine(null);
+      setIsDeletingRoutine(false);
+      setIsEditingRoutine(false);
+    });
   };
 
   const handleDeleteRoutine = async () => {
@@ -401,6 +417,7 @@ export default function Routines() {
       if (error) throw error;
 
       setRoutines((current) => current.filter((item) => item.id !== selectedRoutine.id));
+      routinesScreenCache.routines = routinesScreenCache.routines.filter((item) => item.id !== selectedRoutine.id);
       closeRoutineDetails();
     } catch (err: unknown) {
       console.error('Error deleting routine:', err);
@@ -599,11 +616,29 @@ export default function Routines() {
           days: savedRoutine.days_of_week || 'N/A',
           time: formatTime(savedRoutine.execution_time),
           room: selectedRoom.name,
+          roomId: selectedRoom.id,
+          scenarioId,
           active: savedRoutine.is_active,
           image: resolveRoutineImage(savedRoutine.image ?? newRoutineImageKey, savedRoutine.name),
+          imageKey: savedRoutine.image ?? newRoutineImageKey,
         },
         ...current,
       ]);
+      routinesScreenCache.routines = [
+        {
+          id: savedRoutine.id,
+          title: savedRoutine.name,
+          days: savedRoutine.days_of_week || 'N/A',
+          time: formatTime(savedRoutine.execution_time),
+          room: selectedRoom.name,
+          roomId: selectedRoom.id,
+          scenarioId,
+          active: savedRoutine.is_active,
+          image: resolveRoutineImage(savedRoutine.image ?? newRoutineImageKey, savedRoutine.name),
+          imageKey: savedRoutine.image ?? newRoutineImageKey,
+        },
+        ...routinesScreenCache.routines,
+      ];
 
       closeAddRoutineModal();
       showFeedback(`"${savedRoutine.name}" is now part of your routines.`, 'success');
@@ -633,6 +668,121 @@ export default function Routines() {
       },
     });
   };
+
+  const beginEditingRoutine = () => {
+    if (!selectedRoutine) return;
+
+    setNewRoutineName(selectedRoutine.title);
+    setNewRoutineTime(selectedRoutine.time.replace(' am', '').replace(' pm', ''));
+    setNewRoutineDays(
+      selectedRoutine.days === 'N/A'
+        ? []
+        : selectedRoutine.days.split(',').map((day) => day.trim()).filter(Boolean),
+    );
+    setNewRoutineRoomId(selectedRoutine.roomId ?? rooms.find((room) => room.name === selectedRoutine.room)?.id ?? null);
+    setNewRoutineImageKey(selectedRoutine.imageKey ?? ROUTINE_IMAGE_OPTIONS[0].key);
+    setIsEditingRoutine(true);
+  };
+
+  const handleUpdateRoutine = async () => {
+    if (!selectedRoutine) return;
+    if (!newRoutineName.trim()) {
+      showFeedback('Give your routine a name first.', 'error');
+      return;
+    }
+    if (!newRoutineRoomId) {
+      showFeedback('Choose the room for this routine.', 'error');
+      return;
+    }
+    if (newRoutineDays.length === 0) {
+      showFeedback('Choose at least one day for this routine.', 'error');
+      return;
+    }
+
+    const executionTime = toDatabaseTime(newRoutineTime);
+    if (!executionTime) {
+      showFeedback('Use the HH:MM format, for example 07:30.', 'error');
+      return;
+    }
+
+    setIsSavingRoutine(true);
+    try {
+      const selectedRoom = rooms.find((room) => room.id === newRoutineRoomId);
+      if (!selectedRoom) throw new Error('Selected room not found.');
+
+      if (selectedRoutine.scenarioId && selectedRoutine.roomId !== selectedRoom.id) {
+        const { error: scenarioUpdateError } = await supabase
+          .from('scenarios')
+          .update({ room_id: selectedRoom.id })
+          .eq('id', selectedRoutine.scenarioId);
+
+        if (scenarioUpdateError) throw scenarioUpdateError;
+      }
+
+      const orderedDays = DAY_OPTIONS.filter((day) => newRoutineDays.includes(day)).join(',');
+      const { data: updatedRoutine, error } = await supabase
+        .from('routines')
+        .update({
+          name: newRoutineName.trim(),
+          execution_time: executionTime,
+          days_of_week: orderedDays,
+          image: newRoutineImageKey,
+        })
+        .eq('id', selectedRoutine.id)
+        .select('id, name, execution_time, days_of_week, is_active, image')
+        .single();
+
+      if (error) throw error;
+      if (!updatedRoutine) throw new Error('Routine was not returned after update.');
+
+      const nextRoutine: Routine = {
+        id: updatedRoutine.id,
+        title: updatedRoutine.name,
+        days: updatedRoutine.days_of_week || 'N/A',
+        time: formatTime(updatedRoutine.execution_time),
+        room: selectedRoom.name,
+        roomId: selectedRoom.id,
+        scenarioId: selectedRoutine.scenarioId ?? null,
+        active: updatedRoutine.is_active,
+        image: resolveRoutineImage(updatedRoutine.image ?? newRoutineImageKey, updatedRoutine.name),
+        imageKey: updatedRoutine.image ?? newRoutineImageKey,
+      };
+
+      setRoutines((current) => current.map((item) => (item.id === nextRoutine.id ? nextRoutine : item)));
+      routinesScreenCache.routines = routinesScreenCache.routines.map((item) => (item.id === nextRoutine.id ? nextRoutine : item));
+      setSelectedRoutine(nextRoutine);
+      setIsEditingRoutine(false);
+      showFeedback(`"${updatedRoutine.name}" was updated.`, 'success');
+    } catch (err: unknown) {
+      console.error('Error updating routine:', err);
+      showFeedback(
+        err instanceof Error ? err.message : 'Could not update routine. Please try again.',
+        'error',
+      );
+    } finally {
+      setIsSavingRoutine(false);
+    }
+  };
+
+  const getRoutineMood = (routine: Routine | null) => {
+    const key = routine?.imageKey ?? '';
+    if (key.includes('sleep')) return 'Slow lights, calm sounds and wind-down activities fit this routine best.';
+    if (key.includes('gym')) return 'Energetic scenes, movement prompts and upbeat activities work well here.';
+    if (key.includes('kitchen')) return 'Cooking, breakfast prep and family-start moments match this routine.';
+    if (key.includes('weekend')) return 'Soft starts, comfort scenes and relaxed home activities suit this one.';
+    return 'Gentle automation, focus moments and welcoming home actions fit this routine.';
+  };
+
+  React.useEffect(() => {
+    if (selectedRoutine) {
+      routinePanelTranslateX.setValue(900);
+      Animated.timing(routinePanelTranslateX, {
+        toValue: 0,
+        duration: 260,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [selectedRoutine, routinePanelTranslateX]);
 
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
@@ -726,6 +876,7 @@ export default function Routines() {
               room={item.room}
               isActive={item.active}
               image={item.image}
+              onPress={() => openRoutineDetails(item)}
               onToggle={() => toggleRoutine(item.id)}
               onLongPress={() => openRoutineDetails(item)}
             />
@@ -969,24 +1120,27 @@ export default function Routines() {
       <Modal
         visible={selectedRoutine !== null}
         transparent={true}
-        animationType="fade"
+        animationType="none"
         onRequestClose={closeRoutineDetails}
       >
-        <View className="flex-1 justify-center bg-black/45 px-5">
-          <View className="bg-white rounded-[34px] overflow-hidden shadow-xl">
+        <View className="flex-1 bg-black/35">
+          <Animated.View
+            className="absolute inset-0 bg-[#F6F8F2] shadow-2xl"
+            style={{ transform: [{ translateX: routinePanelTranslateX }] }}
+          >
             <View className="relative">
               <Image
                 source={selectedRoutine?.image ?? DEFAULT_IMAGE}
-                className="w-full h-[190px]"
+                className="w-full h-[280px]"
                 resizeMode="cover"
               />
-              <View className="absolute inset-0 bg-black/25" />
+              <View className="absolute inset-0 bg-black/30" />
               <TouchableOpacity
                 onPress={closeRoutineDetails}
-                className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/90 items-center justify-center"
+                className="absolute top-5 left-5"
                 hitSlop={8}
               >
-                <MaterialIcons name="close" size={22} color="#354F52" />
+                <Ionicons name="chevron-back" size={28} color="white" />
               </TouchableOpacity>
               <View className="absolute left-5 right-5 bottom-5">
                 <Text
@@ -1010,70 +1164,239 @@ export default function Routines() {
               </View>
             </View>
 
-            <View className="px-6 pt-5 pb-6">
-              <Text
-                className="text-[#354F52] text-lg mb-1"
-                style={{ fontFamily: 'Nunito_700Bold' }}
-              >
-                Routine Details
-              </Text>
-              <Text
-                className="text-[#6B7C76] text-sm mb-5"
-                style={{ fontFamily: 'Nunito_600SemiBold' }}
-              >
-                Runs on {selectedRoutine?.days || 'N/A'} and is shared with your home.
-              </Text>
+            <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, paddingBottom: 36 }} showsVerticalScrollIndicator={false}>
+              {!isEditingRoutine ? (
+                <>
+                  <Text
+                    className="text-[#354F52] text-lg mb-1"
+                    style={{ fontFamily: 'Nunito_700Bold' }}
+                  >
+                    Routine Overview
+                  </Text>
+                  <Text
+                    className="text-[#6B7C76] text-sm mb-5"
+                    style={{ fontFamily: 'Nunito_600SemiBold' }}
+                  >
+                    Runs on {selectedRoutine?.days || 'N/A'} and is shared with your home.
+                  </Text>
 
-              <View className="rounded-[26px] bg-[#F4F7F1] p-4 mb-5 border border-[#E0E7DD]">
-                <View className="flex-row items-center mb-3">
-                  <MaterialIcons name="event-repeat" size={18} color="#548F53" />
-                  <Text className="ml-3 text-[#354F52] text-sm" style={{ fontFamily: 'Nunito_700Bold' }}>
-                    {selectedRoutine?.days || 'N/A'}
-                  </Text>
-                </View>
-                <View className="flex-row items-center mb-3">
-                  <MaterialIcons name="schedule" size={18} color="#548F53" />
-                  <Text className="ml-3 text-[#354F52] text-sm" style={{ fontFamily: 'Nunito_700Bold' }}>
-                    {selectedRoutine?.time}
-                  </Text>
-                </View>
-                <View className="flex-row items-center">
-                  <MaterialIcons name="meeting-room" size={18} color="#548F53" />
-                  <Text className="ml-3 text-[#354F52] text-sm" style={{ fontFamily: 'Nunito_700Bold' }}>
-                    {selectedRoutine?.room}
-                  </Text>
-                </View>
-              </View>
-
-              <View className="flex-row justify-between">
-                <TouchableOpacity
-                  onPress={closeRoutineDetails}
-                  className="w-[38%] py-4 bg-[#F1F3EA] rounded-full items-center"
-                >
-                  <Text className="text-[#354F52] text-base font-bold" style={{ fontFamily: 'Nunito_700Bold' }}>
-                    Close
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={handleDeleteRoutine}
-                  disabled={isDeletingRoutine}
-                  className="w-[58%] py-4 bg-[#D7655C] rounded-full items-center flex-row justify-center"
-                >
-                  {isDeletingRoutine ? (
-                    <ActivityIndicator size="small" color="white" />
-                  ) : (
-                    <>
-                      <MaterialIcons name="delete-outline" size={18} color="white" />
-                      <Text className="text-white text-base font-bold ml-2" style={{ fontFamily: 'Nunito_700Bold' }}>
-                        Remove Routine
+                  <View className="rounded-[26px] bg-white p-4 mb-4 border border-[#E0E7DD]">
+                    <View className="flex-row items-center mb-3">
+                      <MaterialIcons name="event-repeat" size={18} color="#548F53" />
+                      <Text className="ml-3 text-[#354F52] text-sm" style={{ fontFamily: 'Nunito_700Bold' }}>
+                        {selectedRoutine?.days || 'N/A'}
                       </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
+                    </View>
+                    <View className="flex-row items-center mb-3">
+                      <MaterialIcons name="schedule" size={18} color="#548F53" />
+                      <Text className="ml-3 text-[#354F52] text-sm" style={{ fontFamily: 'Nunito_700Bold' }}>
+                        {selectedRoutine?.time}
+                      </Text>
+                    </View>
+                    <View className="flex-row items-center">
+                      <MaterialIcons name="meeting-room" size={18} color="#548F53" />
+                      <Text className="ml-3 text-[#354F52] text-sm" style={{ fontFamily: 'Nunito_700Bold' }}>
+                        {selectedRoutine?.room}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View className="rounded-[26px] bg-[#EEF5E8] p-4 mb-5 border border-[#D7E6D2]">
+                    <Text className="text-[#3C5642] text-sm mb-2" style={{ fontFamily: 'Nunito_700Bold' }}>
+                      Inspired activities
+                    </Text>
+                    <Text className="text-[#5E7167] text-sm" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                      {getRoutineMood(selectedRoutine)}
+                    </Text>
+                  </View>
+
+                  <View className="flex-row justify-between mb-3">
+                    <TouchableOpacity
+                      onPress={beginEditingRoutine}
+                      className="w-[48%] py-4 bg-[#548F53] rounded-full items-center"
+                    >
+                      <Text className="text-white text-base font-bold" style={{ fontFamily: 'Nunito_700Bold' }}>
+                        Edit Routine
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={closeRoutineDetails}
+                      className="w-[48%] py-4 bg-[#E9EEE5] rounded-full items-center"
+                    >
+                      <Text className="text-[#354F52] text-base font-bold" style={{ fontFamily: 'Nunito_700Bold' }}>
+                        Close
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={handleDeleteRoutine}
+                    disabled={isDeletingRoutine}
+                    className="py-4 bg-[#D7655C] rounded-full items-center flex-row justify-center"
+                  >
+                    {isDeletingRoutine ? (
+                      <ActivityIndicator size="small" color="white" />
+                    ) : (
+                      <>
+                        <MaterialIcons name="delete-outline" size={18} color="white" />
+                        <Text className="text-white text-base font-bold ml-2" style={{ fontFamily: 'Nunito_700Bold' }}>
+                          Remove Routine
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <View className="flex-row items-center justify-between mb-2">
+                    <Text
+                      className="text-[26px] text-[#354F52]"
+                      style={{ fontFamily: 'Nunito_700Bold' }}
+                    >
+                      Edit Routine
+                    </Text>
+                    <TouchableOpacity onPress={() => setIsEditingRoutine(false)} hitSlop={12}>
+                      <MaterialIcons name="arrow-forward" size={22} color="#7A8C85" />
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text
+                    className="text-[#6B7C76] text-sm mb-5"
+                    style={{ fontFamily: 'Nunito_600SemiBold' }}
+                  >
+                    Update the timing, room and feel of this routine.
+                  </Text>
+
+                  <Text className="text-[#354F52] text-sm mb-2" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                    Routine Name
+                  </Text>
+                  <TextInput
+                    placeholder="e.g. Morning Kitchen Prep"
+                    placeholderTextColor="#6B7C76"
+                    value={newRoutineName}
+                    onChangeText={setNewRoutineName}
+                    className="bg-white border border-[#BDC7C2] rounded-2xl px-4 py-4 text-base text-[#2C3A35] mb-5"
+                    style={{ fontFamily: 'Nunito_700Bold', color: '#1F2A24' }}
+                    selectionColor="#548F53"
+                  />
+
+                  <Text className="text-[#354F52] text-sm mb-3" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                    Cover Image
+                  </Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
+                    {ROUTINE_IMAGE_OPTIONS.map((option) => {
+                      const isSelected = newRoutineImageKey === option.key;
+                      return (
+                        <TouchableOpacity
+                          key={option.key}
+                          onPress={() => setNewRoutineImageKey(option.key)}
+                          className="mr-3 w-[104px]"
+                        >
+                          <View
+                            className={`rounded-[22px] overflow-hidden border-2 ${
+                              isSelected ? 'border-[#548F53]' : 'border-[#D8DFD5]'
+                            }`}
+                          >
+                            <Image source={option.source} className="w-full h-[78px]" resizeMode="cover" />
+                          </View>
+                          <Text
+                            className={`mt-2 text-center text-xs ${isSelected ? 'text-[#354F52]' : 'text-[#6B7C76]'}`}
+                            style={{ fontFamily: isSelected ? 'Nunito_700Bold' : 'Nunito_600SemiBold' }}
+                          >
+                            {option.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+
+                  <Text className="text-[#354F52] text-sm mb-2 mt-2" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                    Time
+                  </Text>
+                  <TextInput
+                    placeholder="07:30"
+                    placeholderTextColor="#6B7C76"
+                    value={newRoutineTime}
+                    onChangeText={(value) => setNewRoutineTime(normalizeTimeInput(value))}
+                    keyboardType="number-pad"
+                    maxLength={5}
+                    className="bg-white border border-[#BDC7C2] rounded-2xl px-4 py-4 text-base text-[#2C3A35] mb-5"
+                    style={{ fontFamily: 'Nunito_700Bold', color: '#1F2A24' }}
+                    selectionColor="#548F53"
+                  />
+
+                  <Text className="text-[#354F52] text-sm mb-3" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                    Days
+                  </Text>
+                  <View className="flex-row flex-wrap mb-5">
+                    {DAY_OPTIONS.map((day) => {
+                      const isSelected = newRoutineDays.includes(day);
+                      return (
+                        <TouchableOpacity
+                          key={day}
+                          onPress={() => toggleRoutineDay(day)}
+                          className={`mr-3 mb-3 px-4 py-3 rounded-2xl border ${
+                            isSelected ? 'bg-[#BBE6BA] border-transparent' : 'bg-transparent border-[#BDC7C2]'
+                          }`}
+                        >
+                          <Text className="text-[#354F52] font-bold" style={{ fontFamily: 'Nunito_700Bold' }}>
+                            {day}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  <Text className="text-[#354F52] text-sm mb-3" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                    Room
+                  </Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 8 }}>
+                    {rooms.map((room) => {
+                      const isSelected = newRoutineRoomId === room.id;
+                      return (
+                        <TouchableOpacity
+                          key={room.id}
+                          onPress={() => setNewRoutineRoomId(room.id)}
+                          className={`mr-3 px-4 py-3 rounded-2xl border ${
+                            isSelected ? 'bg-[#BBE6BA] border-transparent' : 'bg-transparent border-[#BDC7C2]'
+                          }`}
+                        >
+                          <Text className="text-[#354F52] font-bold" style={{ fontFamily: 'Nunito_700Bold' }}>
+                            {room.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+
+                  <View className="flex-row justify-between mt-5">
+                    <TouchableOpacity
+                      onPress={() => setIsEditingRoutine(false)}
+                      className="w-[48%] py-4 bg-[#E9EEE5] rounded-full items-center"
+                    >
+                      <Text className="text-[#354F52] text-base font-bold" style={{ fontFamily: 'Nunito_700Bold' }}>
+                        Cancel
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={handleUpdateRoutine}
+                      disabled={isSavingRoutine}
+                      className="w-[48%] py-4 bg-[#548F53] rounded-full items-center flex-row justify-center"
+                    >
+                      {isSavingRoutine ? (
+                        <ActivityIndicator size="small" color="white" />
+                      ) : (
+                        <Text className="text-white text-base font-bold" style={{ fontFamily: 'Nunito_700Bold' }}>
+                          Save Changes
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+            </ScrollView>
+          </Animated.View>
         </View>
       </Modal>
     </SafeAreaView>
