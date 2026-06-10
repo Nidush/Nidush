@@ -15,50 +15,49 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     const authHeader = req.headers.get('Authorization')
-
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    const authClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    })
-
-    const { data: { user }, error: authError } = await authClient.auth.getUser()
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Invalid session' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
     const payload = await req.json().catch(() => ({}))
+
+    let authenticatedUser:
+      | {
+          id: string
+          email?: string | null
+          user_metadata?: { first_name?: string | null }
+        }
+      | null = null
+
+    if (authHeader) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+      const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+      const authClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      })
+
+      const { data: { user }, error: authError } = await authClient.auth.getUser()
+      if (!authError && user) {
+        authenticatedUser = user
+      }
+    }
+
+    const email = String(payload?.email ?? authenticatedUser?.email ?? '').trim()
     const name = String(
       payload?.name ??
-      user.user_metadata?.first_name ??
-      user.email?.split('@')[0] ??
+      authenticatedUser?.user_metadata?.first_name ??
+      email.split('@')[0] ??
       'utilizador',
-    )
+    ).trim()
 
-    // Pegar a chave do Resend das variáveis de ambiente do Supabase
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
+    const FROM_EMAIL = Deno.env.get('WELCOME_EMAIL_FROM') ?? 'welcome@nidush.pt'
+    const TEST_MODE = (Deno.env.get('WELCOME_EMAIL_TEST_MODE') ?? 'false').toLowerCase() === 'true'
+    const VERIFIED_EMAIL = Deno.env.get('WELCOME_EMAIL_TEST_RECIPIENT') ?? 'nidush7@gmail.com'
+    const recipient = TEST_MODE ? VERIFIED_EMAIL : email
 
-    // Sem domínio verificado no Resend, só é possível enviar para o email da conta.
-    // Quando tiveres domínio próprio, muda TEST_MODE para false.
-    const TEST_MODE = true
-    const VERIFIED_EMAIL = 'nidush7@gmail.com'
-    const recipient = TEST_MODE ? VERIFIED_EMAIL : user.email
-
-    if (!RESEND_API_KEY || !recipient) {
+    if (!RESEND_API_KEY || !recipient || !FROM_EMAIL) {
       log.error('Missing email configuration.', {
         hasResendKey: Boolean(RESEND_API_KEY),
         hasRecipient: Boolean(recipient),
+        hasFromEmail: Boolean(FROM_EMAIL),
       })
       return new Response(JSON.stringify({ error: "Configuração de mail em falta." }), { status: 500, headers: corsHeaders })
     }
@@ -71,7 +70,7 @@ Deno.serve(async (req: Request) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Nidush <nidush.pt>',
+        from: `Nidush <${FROM_EMAIL}>`,
         to: [recipient],
         subject: 'Bem-vindo ao Nidush! ',
         html: `
@@ -117,8 +116,9 @@ Deno.serve(async (req: Request) => {
     }
 
     log.info('Welcome email request sent.', {
-      userId: user.id,
+      userId: authenticatedUser?.id ?? null,
       testMode: TEST_MODE,
+      usedAuthenticatedUser: Boolean(authenticatedUser),
     })
 
     return new Response(

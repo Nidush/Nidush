@@ -118,9 +118,10 @@ export default function SignUp() {
       console.log('Erro ao enviar email de boas-vindas:', fnError);
     }
 
-    // Signup bem sucedido, limpar progresso anterior se existir
+    // Signup bem sucedido, limpar progresso anterior e qualquer flag antiga de onboarding
     try {
       await AsyncStorage.removeItem('@onboarding_progress');
+      await AsyncStorage.removeItem('@viewedOnboarding');
     } catch (e) {
       console.log('Erro ao limpar progresso:', e);
     }
