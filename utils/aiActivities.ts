@@ -16,6 +16,8 @@ export type AiActivityIdea = {
   contentTitle?: string;
   contentType?: string;
   contentCategory?: string;
+  playlistId?: string;
+  playlistName?: string;
   instructions?: unknown[];
   ingredients?: { item: string; amount: string }[];
 };
@@ -25,6 +27,10 @@ type FetchAiActivityIdeasOptions = {
   activeFilter?: string;
   prompt?: string;
   source?: string;
+  spotifyPlaylists?: Array<{
+    id: string;
+    name: string;
+  }>;
 };
 
 export const fetchAiActivityIdeas = async ({
@@ -32,6 +38,7 @@ export const fetchAiActivityIdeas = async ({
   activeFilter = 'All',
   prompt = '',
   source = 'app',
+  spotifyPlaylists = [],
 }: FetchAiActivityIdeasOptions = {}) => {
   const { data, error } = await supabase.functions.invoke('generate-activity-ideas', {
     body: {
@@ -40,6 +47,7 @@ export const fetchAiActivityIdeas = async ({
       prompt,
       source,
       localTime: new Date().toLocaleString(),
+      spotifyPlaylists,
     },
   });
 

@@ -38,6 +38,8 @@ export type GeminiIdea = {
   contentTitle?: unknown
   contentType?: unknown
   contentCategory?: unknown
+  playlistId?: unknown
+  playlistName?: unknown
   instructions?: unknown
   ingredients?: unknown
 }
@@ -534,6 +536,8 @@ export const normalizeIdeas = (rawIdeas: GeminiIdea[], rooms: RoomRow[]) =>
       contentTitle: clampText(idea.contentTitle, `${title} Guide`, 80),
       contentType: normalizeContentType(normalizeType(idea.type), idea.contentType),
       contentCategory: normalizeContentCategory(normalizeType(idea.type), idea.contentCategory),
+      playlistId: clampText(idea.playlistId, '', 120) || undefined,
+      playlistName: clampText(idea.playlistName, '', 120) || undefined,
       instructions: normalizeInstructions(idea.instructions, normalizeType(idea.type)),
       ingredients: normalizeIngredients(idea.ingredients, normalizeType(idea.type)),
     }

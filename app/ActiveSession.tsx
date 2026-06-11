@@ -37,6 +37,7 @@ import {
   mapUserActivity,
   normalizeScenarioTemplateId,
 } from '@/utils/catalogTemplates';
+import { getScenarioDeviceMeta, mapLinkedDeviceToScenarioState } from '@/utils/activityDeviceConfigs';
 
 type FormattedInstruction = {
   text: string;
@@ -125,6 +126,11 @@ const getNumericRoomId = (item: StoredActivityLike | Activity | Scenario) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const normalizeLinkedDevice = (value: unknown) => {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value;
+};
+
 export default function ActiveSession() {
   const { id } = useLocalSearchParams<{ id: string; musicStarted?: string }>();
   const {
@@ -178,7 +184,27 @@ export default function ActiveSession() {
           .single();
 
         if (data && !error) {
-          foundItem = mapUserActivity(data);
+          const mappedActivity = mapUserActivity(data);
+          const { data: linkedRows } = await supabase
+            .from('activity_devices')
+            .select('device_id, devices(id, name, type, status, status_level)')
+            .eq('activity_id', id);
+
+          foundItem = {
+            ...mappedActivity,
+            devices: (linkedRows ?? [])
+              .map((row) => normalizeLinkedDevice(row.devices))
+              .filter(Boolean)
+              .map((device) =>
+                mapLinkedDeviceToScenarioState(device as {
+                  id: number;
+                  name: string;
+                  type: string | null;
+                  status?: string | null;
+                  status_level?: number | null;
+                }),
+              ),
+          };
         }
       }
 
@@ -333,10 +359,12 @@ export default function ActiveSession() {
           if (!pId) pId = '37i9dQZF1DX76W9kuv1Z0g';
         }
         
-        const sessionDevices = relatedScenario?.devices || getItemDevices(foundItem);
+        const sessionDevices =
+          relatedScenario?.devices?.length ? relatedScenario.devices : getItemDevices(foundItem);
         const hasScenarioTv = sessionDevices.some((config: ScenarioDeviceState) => {
           const device = SMART_HOME_DEVICES[config.deviceId];
-          return device?.type === 'tv';
+          const fallbackMeta = getScenarioDeviceMeta(config);
+          return device?.type === 'tv' || fallbackMeta.type === 'tv';
         });
         const shouldPreferTv =
           hasScenarioTv &&

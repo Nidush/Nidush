@@ -5,6 +5,7 @@ import { HeaderSection } from '@/components/activitiesScenarios/HeaderSection';
 import { CustomAlert } from '@/components/CustomAlert';
 import { FeedbackState } from '@/components/UI/FeedbackState';
 import { useBiometrics } from '@/context/BiometricsContext';
+import { useSpotify } from '@/context/SpotifyContext';
 import { supabase } from '@/utils/supabase';
 import {
   Nunito_400Regular,
@@ -50,6 +51,7 @@ import { getDynamicRecommendations } from '@/utils/recommendationEngine';
 
 const UnifiedActivitiesScreen = () => {
   const { currentState } = useBiometrics();
+  const { getUserPlaylists, isAuthenticated } = useSpotify();
 
   const [viewMode, setViewMode] = useState<'activities' | 'scenarios'>(
     'activities',
@@ -276,11 +278,21 @@ const UnifiedActivitiesScreen = () => {
     setIsGeneratingAiIdeas(true);
 
     try {
+      const spotifyPlaylists = isAuthenticated
+        ? (await getUserPlaylists())
+            .slice(0, 15)
+            .map((playlist) => ({
+              id: playlist.id,
+              name: playlist.name,
+            }))
+        : [];
+
       const ideas = await fetchAiActivityIdeas({
         mood: currentState,
         activeFilter,
         prompt: searchQuery,
         source: 'activities-ai-modal',
+        spotifyPlaylists,
       });
 
       setAiIdeas(ideas);
@@ -297,7 +309,7 @@ const UnifiedActivitiesScreen = () => {
     } finally {
       setIsGeneratingAiIdeas(false);
     }
-  }, [activeFilter, currentState, searchQuery]);
+  }, [activeFilter, currentState, getUserPlaylists, isAuthenticated, searchQuery]);
 
   const saveAiIdea = async (idea: AiActivityIdea) => {
     if (isSavingAiIdeaId) return;

@@ -35,6 +35,7 @@ import {
   isUserScenarioRouteId,
   mapUserActivity,
 } from '@/utils/catalogTemplates';
+import { getScenarioDeviceMeta, mapLinkedDeviceToScenarioState } from '@/utils/activityDeviceConfigs';
 
 type AlertConfigState = {
   visible: boolean;
@@ -134,6 +135,11 @@ const getItemTypeKey = (item: Activity | Scenario) =>
 const getItemDevices = (item: Activity | Scenario) =>
   ('devices' in item && Array.isArray(item.devices) ? item.devices : []) as ScenarioDeviceState[];
 
+const normalizeLinkedDevice = (value: unknown) => {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value;
+};
+
 export default function ActivityDetails() {
   const { id, isNew, itemType } = useLocalSearchParams<{ id: string; isNew?: string; itemType?: string }>();
 
@@ -193,6 +199,31 @@ export default function ActivityDetails() {
       }
 
       if (foundActivity) {
+        const linkedDevicesPromise = (async () => {
+          const activityId = Number(foundActivity.id);
+          if (!Number.isFinite(activityId)) return [];
+
+          const { data: linkedRows, error: linkedError } = await supabase
+            .from('activity_devices')
+            .select('device_id, devices(id, name, type, status, status_level)')
+            .eq('activity_id', activityId);
+
+          if (linkedError || !linkedRows) return [];
+
+          return linkedRows
+            .map((row) => normalizeLinkedDevice(row.devices))
+            .filter(Boolean)
+            .map((device) =>
+              mapLinkedDeviceToScenarioState(device as {
+                id: number;
+                name: string;
+                type: string | null;
+                status?: string | null;
+                status_level?: number | null;
+              }),
+            );
+        })();
+
         const shortcutPromise = (async () => {
           if (String(foundActivity.id).startsWith('template:')) {
             return foundActivity.shortcuts;
@@ -280,12 +311,17 @@ export default function ActivityDetails() {
             })()
           : Promise.resolve(null);
 
-        const [shortcutValue, scen, content] = await Promise.all([
+        const [shortcutValue, scen, content, linkedDevices] = await Promise.all([
           shortcutPromise,
           scenarioPromise,
           contentPromise,
+          linkedDevicesPromise,
         ]);
-        const activityWithShortcut = { ...foundActivity, shortcuts: shortcutValue };
+        const activityWithShortcut = {
+          ...foundActivity,
+          shortcuts: shortcutValue,
+          devices: linkedDevices,
+        };
 
         setMainItem(activityWithShortcut);
         setRelatedScenario(scen);
@@ -584,15 +620,16 @@ export default function ActivityDetails() {
       : imgObj || { uri: 'https://picsum.photos/400/600' };
 
   const devicesToShow: ScenarioDeviceState[] =
-    relatedScenario?.devices || getItemDevices(mainItem);
+    relatedScenario?.devices?.length ? relatedScenario.devices : getItemDevices(mainItem);
 
   const activeSpeakerConfig = devicesToShow.find((config) => {
     const device = SMART_HOME_DEVICES[config.deviceId];
-    return device?.type === 'speaker';
+    const fallbackMeta = getScenarioDeviceMeta(config);
+    return device?.type === 'speaker' || fallbackMeta.type === 'speaker';
   });
 
   const audioStatusText = activeSpeakerConfig
-    ? `Playlist will be played on ${SMART_HOME_DEVICES[activeSpeakerConfig.deviceId].name}`
+    ? `Playlist will be played on ${SMART_HOME_DEVICES[activeSpeakerConfig.deviceId]?.name || getScenarioDeviceMeta(activeSpeakerConfig).name}`
     : 'Playlist will be played';
 
   // Helper: parse JSON safely (handles strings, arrays, objects)
