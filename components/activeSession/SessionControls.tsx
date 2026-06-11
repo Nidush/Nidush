@@ -1,9 +1,15 @@
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, ImageSourcePropType, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   SharedValue,
+  cancelAnimation,
+  Easing,
   useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
 } from 'react-native-reanimated';
 
 interface SessionControlsProps {
@@ -47,8 +53,16 @@ export const SessionControls = ({
   onNextStep,
   currentTrack,
 }: SessionControlsProps) => {
+  const [titleContainerWidth, setTitleContainerWidth] = useState(0);
+  const [titleTextWidth, setTitleTextWidth] = useState(0);
+  const titleTranslateX = useSharedValue(0);
+
   const animatedProgressStyle = useAnimatedStyle(() => ({
     width: `${progress.value}%`,
+  }));
+
+  const titleAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: titleTranslateX.value }],
   }));
 
   const imageSource =
@@ -60,6 +74,35 @@ export const SessionControls = ({
 
   const minutesLeft = Math.floor(secondsLeft / 60);
   const remainingSeconds = (secondsLeft % 60).toString().padStart(2, '0');
+  const currentTitle = currentTrack?.title || 'Music';
+
+  useEffect(() => {
+    const overflow = titleTextWidth - titleContainerWidth;
+
+    cancelAnimation(titleTranslateX);
+    titleTranslateX.value = 0;
+
+    if (overflow <= 12) return;
+
+    titleTranslateX.value = withRepeat(
+      withSequence(
+        withTiming(0, { duration: 1200 }),
+        withTiming(-overflow, {
+          duration: Math.max(overflow * 45, 3500),
+          easing: Easing.linear,
+        }),
+        withTiming(-overflow, { duration: 1000 }),
+        withTiming(0, { duration: 900, easing: Easing.out(Easing.ease) }),
+      ),
+      -1,
+      false,
+    );
+
+    return () => {
+      cancelAnimation(titleTranslateX);
+      titleTranslateX.value = 0;
+    };
+  }, [currentTitle, titleContainerWidth, titleTextWidth, titleTranslateX]);
 
   return (
     <View className="bg-[#F1F4EE] px-10 pb-8">
@@ -158,15 +201,25 @@ export const SessionControls = ({
               accessibilityRole="text"
               accessibilityLabel={`Background music: ${currentTrack?.title || 'Music'} by ${currentTrack?.artist || 'Artist'}`}
             >
-              <Text
-                maxFontSizeMultiplier={1.2}
-                className="text-[#354F52] text-[17px]"
-                style={{ fontFamily: 'Nunito_700Bold' }}
-                importantForAccessibility="no-hide-descendants"
-                numberOfLines={1}
+              <View
+                className="overflow-hidden"
+                onLayout={(event) =>
+                  setTitleContainerWidth(event.nativeEvent.layout.width)
+                }
               >
-                {currentTrack?.title || 'Music'}
-              </Text>
+                <Animated.Text
+                  maxFontSizeMultiplier={1.2}
+                  className="text-[#354F52] text-[17px]"
+                  style={[{ fontFamily: 'Nunito_700Bold' }, titleAnimatedStyle]}
+                  importantForAccessibility="no-hide-descendants"
+                  numberOfLines={1}
+                  onLayout={(event) =>
+                    setTitleTextWidth(event.nativeEvent.layout.width)
+                  }
+                >
+                  {currentTitle}
+                </Animated.Text>
+              </View>
               <Text
                 maxFontSizeMultiplier={1.2}
                 className="text-[#354F52]/70 text-sm"

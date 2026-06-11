@@ -34,6 +34,7 @@ import {
   fetchScenarioTemplateById,
   isUserScenarioRouteId,
   mapUserActivity,
+  parseUserScenarioDbId,
 } from '@/utils/catalogTemplates';
 import { getScenarioDeviceMeta, mapLinkedDeviceToScenarioState } from '@/utils/activityDeviceConfigs';
 
@@ -254,10 +255,11 @@ export default function ActivityDetails() {
 
               if (!scen) {
                 console.log('[ActivityDetails] Fetching scenario from DB:', foundActivity.scenario_id);
+                const scenarioDbId = parseUserScenarioDbId(foundActivity.scenario_id);
                 const { data: scenData } = await supabase
                   .from('scenarios')
                   .select('*')
-                  .eq('id', foundActivity.scenario_id)
+                  .eq('id', scenarioDbId)
                   .maybeSingle<ScenarioRow>();
 
                 if (scenData) {

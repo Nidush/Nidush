@@ -33,6 +33,80 @@ type FetchAiActivityIdeasOptions = {
   }>;
 };
 
+type SpotifyPlaylistOption = {
+  id: string;
+  name: string;
+};
+
+const PLAYLIST_KEYWORDS: Record<AiActivityIdea['type'], string[]> = {
+  Cooking: ['cook', 'kitchen', 'dinner', 'coffee', 'food', 'chill', 'jazz'],
+  Meditation: ['meditation', 'calm', 'peace', 'ambient', 'focus', 'sleep', 'breath'],
+  Workout: ['workout', 'gym', 'run', 'power', 'energy', 'training', 'cardio'],
+  Audiobooks: ['focus', 'reading', 'books', 'study', 'instrumental', 'deep focus'],
+  Yoga: ['yoga', 'stretch', 'flow', 'zen', 'calm', 'balance'],
+  Reading: ['reading', 'focus', 'study', 'quiet', 'instrumental', 'ambient'],
+  other: ['mood', 'daily', 'mix', 'favorites', 'chill'],
+};
+
+const scorePlaylistForIdea = (
+  playlist: SpotifyPlaylistOption,
+  idea: AiActivityIdea,
+) => {
+  const haystack = `${idea.title} ${idea.description} ${idea.reason}`.toLowerCase();
+  const playlistName = playlist.name.toLowerCase();
+  const keywords = PLAYLIST_KEYWORDS[idea.type] ?? PLAYLIST_KEYWORDS.other;
+
+  let score = 0;
+
+  if (haystack.includes('morning') && playlistName.includes('morning')) score += 5;
+  if (haystack.includes('night') && (playlistName.includes('night') || playlistName.includes('sleep'))) score += 5;
+  if (haystack.includes('focus') && playlistName.includes('focus')) score += 5;
+  if (haystack.includes('relax') && (playlistName.includes('relax') || playlistName.includes('calm'))) score += 5;
+
+  for (const keyword of keywords) {
+    if (playlistName.includes(keyword)) score += 3;
+    if (haystack.includes(keyword) && playlistName.includes(keyword)) score += 4;
+  }
+
+  if (playlistName.includes('liked songs')) score += 1;
+  if (playlistName.includes('favorites')) score += 2;
+
+  return score;
+};
+
+const pickPlaylistForIdea = (
+  idea: AiActivityIdea,
+  spotifyPlaylists: SpotifyPlaylistOption[],
+) => {
+  if (!spotifyPlaylists.length) return null;
+
+  const ranked = [...spotifyPlaylists]
+    .map((playlist) => ({
+      playlist,
+      score: scorePlaylistForIdea(playlist, idea),
+    }))
+    .sort((left, right) => right.score - left.score);
+
+  return ranked[0]?.playlist ?? spotifyPlaylists[0];
+};
+
+const attachSpotifyPlaylistsToIdeas = (
+  ideas: AiActivityIdea[],
+  spotifyPlaylists: SpotifyPlaylistOption[],
+) =>
+  ideas.map((idea) => {
+    if (idea.playlistId && idea.playlistName) return idea;
+
+    const selectedPlaylist = pickPlaylistForIdea(idea, spotifyPlaylists);
+    if (!selectedPlaylist) return idea;
+
+    return {
+      ...idea,
+      playlistId: idea.playlistId || selectedPlaylist.id,
+      playlistName: idea.playlistName || selectedPlaylist.name,
+    };
+  });
+
 export const fetchAiActivityIdeas = async ({
   mood,
   activeFilter = 'All',
@@ -53,7 +127,8 @@ export const fetchAiActivityIdeas = async ({
 
   if (error) throw error;
 
-  return Array.isArray(data?.ideas) ? (data.ideas as AiActivityIdea[]) : [];
+  const ideas = Array.isArray(data?.ideas) ? (data.ideas as AiActivityIdea[]) : [];
+  return attachSpotifyPlaylistsToIdeas(ideas, spotifyPlaylists);
 };
 
 export const saveAiActivityIdea = async (idea: AiActivityIdea): Promise<Activity> => {

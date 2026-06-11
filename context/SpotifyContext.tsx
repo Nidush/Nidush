@@ -74,6 +74,7 @@ interface SpotifyContextType {
 type SpotifyPlaybackOptions = {
   preferredDeviceTypes?: string[];
   preferredDeviceNameIncludes?: string[];
+  suppressAppOpen?: boolean;
 };
 
 const SpotifyContext = createContext<SpotifyContextType | undefined>(undefined);
@@ -355,6 +356,9 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const availableDevices = devices.filter((device) => !device.is_restricted);
     const preferredTypes = options?.preferredDeviceTypes?.map((type) => type.toLowerCase()) ?? [];
     const preferredNames = options?.preferredDeviceNameIncludes?.map((name) => name.toLowerCase()) ?? [];
+    const smartphoneDevice = availableDevices.find(
+      (device) => String(device.type || '').toLowerCase() === 'smartphone',
+    );
 
     return (
       availableDevices.find((device) =>
@@ -363,7 +367,7 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       availableDevices.find((device) =>
         preferredNames.some((name) => String(device.name || '').toLowerCase().includes(name)),
       ) ||
-      availableDevices.find((device) => device.type === 'Smartphone') ||
+      smartphoneDevice ||
       availableDevices[0]
     );
   };
@@ -475,16 +479,16 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
             }
           };
           setTimeout(forcePlayback, 3000); // Esperar 3s após transferir
-        } else {
+        } else if (!options?.suppressAppOpen) {
           logger.debug('[Spotify] No active device. Attempting to open Spotify.');
-          // Tentar abrir a app do Spotify. Infelizmente, o Android exige que a app esteja 
-          // em primeiro plano pelo menos uma vez para "reativar" o recetor de áudio.
           Linking.openURL('spotify:').catch(() => {
             Alert.alert(
               'Spotify em Suspensão',
               'O teu telemóvel desligou o Spotify. Por favor, abre o Spotify uma vez e certifica-te que a Bateria está em "Não Restrito".'
             );
           });
+        } else {
+          logger.debug('[Spotify] No active Spotify device available and app auto-open is disabled.');
         }
       }
     } catch (e) {

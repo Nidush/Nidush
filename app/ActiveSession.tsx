@@ -30,12 +30,14 @@ import {
   Scenario,
   ScenarioDeviceState,
 } from '@/constants/data';
+import { resolveCatalogImage } from '@/constants/data/catalogAssets';
 import { SMART_HOME_DEVICES } from '@/constants/devices';
 import {
   fetchActivityTemplateById,
   fetchScenarioTemplateById,
   mapUserActivity,
   normalizeScenarioTemplateId,
+  parseUserScenarioDbId,
 } from '@/utils/catalogTemplates';
 import { getScenarioDeviceMeta, mapLinkedDeviceToScenarioState } from '@/utils/activityDeviceConfigs';
 
@@ -76,6 +78,21 @@ type ContentRow = {
   type?: string | null;
   instructions?: unknown;
   video_url?: string | null;
+};
+
+const getJoinedRoomName = (value: unknown) => {
+  if (Array.isArray(value)) {
+    const first = value[0];
+    return first && typeof first === 'object' && 'name' in first
+      ? String((first as { name?: unknown }).name ?? '')
+      : '';
+  }
+
+  if (value && typeof value === 'object' && 'name' in value) {
+    return String((value as { name?: unknown }).name ?? '');
+  }
+
+  return '';
 };
 
 const isStoredActivityLike = (value: unknown): value is StoredActivityLike =>
@@ -253,7 +270,30 @@ export default function ActiveSession() {
       }
 
       const sId = getScenarioId(foundItem);
-      relatedScenario = sId ? await fetchScenarioTemplateById(sId) : null;
+      relatedScenario = sId ? await fetchScenarioTemplateById(String(sId)) : null;
+      if (!relatedScenario && sId) {
+        const scenarioDbId = parseUserScenarioDbId(sId);
+        const { data: scenData } = await supabase
+          .from('scenarios')
+          .select('id, name, description, image, playlist_id, playlist_name, focus_mode_enabled, rooms(name)')
+          .eq('id', scenarioDbId)
+          .maybeSingle();
+
+        if (scenData) {
+          relatedScenario = {
+            id: `scenario:${scenData.id}`,
+            title: scenData.name,
+            description: scenData.description || '',
+            playlist: scenData.playlist_name || (scenData.playlist_id ? 'Spotify Music' : undefined),
+            playlist_id: scenData.playlist_id || undefined,
+            focusMode: scenData.focus_mode_enabled === true,
+            shortcuts: false,
+            devices: [],
+            room: getJoinedRoomName(scenData.rooms) || undefined,
+            image: resolveCatalogImage(scenData.image || 'Scenarios/moonlight_bay.png'),
+          } as Scenario;
+        }
+      }
       if (contentType !== 'video' && relatedScenario?.playlist) {
         playlistName = relatedScenario.playlist;
       }
@@ -323,7 +363,7 @@ export default function ActiveSession() {
 
       // Tocar música no Spotify só em sessões sem vídeo.
       if (isAuthenticated && contentType !== 'video') {
-        let pId = getPlaylistId(foundItem);
+        let pId = getPlaylistId(foundItem) || relatedScenario?.playlist_id;
         
         if (!pId) {
           const type = getActivityType(foundItem);

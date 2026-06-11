@@ -101,6 +101,15 @@ const getImageUri = (value: ImageSourcePropType | string | null) =>
       ? value.uri
       : undefined;
 
+const resolveScenarioDbId = (value: string) => {
+  if (typeof parseUserScenarioDbId === 'function') {
+    return parseUserScenarioDbId(value);
+  }
+
+  const raw = String(value ?? '');
+  return raw.startsWith('scenario:') ? raw.replace(/^scenario:/, '') : raw;
+};
+
 export default function NewActivityFlow() {
   let [fontsLoaded] = useFonts({
     Nunito_700Bold,
@@ -423,7 +432,7 @@ export default function NewActivityFlow() {
         type: formattedType,
         content_id: selectedContentId || null,
         scenario_id: selectedScenarioId
-          ? parseInt(parseUserScenarioDbId(selectedScenarioId).toString().replace(/\D/g, ''), 10)
+          ? parseInt(resolveScenarioDbId(selectedScenarioId).toString().replace(/\D/g, ''), 10)
           : 1,
         room_id: dbRoomId,
         home_id: currentHomeId,
