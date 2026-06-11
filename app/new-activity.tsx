@@ -12,7 +12,11 @@ import { supabase, uploadImage, apiLog } from '../utils/supabase';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNotifications } from '@/context/NotificationsContext';
-import { fetchScenarioTemplates } from '@/utils/catalogTemplates';
+import {
+  fetchScenarioTemplates,
+  fetchUserScenarios,
+  parseUserScenarioDbId,
+} from '@/utils/catalogTemplates';
 import { captureException, trackEvent } from '@/utils/observability';
 import {
   AccessibilityInfo,
@@ -227,7 +231,18 @@ export default function NewActivityFlow() {
   useEffect(() => {
     const fetchScenarios = async () => {
       try {
-        setScenarioTemplates(await fetchScenarioTemplates());
+        const [templateScenarios, userScenarios] = await Promise.all([
+          fetchScenarioTemplates(),
+          fetchUserScenarios().catch(() => []),
+        ]);
+
+        const mergedScenarios = [...userScenarios, ...templateScenarios];
+        const uniqueScenarios = mergedScenarios.filter(
+          (scenario, index, list) =>
+            list.findIndex((item) => item.id === scenario.id) === index,
+        );
+
+        setScenarioTemplates(uniqueScenarios);
       } catch (error) {
         console.error('Failed to load scenario templates:', error);
         setScenarioTemplates([]);
@@ -407,7 +422,9 @@ export default function NewActivityFlow() {
         category: 'My creations',
         type: formattedType,
         content_id: selectedContentId || null,
-        scenario_id: selectedScenarioId ? parseInt(selectedScenarioId.toString().replace(/\D/g, '')) : 1,
+        scenario_id: selectedScenarioId
+          ? parseInt(parseUserScenarioDbId(selectedScenarioId).toString().replace(/\D/g, ''), 10)
+          : 1,
         room_id: dbRoomId,
         home_id: currentHomeId,
       };

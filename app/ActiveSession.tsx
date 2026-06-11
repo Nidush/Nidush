@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/utils/supabase';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -127,7 +127,16 @@ const getNumericRoomId = (item: StoredActivityLike | Activity | Scenario) => {
 
 export default function ActiveSession() {
   const { id } = useLocalSearchParams<{ id: string; musicStarted?: string }>();
-  const { playPlaylist, pausePlayback, resumePlayback, currentTrack, isAuthenticated } = useSpotify();
+  const {
+    playPlaylist,
+    pausePlayback,
+    resumePlayback,
+    nextTrack,
+    previousTrack,
+    openCurrentTrack,
+    currentTrack,
+    isAuthenticated,
+  } = useSpotify();
 
   // --- 1. STATE ---
   const [loading, setLoading] = useState(true);
@@ -138,6 +147,7 @@ export default function ActiveSession() {
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [showExitModal, setShowExitModal] = useState(false);
+  const startedPlaybackForSessionRef = useRef<string | null>(null);
 
   const progress = useSharedValue(0);
   const contentOpacity = useSharedValue(1);
@@ -347,7 +357,8 @@ export default function ActiveSession() {
             }
           : undefined;
 
-        if (pId) {
+        if (pId && startedPlaybackForSessionRef.current !== String(id)) {
+          startedPlaybackForSessionRef.current = String(id);
           console.log('[Spotify] A iniciar música no momento do Exercício:', pId);
           playPlaylist(pId, tvPlaybackOptions);
         } else {
@@ -358,7 +369,8 @@ export default function ActiveSession() {
             cooking: '37i9dQZF1DXdbChS9879u9',
             meditation: '37i9dQZF1DWZ0XmS6AnY9s'
           };
-          if (fallbacks[type]) {
+          if (fallbacks[type] && startedPlaybackForSessionRef.current !== String(id)) {
+            startedPlaybackForSessionRef.current = String(id);
             console.log('[Spotify] A usar fallback no Exercício:', type);
             playPlaylist(fallbacks[type], tvPlaybackOptions);
           }
@@ -377,8 +389,9 @@ export default function ActiveSession() {
   }, [id, isAuthenticated, playPlaylist]);
 
   useEffect(() => {
+    startedPlaybackForSessionRef.current = null;
     loadData();
-  }, [loadData]);
+  }, [id, loadData]);
 
   useEffect(() => {
     if (isVideoSession) return;
@@ -552,6 +565,9 @@ export default function ActiveSession() {
             progress={progress}
             onToggleSession={handleToggleSession}
             onToggleMusic={handleToggleMusic}
+            onNextTrack={nextTrack}
+            onPreviousTrack={previousTrack}
+            onOpenSpotify={openCurrentTrack}
             currentTrack={currentTrack}
           />
         </>
