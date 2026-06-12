@@ -128,7 +128,10 @@ jobs:
         with:
           deno-version: latest
 
-      - name: Bootstrap local database
+      - name: Start local Supabase
+        run: supabase start
+
+      - name: Reset local database
         run: supabase db reset
 
       - name: Lint database schema
