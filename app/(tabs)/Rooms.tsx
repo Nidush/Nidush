@@ -661,6 +661,13 @@ export default function Rooms() {
 
       if (activitiesError) throw activitiesError;
 
+      const { error: scenariosError } = await supabase
+        .from('scenarios')
+        .delete()
+        .eq('room_id', room.id);
+
+      if (scenariosError) throw scenariosError;
+
       const { error } = await supabase
         .from('rooms')
         .delete()
