@@ -3,7 +3,6 @@ import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
-  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -108,6 +107,7 @@ export default function Rooms() {
   const [newDeviceRoomId, setNewDeviceRoomId] = useState<number | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [isDeletingRoom, setIsDeletingRoom] = useState(false);
+  const [roomPendingDeletion, setRoomPendingDeletion] = useState<number | null>(null);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [deviceDraftName, setDeviceDraftName] = useState('');
   const [deviceDraftRoomId, setDeviceDraftRoomId] = useState<number | null>(null);
@@ -647,6 +647,20 @@ export default function Rooms() {
 
     setIsDeletingRoom(true);
     try {
+      const { error: devicesError } = await supabase
+        .from('devices')
+        .update({ room_id: null })
+        .eq('room_id', room.id);
+
+      if (devicesError) throw devicesError;
+
+      const { error: activitiesError } = await supabase
+        .from('activities')
+        .update({ room_id: null })
+        .eq('room_id', room.id);
+
+      if (activitiesError) throw activitiesError;
+
       const { error } = await supabase
         .from('rooms')
         .delete()
@@ -679,11 +693,11 @@ export default function Rooms() {
       });
       setActiveRoomId((current) => {
         if (current !== room.id) return current;
-        const remainingRooms = roomsScreenCache.rooms.filter((item) => item.id !== room.id);
-        const nextRoomId = remainingRooms[0]?.id ?? null;
+        const nextRoomId = roomsScreenCache.rooms[0]?.id ?? null;
         roomsScreenCache.activeRoomId = nextRoomId;
         return nextRoomId;
       });
+      setRoomPendingDeletion((current) => (current === room.id ? null : current));
       showFeedback(`"${room.name}" was removed from your home.`, 'success');
     } catch (err: unknown) {
       console.error('Failed to delete room:', err);
@@ -696,23 +710,6 @@ export default function Rooms() {
       setIsDeletingRoom(false);
     }
   }, [isDeletingRoom, showFeedback]);
-
-  const confirmDeleteRoom = useCallback((room: Room) => {
-    Alert.alert(
-      'Delete room',
-      `Do you want to delete "${room.name}"? Devices in this room will become unassigned, and room scenarios may be removed.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            void handleDeleteRoom(room);
-          },
-        },
-      ],
-    );
-  }, [handleDeleteRoom]);
 
   const menuActions = [
     { label: 'Room', onPress: openAddRoomModal },
@@ -925,24 +922,71 @@ export default function Rooms() {
                 {filteredDevices.length} device{filteredDevices.length === 1 ? '' : 's'}, with {roomActivities.length} activity
                 {roomActivities.length === 1 ? '' : 'ies'} linked to this room.
               </Text>
-              <TouchableOpacity
-                onPress={() => confirmDeleteRoom(activeRoom)}
-                disabled={isDeletingRoom}
-                className="self-start mt-2 px-4 py-3 rounded-full bg-[#FBE8E6]"
-                accessibilityRole="button"
-                accessibilityLabel={`Delete room ${activeRoom.name}`}
-              >
-                {isDeletingRoom ? (
-                  <ActivityIndicator size="small" color="#B5564D" />
-                ) : (
+              {roomPendingDeletion === activeRoom.id ? (
+                <View className="mt-3 rounded-[22px] border border-[#F2C9C4] bg-[#FFF2EF] p-4">
                   <Text
-                    className="text-[#B5564D] text-sm"
-                    style={{ fontFamily: 'Nunito_700Bold' }}
+                    className="text-[#8E473F] text-sm mb-3"
+                    style={{ fontFamily: 'Nunito_600SemiBold' }}
                   >
-                    Delete room
+                    Delete "{activeRoom.name}"? Devices in this room will become unassigned.
                   </Text>
-                )}
-              </TouchableOpacity>
+                  <View className="flex-row gap-3">
+                    <TouchableOpacity
+                      onPress={() => setRoomPendingDeletion(null)}
+                      disabled={isDeletingRoom}
+                      className="px-4 py-3 rounded-full bg-white border border-[#E7D7D3]"
+                      accessibilityRole="button"
+                      accessibilityLabel={`Cancel deleting room ${activeRoom.name}`}
+                    >
+                      <Text
+                        className="text-[#6C7A74] text-sm"
+                        style={{ fontFamily: 'Nunito_700Bold' }}
+                      >
+                        Cancel
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        void handleDeleteRoom(activeRoom);
+                      }}
+                      disabled={isDeletingRoom}
+                      className="px-4 py-3 rounded-full bg-[#B5564D]"
+                      accessibilityRole="button"
+                      accessibilityLabel={`Confirm deleting room ${activeRoom.name}`}
+                    >
+                      {isDeletingRoom ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Text
+                          className="text-white text-sm"
+                          style={{ fontFamily: 'Nunito_700Bold' }}
+                        >
+                          Confirm delete
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => setRoomPendingDeletion(activeRoom.id)}
+                  disabled={isDeletingRoom}
+                  className="self-start mt-2 px-4 py-3 rounded-full bg-[#FBE8E6]"
+                  accessibilityRole="button"
+                  accessibilityLabel={`Delete room ${activeRoom.name}`}
+                >
+                  {isDeletingRoom ? (
+                    <ActivityIndicator size="small" color="#B5564D" />
+                  ) : (
+                    <Text
+                      className="text-[#B5564D] text-sm"
+                      style={{ fontFamily: 'Nunito_700Bold' }}
+                    >
+                      Delete room
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
           ) : null
         }
