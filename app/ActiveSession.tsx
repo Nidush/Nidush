@@ -411,8 +411,12 @@ export default function ActiveSession() {
           ['meditation', 'yoga', 'general', 'other'].includes(
             getActivityType(foundItem),
           );
+        const basePlaybackOptions = {
+          suppressAppOpen: true,
+        };
         const tvPlaybackOptions = shouldPreferTv
           ? {
+              ...basePlaybackOptions,
               preferredDeviceTypes: ['TV'],
               preferredDeviceNameIncludes: [
                 connectedTvName || '',
@@ -423,7 +427,7 @@ export default function ActiveSession() {
                 'chromecast',
               ].filter(Boolean),
             }
-          : undefined;
+          : basePlaybackOptions;
 
         if (pId && startedPlaybackForSessionRef.current !== String(id)) {
           startedPlaybackForSessionRef.current = String(id);
