@@ -7,6 +7,7 @@ import MaskedView from '@react-native-masked-view/masked-view';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { Image, ImageSourcePropType, Platform, StyleSheet, Text, View } from 'react-native';
+import { getRoomIconName } from '@/utils/roomIcons';
 import { ReviewCard } from '../ReviewCard';
 import { ScenarioReviewCard } from '../ScenarioReviewCard';
 import { StepWrapper } from '../StepWrapper';
@@ -78,29 +79,8 @@ const getActivityIcon = (type: string) => {
 };
 
 const getRoomIcon = (room: string) => {
-  const lowerRoom = room ? room.toLowerCase() : '';
   const props = { size: 24, color: '#354F52' };
-
-  if (lowerRoom.includes('kitchen') || lowerRoom.includes('dining')) {
-    return <MaterialIcons name="restaurant" {...props} />;
-  }
-
-  let iconName: keyof typeof MaterialIcons.glyphMap = 'room';
-  if (lowerRoom.includes('bed')) iconName = 'bed';
-  else if (lowerRoom.includes('living') || lowerRoom.includes('lounge'))
-    iconName = 'weekend';
-  else if (
-    lowerRoom.includes('office') ||
-    lowerRoom.includes('desk') ||
-    lowerRoom.includes('study')
-  )
-    iconName = 'computer';
-  else if (lowerRoom.includes('bath') || lowerRoom.includes('toilet'))
-    iconName = 'bathtub';
-  else if (lowerRoom.includes('garden') || lowerRoom.includes('out'))
-    iconName = 'deck';
-
-  return <MaterialIcons name={iconName} {...props} />;
+  return <MaterialIcons name={getRoomIconName(room)} {...props} />;
 };
 
 export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {

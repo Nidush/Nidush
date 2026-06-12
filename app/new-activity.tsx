@@ -18,6 +18,7 @@ import {
   parseUserScenarioDbId,
 } from '@/utils/catalogTemplates';
 import { captureException, trackEvent } from '@/utils/observability';
+import { getRoomIconName } from '@/utils/roomIcons';
 import {
   AccessibilityInfo,
   Keyboard,
@@ -84,6 +85,11 @@ type ContentRow = {
   author?: string | null;
 };
 
+type HomeRoomRow = {
+  id: number;
+  name: string;
+};
+
 const normalizeContentInstructions = (value: unknown): Content['instructions'] => {
   if (!Array.isArray(value)) return undefined;
   return value as Content['instructions'];
@@ -136,6 +142,8 @@ export default function NewActivityFlow() {
   const [activityImage, setActivityImage] = useState<ImageSourcePropType | string | null>(null);
   const [dbContent, setDbContent] = useState<Content[]>([]);
   const [scenarioTemplates, setScenarioTemplates] = useState<Scenario[]>([]);
+  const [homeRooms, setHomeRooms] = useState<HomeRoomRow[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const linkRoomTvDevices = async (activityId: number, homeId: number, roomId: number | null) => {
@@ -238,6 +246,65 @@ export default function NewActivityFlow() {
   }, []);
 
   useEffect(() => {
+    const fetchHomeSetup = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setLoadError('You need to be logged in to create an activity.');
+          return;
+        }
+
+        const { data: userHome, error: userHomeError } = await supabase
+          .from('user_homes')
+          .select('home_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (userHomeError) throw userHomeError;
+
+        if (!userHome?.home_id) {
+          setLoadError('Connect this profile to a home before creating activities.');
+          return;
+        }
+
+        const { data: roomRows, error: roomsError } = await supabase
+          .from('rooms')
+          .select('id, name')
+          .eq('home_id', userHome.home_id)
+          .order('id', { ascending: true });
+
+        if (roomsError) throw roomsError;
+
+        const safeRooms = roomRows ?? [];
+        setHomeRooms(safeRooms);
+        if (safeRooms.length === 0) {
+          setLoadError('Create at least one room before creating an activity.');
+          return;
+        }
+
+        const { count: assignedDevicesCount, error: devicesError } = await supabase
+          .from('devices')
+          .select('id', { count: 'exact', head: true })
+          .eq('home_id', userHome.home_id)
+          .not('room_id', 'is', null);
+
+        if (devicesError) throw devicesError;
+        if (!assignedDevicesCount) {
+          setLoadError('Assign at least one device to a room before creating an activity.');
+          return;
+        }
+
+        setLoadError(null);
+      } catch (error) {
+        console.error('Failed to load home setup for activity creation:', error);
+        setLoadError('We could not load your home setup right now.');
+      }
+    };
+
+    fetchHomeSetup();
+  }, []);
+
+  useEffect(() => {
     const fetchScenarios = async () => {
       try {
         const [templateScenarios, userScenarios] = await Promise.all([
@@ -271,6 +338,18 @@ export default function NewActivityFlow() {
       setRoomId(selectedScenario.room || selectedScenario.room_id || '');
     }
   }, [isEditMode, room_id, selectedScenarioId, scenarioTemplates]);
+
+  useEffect(() => {
+    if (!homeRooms.length) return;
+
+    const rawRoomValue = String(room_id ?? '');
+    if (!/^\d+$/.test(rawRoomValue)) return;
+
+    const matchedRoom = homeRooms.find((room) => String(room.id) === rawRoomValue);
+    if (matchedRoom) {
+      setRoomId(matchedRoom.name);
+    }
+  }, [homeRooms, room_id]);
 
   const allContent = useMemo(() => {
     const combined = [...dbContent];
@@ -348,7 +427,7 @@ export default function NewActivityFlow() {
   };
 
   const handleSave = async () => {
-    if (isSaving) return;
+    if (isSaving || loadError) return;
 
     const contentObj = allContent.find(
       (c) => c.id === selectedContentId,
@@ -510,6 +589,14 @@ export default function NewActivityFlow() {
 
   if (!fontsLoaded) return null;
 
+  const roomOptions = homeRooms.map((room) => {
+    return {
+      id: room.name,
+      name: room.name,
+      icon: getRoomIconName(room.name),
+    };
+  });
+
   const reviewContent = allContent.find(
     (c) => c.id === selectedContentId,
   );
@@ -551,53 +638,78 @@ export default function NewActivityFlow() {
               }}
               keyboardShouldPersistTaps="handled"
             >
-              {step === 1 && (
-                <Step1_Type
-                  selected={activityType}
-                  onSelect={setActivityType}
-                />
-              )}
-              {step === 2 && (
-                <Step2_Content
-                  activityType={activityType}
-                  selectedContentId={selectedContentId}
-                  onSelect={handleContentSelect}
-                  contentList={allContent}
-                />
-              )}
-              {step === 3 && <Step3_Room selected={room_id} onSelect={setRoomId} />}
-              {step === 4 && (
-                <Step4_Environment
-                  roomName={room_id}
-                  selected={selectedScenarioId}
-                  onSelect={setSelectedScenarioId}
-                  scenarios={scenarioTemplates}
-                />
-              )}
-              {step === 5 && (
-                <Step5_Details
-                  name={activityName}
-                  setName={setActivityName}
-                  desc={description}
-                  setDesc={setDescription}
-                  image={activityImage}
-                  setImage={setActivityImage}
-                  defaultImage={reviewContent?.image || null}
-                />
-              )}
-              {step === 6 && (
-                <Step6_Review
-                  data={{
-                    activityType,
-                    content: reviewContent || null,
-                    room: room_id,
-                    environment: reviewScenario || null,
-                    activityName,
-                    description,
-                    activityImage,
-                  }}
-                  onJumpToStep={setStep}
-                />
+              {loadError ? (
+                <View className="bg-white rounded-3xl border border-[#DDE5D7] p-5 mt-4">
+                  <Text
+                    className="text-[#354F52] text-lg mb-2"
+                    style={{ fontFamily: 'Nunito_700Bold' }}
+                  >
+                    Activity creation is not ready yet
+                  </Text>
+                  <Text
+                    className="text-[#6C7A74] text-base"
+                    style={{ fontFamily: 'Nunito_400Regular' }}
+                  >
+                    {loadError}
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  {step === 1 && (
+                    <Step1_Type
+                      selected={activityType}
+                      onSelect={setActivityType}
+                    />
+                  )}
+                  {step === 2 && (
+                    <Step2_Content
+                      activityType={activityType}
+                      selectedContentId={selectedContentId}
+                      onSelect={handleContentSelect}
+                      contentList={allContent}
+                    />
+                  )}
+                  {step === 3 && (
+                    <Step3_Room
+                      selected={room_id}
+                      onSelect={setRoomId}
+                      options={roomOptions}
+                    />
+                  )}
+                  {step === 4 && (
+                    <Step4_Environment
+                      roomName={room_id}
+                      selected={selectedScenarioId}
+                      onSelect={setSelectedScenarioId}
+                      scenarios={scenarioTemplates}
+                    />
+                  )}
+                  {step === 5 && (
+                    <Step5_Details
+                      name={activityName}
+                      setName={setActivityName}
+                      desc={description}
+                      setDesc={setDescription}
+                      image={activityImage}
+                      setImage={setActivityImage}
+                      defaultImage={reviewContent?.image || null}
+                    />
+                  )}
+                  {step === 6 && (
+                    <Step6_Review
+                      data={{
+                        activityType,
+                        content: reviewContent || null,
+                        room: room_id,
+                        environment: reviewScenario || null,
+                        activityName,
+                        description,
+                        activityImage,
+                      }}
+                      onJumpToStep={setStep}
+                    />
+                  )}
+                </>
               )}
             </ScrollView>
 
@@ -614,16 +726,16 @@ export default function NewActivityFlow() {
                 <TouchableOpacity
                   // Se estiver desativado, fica cinzento/translúcido e sem sombra
                   className={`h-14 w-[210px] rounded-full justify-center items-center transition-all ${
-                    isNextDisabled()
+                    isNextDisabled() || Boolean(loadError)
                       ? 'bg-gray-400 opacity-60 shadow-none'
                       : 'bg-[#548F53] shadow-lg'
                   }`}
                   onPress={step === 6 ? handleSave : nextStep}
-                  disabled={isNextDisabled() || isSaving} // Impede o clique físico
+                  disabled={isNextDisabled() || isSaving || Boolean(loadError)} // Impede o clique físico
                   accessible={true}
                   accessibilityRole="button"
                   // Informa o leitor de ecrã (VoiceOver/TalkBack) que o botão está inativo
-                  accessibilityState={{ disabled: isNextDisabled() || isSaving }}
+                  accessibilityState={{ disabled: isNextDisabled() || isSaving || Boolean(loadError) }}
                   accessibilityLabel={
                     step === 6
                       ? isEditMode

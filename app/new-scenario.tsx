@@ -6,7 +6,6 @@ import { Step5_Details } from '@/components/newActivityFlow/steps/Step5_Details'
 import { StepWrapper } from '@/components/newActivityFlow/StepWrapper';
 import SpotifyPlaylistSelector from '@/components/UI/SpotifyPlaylistSelector';
 import { resolveCatalogImage } from '@/constants/data/catalogAssets';
-import { ROOMS } from '@/constants/data/rooms';
 import { useNotifications } from '@/context/NotificationsContext';
 import {
   Nunito_400Regular,
@@ -15,7 +14,7 @@ import {
   useFonts,
 } from '@expo-google-fonts/nunito';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { Stack, router } from 'expo-router';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
@@ -33,7 +32,7 @@ import {
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { captureException, trackEvent } from '@/utils/observability';
-import { ensureDefaultHomeRooms } from '@/utils/homeSetup';
+import { getRoomIconName } from '@/utils/roomIcons';
 import { supabase, uploadImage } from '@/utils/supabase';
 
 type RoomRow = {
@@ -54,19 +53,6 @@ const SCENARIO_DEFAULT_IMAGES: Record<string, string> = {
 };
 
 const TOTAL_STEPS = 4;
-
-const getRoomIcon = (roomName: string) => {
-  const fallback = ROOMS.find((room) => room.name.toLowerCase() === roomName.toLowerCase());
-  if (fallback) return fallback.icon;
-
-  const normalized = roomName.toLowerCase();
-  if (normalized.includes('bed')) return 'bed';
-  if (normalized.includes('kitchen') || normalized.includes('cook')) return 'restaurant';
-  if (normalized.includes('living') || normalized.includes('lounge')) return 'weekend';
-  if (normalized.includes('bath')) return 'bathtub';
-  if (normalized.includes('office') || normalized.includes('desk')) return 'computer';
-  return 'room';
-};
 
 const getDefaultScenarioImage = (roomName: string | null) => {
   if (!roomName) return resolveCatalogImage('Scenarios/forest_bathing.png');
@@ -96,8 +82,10 @@ function NewScenarioContent() {
   const previousDefaultImageRef = useRef<string | ImageSourcePropType | null>(null);
 
   const { addNotification } = useNotifications();
+  const { roomName: roomNameParam } = useLocalSearchParams<{ roomName?: string }>();
 
   const [step, setStep] = useState(1);
+  const [isRoomStepSkipped, setIsRoomStepSkipped] = useState(false);
   const [rooms, setRooms] = useState<RoomRow[]>([]);
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState('');
@@ -114,6 +102,9 @@ function NewScenarioContent() {
     () => rooms.find((room) => room.id === selectedRoomId) ?? null,
     [rooms, selectedRoomId],
   );
+
+  const displayedTotalSteps = isRoomStepSkipped ? TOTAL_STEPS - 1 : TOTAL_STEPS;
+  const displayedStep = isRoomStepSkipped ? Math.max(step - 1, 1) : step;
 
   const defaultScenarioImage = useMemo(
     () => getDefaultScenarioImage(selectedRoom?.name ?? null),
@@ -133,8 +124,8 @@ function NewScenarioContent() {
   }, [defaultScenarioImage, scenarioImage]);
 
   useEffect(() => {
-    AccessibilityInfo.announceForAccessibility(`Step ${step} of ${TOTAL_STEPS}`);
-  }, [step]);
+    AccessibilityInfo.announceForAccessibility(`Step ${displayedStep} of ${displayedTotalSteps}`);
+  }, [displayedStep, displayedTotalSteps]);
 
   useEffect(() => {
     const keyboardShowListener = Keyboard.addListener(
@@ -187,13 +178,42 @@ function NewScenarioContent() {
 
         if (roomsError) throw roomsError;
 
-        let safeRooms = roomRows ?? [];
+        const safeRooms = roomRows ?? [];
         if (safeRooms.length === 0) {
-          safeRooms = await ensureDefaultHomeRooms(userHome.home_id);
+          setRooms([]);
+          setSelectedRoomId(null);
+          setLoadError('Create at least one room before creating a scenario.');
+          return;
         }
+
+        const { count: assignedDevicesCount, error: devicesError } = await supabase
+          .from('devices')
+          .select('id', { count: 'exact', head: true })
+          .eq('home_id', userHome.home_id)
+          .not('room_id', 'is', null);
+
+        if (devicesError) throw devicesError;
+        if (!assignedDevicesCount) {
+          setRooms(safeRooms);
+          setSelectedRoomId((current) => current ?? safeRooms[0]?.id ?? null);
+          setIsRoomStepSkipped(false);
+          setLoadError('Assign at least one device to a room before creating a scenario.');
+          return;
+        }
+
+        const normalizedRoomNameParam = String(roomNameParam ?? '').trim().toLowerCase();
+        const preselectedRoom =
+          normalizedRoomNameParam.length > 0
+            ? safeRooms.find((room) => room.name.trim().toLowerCase() === normalizedRoomNameParam)
+            : null;
+
         setRooms(safeRooms);
-        setSelectedRoomId((current) => current ?? safeRooms[0]?.id ?? null);
-        setLoadError(safeRooms.length === 0 ? 'Create at least one room before creating a scenario.' : null);
+        setSelectedRoomId((current) => current ?? preselectedRoom?.id ?? safeRooms[0]?.id ?? null);
+        setIsRoomStepSkipped(Boolean(preselectedRoom));
+        if (preselectedRoom) {
+          setStep((current) => (current === 1 ? 2 : current));
+        }
+        setLoadError(null);
       } catch (error) {
         console.error('Failed to load rooms for scenario creation:', error);
         setLoadError('We could not load your home rooms right now.');
@@ -201,13 +221,18 @@ function NewScenarioContent() {
     };
 
     loadRooms();
-  }, []);
+  }, [roomNameParam]);
 
   const nextStep = () => {
     if (step < TOTAL_STEPS) setStep((current) => current + 1);
   };
 
   const prevStep = () => {
+    if (isRoomStepSkipped && step === 2) {
+      router.back();
+      return;
+    }
+
     if (step > 1) {
       setStep((current) => current - 1);
       return;
@@ -341,7 +366,7 @@ function NewScenarioContent() {
     <View style={{ flex: 1, backgroundColor: '#F9FAF7' }} accessibilityLanguage="en-US">
       <Stack.Screen
         options={{
-          title: `New Scenario - Step ${step} of ${TOTAL_STEPS}`,
+          title: `New Scenario - Step ${displayedStep} of ${displayedTotalSteps}`,
           headerShown: false,
         }}
       />
@@ -350,8 +375,8 @@ function NewScenarioContent() {
       <View className="px-5 pt-2">
         <FlowHeader
           title="New scenario"
-          step={step}
-          totalSteps={TOTAL_STEPS}
+          step={displayedStep}
+          totalSteps={displayedTotalSteps}
           onBack={prevStep}
         />
       </View>
@@ -404,7 +429,7 @@ function NewScenarioContent() {
                         <SelectionCard
                           key={room.id}
                           label={room.name}
-                          icon={getRoomIcon(room.name)}
+                          icon={getRoomIconName(room.name)}
                           isSelected={selectedRoomId === room.id}
                           onPress={() => setSelectedRoomId(room.id)}
                         />
@@ -578,7 +603,7 @@ function NewScenarioContent() {
                       <View className="flex-row items-center">
                         <View className="w-11 h-11 rounded-lg bg-[#C8E2C8] justify-center items-center mr-3">
                           <MaterialIcons
-                            name={getRoomIcon(selectedRoom?.name || '')}
+                            name={getRoomIconName(selectedRoom?.name || '')}
                             size={24}
                             color="#354F52"
                           />

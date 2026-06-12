@@ -22,7 +22,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { supabase } from '../../utils/supabase';
 import { captureException, trackEvent } from '../../utils/observability';
-import { ensureDefaultHomeRooms } from '../../utils/homeSetup';
 
 import AddRoomDevice from '../../components/rooms/AddRoomDevice';
 import RoutineCard from '../../components/routines/RoutineCard';
@@ -283,10 +282,7 @@ export default function Routines() {
 
       if (roomsResult.error) throw roomsResult.error;
 
-      let loadedRooms = roomsResult.data || [];
-      if (loadedRooms.length === 0) {
-        loadedRooms = await ensureDefaultHomeRooms(homeId);
-      }
+      const loadedRooms = roomsResult.data || [];
       setRooms(loadedRooms);
       routinesScreenCache.rooms = loadedRooms;
       setNewRoutineRoomId((current) => current ?? loadedRooms[0]?.id ?? null);

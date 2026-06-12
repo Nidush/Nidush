@@ -133,7 +133,12 @@ export const Step4_Environment = ({
           <TouchableOpacity
             className="w-full h-full bg-[#D1E4D1] rounded-2xl justify-center items-center"
             activeOpacity={0.7}
-            onPress={() => router.push('/new-scenario')}
+            onPress={() =>
+              router.push({
+                pathname: '/new-scenario',
+                params: roomName ? { roomName } : undefined,
+              })
+            }
             accessible={true}
             accessibilityRole="button"
             accessibilityLabel="Create new scene"

@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import { invokeFunction, supabase } from '../utils/supabase';
 import { logger } from '../utils/logger';
-import { ensureDefaultHomeRooms } from '../utils/homeSetup';
 
 import {
   Nunito_400Regular,
@@ -559,14 +558,6 @@ export default function SetupProfile() {
                   }
                 }
 
-                if (!hasError) {
-                  try {
-                    await ensureDefaultHomeRooms(finalHomeId);
-                  } catch (roomSetupError) {
-                    logger.error('Error bootstrapping default home rooms:', roomSetupError);
-                    hasError = true;
-                  }
-                }
               }
             }
 
