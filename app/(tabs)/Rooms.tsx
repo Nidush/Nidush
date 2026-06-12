@@ -3,6 +3,7 @@ import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -106,6 +107,7 @@ export default function Rooms() {
   const [newDeviceType, setNewDeviceType] = useState<'light' | 'speaker' | 'difuser' | 'purifier'>('light');
   const [newDeviceRoomId, setNewDeviceRoomId] = useState<number | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [isDeletingRoom, setIsDeletingRoom] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [deviceDraftName, setDeviceDraftName] = useState('');
   const [deviceDraftRoomId, setDeviceDraftRoomId] = useState<number | null>(null);
@@ -640,6 +642,78 @@ export default function Rooms() {
     }
   };
 
+  const handleDeleteRoom = useCallback(async (room: Room) => {
+    if (isDeletingRoom) return;
+
+    setIsDeletingRoom(true);
+    try {
+      const { error } = await supabase
+        .from('rooms')
+        .delete()
+        .eq('id', room.id);
+
+      if (error) throw error;
+
+      setRooms((current) => {
+        const nextRooms = current.filter((item) => item.id !== room.id);
+        roomsScreenCache.rooms = nextRooms;
+        return nextRooms;
+      });
+      setAllDevices((current) => {
+        const nextDevices = current.map((device) =>
+          device.room_id === room.id
+            ? { ...device, room_id: null }
+            : device,
+        );
+        roomsScreenCache.allDevices = nextDevices;
+        return nextDevices;
+      });
+      setAllActivities((current) => {
+        const nextActivities = current.map((activity) =>
+          activity.room_id === room.id
+            ? { ...activity, room_id: null }
+            : activity,
+        );
+        roomsScreenCache.allActivities = nextActivities;
+        return nextActivities;
+      });
+      setActiveRoomId((current) => {
+        if (current !== room.id) return current;
+        const remainingRooms = roomsScreenCache.rooms.filter((item) => item.id !== room.id);
+        const nextRoomId = remainingRooms[0]?.id ?? null;
+        roomsScreenCache.activeRoomId = nextRoomId;
+        return nextRoomId;
+      });
+      showFeedback(`"${room.name}" was removed from your home.`, 'success');
+    } catch (err: unknown) {
+      console.error('Failed to delete room:', err);
+      showFeedback(
+        'Could not delete this room: ' +
+          (err instanceof Error ? err.message : 'Unknown error'),
+        'error',
+      );
+    } finally {
+      setIsDeletingRoom(false);
+    }
+  }, [isDeletingRoom, showFeedback]);
+
+  const confirmDeleteRoom = useCallback((room: Room) => {
+    Alert.alert(
+      'Delete room',
+      `Do you want to delete "${room.name}"? Devices in this room will become unassigned, and room scenarios may be removed.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void handleDeleteRoom(room);
+          },
+        },
+      ],
+    );
+  }, [handleDeleteRoom]);
+
   const menuActions = [
     { label: 'Room', onPress: openAddRoomModal },
     { label: 'Device', onPress: openAddDeviceModal },
@@ -851,6 +925,24 @@ export default function Rooms() {
                 {filteredDevices.length} device{filteredDevices.length === 1 ? '' : 's'}, with {roomActivities.length} activity
                 {roomActivities.length === 1 ? '' : 'ies'} linked to this room.
               </Text>
+              <TouchableOpacity
+                onPress={() => confirmDeleteRoom(activeRoom)}
+                disabled={isDeletingRoom}
+                className="self-start mt-2 px-4 py-3 rounded-full bg-[#FBE8E6]"
+                accessibilityRole="button"
+                accessibilityLabel={`Delete room ${activeRoom.name}`}
+              >
+                {isDeletingRoom ? (
+                  <ActivityIndicator size="small" color="#B5564D" />
+                ) : (
+                  <Text
+                    className="text-[#B5564D] text-sm"
+                    style={{ fontFamily: 'Nunito_700Bold' }}
+                  >
+                    Delete room
+                  </Text>
+                )}
+              </TouchableOpacity>
             </View>
           ) : null
         }
