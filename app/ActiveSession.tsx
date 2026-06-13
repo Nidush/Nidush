@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/utils/supabase';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -30,13 +30,16 @@ import {
   Scenario,
   ScenarioDeviceState,
 } from '@/constants/data';
+import { resolveCatalogImage } from '@/constants/data/catalogAssets';
 import { SMART_HOME_DEVICES } from '@/constants/devices';
 import {
   fetchActivityTemplateById,
   fetchScenarioTemplateById,
   mapUserActivity,
   normalizeScenarioTemplateId,
+  parseUserScenarioDbId,
 } from '@/utils/catalogTemplates';
+import { getScenarioDeviceMeta, mapLinkedDeviceToScenarioState } from '@/utils/activityDeviceConfigs';
 
 type FormattedInstruction = {
   text: string;
@@ -75,6 +78,21 @@ type ContentRow = {
   type?: string | null;
   instructions?: unknown;
   video_url?: string | null;
+};
+
+const getJoinedRoomName = (value: unknown) => {
+  if (Array.isArray(value)) {
+    const first = value[0];
+    return first && typeof first === 'object' && 'name' in first
+      ? String((first as { name?: unknown }).name ?? '')
+      : '';
+  }
+
+  if (value && typeof value === 'object' && 'name' in value) {
+    return String((value as { name?: unknown }).name ?? '');
+  }
+
+  return '';
 };
 
 const isStoredActivityLike = (value: unknown): value is StoredActivityLike =>
@@ -125,9 +143,23 @@ const getNumericRoomId = (item: StoredActivityLike | Activity | Scenario) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const normalizeLinkedDevice = (value: unknown) => {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value;
+};
+
 export default function ActiveSession() {
   const { id } = useLocalSearchParams<{ id: string; musicStarted?: string }>();
-  const { playPlaylist, pausePlayback, resumePlayback, currentTrack, isAuthenticated } = useSpotify();
+  const {
+    playPlaylist,
+    pausePlayback,
+    resumePlayback,
+    nextTrack,
+    previousTrack,
+    openCurrentTrack,
+    currentTrack,
+    isAuthenticated,
+  } = useSpotify();
 
   // --- 1. STATE ---
   const [loading, setLoading] = useState(true);
@@ -138,6 +170,7 @@ export default function ActiveSession() {
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [showExitModal, setShowExitModal] = useState(false);
+  const startedPlaybackForSessionRef = useRef<string | null>(null);
 
   const progress = useSharedValue(0);
   const contentOpacity = useSharedValue(1);
@@ -168,7 +201,27 @@ export default function ActiveSession() {
           .single();
 
         if (data && !error) {
-          foundItem = mapUserActivity(data);
+          const mappedActivity = mapUserActivity(data);
+          const { data: linkedRows } = await supabase
+            .from('activity_devices')
+            .select('device_id, devices(id, name, type, status, status_level)')
+            .eq('activity_id', id);
+
+          foundItem = {
+            ...mappedActivity,
+            devices: (linkedRows ?? [])
+              .map((row) => normalizeLinkedDevice(row.devices))
+              .filter(Boolean)
+              .map((device) =>
+                mapLinkedDeviceToScenarioState(device as {
+                  id: number;
+                  name: string;
+                  type: string | null;
+                  status?: string | null;
+                  status_level?: number | null;
+                }),
+              ),
+          };
         }
       }
 
@@ -217,7 +270,30 @@ export default function ActiveSession() {
       }
 
       const sId = getScenarioId(foundItem);
-      relatedScenario = sId ? await fetchScenarioTemplateById(sId) : null;
+      relatedScenario = sId ? await fetchScenarioTemplateById(String(sId)) : null;
+      if (!relatedScenario && sId) {
+        const scenarioDbId = parseUserScenarioDbId(sId);
+        const { data: scenData } = await supabase
+          .from('scenarios')
+          .select('id, name, description, image, playlist_id, playlist_name, focus_mode_enabled, rooms(name)')
+          .eq('id', scenarioDbId)
+          .maybeSingle();
+
+        if (scenData) {
+          relatedScenario = {
+            id: `scenario:${scenData.id}`,
+            title: scenData.name,
+            description: scenData.description || '',
+            playlist: scenData.playlist_name || (scenData.playlist_id ? 'Spotify Music' : undefined),
+            playlist_id: scenData.playlist_id || undefined,
+            focusMode: scenData.focus_mode_enabled === true,
+            shortcuts: false,
+            devices: [],
+            room: getJoinedRoomName(scenData.rooms) || undefined,
+            image: resolveCatalogImage(scenData.image || 'Scenarios/moonlight_bay.png'),
+          } as Scenario;
+        }
+      }
       if (contentType !== 'video' && relatedScenario?.playlist) {
         playlistName = relatedScenario.playlist;
       }
@@ -287,7 +363,7 @@ export default function ActiveSession() {
 
       // Tocar música no Spotify só em sessões sem vídeo.
       if (isAuthenticated && contentType !== 'video') {
-        let pId = getPlaylistId(foundItem);
+        let pId = getPlaylistId(foundItem) || relatedScenario?.playlist_id;
         
         if (!pId) {
           const type = getActivityType(foundItem);
@@ -323,18 +399,24 @@ export default function ActiveSession() {
           if (!pId) pId = '37i9dQZF1DX76W9kuv1Z0g';
         }
         
-        const sessionDevices = relatedScenario?.devices || getItemDevices(foundItem);
+        const sessionDevices =
+          relatedScenario?.devices?.length ? relatedScenario.devices : getItemDevices(foundItem);
         const hasScenarioTv = sessionDevices.some((config: ScenarioDeviceState) => {
           const device = SMART_HOME_DEVICES[config.deviceId];
-          return device?.type === 'tv';
+          const fallbackMeta = getScenarioDeviceMeta(config);
+          return device?.type === 'tv' || fallbackMeta.type === 'tv';
         });
         const shouldPreferTv =
           hasScenarioTv &&
           ['meditation', 'yoga', 'general', 'other'].includes(
             getActivityType(foundItem),
           );
+        const basePlaybackOptions = {
+          suppressAppOpen: true,
+        };
         const tvPlaybackOptions = shouldPreferTv
           ? {
+              ...basePlaybackOptions,
               preferredDeviceTypes: ['TV'],
               preferredDeviceNameIncludes: [
                 connectedTvName || '',
@@ -345,9 +427,10 @@ export default function ActiveSession() {
                 'chromecast',
               ].filter(Boolean),
             }
-          : undefined;
+          : basePlaybackOptions;
 
-        if (pId) {
+        if (pId && startedPlaybackForSessionRef.current !== String(id)) {
+          startedPlaybackForSessionRef.current = String(id);
           console.log('[Spotify] A iniciar música no momento do Exercício:', pId);
           playPlaylist(pId, tvPlaybackOptions);
         } else {
@@ -358,7 +441,8 @@ export default function ActiveSession() {
             cooking: '37i9dQZF1DXdbChS9879u9',
             meditation: '37i9dQZF1DWZ0XmS6AnY9s'
           };
-          if (fallbacks[type]) {
+          if (fallbacks[type] && startedPlaybackForSessionRef.current !== String(id)) {
+            startedPlaybackForSessionRef.current = String(id);
             console.log('[Spotify] A usar fallback no Exercício:', type);
             playPlaylist(fallbacks[type], tvPlaybackOptions);
           }
@@ -377,8 +461,9 @@ export default function ActiveSession() {
   }, [id, isAuthenticated, playPlaylist]);
 
   useEffect(() => {
+    startedPlaybackForSessionRef.current = null;
     loadData();
-  }, [loadData]);
+  }, [id, loadData]);
 
   useEffect(() => {
     if (isVideoSession) return;
@@ -552,6 +637,9 @@ export default function ActiveSession() {
             progress={progress}
             onToggleSession={handleToggleSession}
             onToggleMusic={handleToggleMusic}
+            onNextTrack={nextTrack}
+            onPreviousTrack={previousTrack}
+            onOpenSpotify={openCurrentTrack}
             currentTrack={currentTrack}
           />
         </>

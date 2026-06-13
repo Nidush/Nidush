@@ -11,13 +11,14 @@ import {
   HealthConnectSyncResult,
   syncLatestHealthConnectReading,
 } from '@/utils/healthConnectSync';
-import { hasStoredHealthConsent } from '@/utils/legal';
+import { hasHealthConnectEnabled } from '@/utils/legal';
 import { supabase } from '@/utils/supabase';
 import { useSegments } from 'expo-router';
 import React, {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -87,6 +88,7 @@ export const BiometricsProvider = ({
   const lastStateRef = useRef<UserState>('RELAXED');
   const lastHealthConnectSyncRef = useRef(0);
   const segments = useSegments();
+  const routeKey = useMemo(() => segments.join('/'), [segments]);
 
   const persistBaselineSnapshot = async () => {
     try {
@@ -175,9 +177,8 @@ export const BiometricsProvider = ({
   };
 
   useEffect(() => {
-    const isOnboarding = segments.some(
-      (segment) => segment === 'onboarding' || segment === 'profile-selection',
-    );
+    const isOnboarding =
+      routeKey.includes('onboarding') || routeKey.includes('profile-selection');
 
     if (isOnboarding) return;
 
@@ -237,8 +238,8 @@ export const BiometricsProvider = ({
       await restoreBaselineSnapshot();
       if (!isMounted) return;
 
-      const hasHealthConsent = await hasStoredHealthConsent();
-      if (!isMounted || !hasHealthConsent) {
+      const isHealthConnectEnabled = await hasHealthConnectEnabled();
+      if (!isMounted || !isHealthConnectEnabled) {
         startFallbackSimulation();
         return;
       }
@@ -270,7 +271,7 @@ export const BiometricsProvider = ({
       if (healthConnectInterval) clearInterval(healthConnectInterval);
       appStateSubscription?.remove();
     };
-  }, [segments, addNotification]);
+  }, [routeKey, addNotification]);
 
   return (
     <BiometricsContext.Provider

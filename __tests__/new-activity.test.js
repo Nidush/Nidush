@@ -55,6 +55,8 @@ jest.mock('@/utils/catalogTemplates', () => ({
       room: 'Bedroom',
     },
   ]),
+  fetchUserScenarios: jest.fn(async () => []),
+  parseUserScenarioDbId: jest.fn((value) => value),
 }));
 
 jest.mock('@/constants/data', () => ({
@@ -148,6 +150,10 @@ jest.mock('../utils/supabase', () => ({
         return {
           select: jest.fn(() => ({
             eq: jest.fn(() => ({
+              order: jest.fn(async () => ({
+                data: [{ id: 11, name: 'Bedroom' }],
+                error: null,
+              })),
               eq: jest.fn(() => ({
                 maybeSingle: jest.fn(async () => ({
                   data: { id: 11 },
@@ -175,6 +181,10 @@ jest.mock('../utils/supabase', () => ({
         return {
           select: jest.fn(() => ({
             eq: jest.fn(() => ({
+              not: jest.fn(async () => ({
+                count: 1,
+                error: null,
+              })),
               eq: jest.fn(() => ({
                 in: jest.fn(async () => ({
                   data: [{ id: 3 }],
@@ -268,11 +278,19 @@ describe('NewActivityFlow', () => {
   });
 
   it('shows an error when saving without an authenticated user', async () => {
-    mockGetUser.mockResolvedValueOnce({
-      data: {
-        user: null,
-      },
-    });
+    mockGetUser
+      .mockResolvedValueOnce({
+        data: {
+          user: {
+            id: 'user-123',
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          user: null,
+        },
+      });
 
     const screen = render(<NewActivityFlow />);
 
@@ -285,5 +303,19 @@ describe('NewActivityFlow', () => {
 
     expect(mockPush).not.toHaveBeenCalled();
     expect(global.alert).not.toHaveBeenCalled();
+  });
+
+  it('blocks the flow when the user is not authenticated on initial load', async () => {
+    mockGetUser.mockResolvedValueOnce({
+      data: {
+        user: null,
+      },
+    });
+
+    const screen = render(<NewActivityFlow />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Activity creation is not ready yet')).toBeTruthy();
+    });
   });
 });

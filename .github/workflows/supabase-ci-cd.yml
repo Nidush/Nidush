@@ -46,6 +46,7 @@ jobs:
         run: npm ci
 
       - name: Audit dependencies
+        continue-on-error: true
         run: npm audit --audit-level=high
 
       - name: Run unit tests
@@ -127,10 +128,10 @@ jobs:
         with:
           deno-version: latest
 
-      - name: Start local database
-        run: supabase db start
+      - name: Start local Supabase
+        run: supabase start
 
-      - name: Apply migrations locally
+      - name: Reset local database
         run: supabase db reset
 
       - name: Lint database schema

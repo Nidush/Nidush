@@ -1,7 +1,8 @@
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { AppState, Image, Modal, ScrollView, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { AppState, Image, Modal, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { pickImage } from '../utils/imagePicker';
 import { supabase, uploadImage } from '../utils/supabase';
@@ -27,7 +28,7 @@ import { LegalContent } from '../components/legal/LegalContent';
 import {
   hasHeartRateReadPermission,
 } from '../utils/healthConnectSync';
-import { LEGAL_POLICY_VERSION, setStoredHealthConsent } from '../utils/legal';
+import { LEGAL_POLICY_VERSION, setHealthConnectEnabled } from '../utils/legal';
 import { captureException, trackEvent } from '../utils/observability';
 
 export default function Profile() {
@@ -45,6 +46,7 @@ export default function Profile() {
   } = useNotifications();
   const [userName, setUserName] = useState('A carregar...');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isProfileHeaderLoading, setIsProfileHeaderLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedHobbies, setSelectedHobbies] = useState<string[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -52,8 +54,12 @@ export default function Profile() {
   const [isAccountModalVisible, setIsAccountModalVisible] = useState(false);
   const [isNotificationsModalVisible, setIsNotificationsModalVisible] = useState(false);
   const [isDeviceScanModalVisible, setIsDeviceScanModalVisible] = useState(false);
+  const [isDeleteAccountModalVisible, setIsDeleteAccountModalVisible] = useState(false);
   const [isExportingData, setIsExportingData] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [dataExportJson, setDataExportJson] = useState('');
+  const [deleteAccountConfirmation, setDeleteAccountConfirmation] = useState('');
+  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
   const [deviceScanModalTitle, setDeviceScanModalTitle] = useState('Smart device scan');
   const [deviceScanModalMessage, setDeviceScanModalMessage] = useState('');
   const [userEmail, setUserEmail] = useState('');
@@ -125,6 +131,61 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     error_message?: string | null;
     result?: DeviceDiscoveryResult | null;
   };
+
+  type ProfileCacheSnapshot = {
+    userName?: string;
+    avatarUrl?: string | null;
+    userEmail?: string;
+    selectedHobbies?: string[];
+    userHomeId?: number | string | null;
+    joinCode?: string | null;
+    accountDetails?: typeof accountDetails;
+    discoveredDevices?: ConnectedDevice[];
+    cachedAt?: string;
+  };
+
+  const getProfileCacheKey = (userId: string) => `@profile_cache:v1:${userId}`;
+
+  const applyProfileCache = useCallback((snapshot: ProfileCacheSnapshot) => {
+    if (snapshot.userName) setUserName(snapshot.userName);
+    if (snapshot.avatarUrl !== undefined) setAvatarUrl(snapshot.avatarUrl);
+    if (snapshot.userEmail) setUserEmail(snapshot.userEmail);
+    if (snapshot.selectedHobbies) setSelectedHobbies(snapshot.selectedHobbies);
+    if (snapshot.userHomeId !== undefined) setUserHomeId(snapshot.userHomeId);
+    if (snapshot.joinCode !== undefined) setJoinCode(snapshot.joinCode);
+    if (snapshot.accountDetails) setAccountDetails(snapshot.accountDetails);
+    if (snapshot.discoveredDevices) setDiscoveredDevices(snapshot.discoveredDevices);
+    setIsProfileHeaderLoading(false);
+    setIsLoading(false);
+  }, []);
+
+  const writeProfileCache = useCallback(async (userId: string, snapshot: ProfileCacheSnapshot) => {
+    try {
+      await AsyncStorage.setItem(
+        getProfileCacheKey(userId),
+        JSON.stringify({
+          ...snapshot,
+          cachedAt: new Date().toISOString(),
+        }),
+      );
+    } catch (error) {
+      console.warn('Could not persist profile cache:', error);
+    }
+  }, []);
+
+  const mergeProfileCache = useCallback(async (userId: string, patch: Partial<ProfileCacheSnapshot>) => {
+    try {
+      const cacheKey = getProfileCacheKey(userId);
+      const current = await AsyncStorage.getItem(cacheKey);
+      const parsed = current ? (JSON.parse(current) as ProfileCacheSnapshot) : {};
+      await writeProfileCache(userId, {
+        ...parsed,
+        ...patch,
+      });
+    } catch (error) {
+      console.warn('Could not update profile cache:', error);
+    }
+  }, [writeProfileCache]);
 
   const [discoveredDevices, setDiscoveredDevices] = useState<ConnectedDevice[]>([]);
   const [isRefreshingDevices, setIsRefreshingDevices] = useState(false);
@@ -231,7 +292,8 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     setIsRefreshingDevices(true);
     try {
       const resolvedHomeId = homeId ?? (await getCurrentUserHomeId(userId));
-      await loadConnectedDevices(userId, resolvedHomeId);
+      const refreshedDevices = await loadConnectedDevices(userId, resolvedHomeId);
+      await mergeProfileCache(userId, { discoveredDevices: refreshedDevices, userHomeId: resolvedHomeId });
     } finally {
       setIsRefreshingDevices(false);
     }
@@ -457,127 +519,167 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     let activeHomeChannel: ReturnType<typeof subscribeToHomeDeviceChanges> | null = null;
 
     const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setAvatarUrl(user.user_metadata?.avatar_url || null);
-        const first = user.user_metadata?.first_name || '';
-        const last = user.user_metadata?.last_name || '';
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          try {
+            const cachedProfile = await AsyncStorage.getItem(getProfileCacheKey(user.id));
+            if (cachedProfile) {
+              applyProfileCache(JSON.parse(cachedProfile) as ProfileCacheSnapshot);
+            }
+          } catch (error) {
+            console.warn('Could not read profile cache:', error);
+          }
 
-        if (first || last) {
-          setUserName(`${first} ${last}`.trim());
-        } else if (user.email) {
-          setUserName(user.email.split('@')[0]);
-        } else {
-          setUserName('Utilizador');
-        }
+          setAvatarUrl(user.user_metadata?.avatar_url || null);
+          const first = user.user_metadata?.first_name || '';
+          const last = user.user_metadata?.last_name || '';
 
-        const userEmail = user.email || '';
-        setUserEmail(userEmail);
-        let [
-          userDataResult,
-          homeAssociationResult,
-        ] = await Promise.all([
-          supabase
-            .from('users')
-            .select('hobbies, created_at')
-            .eq('auth_uid', user.id)
-            .maybeSingle(),
-          supabase
-            .from('user_homes')
-            .select('home_id, role, created_at')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: true })
-            .limit(1)
-            .maybeSingle(),
-        ]);
+          if (first || last) {
+            setUserName(`${first} ${last}`.trim());
+          } else if (user.email) {
+            setUserName(user.email.split('@')[0]);
+          } else {
+            setUserName('Utilizador');
+          }
 
-        let userData = userDataResult.data;
-        let userDataError = userDataResult.error;
+          const userEmail = user.email || '';
+          setUserEmail(userEmail);
+          setIsProfileHeaderLoading(false);
 
-        if ((!userData || userDataError) && userEmail) {
-          const fallback = await supabase
-            .from('users')
-            .select('hobbies, created_at')
-            .eq('email', userEmail)
-            .maybeSingle();
+          let [
+            userDataResult,
+            homeAssociationResult,
+          ] = await Promise.all([
+            supabase
+              .from('users')
+              .select('hobbies, created_at')
+              .eq('auth_uid', user.id)
+              .maybeSingle(),
+            supabase
+              .from('user_homes')
+              .select('home_id, role, created_at')
+              .eq('user_id', user.id)
+              .order('created_at', { ascending: true })
+              .limit(1)
+              .maybeSingle(),
+          ]);
 
-          userData = fallback.data;
-          userDataError = fallback.error;
-        }
+          let userData = userDataResult.data;
+          let userDataError = userDataResult.error;
 
-        if (userDataError) {
-          console.error('Erro a carregar hobbies:', userDataError);
-        }
+          if ((!userData || userDataError) && userEmail) {
+            const fallback = await supabase
+              .from('users')
+              .select('hobbies, created_at')
+              .eq('email', userEmail)
+              .maybeSingle();
 
-        setSelectedHobbies(parseHobbies(userData?.hobbies));
+            userData = fallback.data;
+            userDataError = fallback.error;
+          }
 
-        let finalHomeId = null;
-        const homeAssociation = homeAssociationResult.data;
+          if (userDataError) {
+            console.error('Erro a carregar hobbies:', userDataError);
+          }
 
-        if (homeAssociation) {
-          finalHomeId = homeAssociation.home_id;
-          setUserHomeId(finalHomeId);
-        }
+          setSelectedHobbies(parseHobbies(userData?.hobbies));
 
-        const [
-          homeDataResult,
-          activitiesCountResult,
-          shortcutsCountResult,
-          connectedDevices,
-        ] = await Promise.all([
-          finalHomeId
-            ? supabase.from('homes').select('name, join_code').eq('id', finalHomeId).maybeSingle()
-            : Promise.resolve({ data: null }),
-          supabase
-            .from('activities')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', user.id),
-          supabase
-            .from('shortcuts')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', user.id),
-          loadConnectedDevices(user.id, finalHomeId),
-        ]);
+          let finalHomeId = null;
+          const homeAssociation = homeAssociationResult.data;
 
-        let homeData = homeDataResult.data;
-        if ('error' in homeDataResult && homeDataResult.error?.code === '42703' && finalHomeId) {
-          const legacyHomeResult = await supabase
-            .from('homes')
-            .select('name, join_code')
-            .eq('id', finalHomeId)
-            .maybeSingle();
-          homeData = legacyHomeResult.data as typeof homeData;
-        }
-        const homeName = homeData?.name || 'Not connected';
-        const resolvedJoinCode = homeData?.join_code || null;
-        if (resolvedJoinCode) {
-          setJoinCode(resolvedJoinCode);
-        }
+          if (homeAssociation) {
+            finalHomeId = homeAssociation.home_id;
+            setUserHomeId(finalHomeId);
+          }
 
-        setAccountDetails({
-          homeName,
-          role: homeAssociation?.role || 'Resident',
-          memberSince: formatProfileDate(user.created_at || userData?.created_at),
-          accountCode: user.id.slice(0, 8).toUpperCase(),
-          activitiesCount: activitiesCountResult.count ?? 0,
-          shortcutsCount: shortcutsCountResult.count ?? 0,
-        });
-        if (!resolvedJoinCode) {
-          setJoinCode(null);
-        }
+          const [
+            homeDataResult,
+            activitiesCountResult,
+            shortcutsCountResult,
+            connectedDevices,
+          ] = await Promise.all([
+            finalHomeId
+              ? supabase.from('homes').select('name, join_code').eq('id', finalHomeId).maybeSingle()
+              : Promise.resolve({ data: null }),
+            supabase
+              .from('activities')
+              .select('id', { count: 'exact', head: true })
+              .eq('user_id', user.id),
+            supabase
+              .from('shortcuts')
+              .select('id', { count: 'exact', head: true })
+              .eq('user_id', user.id),
+            loadConnectedDevices(user.id, finalHomeId),
+          ]);
 
-        setDiscoveredDevices(connectedDevices);
+          let homeData = homeDataResult.data;
+          if ('error' in homeDataResult && homeDataResult.error?.code === '42703' && finalHomeId) {
+            const legacyHomeResult = await supabase
+              .from('homes')
+              .select('name, join_code')
+              .eq('id', finalHomeId)
+              .maybeSingle();
+            homeData = legacyHomeResult.data as typeof homeData;
+          }
+          const homeName = homeData?.name || 'Not connected';
+          const resolvedJoinCode = homeData?.join_code || null;
+          if (resolvedJoinCode) {
+            setJoinCode(resolvedJoinCode);
+          }
 
-        if (finalHomeId) {
-          activeHomeChannel = subscribeToHomeDeviceChanges(Number(finalHomeId), async () => {
-            await loadConnectedDevices(user.id, finalHomeId);
+          const nextAccountDetails = {
+            homeName,
+            role: homeAssociation?.role || 'Resident',
+            memberSince: formatProfileDate(user.created_at || userData?.created_at),
+            accountCode: user.id.slice(0, 8).toUpperCase(),
+            activitiesCount: activitiesCountResult.count ?? 0,
+            shortcutsCount: shortcutsCountResult.count ?? 0,
+          };
+          setAccountDetails(nextAccountDetails);
+          if (!resolvedJoinCode) {
+            setJoinCode(null);
+          }
+
+          setDiscoveredDevices(connectedDevices);
+
+          await writeProfileCache(user.id, {
+            userName:
+              (first || last)
+                ? `${first} ${last}`.trim()
+                : user.email
+                  ? user.email.split('@')[0]
+                  : 'Utilizador',
+            avatarUrl: user.user_metadata?.avatar_url || null,
+            userEmail,
+            selectedHobbies: parseHobbies(userData?.hobbies),
+            userHomeId: finalHomeId,
+            joinCode: resolvedJoinCode,
+            accountDetails: nextAccountDetails,
+            discoveredDevices: connectedDevices,
           });
-        }
 
-      } else {
-        setUserName('Visitante');
+          if (activeHomeChannel) {
+            supabase.removeChannel(activeHomeChannel);
+            activeHomeChannel = null;
+          }
+          if (finalHomeId) {
+            activeHomeChannel = subscribeToHomeDeviceChanges(Number(finalHomeId), async () => {
+              const refreshedDevices = await loadConnectedDevices(user.id, finalHomeId);
+              await mergeProfileCache(user.id, { discoveredDevices: refreshedDevices });
+            });
+          }
+        } else {
+          setUserName('Visitante');
+          setIsProfileHeaderLoading(false);
+        }
+      } catch (error) {
+        console.error('Erro a carregar perfil:', error);
+        setUserName('Utilizador');
+        setIsProfileHeaderLoading(false);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     const checkHealthConnect = async () => {
@@ -599,13 +701,16 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
         );
 
         if (!canReadHeartRate) {
+          await setHealthConnectEnabled(false);
           setHealthConnectStatus('disconnected');
           return;
         }
 
+        await setHealthConnectEnabled(true);
         setHealthConnectStatus('connected');
         await syncDeviceToDB('Health Connect', 'heart', 'health_connect', 'android_hc');
       } catch {
+        await setHealthConnectEnabled(false);
         setHealthConnectStatus('disconnected');
       }
     };
@@ -615,6 +720,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active') {
+        fetchUser();
         checkHealthConnect();
       }
     });
@@ -662,6 +768,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
       }
 
       setAvatarUrl(publicUrl);
+      await mergeProfileCache(user.id, { avatarUrl: publicUrl });
     } else {
       console.warn('Profile image upload did not complete.');
     }
@@ -696,7 +803,9 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
       if (error) {
         console.error("Erro ao guardar hobbies:", error);
       } else {
-        setSelectedHobbies(parseHobbies(data?.hobbies));
+        const nextHobbies = parseHobbies(data?.hobbies);
+        setSelectedHobbies(nextHobbies);
+        await mergeProfileCache(user.id, { selectedHobbies: nextHobbies });
         setIsModalVisible(false);
       }
 
@@ -726,6 +835,52 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
       );
     } finally {
       setIsExportingData(false);
+    }
+  };
+
+  const openDeleteAccountModal = () => {
+    setDeleteAccountError(null);
+    setDeleteAccountConfirmation('');
+    setIsDeleteAccountModalVisible(true);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteAccountConfirmation.trim().toUpperCase() !== 'DELETE') {
+      setDeleteAccountError('Type DELETE to confirm account deletion.');
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    setDeleteAccountError(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-account', {
+        body: {},
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.error) {
+        throw new Error(String(data.error));
+      }
+
+      await supabase.auth.signOut({ scope: 'local' });
+      setIsDeleteAccountModalVisible(false);
+      setIsPrivacyModalVisible(false);
+      router.replace('/login');
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Could not delete your account right now.';
+      setDeleteAccountError(message);
+      captureException(error, {
+        area: 'privacy',
+        screen: 'profile',
+        action: 'delete-account',
+      });
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
@@ -781,7 +936,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
             style={{ position: 'relative' }}
             testID="avatar-picker-button"
           >
-            {isLoading ? (
+            {isProfileHeaderLoading ? (
               <View className="w-32 h-32 rounded-full bg-[#E8EDDF]" />
             ) : (
               <Image
@@ -1018,7 +1173,6 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
                 const initialized = await initialize();
                 if (initialized) {
-                  await setStoredHealthConsent(true);
                   if (healthConnectStatus !== 'connected') {
                     openHealthConnectSettings();
                     console.info('Opened Health Connect settings for permission review.');
@@ -1364,7 +1518,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
         onRequestClose={() => setIsPrivacyModalVisible(false)}
       >
         <View className="flex-1 justify-end bg-black/50">
-          <View className="bg-white w-full rounded-t-[40px] px-8 pt-8 pb-16 shadow-2xl h-[76%]">
+          <View className="bg-white w-full rounded-t-[40px] px-8 pt-8 pb-12 shadow-2xl h-[86%]">
             <View className="flex-row justify-between items-center mb-6">
               <Text
                 className="text-2xl text-[#3A4D3F]"
@@ -1377,7 +1531,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} className="mb-4">
+            <ScrollView showsVerticalScrollIndicator={false} className="mb-3">
               <View className="bg-[#F5F7F0] border border-[#D1D9C5] rounded-[24px] p-4 mb-5">
                 <Text
                   className="text-lg text-[#3A4D3F]"
@@ -1424,6 +1578,40 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
                 ) : null}
               </View>
 
+              <View className="bg-[#FFF4F1] border border-[#E6B8AC] rounded-[24px] p-4 mb-5">
+                <Text
+                  className="text-lg text-[#8A3D2B]"
+                  style={{ fontFamily: 'Nunito_700Bold' }}
+                >
+                  Delete account
+                </Text>
+                <Text
+                  className="text-[#8A5B50] mt-2 leading-6"
+                  style={{ fontFamily: 'Nunito_400Regular' }}
+                >
+                  Permanently remove your profile, preferences, activities, routines, devices, notifications, consents, and active session from Nidush.
+                </Text>
+                <Text
+                  className="text-[#8A5B50] mt-2 text-xs"
+                  style={{ fontFamily: 'Nunito_600SemiBold' }}
+                >
+                  If you are the only admin in a shared home, Nidush will transfer admin access to the oldest remaining member when possible.
+                </Text>
+
+                <TouchableOpacity
+                  onPress={openDeleteAccountModal}
+                  className="mt-4 py-3 rounded-full items-center bg-[#C95F44]"
+                  testID="open-delete-account-button"
+                >
+                  <Text
+                    className="text-white text-base"
+                    style={{ fontFamily: 'Nunito_700Bold' }}
+                  >
+                    Delete my account
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               <LegalContent />
             </ScrollView>
 
@@ -1437,6 +1625,80 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
               >
                 Close
               </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={isDeleteAccountModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsDeleteAccountModalVisible(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black/50 px-6">
+          <View className="bg-white w-full rounded-[32px] p-7 shadow-xl">
+            <View className="w-14 h-14 rounded-full bg-[#FFF4F1] items-center justify-center self-center mb-4">
+              <MaterialIcons name="delete-forever" size={28} color="#C95F44" />
+            </View>
+
+            <Text
+              className="text-2xl text-[#3A2E2A] mb-3 text-center"
+              style={{ fontFamily: 'Nunito_700Bold' }}
+            >
+              Confirm account deletion
+            </Text>
+
+            <Text
+              className="text-[#7A665E] text-base text-center leading-6"
+              style={{ fontFamily: 'Nunito_400Regular' }}
+            >
+              This action is permanent. Type DELETE to confirm that Nidush should erase your account and personal app data.
+            </Text>
+
+            <TextInput
+              value={deleteAccountConfirmation}
+              onChangeText={(value) => {
+                setDeleteAccountConfirmation(value);
+                if (deleteAccountError) setDeleteAccountError(null);
+              }}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              placeholder="Type DELETE"
+              placeholderTextColor="#A28F87"
+              className="mt-5 border border-[#E6B8AC] rounded-2xl px-4 py-3 text-[#3A2E2A]"
+              testID="delete-account-confirm-input"
+            />
+
+            {deleteAccountError ? (
+              <Text
+                className="text-[#C95F44] mt-3 text-sm"
+                style={{ fontFamily: 'Nunito_600SemiBold' }}
+              >
+                {deleteAccountError}
+              </Text>
+            ) : null}
+
+            <TouchableOpacity
+              onPress={handleDeleteAccount}
+              disabled={isDeletingAccount}
+              className={`mt-6 py-4 rounded-full items-center shadow-md ${isDeletingAccount ? 'bg-[#D9A79A]' : 'bg-[#C95F44]'}`}
+              testID="confirm-delete-account-button"
+            >
+              <Text
+                className="text-white text-lg"
+                style={{ fontFamily: 'Nunito_700Bold' }}
+              >
+                {isDeletingAccount ? 'Deleting account...' : 'Permanently delete'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setIsDeleteAccountModalVisible(false)}
+              disabled={isDeletingAccount}
+              className="mt-4 py-2 items-center"
+            >
+              <Text className="text-gray-400 text-lg">Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>

@@ -1,5 +1,5 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { Link, useRouter } from 'expo-router';
+import { Link } from 'expo-router';
 import React from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 import { useNotifications } from '@/context/NotificationsContext';
@@ -10,7 +10,6 @@ interface HomeHeaderProps {
 }
 
 export const HomeHeader = ({ userName, avatarUrl }: HomeHeaderProps) => {
-  const router = useRouter();
   const { unreadCount } = useNotifications();
   const getGreeting = () => {
     const currentHour = new Date().getHours();
@@ -54,22 +53,49 @@ export const HomeHeader = ({ userName, avatarUrl }: HomeHeaderProps) => {
       </View>
 
       <View className="flex-row items-center">
-        <Pressable
-          className="mr-4 relative"
-          accessibilityRole="button"
-          accessibilityLabel="Notifications"
-          onPress={() => router.push('/notifications')}
-        >
-          <MaterialIcons name="notifications-none" size={36} color="#548F53" />
-          {unreadCount > 0 && (
-            <View 
-              style={{ position: 'absolute', right: -2, top: -2, backgroundColor: '#548F53', width: 18, height: 18, borderRadius: 9, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#F0F2EB' }} 
-              importantForAccessibility="no"
-            >
-              <Text style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-            </View>
-          )}
-        </Pressable>
+        <Link href="/notifications" asChild>
+          <Pressable
+            className="mr-4 relative items-center justify-center"
+            style={{ width: 48, height: 48 }}
+            accessibilityRole="button"
+            accessibilityLabel="Notifications"
+            accessibilityHint="Opens the full notifications list"
+            hitSlop={10}
+          >
+            <MaterialIcons name="notifications-none" size={34} color="#548F53" />
+            {unreadCount > 0 && (
+              <View 
+                style={{
+                  position: 'absolute',
+                  right: 1,
+                  top: 5,
+                  minWidth: 18,
+                  height: 18,
+                  paddingHorizontal: 3,
+                  borderRadius: 9,
+                  backgroundColor: '#548F53',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  borderWidth: 2,
+                  borderColor: '#F0F2EB',
+                }} 
+                importantForAccessibility="no"
+              >
+                <Text
+                  style={{
+                    color: 'white',
+                    fontSize: 9,
+                    fontWeight: 'bold',
+                    lineHeight: 10,
+                    textAlign: 'center',
+                  }}
+                >
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </Text>
+              </View>
+            )}
+          </Pressable>
+        </Link>
 
         <Link href="/Profile" asChild>
           <Pressable

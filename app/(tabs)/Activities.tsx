@@ -2,8 +2,10 @@ import { CarouselSection } from '@/components/activitiesScenarios/CarouselSectio
 import { FabMenu } from '@/components/activitiesScenarios/FabMenu';
 import { FilterBar } from '@/components/activitiesScenarios/FilterBar';
 import { HeaderSection } from '@/components/activitiesScenarios/HeaderSection';
+import { CustomAlert } from '@/components/CustomAlert';
 import { FeedbackState } from '@/components/UI/FeedbackState';
 import { useBiometrics } from '@/context/BiometricsContext';
+import { useSpotify } from '@/context/SpotifyContext';
 import { supabase } from '@/utils/supabase';
 import {
   Nunito_400Regular,
@@ -16,7 +18,6 @@ import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Modal,
   Platform,
@@ -36,12 +37,13 @@ import { resolveCatalogImage } from '@/constants/data/catalogAssets';
 import {
   fetchActivityTemplates,
   fetchScenarioTemplates,
+  fetchUserScenarios,
   mapUserActivity,
 } from '@/utils/catalogTemplates';
 import {
   AiActivityIdea,
   fetchAiActivityIdeas,
-  getFunctionErrorMessage,
+  getNidushAiErrorMessage,
   saveAiActivityIdea,
 } from '@/utils/aiActivities';
 import { logger } from '@/utils/logger';
@@ -49,6 +51,7 @@ import { getDynamicRecommendations } from '@/utils/recommendationEngine';
 
 const UnifiedActivitiesScreen = () => {
   const { currentState } = useBiometrics();
+  const { getUserPlaylists, isAuthenticated } = useSpotify();
 
   const [viewMode, setViewMode] = useState<'activities' | 'scenarios'>(
     'activities',
@@ -69,6 +72,17 @@ const UnifiedActivitiesScreen = () => {
   const [aiRecommendedIdeas, setAiRecommendedIdeas] = useState<AiActivityIdea[]>([]);
   const [isLoadingAiRecommendations, setIsLoadingAiRecommendations] = useState(false);
   const [isSavingAiRecommendationId, setIsSavingAiRecommendationId] = useState<string | null>(null);
+  const [aiAlert, setAiAlert] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'error' | 'info';
+  }>({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info',
+  });
 
   const isLoadingRef = useRef(false);
   const PAGE_SIZE = 10;
@@ -83,12 +97,13 @@ const UnifiedActivitiesScreen = () => {
 
   const loadTemplates = useCallback(async () => {
     try {
-      const [activities, scenarios] = await Promise.all([
+      const [activities, scenarios, userScenarios] = await Promise.all([
         fetchActivityTemplates(),
         fetchScenarioTemplates(),
+        fetchUserScenarios().catch(() => []),
       ]);
       setActivityTemplates(activities);
-      setScenarioTemplates(scenarios);
+      setScenarioTemplates([...userScenarios, ...scenarios]);
     } catch (error) {
       logger.error('Failed to load activity/scenario templates:', error);
       setActivityTemplates([]);
@@ -162,35 +177,10 @@ const UnifiedActivitiesScreen = () => {
     }, [loadActivities, loadTemplates])
   );
 
-  const loadAiRecommendations = useCallback(async () => {
-    if (viewMode !== 'activities') {
-      setAiRecommendedIdeas([]);
-      return;
-    }
-
-    setIsLoadingAiRecommendations(true);
-    try {
-      const ideas = await fetchAiActivityIdeas({
-        mood: currentState,
-        activeFilter,
-        prompt: searchQuery,
-        source: 'activities-recommended',
-      });
-
-      setAiRecommendedIdeas(ideas.slice(0, 5));
-    } catch (error) {
-      logger.warn('Failed to load AI activity recommendations:', error);
-      setAiRecommendedIdeas([]);
-    } finally {
-      setIsLoadingAiRecommendations(false);
-    }
+  useEffect(() => {
+    setAiRecommendedIdeas([]);
+    setIsLoadingAiRecommendations(false);
   }, [activeFilter, currentState, searchQuery, viewMode]);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadAiRecommendations();
-    }, [loadAiRecommendations]),
-  );
 
   let [fontsLoaded] = useFonts({
     Nunito_700Bold,
@@ -288,26 +278,38 @@ const UnifiedActivitiesScreen = () => {
     setIsGeneratingAiIdeas(true);
 
     try {
+      const spotifyPlaylists = isAuthenticated
+        ? (await getUserPlaylists())
+            .slice(0, 15)
+            .map((playlist) => ({
+              id: playlist.id,
+              name: playlist.name,
+            }))
+        : [];
+
       const ideas = await fetchAiActivityIdeas({
         mood: currentState,
         activeFilter,
         prompt: searchQuery,
         source: 'activities-ai-modal',
+        spotifyPlaylists,
       });
 
       setAiIdeas(ideas);
     } catch (error: unknown) {
-      logger.error('Failed to generate AI activity ideas:', error);
-      const message = await getFunctionErrorMessage(error);
-      Alert.alert(
-        'Could not generate ideas',
+      logger.warn('Failed to generate AI activity ideas:', error);
+      const message = await getNidushAiErrorMessage(error);
+      setAiAlert({
+        visible: true,
+        title: 'AI guide unavailable',
         message,
-      );
+        type: 'info',
+      });
       setAiIdeas([]);
     } finally {
       setIsGeneratingAiIdeas(false);
     }
-  }, [activeFilter, currentState, searchQuery]);
+  }, [activeFilter, currentState, getUserPlaylists, isAuthenticated, searchQuery]);
 
   const saveAiIdea = async (idea: AiActivityIdea) => {
     if (isSavingAiIdeaId) return;
@@ -320,11 +322,14 @@ const UnifiedActivitiesScreen = () => {
       setAiIdeas((current) => current.filter((item) => item.id !== idea.id));
       setIsAiModalVisible(false);
     } catch (error: unknown) {
-      console.error('Failed to save AI activity:', error);
-      Alert.alert(
-        'Could not save activity',
-        error instanceof Error ? error.message : 'Please try again.',
-      );
+      logger.warn('Failed to save AI activity:', error);
+      const message = await getNidushAiErrorMessage(error);
+      setAiAlert({
+        visible: true,
+        title: 'Could not save activity',
+        message,
+        type: 'error',
+      });
     } finally {
       setIsSavingAiIdeaId(null);
     }
@@ -347,11 +352,14 @@ const UnifiedActivitiesScreen = () => {
         },
       });
     } catch (error: unknown) {
-      logger.error('Failed to save AI recommendation:', error);
-      Alert.alert(
-        'Could not save activity',
-        error instanceof Error ? error.message : 'Please try again.',
-      );
+      logger.warn('Failed to save AI recommendation:', error);
+      const message = await getNidushAiErrorMessage(error);
+      setAiAlert({
+        visible: true,
+        title: 'Could not save activity',
+        message,
+        type: 'error',
+      });
     } finally {
       setIsSavingAiRecommendationId(null);
     }
@@ -602,6 +610,19 @@ const UnifiedActivitiesScreen = () => {
           </View>
         </View>
       </Modal>
+      <CustomAlert
+        visible={aiAlert.visible}
+        title={aiAlert.title}
+        message={aiAlert.message}
+        type={aiAlert.type}
+        confirmText="OK"
+        onClose={() =>
+          setAiAlert((current) => ({
+            ...current,
+            visible: false,
+          }))
+        }
+      />
     </SafeAreaView>
   );
 };

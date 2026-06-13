@@ -38,15 +38,70 @@ export type GeminiIdea = {
   contentTitle?: unknown
   contentType?: unknown
   contentCategory?: unknown
+  playlistId?: unknown
+  playlistName?: unknown
   instructions?: unknown
   ingredients?: unknown
 }
 
 export type UserState = 'RELAXED' | 'FOCUSED' | 'STRESSED' | 'ANXIOUS'
 
+export type RateLimitDecision = {
+  allowed: boolean
+  retryAfterSeconds: number
+  reason: 'cooldown' | 'hourly_quota' | null
+}
+
 export const clampText = (value: unknown, fallback: string, maxLength: number) => {
   const text = String(value ?? '').replace(/\s+/g, ' ').trim()
   return (text || fallback).slice(0, maxLength)
+}
+
+export const clampPositiveInteger = (value: unknown, fallback: number, min = 1, max = 100000) => {
+  const parsed = Number.parseInt(String(value ?? ''), 10)
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.min(Math.max(parsed, min), max)
+}
+
+export const evaluateRateLimit = ({
+  recentRequestCount,
+  maxRequestsPerHour,
+  minSecondsBetweenRequests,
+  lastRequestAt,
+  now = new Date(),
+}: {
+  recentRequestCount: number
+  maxRequestsPerHour: number
+  minSecondsBetweenRequests: number
+  lastRequestAt?: string | Date | null
+  now?: Date
+}): RateLimitDecision => {
+  if (minSecondsBetweenRequests > 0 && lastRequestAt) {
+    const lastRequestTime = lastRequestAt instanceof Date ? lastRequestAt : new Date(lastRequestAt)
+    const elapsedSeconds = Math.floor((now.getTime() - lastRequestTime.getTime()) / 1000)
+
+    if (Number.isFinite(elapsedSeconds) && elapsedSeconds < minSecondsBetweenRequests) {
+      return {
+        allowed: false,
+        retryAfterSeconds: Math.max(minSecondsBetweenRequests - elapsedSeconds, 1),
+        reason: 'cooldown',
+      }
+    }
+  }
+
+  if (maxRequestsPerHour > 0 && recentRequestCount >= maxRequestsPerHour) {
+    return {
+      allowed: false,
+      retryAfterSeconds: 60 * 60,
+      reason: 'hourly_quota',
+    }
+  }
+
+  return {
+    allowed: true,
+    retryAfterSeconds: 0,
+    reason: null,
+  }
 }
 
 const normalizeType = (value: unknown): ActivityType => {
@@ -481,6 +536,8 @@ export const normalizeIdeas = (rawIdeas: GeminiIdea[], rooms: RoomRow[]) =>
       contentTitle: clampText(idea.contentTitle, `${title} Guide`, 80),
       contentType: normalizeContentType(normalizeType(idea.type), idea.contentType),
       contentCategory: normalizeContentCategory(normalizeType(idea.type), idea.contentCategory),
+      playlistId: clampText(idea.playlistId, '', 120) || undefined,
+      playlistName: clampText(idea.playlistName, '', 120) || undefined,
       instructions: normalizeInstructions(idea.instructions, normalizeType(idea.type)),
       ingredients: normalizeIngredients(idea.ingredients, normalizeType(idea.type)),
     }
