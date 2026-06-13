@@ -272,7 +272,7 @@ const createIdeasPrompt = ({
     ...moodDirective.guidance,
     'Prefer rooms and devices that match the user routines when they are available.',
     'Return JSON only with this shape:',
-    '{"ideas":[{"title":"string","description":"string","type":"Cooking|Meditation|Workout|Audiobooks|Yoga|Reading|other","roomName":"one of the provided room names","durationMinutes":number,"image":"one of the allowed image keys","reason":"short reason","devicePlan":["short action"],"contentTitle":"string","contentType":"recipe|audio|exercise|video","contentCategory":"cooking|meditation|workout|audiobook|general","ingredients":[{"item":"string","amount":"string"}],"instructions":[{"text":"string","duration":number}]}]}',
+    '{"ideas":[{"title":"string","description":"string","type":"Cooking|Meditation|Workout|Audiobooks|Yoga|Reading|other","roomName":"one of the provided room names","durationMinutes":number,"image":"one of the allowed image keys","reason":"short reason","devicePlan":["short action"]}]}',
     `Allowed image keys: ${IMAGE_KEYS.join(', ')}`,
     `Local user time: ${localTime}`,
     `User first name: ${profile?.first_name ?? ''}`,
@@ -286,10 +286,7 @@ const createIdeasPrompt = ({
       days_of_week: routine.days_of_week,
     })))}`,
     promptHint ? `Extra personalization hint: ${promptHint}` : '',
-    'For cooking ideas, include concrete ingredients and ordered recipe steps.',
-    'For workout or yoga ideas, include ordered exercise steps with durations in seconds.',
-    'For meditation, reading, or audiobook ideas, include ordered guidance steps.',
-  ].filter(Boolean).join('\n')
+  ].filter(Boolean).join('\\n')
 }
 
 const generateIdea = async ({
@@ -393,26 +390,23 @@ const saveIdea = async ({
   userId: string
   roomDevices: DeviceRow[]
 }): Promise<SavedSuggestion> => {
-  const contentId = `ai_auto_${homeId}_${userId.slice(0, 8)}_${Date.now()}_${slugify(idea.title)}`
-
-  const { data: createdContent, error: contentError } = await supabase
+  const { data: matchedContents } = await supabase
     .from('contents')
-    .insert({
-      id: contentId,
-      title: idea.contentTitle,
-      description: idea.description,
-      type: idea.contentType,
-      category: idea.contentCategory,
-      duration: `${idea.durationMinutes} min`,
-      image: idea.image,
-      instructions: idea.instructions,
-      ingredients: idea.ingredients,
-      author: 'Nidush AI Auto',
-    })
     .select('id')
-    .single()
+    .eq('category', idea.contentCategory)
+    .limit(50)
 
-  if (contentError) throw contentError
+  let finalContentId = ''
+  if (matchedContents && matchedContents.length > 0) {
+    finalContentId = matchedContents[Math.floor(Math.random() * matchedContents.length)].id
+  } else {
+    const { data: fallbackContents } = await supabase.from('contents').select('id').limit(50)
+    if (fallbackContents && fallbackContents.length > 0) {
+      finalContentId = fallbackContents[Math.floor(Math.random() * fallbackContents.length)].id
+    } else {
+      throw new Error('No existing contents found in DB')
+    }
+  }
 
   const linkedDeviceIds = getRelevantDeviceIds(roomDevices, idea.type)
 
@@ -465,7 +459,7 @@ const saveIdea = async ({
       image: idea.image,
       category: 'AI For You',
       type: idea.type,
-      content_id: createdContent.id,
+      content_id: finalContentId,
       scenario_id: scenarioId,
       room_id: idea.roomId,
       home_id: homeId,
@@ -496,7 +490,7 @@ const saveIdea = async ({
   return {
     activityId: Number(createdActivity.id),
     scenarioId,
-    contentId: createdContent.id,
+    contentId: finalContentId,
     title: idea.title,
   }
 }
