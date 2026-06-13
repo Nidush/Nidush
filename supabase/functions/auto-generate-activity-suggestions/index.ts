@@ -386,7 +386,7 @@ const saveIdea = async ({
   userId,
   roomDevices,
 }: {
-  supabase: ReturnType<typeof createClient>
+  supabase: any
   idea: ReturnType<typeof normalizeIdeas>[number]
   homeId: number
   userId: string

@@ -241,7 +241,7 @@ const fetchWorkoutXExercises = async (
 }
 
 const uploadGifToStorage = async (
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   apiKey: string,
   exerciseId: string,
 ): Promise<string | null> => {

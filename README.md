@@ -42,7 +42,7 @@ The app is focused on people dealing with stress or anxiety in urban contexts. I
 Recent development work includes:
 
 - **Supabase integration:** Auth, database migrations, RLS policies, Storage support, Edge Functions and production-ready data flows.
-- **Weekly API automation:** A scheduled Supabase cron job refreshes external content from TheMealDB and API Ninjas without creating duplicated records.
+- **Weekly API automation:** A scheduled Supabase cron job refreshes external content from TheMealDB and WorkoutX, caching workout GIFs in Supabase Storage to avoid repeated client/API requests.
 - **Activities catalog split:** App-provided activities now live in `activity_templates`, while user-created activities remain in `activities`.
 - **Recommendations fixes:** Recommended activities now correctly include app-provided catalog items in **Activities** and **Activities for you**.
 - **Profile and avatars:** Profile data, account summary, avatar storage and resident/home associations were improved.
@@ -100,7 +100,7 @@ The weekly API sync was deployed and manually tested successfully:
 ### APIs & Integrations
 
 - **TheMealDB API:** Imports recipe content.
-- **API Ninjas Exercises API:** Imports workout/exercise content.
+- **WorkoutX API:** Imports workout/exercise content and weekly cached GIFs.
 - **Spotify API:** Authentication, playlists and music-related session support.
 - **Resend API:** Welcome email Edge Function.
 - **Google Gemini API:** Personalized activity idea generation in the `generate-activity-ideas` Edge Function.
@@ -179,7 +179,7 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=
 EXPO_PUBLIC_SPOTIFY_CLIENT_ID=
 EXPO_PUBLIC_SPOTIFY_SCHEME=
 EXPO_PUBLIC_ENABLE_AI_AUTO_CALLS=true
-API_NINJAS_KEY=
+WORKOUTX_API_KEY=
 PORT=3000
 ```
 
@@ -286,7 +286,7 @@ supabase functions deploy weekly-api-content-sync
 Set required secrets:
 
 ```bash
-supabase secrets set API_NINJAS_KEY="your-api-ninjas-key"
+supabase secrets set WORKOUTX_API_KEY="your-workoutx-api-key"
 supabase secrets set GEMINI_API_KEY="your-gemini-api-key"
 supabase secrets set ENABLE_GEMINI_API="true"
 supabase secrets set ENABLE_AI_RATE_LIMIT="true"
@@ -337,12 +337,14 @@ The project includes a scheduled content refresh:
 The function fetches:
 
 - Recipes from **TheMealDB**
-- Exercises from **API Ninjas**
+- 10 exercises from **WorkoutX**
+- Workout GIFs are uploaded once per exercise to the public Supabase Storage bucket `api-content-media`
 
 It avoids duplicates by:
 
-- Using stable API-based IDs, such as `api_mealdb_<mealId>` and `api_ninjas_exercise_<slug>`
+- Using stable API-based IDs, such as `api_mealdb_<mealId>` and `workoutx_exercise_<id>`
 - Checking existing records by `title + author`
+- Reusing previously uploaded Supabase Storage GIF URLs when the exercise already exists
 - Using Supabase `upsert` on `contents.id`
 
 Manual test:
