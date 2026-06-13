@@ -386,6 +386,7 @@ const saveIdea = async ({
   userId,
   roomDevices,
 }: {
+  // deno-lint-ignore no-explicit-any
   supabase: any
   idea: ReturnType<typeof normalizeIdeas>[number]
   homeId: number

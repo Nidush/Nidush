@@ -241,6 +241,7 @@ const fetchWorkoutXExercises = async (
 }
 
 const uploadGifToStorage = async (
+  // deno-lint-ignore no-explicit-any
   supabase: any,
   apiKey: string,
   exerciseId: string,
