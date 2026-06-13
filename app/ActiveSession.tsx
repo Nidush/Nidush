@@ -43,6 +43,8 @@ type FormattedInstruction = {
   text: string;
   duration?: number;
   description?: string;
+  isIngredientsStep?: boolean;
+  audio_url?: string;
 };
 
 type SessionData = {
@@ -99,6 +101,30 @@ const parseArrayValue = <T,>(value: unknown): T[] => {
   }
 
   return Array.isArray(value) ? (value as T[]) : [value as T];
+};
+
+const normalizeIngredients = (value: unknown): any[] => {
+  const parsed = parseArrayValue<any>(value);
+
+  return parsed.map((entry) => {
+    // Se já for um objeto no formato correto
+    if (entry && typeof entry === 'object' && 'item' in entry) {
+      return {
+        item: String((entry as { item?: unknown }).item ?? ''),
+        amount: String((entry as { amount?: unknown }).amount ?? ''),
+      };
+    }
+
+    // Se for uma string simples do The Meal Database
+    const text = String(entry ?? '');
+    const spaceIdx = text.indexOf(' ');
+
+    // Se não tiver espaços, é apenas o ingrediente
+    if (spaceIdx === -1) return { item: text, amount: '' };
+
+    // Divide pela primeira palavra (normalmente a quantidade) e o resto é o item
+    return { amount: text.slice(0, spaceIdx), item: text.slice(spaceIdx + 1) };
+  });
 };
 
 const getActivityType = (item: Partial<Activity> | Partial<Scenario>) =>
@@ -272,11 +298,40 @@ export default function ActiveSession() {
         contentData?.instructions || localContent?.instructions || [],
       );
 
-      const formattedInstructions = rawInstructions.map((step) => {
-        if (typeof step === 'string')
-          return { text: step, duration: undefined, description: undefined };
-        return step;
-      });
+      // NOVA LÓGICA DE DIVISÃO DOS PASSOS:
+      // NOVA LÓGICA DE DIVISÃO DOS PASSOS:
+      const formattedInstructions: FormattedInstruction[] = rawInstructions
+        .map((step: any) => {
+          if (typeof step === 'string') {
+            return { text: step, duration: undefined, description: undefined };
+          }
+          return {
+            text: String(step.text ?? ''),
+            duration: step.duration,
+            description: step.description,
+            audio_url: step.audio_url, // <--- 2. PUXAR O LINK DA BASE DE DADOS AQUI
+          };
+        })
+        .flatMap((stepObj) => {
+          if (!stepObj.text) return [];
+
+          const sentences = stepObj.text
+            .split('.')
+            .map((sentence) => sentence.trim())
+            .filter((sentence) => sentence.length > 0);
+
+          if (sentences.length <= 1) {
+            return [stepObj];
+          }
+
+          return sentences.map((sentence, index) => ({
+            text: sentence + '.',
+            duration: index === 0 ? stepObj.duration : undefined,
+            description: stepObj.description,
+            // 3. SE O TEXTO FOR DIVIDIDO, O ÁUDIO FICA NO 1º PEDAÇO DA FRASE
+            audio_url: index === 0 ? stepObj.audio_url : undefined,
+          }));
+        });
 
       if (formattedInstructions.length === 0) {
         formattedInstructions.push({
@@ -285,6 +340,7 @@ export default function ActiveSession() {
           description: undefined,
         });
       }
+
       // 1. Criamos um fallback robusto para procurar ingredientes em todo o lado
       const robustIngredients =
         contentData?.ingredients ??
@@ -294,19 +350,33 @@ export default function ActiveSession() {
         localContent?.ingredients ??
         [];
 
+      // USAR O NORMALIZE AQUI EM VEZ DE parseArrayValue
+      const parsedIngredients = normalizeIngredients(robustIngredients);
+      const activityType = getActivityType(foundItem);
+
+      // INJETAR PASSO DE INGREDIENTES EXCLUSIVO NO INÍCIO DO ARRAY
+      if (activityType === 'cooking' && parsedIngredients.length > 0) {
+        formattedInstructions.unshift({
+          text: 'Check and prepare all the required ingredients before starting the preparation.',
+          duration: undefined, // Sem duração fixa para ser controlado manualmente pelo botão Next
+          description: undefined,
+          isIngredientsStep: true,
+        });
+      }
+
       // 2. Atualizamos o estado da sessão com os ingredientes extraídos
       setSessionData({
         title: foundItem.title || 'Session',
         room: getActivityRoom(foundItem),
         playlistName: playlistName,
         image: foundItem.image,
-        instructions: formattedInstructions,
+        instructions: formattedInstructions, // Já inclui o passo de ingredientes no início
         type: contentType,
         videoUrl: videoUrl,
         devices: relatedScenario?.devices || getItemDevices(foundItem),
         tvDeviceName: connectedTvName,
-        activityType: getActivityType(foundItem),
-        ingredients: parseArrayValue<any>(robustIngredients),
+        activityType: activityType,
+        ingredients: parsedIngredients,
       });
 
       // Tocar música no Spotify só em sessões sem vídeo.
@@ -446,6 +516,24 @@ export default function ActiveSession() {
     } else {
       router.replace('/Activities');
     }
+  }, [currentStepIndex, sessionData, contentOpacity]);
+
+  const handlePreviousStep = useCallback(() => {
+    if (!sessionData || currentStepIndex === 0) return;
+
+    const prevIndex = currentStepIndex - 1;
+
+    // Fazemos a mesma animação de fade-out / fade-in
+    contentOpacity.value = withSequence(
+      withTiming(0, { duration: 300 }),
+      withTiming(1, { duration: 300 }),
+    );
+
+    setTimeout(() => {
+      setCurrentStepIndex(prevIndex);
+      const prevDuration = sessionData.instructions[prevIndex].duration;
+      setSecondsLeft(prevDuration || 0);
+    }, 300);
   }, [currentStepIndex, sessionData, contentOpacity]);
 
   useEffect(() => {
@@ -595,6 +683,8 @@ export default function ActiveSession() {
             isManualStep={currentStep.duration === undefined}
             isLastStep={isLastStep}
             onNextStep={handleNextStep}
+            isFirstStep={currentStepIndex === 0}
+            onPrevStep={handlePreviousStep}
             playlistName={sessionData.playlistName}
             room={sessionData.room}
             image={sessionData.image}

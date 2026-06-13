@@ -1,12 +1,14 @@
 import { apiLog, supabase } from '@/utils/supabase';
 import { Ionicons } from '@expo/vector-icons';
-
+import * as IntentLauncher from 'expo-intent-launcher';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
+  Alert,
   ImageSourcePropType,
+  Platform,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -87,7 +89,7 @@ const parseUnknownArray = (value: unknown): unknown[] => {
       const parsed = JSON.parse(value);
       return Array.isArray(parsed) ? parsed : [];
     } catch {
-      return [];
+      return [value];
     }
   }
   return Array.isArray(value) ? value : [];
@@ -328,21 +330,7 @@ export default function ActivityDetails() {
     setAlertConfig((prev) => ({ ...prev, visible: false }));
 
   const handleStartPress = () => {
-    if (!mainItem) return;
-
-    // Permitir todas as atividades e cenários avançarem para o ecrã de execução
-    if (mainItem) {
-      // 🎵 Removido daqui para tocar apenas no ecrã de exercício (como pedido)
-      router.push({
-        pathname: '/LoadingActivity',
-        params: {
-          id: mainItem.id,
-          title: mainItem.title,
-          type: isActivity ? 'activity' : 'scenario',
-          focusMode: focusEnabled.toString(),
-        },
-      });
-    } else {
+    if (!mainItem) {
       setAlertConfig({
         visible: true,
         title: 'Error',
@@ -352,6 +340,67 @@ export default function ActivityDetails() {
         isDestructive: false,
         onConfirm: undefined,
       });
+      return;
+    }
+
+    // Criamos uma função auxiliar que faz a navegação para a sessão
+    const proceedToSession = () => {
+      router.push({
+        pathname: '/LoadingActivity',
+        params: {
+          id: mainItem.id,
+          title: mainItem.title,
+          type: isActivity ? 'activity' : 'scenario',
+          focusMode: focusEnabled.toString(),
+        },
+      });
+    };
+
+    // Verificamos se o modo Focus está ativado antes de avançar
+    if (focusEnabled) {
+      if (Platform.OS === 'android') {
+        Alert.alert(
+          'Focus Mode',
+          "Enable 'Focus Mode' on your device. This will minimize distractions by limiting notifications and background activities.",
+          [
+            {
+              text: 'Skip',
+              style: 'cancel',
+              onPress: proceedToSession,
+            },
+            {
+              text: 'Open Settings',
+              onPress: async () => {
+                try {
+                  await IntentLauncher.startActivityAsync(
+                    IntentLauncher.ActivityAction.ZEN_MODE_PRIORITY_SETTINGS,
+                  );
+                } catch (error) {
+                  console.log('It was not possible to open settings', error);
+                } finally {
+                  // Navega para a sessão. Assim, quando o utilizador voltar das definições para a app, já está no ecrã de carregamento/sessão!
+                  proceedToSession();
+                }
+              },
+            },
+          ],
+        );
+      } else if (Platform.OS === 'ios') {
+        Alert.alert(
+          'Modo de Concentração',
+          "O iOS não permite bloquear outras apps automaticamente. Desliza a Central de Controlo para baixo e ativa o teu modo 'Não Incomodar' ou 'Foco'.",
+          [
+            {
+              text: 'Entendido',
+              style: 'default',
+              onPress: proceedToSession, // Avança depois de ler o aviso
+            },
+          ],
+        );
+      }
+    } else {
+      // Se o botão Focus não estava ligado, entra na sessão imediatamente sem chatear o utilizador
+      proceedToSession();
     }
   };
 
@@ -594,8 +643,16 @@ export default function ActivityDetails() {
 
   // Helper: parse JSON safely (handles strings, arrays, objects)
   const rawInstructions = parseUnknownArray(relatedContent?.instructions);
-  const instructions: DisplayInstruction[] =
-    rawInstructions.map(toInstructionText);
+  const instructions: DisplayInstruction[] = rawInstructions
+    .map(toInstructionText)
+    .flatMap(
+      (text) =>
+        text
+          .split('.') // Divide o bloco de texto sempre que encontra um ponto
+          .map((sentence) => sentence.trim()) // Remove espaços extra no início/fim
+          .filter((sentence) => sentence.length > 0) // Remove entradas vazias
+          .map((sentence) => sentence + '.'), // Adiciona o ponto final de volta à frase
+    );
   const ingredients =
     relatedContent?.type === 'recipe'
       ? normalizeIngredients(relatedContent.ingredients)

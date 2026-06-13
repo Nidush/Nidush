@@ -7,6 +7,7 @@ type FormattedInstruction = {
   text: string;
   duration?: number;
   description?: string;
+  audio_url?: string; // <-- 1. ADICIONADO AQUI PARA O TYPESCRIPT NÃO RECLAMAR
 };
 
 interface MeditationVisualsProps {
@@ -26,6 +27,7 @@ export const MeditationVisuals = ({
     <>
       <SessionVisuals
         text={step.text}
+        audioUrl={step.audio_url} // <-- 2. AGORA PASSA CORRETAMENTE
         stepIndex={stepIndex}
         pulseScale={pulseScale}
         contentOpacity={contentOpacity}

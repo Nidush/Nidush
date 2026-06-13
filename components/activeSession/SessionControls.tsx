@@ -18,6 +18,8 @@ interface SessionControlsProps {
   secondsLeft: number;
   isManualStep: boolean;
   isLastStep: boolean;
+  isFirstStep: boolean;
+  onPrevStep: () => void;
   playlistName: string;
   room: string;
   image: ImageSourcePropType | string | null | undefined;
@@ -37,6 +39,8 @@ export const SessionControls = ({
   isLastStep,
   image,
   progress,
+  isFirstStep,
+  onPrevStep,
   onToggleSession,
   onToggleMusic,
   onNextStep,
@@ -54,48 +58,84 @@ export const SessionControls = ({
 
   return (
     <View className="bg-[#F1F4EE] px-10 pb-8">
-      <View className="items-center mb-6 h-20 justify-center">
-        {isManualStep ? (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={onNextStep}
-            className={`px-8 py-3 rounded-full flex-row items-center shadow-sm bg-[#548F53]`}
-            accessible={true}
-            accessibilityRole="button"
-            accessibilityLabel={
-              isLastStep ? 'Finish session' : 'Go to next step'
-            }
-          >
-            <Text
-              maxFontSizeMultiplier={1.2}
-              className="text-white text-xl mr-2"
-              style={{ fontFamily: 'Nunito_700Bold' }}
-            >
-              {isLastStep ? 'Finish' : 'Next Step'}
-            </Text>
-            <MaterialIcons
-              name={isLastStep ? 'check-circle' : 'arrow-forward'}
-              size={24}
-              color="white"
-              importantForAccessibility="no"
-            />
-          </TouchableOpacity>
-        ) : (
-          // --- MODO TEMPO: MOSTRA O CRONÓMETRO ---
-          <Text
-            maxFontSizeMultiplier={1.2}
-            className="text-[#354F52] text-6xl tabular-nums"
-            style={{ fontFamily: 'Nunito_700Bold' }}
-            accessible={true}
-            // Isto diz ao VoiceOver/TalkBack como lidar com conteúdo que muda muito rápido
-            accessibilityRole="timer"
-          >
-            {Math.floor(secondsLeft / 60)}:
-            {(secondsLeft % 60).toString().padStart(2, '0')}
-          </Text>
-        )}
+      {/* ÁREA DOS BOTÕES E TEMPORIZADOR */}
+      <View className="items-center mb-6 h-20 justify-center w-full">
+        <View className="flex-row items-center justify-between w-full relative h-full">
+          {/* TEMPORIZADOR (Centrado em absoluto para não desalinhar os botões) */}
+          {!isManualStep && (
+            <View className="absolute inset-0 items-center justify-center pointer-events-none">
+              <Text
+                maxFontSizeMultiplier={1.2}
+                className="text-[#354F52] text-4xl tabular-nums"
+                style={{ fontFamily: 'Nunito_700Bold' }}
+                accessible={true}
+                accessibilityRole="timer"
+              >
+                {Math.floor(secondsLeft / 60)}:
+                {(secondsLeft % 60).toString().padStart(2, '0')}
+              </Text>
+            </View>
+          )}
 
-        {/* Barra de Progresso (Sempre visível para contextualizar) */}
+          {/* ÁREA ESQUERDA: BOTÃO PREVIOUS */}
+          <View className="flex-1 items-start z-10">
+            {!isFirstStep && (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={onPrevStep}
+                className="px-5 py-3 rounded-full flex-row items-center shadow-sm bg-[#548F53]"
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel="Go to previous step"
+              >
+                <MaterialIcons name="arrow-back" size={24} color="white" />
+                <Text
+                  maxFontSizeMultiplier={1.2}
+                  className="text-white text-lg ml-1"
+                  style={{ fontFamily: 'Nunito_700Bold' }}
+                >
+                  Back
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* ÁREA DIREITA: BOTÃO NEXT / SKIP */}
+          <View className="flex-1 items-end z-10">
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={onNextStep}
+              className="px-5 py-3 rounded-full flex-row items-center shadow-sm bg-[#548F53]"
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={
+                isLastStep ? 'Finish session' : 'Go to next step'
+              }
+            >
+              <Text
+                maxFontSizeMultiplier={1.2}
+                className="text-white text-lg mr-1"
+                style={{ fontFamily: 'Nunito_700Bold' }}
+              >
+                {isLastStep ? 'Finish' : isManualStep ? 'Next' : 'Skip'}
+              </Text>
+              <MaterialIcons
+                name={
+                  isLastStep
+                    ? 'check-circle'
+                    : isManualStep
+                      ? 'arrow-forward'
+                      : 'skip-next'
+                }
+                size={24}
+                color="white"
+                importantForAccessibility="no"
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Barra de Progresso */}
         <View
           className="w-full h-1.5 bg-[#DDE5D7] mt-6 rounded-full overflow-hidden"
           importantForAccessibility="no-hide-descendants"

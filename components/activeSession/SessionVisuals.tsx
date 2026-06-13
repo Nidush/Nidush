@@ -3,7 +3,9 @@ import {
   FontAwesome5,
   MaterialCommunityIcons,
 } from '@expo/vector-icons';
-import React from 'react';
+import { createAudioPlayer, setAudioModeAsync } from 'expo-audio'; // <-- IMPORTAÇÃO ATUALIZADA
+import * as Speech from 'expo-speech';
+import React, { useEffect } from 'react';
 import { Text, View } from 'react-native';
 import Animated, {
   interpolate,
@@ -11,33 +13,109 @@ import Animated, {
   useAnimatedStyle,
 } from 'react-native-reanimated';
 
-// Ícones mapeados
-const ICON_MAP = [
-  <MaterialCommunityIcons
-    key="1"
-    name="meditation"
-    size={80}
-    color="#354F52"
-  />,
-  <FontAwesome5 key="2" name="hands-helping" size={70} color="#354F52" />,
-  <Feather key="3" name="smile" size={80} color="#354F52" />,
-  <MaterialCommunityIcons
-    key="4"
-    name="weather-windy"
-    size={80}
-    color="#354F52"
-  />,
-];
-
 interface SessionVisualsProps {
   text: string;
+  audioUrl?: string;
   stepIndex: number;
   pulseScale: SharedValue<number>;
   contentOpacity: SharedValue<number>;
 }
 
+// === FUNÇÃO PARA DETETAR ÍCONES DE MEDITAÇÃO ===
+const getMeditationIcon = (text: string) => {
+  const lowerText = text.toLowerCase();
+  const iconColor = '#354F52';
+  const iconSize = 80;
+
+  if (
+    lowerText.includes('breath') ||
+    lowerText.includes('inhale') ||
+    lowerText.includes('exhale') ||
+    lowerText.includes('air')
+  ) {
+    return (
+      <MaterialCommunityIcons
+        name="weather-windy"
+        size={iconSize}
+        color={iconColor}
+      />
+    );
+  }
+
+  if (
+    lowerText.includes('body') ||
+    lowerText.includes('scan') ||
+    lowerText.includes('tension') ||
+    lowerText.includes('relax')
+  ) {
+    return (
+      <MaterialCommunityIcons
+        name="human-handsdown"
+        size={iconSize}
+        color={iconColor}
+      />
+    );
+  }
+
+  if (
+    lowerText.includes('mind') ||
+    lowerText.includes('thought') ||
+    lowerText.includes('focus') ||
+    lowerText.includes('observe') ||
+    lowerText.includes('notice')
+  ) {
+    return (
+      <MaterialCommunityIcons
+        name="head-lightbulb-outline"
+        size={iconSize}
+        color={iconColor}
+      />
+    );
+  }
+
+  if (
+    lowerText.includes('heart') ||
+    lowerText.includes('love') ||
+    lowerText.includes('compassion') ||
+    lowerText.includes('feel')
+  ) {
+    return (
+      <MaterialCommunityIcons
+        name="heart-outline"
+        size={iconSize}
+        color={iconColor}
+      />
+    );
+  }
+
+  if (
+    lowerText.includes('smile') ||
+    lowerText.includes('joy') ||
+    lowerText.includes('peace')
+  ) {
+    return <Feather name="smile" size={iconSize} color={iconColor} />;
+  }
+
+  if (
+    lowerText.includes('support') ||
+    lowerText.includes('help') ||
+    lowerText.includes('guide')
+  ) {
+    return <FontAwesome5 name="hands-helping" size={70} color={iconColor} />;
+  }
+
+  return (
+    <MaterialCommunityIcons
+      name="meditation"
+      size={iconSize}
+      color={iconColor}
+    />
+  );
+};
+
 export const SessionVisuals = ({
   text,
+  audioUrl,
   stepIndex,
   pulseScale,
   contentOpacity,
@@ -51,6 +129,58 @@ export const SessionVisuals = ({
     opacity: contentOpacity.value,
   }));
 
+  // === LÓGICA ATUALIZADA COM EXPO-AUDIO ===
+  useEffect(() => {
+    // Usamos 'any' ou o tipo correto se estiveres a usar TypeScript estrito (AudioPlayer)
+    let player: any = null;
+    Speech.stop();
+
+    const playAudioSequence = async () => {
+      const speakOptions = {
+        language: 'en-US',
+        pitch: 0.9,
+        rate: 0.75,
+      };
+
+      if (audioUrl) {
+        try {
+          // No novo expo-audio, a propriedade chama-se apenas 'playsInSilentMode'
+          await setAudioModeAsync({
+            playsInSilentMode: true,
+          });
+
+          // Cria e reproduz o ficheiro do Supabase nativamente
+          player = createAudioPlayer(audioUrl);
+          player.play();
+        } catch (error) {
+          console.log(
+            'Erro ao carregar áudio do Supabase, a usar TTS...',
+            error,
+          );
+          Speech.speak(text, speakOptions);
+        }
+      } else {
+        // Fallback direto
+        Speech.speak(text, speakOptions);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      playAudioSequence();
+    }, 500);
+
+    // Limpeza rigorosa
+    return () => {
+      clearTimeout(timer);
+      Speech.stop();
+      if (player) {
+        player.pause();
+        player.release(); // <-- CRUCIAL no expo-audio para libertar memória do telemóvel
+      }
+    };
+  }, [text, audioUrl]);
+  // ==================================
+
   return (
     <View className="flex-1 items-center justify-center px-10">
       <Animated.View
@@ -60,10 +190,10 @@ export const SessionVisuals = ({
       >
         <View
           className=" mb-10"
-          importantForAccessibility="no-hide-descendants" // Android
+          importantForAccessibility="no-hide-descendants"
           accessibilityElementsHidden={true}
         >
-          {ICON_MAP[stepIndex % ICON_MAP.length]}
+          {getMeditationIcon(text)}
         </View>
         <Text
           maxFontSizeMultiplier={1.2}
