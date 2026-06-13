@@ -8,8 +8,8 @@ import { useAudioPlayer } from 'expo-audio';
 import { Stack, usePathname, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, View, Platform } from 'react-native';
-import { getSessionUser, supabase } from '../utils/supabase';
+import { Animated, AppState, Easing, StyleSheet, View, Platform } from 'react-native';
+import { getSessionUser, supabase, touchUserAppPresence } from '../utils/supabase';
 import { registerHealthConnectBackgroundSync } from '../utils/healthConnectBackgroundTask';
 import * as WebBrowser from 'expo-web-browser';
 import { logger } from '../utils/logger';
@@ -48,6 +48,35 @@ export default function RootLayout() {
       releaseChannel: process.env.EXPO_PUBLIC_APP_ENV || 'development',
     });
     setIsReady(true);
+  }, []);
+
+  useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const pingPresence = async (force = false) => {
+      try {
+        await touchUserAppPresence(force);
+      } catch (error) {
+        logger.warn('Could not refresh app presence heartbeat.', error);
+      }
+    };
+
+    void pingPresence(true);
+
+    intervalId = setInterval(() => {
+      void pingPresence(false);
+    }, 5 * 60 * 1000);
+
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        void pingPresence(true);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+      if (intervalId) clearInterval(intervalId);
+    };
   }, []);
 
   useEffect(() => {

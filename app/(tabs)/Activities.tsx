@@ -447,7 +447,7 @@ const UnifiedActivitiesScreen = () => {
 
             {(recommendedData.length > 0 || isLoadingAiRecommendations) && (
               <CarouselSection
-                title={viewMode === 'activities' ? 'AI recommended' : 'Recommended'}
+                title="Recommended"
                 data={recommendedData}
                 showTime={viewMode === 'activities'}
                 isLoadingMore={isLoadingAiRecommendations}

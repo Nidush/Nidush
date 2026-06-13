@@ -229,6 +229,30 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
     }
   }, [loadNotifications, userId]);
 
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`notifications-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          void refreshNotifications();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [refreshNotifications, userId]);
+
   const ensurePublicUser = useCallback(async (uid: string) => {
     const user = await getSessionUser();
     if (!user) return false;

@@ -8,6 +8,7 @@ import { logger } from './logger';
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL as string;
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string;
 const shouldLogSupabaseTraffic = typeof __DEV__ !== 'undefined' && __DEV__;
+let lastPresencePingAt = 0;
 
 const webStorage =
   typeof window !== 'undefined' && window.sessionStorage
@@ -116,6 +117,29 @@ export const getSessionUser = async () => {
 
     throw error;
   }
+};
+
+export const touchUserAppPresence = async (force = false) => {
+  const now = Date.now();
+  if (!force && now - lastPresencePingAt < 60 * 1000) return;
+
+  const user = await getSessionUser();
+  if (!user) return;
+
+  const { error } = await supabase
+    .from('users')
+    .update({
+      last_app_active_at: new Date(now).toISOString(),
+      updated_at: new Date(now).toISOString(),
+    })
+    .eq('auth_uid', user.id);
+
+  if (error) {
+    logger.warn('Failed to update app presence.', error);
+    return;
+  }
+
+  lastPresencePingAt = now;
 };
 
 export const apiLog = (method: string, table: string, data?: LogPayload) => {

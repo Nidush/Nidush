@@ -98,6 +98,13 @@ const parseUnknownArray = (value: unknown): unknown[] => {
   return Array.isArray(value) ? value : [];
 };
 
+const splitInstructionText = (value: string) =>
+  value
+    .replace(/\s+/g, ' ')
+    .split(/(?:\r?\n)+|;\s+|[.!?],\s*|(?<=[.!?])\s+(?=[A-Z0-9])|(?<=\d\.)\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
 const toInstructionText = (value: unknown): string => {
   if (typeof value === 'string') return value;
   if (value && typeof value === 'object' && 'text' in value) {
@@ -636,7 +643,8 @@ export default function ActivityDetails() {
 
   // Helper: parse JSON safely (handles strings, arrays, objects)
   const rawInstructions = parseUnknownArray(relatedContent?.instructions);
-  const instructions: DisplayInstruction[] = rawInstructions.map(toInstructionText);
+  const instructions: DisplayInstruction[] = rawInstructions
+    .flatMap((entry) => splitInstructionText(toInstructionText(entry)));
   const ingredients =
     relatedContent?.type === 'recipe'
       ? normalizeIngredients(relatedContent.ingredients)

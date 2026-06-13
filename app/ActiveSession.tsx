@@ -118,6 +118,36 @@ const parseArrayValue = <T,>(value: unknown): T[] => {
   return Array.isArray(value) ? (value as T[]) : [value as T];
 };
 
+const splitInstructionText = (value: string) =>
+  value
+    .replace(/\s+/g, ' ')
+    .split(/(?:\r?\n)+|;\s+|[.!?],\s*|(?<=[.!?])\s+(?=[A-Z0-9])|(?<=\d\.)\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+const normalizeInstructionSteps = (
+  rawInstructions: Array<FormattedInstruction | string>,
+): FormattedInstruction[] =>
+  rawInstructions.flatMap((step) => {
+    if (typeof step === 'string') {
+      return splitInstructionText(step).map((text) => ({
+        text,
+        duration: undefined,
+        description: undefined,
+      }));
+    }
+
+    const text = String(step.text ?? '').trim();
+    const splitText = splitInstructionText(text);
+    if (splitText.length <= 1) return [step];
+
+    return splitText.map((part, index) => ({
+      text: part,
+      duration: index === 0 ? step.duration : undefined,
+      description: step.description,
+    }));
+  });
+
 const getActivityType = (item: Partial<Activity> | Partial<Scenario>) =>
   String(('type' in item ? item.type : '') ?? '').toLowerCase();
 
@@ -335,11 +365,12 @@ export default function ActiveSession() {
         []
       );
 
-      const formattedInstructions = rawInstructions.map((step) => {
-        if (typeof step === 'string')
+      const formattedInstructions = normalizeInstructionSteps(rawInstructions.map((step) => {
+        if (typeof step === 'string') {
           return { text: step, duration: undefined, description: undefined };
+        }
         return step;
-      });
+      }));
 
       if (formattedInstructions.length === 0) {
         formattedInstructions.push({

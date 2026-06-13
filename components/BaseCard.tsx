@@ -1,12 +1,11 @@
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
+import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import {
   DimensionValue,
-  Image,
   ImageSourcePropType,
-  Platform,
   StyleSheet,
   Text,
   View,
@@ -36,11 +35,11 @@ export const BaseCard = ({
       style={{ width, aspectRatio: 1 }}
     >
       <View style={StyleSheet.absoluteFill}>
-        <Image
+        <ExpoImage
           source={image}
           style={StyleSheet.absoluteFill}
-          resizeMode="cover"
-          blurRadius={Platform.OS === 'ios' ? 70 : 50}
+          contentFit="cover"
+          cachePolicy="memory-disk"
           accessible={false}
         />
         <View className="absolute inset-0 " />
@@ -56,10 +55,12 @@ export const BaseCard = ({
           />
         }
       >
-        <Image
+        <ExpoImage
           source={image}
           style={StyleSheet.absoluteFill}
-          resizeMode="cover"
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={200}
           accessible={false}
         />
       </MaskedView>
