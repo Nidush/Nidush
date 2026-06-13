@@ -31,6 +31,19 @@ type ScenarioTemplateRow = {
   keywords: string[] | null;
 };
 
+type UserScenarioRow = {
+  id: number | string;
+  name: string;
+  description?: string | null;
+  room_id?: number | string | null;
+  image?: string | null;
+  playlist_id?: string | null;
+  playlist_name?: string | null;
+  focus_mode_enabled?: boolean | null;
+  shortcuts?: boolean | string | null;
+  rooms?: { name?: string | null } | null;
+};
+
 type UserActivityRow = {
   id: number | string;
   title: string;
@@ -54,6 +67,8 @@ let activityTemplatesCache: Activity[] | null = null;
 let scenarioTemplatesCache: Scenario[] | null = null;
 let activityTemplatesPromise: Promise<Activity[]> | null = null;
 let scenarioTemplatesPromise: Promise<Scenario[]> | null = null;
+
+export const USER_SCENARIO_ID_PREFIX = 'scenario:';
 
 const LOCAL_SCENARIO_TEMPLATES: Scenario[] = [
   {
@@ -97,7 +112,21 @@ const normalizeActivityType = (type: string | null | undefined): Activity['type'
 export const normalizeScenarioTemplateId = (value: number | string | null | undefined) => {
   if (value === null || value === undefined || value === '') return undefined;
   const raw = String(value);
+  if (raw.startsWith(USER_SCENARIO_ID_PREFIX)) return raw;
   return raw.startsWith('s') ? raw : `s${raw}`;
+};
+
+export const isUserScenarioRouteId = (value: unknown) =>
+  String(value ?? '').startsWith(USER_SCENARIO_ID_PREFIX);
+
+export const toUserScenarioRouteId = (value: number | string) =>
+  `${USER_SCENARIO_ID_PREFIX}${value}`;
+
+export const parseUserScenarioDbId = (value: unknown) => {
+  const raw = String(value ?? '');
+  return isUserScenarioRouteId(raw)
+    ? raw.slice(USER_SCENARIO_ID_PREFIX.length)
+    : raw;
 };
 
 const normalizeActivityTemplateId = (id: string) =>
@@ -333,6 +362,22 @@ export const mapScenarioTemplate = (row: ScenarioTemplateRow): Scenario => ({
   keywords: row.keywords ?? [],
 });
 
+export const mapUserScenario = (row: UserScenarioRow): Scenario => ({
+  id: toUserScenarioRouteId(row.id),
+  title: row.name,
+  description: row.description ?? '',
+  room: row.rooms?.name ?? undefined,
+  room_id: row.room_id !== null && row.room_id !== undefined ? String(row.room_id) : undefined,
+  image: resolveCatalogImage(row.image || 'Scenarios/moonlight_bay.png'),
+  category: 'My creations',
+  devices: [],
+  playlist: row.playlist_name ?? (row.playlist_id ? 'Spotify Music' : undefined),
+  playlist_id: row.playlist_id ?? undefined,
+  focusMode: row.focus_mode_enabled === true,
+  shortcuts: row.shortcuts === true || row.shortcuts === 'true',
+  keywords: [],
+});
+
 export const mapUserActivity = (row: UserActivityRow): Activity => ({
   id: String(row.id),
   title: row.title,
@@ -429,6 +474,16 @@ export const fetchScenarioTemplates = async ({ forceRefresh = false }: FetchCata
   }
 };
 
+export const fetchUserScenarios = async (): Promise<Scenario[]> => {
+  const { data, error } = await supabase
+    .from('scenarios')
+    .select('id, name, description, room_id, image, playlist_id, playlist_name, focus_mode_enabled, shortcuts, rooms(name)')
+    .order('id', { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []).map((row) => mapUserScenario(row as UserScenarioRow));
+};
+
 export const fetchActivityTemplateById = async (id: string) => {
   if (!id.startsWith('template:')) return null;
   const templateId = normalizeActivityTemplateId(id);
@@ -453,6 +508,18 @@ export const fetchActivityTemplateById = async (id: string) => {
 };
 
 export const fetchScenarioTemplateById = async (id: string) => {
+  if (isUserScenarioRouteId(id)) {
+    const scenarioId = parseUserScenarioDbId(id);
+    const { data, error } = await supabase
+      .from('scenarios')
+      .select('id, name, description, room_id, image, playlist_id, playlist_name, focus_mode_enabled, shortcuts, rooms(name)')
+      .eq('id', scenarioId)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data ? mapUserScenario(data as UserScenarioRow) : null;
+  }
+
   const normalizedId = normalizeScenarioTemplateId(id) ?? id;
   const cachedScenario = scenarioTemplatesCache?.find((item) => item.id === normalizedId);
   if (cachedScenario) return cachedScenario;

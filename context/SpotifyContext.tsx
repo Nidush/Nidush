@@ -6,7 +6,7 @@ import {
     useAuthRequest
 } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Alert, Linking, Platform } from 'react-native';
 import { SPOTIFY_CONFIG } from '../constants/spotify-config';
 import { logger } from '../utils/logger';
@@ -46,23 +46,35 @@ type SpotifyDevice = {
   is_restricted?: boolean;
 };
 
+type SpotifyCurrentTrack = {
+  title: string;
+  artist: string;
+  album?: string;
+  imageUrl?: string | null;
+  externalUrl?: string | null;
+};
+
 interface SpotifyContextType {
   token: string | null;
   isAuthenticated: boolean;
   login: () => Promise<void>;
   logout: () => Promise<void>;
   userProfile: SpotifyUserProfile | null;
-  currentTrack: { title: string; artist: string } | null;
+  currentTrack: SpotifyCurrentTrack | null;
   isLoading: boolean;
   getUserPlaylists: () => Promise<SpotifyPlaylist[]>;
   playPlaylist: (playlistId: string, options?: SpotifyPlaybackOptions) => Promise<void>;
   pausePlayback: () => Promise<void>;
   resumePlayback: () => Promise<void>;
+  nextTrack: () => Promise<void>;
+  previousTrack: () => Promise<void>;
+  openCurrentTrack: () => Promise<void>;
 }
 
 type SpotifyPlaybackOptions = {
   preferredDeviceTypes?: string[];
   preferredDeviceNameIncludes?: string[];
+  suppressAppOpen?: boolean;
 };
 
 const SpotifyContext = createContext<SpotifyContextType | undefined>(undefined);
@@ -70,7 +82,7 @@ const SpotifyContext = createContext<SpotifyContextType | undefined>(undefined);
 export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [token, setToken] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<SpotifyUserProfile | null>(null);
-  const [currentTrack, setCurrentTrack] = useState<{ title: string; artist: string } | null>(null);
+  const [currentTrack, setCurrentTrack] = useState<SpotifyCurrentTrack | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const [request, response, promptAsync] = useAuthRequest(
@@ -88,141 +100,88 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
     loadSavedToken();
   }, []);
 
-  useEffect(() => {
-    if (response) {
-      logger.debug('[Spotify] Response received:', response.type, response);
-    }
-    if (response?.type === 'success') {
-      const { code } = response.params;
-      logger.debug('[Spotify] Auth successful. Exchanging code response.');
-      if (code && request?.codeVerifier) {
-        exchangeCodeForToken(code, request.codeVerifier);
-      } else {
-        logger.warn('[Spotify] Missing code or codeVerifier. Request ready:', !!request);
-      }
-    } else if (response?.type === 'error') {
-      logger.error('[Spotify] Auth response error:', response.error);
-    }
-  }, [response]);
+  const logout = useCallback(async () => {
+    await AsyncStorage.removeItem('@spotify_token');
+    setToken(null);
+    setUserProfile(null);
+    setCurrentTrack(null);
 
-  const fetchCurrentTrack = async () => {
-    if (!token) return;
-    try {
-      const response = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      // Spotify retorna 204 quando não há nada a tocar. .json() daria erro aqui.
-      if (response.status === 204) {
-        setCurrentTrack(null);
-        return;
-      }
-
-      if (response.status === 401 || response.status === 403) {
-        logger.warn('[Spotify] Token invalid or insufficient permissions. Logging out.');
-        logout();
-        return;
-      }
-
-      if (response.status === 200) {
-        const data = await response.json();
-        if (data && data.item) {
-          setCurrentTrack({
-            title: data.item.name,
-            artist: data.item.artists[0]?.name || 'Unknown',
-          });
-        }
-      } else {
-        setCurrentTrack(null);
-      }
-    } catch (e) {
-      logger.error('Error fetching current track:', e);
-    }
-  };
-
-  useEffect(() => {
-    fetchCurrentTrack();
-    const interval = setInterval(fetchCurrentTrack, 5000);
-    return () => clearInterval(interval);
-  }, [token]);
-
-  const exchangeCodeForToken = async (code: string, codeVerifier: string) => {
-    try {
-      const params = new URLSearchParams();
-      params.append('grant_type', 'authorization_code');
-      params.append('code', code);
-      params.append('redirect_uri', REDIRECT_URI);
-      params.append('client_id', SPOTIFY_CONFIG.clientId);
-      params.append('code_verifier', codeVerifier);
-
-      const res = await fetch('https://accounts.spotify.com/api/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: params.toString(),
-      });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        logger.error('[Spotify] Token exchange failed:', res.status, errorText);
-        return;
-      }
-
-      const data = await res.json();
-      if (data.access_token) {
-        logger.debug('[Spotify] Token exchanged successfully.');
-        saveToken(data.access_token);
-        fetchUserProfile(data.access_token);
-      } else if (data.error) {
-        logger.error('[Spotify] Token exchange error:', data.error, data.error_description);
-      } else {
-        logger.error('Error exchanging code for token:', data);
-      }
-    } catch (e) {
-      logger.error('Failed to exchange code:', e);
-    }
-  };
-
-  const loadSavedToken = async () => {
-    setIsLoading(true);
-    try {
-      const savedToken = await AsyncStorage.getItem('@spotify_token');
-
-      if (savedToken && typeof savedToken === 'string') {
-        const tokenStr: string = savedToken;
-        setToken(tokenStr);
-        await fetchUserProfile(tokenStr);
-      }
-    } catch (e) {
-      logger.error('Error loading saved token:', e);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const saveToken = async (newToken: string) => {
-    await AsyncStorage.setItem('@spotify_token', newToken);
-    setToken(newToken);
-
-    // Sincronizar com o Supabase
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         await supabase
           .from('users')
-          .update({
-            spotify_connected: true
-          })
+          .update({ spotify_connected: false })
           .eq('auth_uid', user.id);
-        logger.debug('[Spotify] Spotify connection state synced to Supabase.');
       }
     } catch (e) {
-      logger.error('[Spotify] Failed to sync Spotify connection state:', e);
+      logger.error('[Spotify] Error clearing Spotify state in Supabase:', e);
     }
-  };
+  }, []);
 
-  const fetchUserProfile = async (authToken: string) => {
+  const fetchCurrentTrack = useCallback(async () => {
+    if (!token) {
+      setCurrentTrack(null);
+      return;
+    }
+    try {
+      const mapTrack = (item: any) => ({
+        title: item?.name || 'Music',
+        artist: item?.artists?.[0]?.name || 'Unknown',
+        album: item?.album?.name || undefined,
+        imageUrl: item?.album?.images?.[0]?.url || null,
+        externalUrl: item?.external_urls?.spotify || null,
+      });
+
+      const currentlyPlayingResponse = await fetch(
+        'https://api.spotify.com/v1/me/player/currently-playing',
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      if (currentlyPlayingResponse.status === 401 || currentlyPlayingResponse.status === 403) {
+        logger.warn('[Spotify] Token invalid or insufficient permissions. Logging out.');
+        logout();
+        return;
+      }
+
+      if (currentlyPlayingResponse.status === 200) {
+        const currentlyPlayingData = await currentlyPlayingResponse.json();
+        if (currentlyPlayingData?.item) {
+          setCurrentTrack(mapTrack(currentlyPlayingData.item));
+          return;
+        }
+      }
+
+      const playbackStateResponse = await fetch(
+        'https://api.spotify.com/v1/me/player',
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      if (playbackStateResponse.status === 401 || playbackStateResponse.status === 403) {
+        logger.warn('[Spotify] Token invalid or insufficient permissions. Logging out.');
+        logout();
+        return;
+      }
+
+      if (playbackStateResponse.status === 200) {
+        const playbackStateData = await playbackStateResponse.json();
+        if (playbackStateData?.item) {
+          setCurrentTrack(mapTrack(playbackStateData.item));
+          return;
+        }
+      }
+
+      setCurrentTrack(null);
+    } catch (e) {
+      logger.error('Error fetching current track:', e);
+    }
+  }, [logout, token]);
+
+  const fetchUserProfile = useCallback(async (authToken: string) => {
     try {
       const res = await fetch('https://api.spotify.com/v1/me', {
         headers: { Authorization: `Bearer ${authToken}` },
@@ -251,9 +210,111 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       logger.error('Error fetching Spotify profile:', e);
       logout();
     }
-  };
+  }, [logout]);
 
-  const login = async () => {
+  const saveToken = useCallback(async (newToken: string) => {
+    await AsyncStorage.setItem('@spotify_token', newToken);
+    setToken(newToken);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase
+          .from('users')
+          .update({
+            spotify_connected: true
+          })
+          .eq('auth_uid', user.id);
+        logger.debug('[Spotify] Spotify connection state synced to Supabase.');
+      }
+    } catch (e) {
+      logger.error('[Spotify] Failed to sync Spotify connection state:', e);
+    }
+  }, []);
+
+  const exchangeCodeForToken = useCallback(async (code: string, codeVerifier: string) => {
+    try {
+      const params = new URLSearchParams();
+      params.append('grant_type', 'authorization_code');
+      params.append('code', code);
+      params.append('redirect_uri', REDIRECT_URI);
+      params.append('client_id', SPOTIFY_CONFIG.clientId);
+      params.append('code_verifier', codeVerifier);
+
+      const res = await fetch('https://accounts.spotify.com/api/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params.toString(),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        logger.error('[Spotify] Token exchange failed:', res.status, errorText);
+        return;
+      }
+
+      const data = await res.json();
+      if (data.access_token) {
+        logger.debug('[Spotify] Token exchanged successfully.');
+        await saveToken(data.access_token);
+        await fetchUserProfile(data.access_token);
+      } else if (data.error) {
+        logger.error('[Spotify] Token exchange error:', data.error, data.error_description);
+      } else {
+        logger.error('Error exchanging code for token:', data);
+      }
+    } catch (e) {
+      logger.error('Failed to exchange code:', e);
+    }
+  }, [fetchUserProfile, saveToken]);
+
+  useEffect(() => {
+    fetchCurrentTrack();
+    const interval = setInterval(fetchCurrentTrack, 5000);
+    return () => clearInterval(interval);
+  }, [fetchCurrentTrack]);
+
+  const loadSavedToken = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const savedToken = await AsyncStorage.getItem('@spotify_token');
+
+      if (savedToken && typeof savedToken === 'string') {
+        const tokenStr: string = savedToken;
+        setToken(tokenStr);
+        await fetchUserProfile(tokenStr);
+      }
+    } catch (e) {
+      logger.error('Error loading saved token:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [fetchUserProfile]);
+
+  useEffect(() => {
+    loadSavedToken();
+  }, [loadSavedToken]);
+
+  useEffect(() => {
+    if (response) {
+      logger.debug('[Spotify] Response received:', response.type, response);
+    }
+    if (response?.type === 'success') {
+      const { code } = response.params;
+      logger.debug('[Spotify] Auth successful. Exchanging code response.');
+      if (code && request?.codeVerifier) {
+        exchangeCodeForToken(code, request.codeVerifier);
+      } else {
+        logger.warn('[Spotify] Missing code or codeVerifier. Request ready:', !!request);
+      }
+    } else if (response?.type === 'error') {
+      logger.error('[Spotify] Auth response error:', response.error);
+    }
+  }, [exchangeCodeForToken, request, response]);
+
+  const login = useCallback(async () => {
     if (!request) {
       logger.warn('[Spotify] Auth request is not ready yet. Please try again in a moment.');
       return;
@@ -268,27 +329,9 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } else {
       await promptAsync();
     }
-  };
+  }, [promptAsync, request]);
 
-  const logout = async () => {
-    await AsyncStorage.removeItem('@spotify_token');
-    setToken(null);
-    setUserProfile(null);
-
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase
-          .from('users')
-          .update({ spotify_connected: false })
-          .eq('auth_uid', user.id);
-      }
-    } catch (e) {
-      logger.error('[Spotify] Error clearing Spotify state in Supabase:', e);
-    }
-  };
-
-  const getUserPlaylists = async () => {
+  const getUserPlaylists = useCallback(async () => {
     if (!token) return [];
     try {
       const res = await fetch('https://api.spotify.com/v1/me/playlists', {
@@ -307,12 +350,15 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       logger.error('Error fetching playlists:', e);
       return [];
     }
-  };
+  }, [logout, token]);
 
   const findPreferredSpotifyDevice = (devices: SpotifyDevice[], options?: SpotifyPlaybackOptions) => {
     const availableDevices = devices.filter((device) => !device.is_restricted);
     const preferredTypes = options?.preferredDeviceTypes?.map((type) => type.toLowerCase()) ?? [];
     const preferredNames = options?.preferredDeviceNameIncludes?.map((name) => name.toLowerCase()) ?? [];
+    const smartphoneDevice = availableDevices.find(
+      (device) => String(device.type || '').toLowerCase() === 'smartphone',
+    );
 
     return (
       availableDevices.find((device) =>
@@ -321,12 +367,12 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
       availableDevices.find((device) =>
         preferredNames.some((name) => String(device.name || '').toLowerCase().includes(name)),
       ) ||
-      availableDevices.find((device) => device.type === 'Smartphone') ||
+      smartphoneDevice ||
       availableDevices[0]
     );
   };
 
-  const playPlaylist = async (playlistId: string, options?: SpotifyPlaybackOptions) => {
+  const playPlaylist = useCallback(async (playlistId: string, options?: SpotifyPlaybackOptions) => {
     logger.debug('[Spotify] playPlaylist called:', playlistId);
     if (!token) {
       logger.warn('[Spotify] Cannot play playlist because the token is missing.');
@@ -433,24 +479,24 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
             }
           };
           setTimeout(forcePlayback, 3000); // Esperar 3s após transferir
-        } else {
+        } else if (!options?.suppressAppOpen) {
           logger.debug('[Spotify] No active device. Attempting to open Spotify.');
-          // Tentar abrir a app do Spotify. Infelizmente, o Android exige que a app esteja 
-          // em primeiro plano pelo menos uma vez para "reativar" o recetor de áudio.
           Linking.openURL('spotify:').catch(() => {
             Alert.alert(
               'Spotify em Suspensão',
               'O teu telemóvel desligou o Spotify. Por favor, abre o Spotify uma vez e certifica-te que a Bateria está em "Não Restrito".'
             );
           });
+        } else {
+          logger.debug('[Spotify] No active Spotify device available and app auto-open is disabled.');
         }
       }
     } catch (e) {
       logger.error('Error playing playlist:', e);
     }
-  };
+  }, [fetchCurrentTrack, logout, token]);
 
-  const pausePlayback = async () => {
+  const pausePlayback = useCallback(async () => {
     if (!token) return;
     try {
       const response = await fetch('https://api.spotify.com/v1/me/player/pause', {
@@ -462,12 +508,13 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
         logger.warn('[Spotify] Token invalid or insufficient permissions. Logging out.');
         logout();
       }
+      setTimeout(() => fetchCurrentTrack(), 400);
     } catch (e) {
       logger.error('Error pausing playback:', e);
     }
-  };
+  }, [fetchCurrentTrack, logout, token]);
 
-  const resumePlayback = async () => {
+  const resumePlayback = useCallback(async () => {
     if (!token) return;
     try {
       const response = await fetch('https://api.spotify.com/v1/me/player/play', {
@@ -509,26 +556,97 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
           }
         }
       }
+      setTimeout(() => fetchCurrentTrack(), 800);
     } catch (e) {
       logger.error('Error resuming playback:', e);
     }
-  };
+  }, [fetchCurrentTrack, logout, token]);
+
+  const nextTrack = useCallback(async () => {
+    if (!token) return;
+    try {
+      const response = await fetch('https://api.spotify.com/v1/me/player/next', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.status === 401 || response.status === 403) {
+        logger.warn('[Spotify] Token invalid or insufficient permissions. Logging out.');
+        logout();
+        return;
+      }
+
+      setTimeout(() => fetchCurrentTrack(), 900);
+    } catch (e) {
+      logger.error('Error skipping to next track:', e);
+    }
+  }, [fetchCurrentTrack, logout, token]);
+
+  const previousTrack = useCallback(async () => {
+    if (!token) return;
+    try {
+      const response = await fetch('https://api.spotify.com/v1/me/player/previous', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.status === 401 || response.status === 403) {
+        logger.warn('[Spotify] Token invalid or insufficient permissions. Logging out.');
+        logout();
+        return;
+      }
+
+      setTimeout(() => fetchCurrentTrack(), 900);
+    } catch (e) {
+      logger.error('Error going to previous track:', e);
+    }
+  }, [fetchCurrentTrack, logout, token]);
+
+  const openCurrentTrack = useCallback(async () => {
+    const targetUrl = currentTrack?.externalUrl;
+    if (!targetUrl) return;
+
+    try {
+      await Linking.openURL(targetUrl);
+    } catch (e) {
+      logger.error('Error opening current Spotify track:', e);
+    }
+  }, [currentTrack?.externalUrl]);
+
+  const contextValue = useMemo(() => ({
+    token,
+    isAuthenticated: !!token,
+    login,
+    logout,
+    userProfile,
+    currentTrack,
+    isLoading,
+    getUserPlaylists,
+    playPlaylist,
+    pausePlayback,
+    resumePlayback,
+    nextTrack,
+    previousTrack,
+    openCurrentTrack,
+  }), [
+    token,
+    login,
+    logout,
+    userProfile,
+    currentTrack,
+    isLoading,
+    getUserPlaylists,
+    playPlaylist,
+    pausePlayback,
+    resumePlayback,
+    nextTrack,
+    previousTrack,
+    openCurrentTrack,
+  ]);
 
   return (
     <SpotifyContext.Provider
-      value={{
-        token,
-        isAuthenticated: !!token,
-        login,
-        logout,
-        userProfile,
-        currentTrack,
-        isLoading,
-        getUserPlaylists,
-        playPlaylist,
-        pausePlayback,
-        resumePlayback,
-      }}
+      value={contextValue}
     >
       {children}
     </SpotifyContext.Provider>

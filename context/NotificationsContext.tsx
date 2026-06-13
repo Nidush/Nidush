@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { supabase } from '../utils/supabase';
+import { getSessionUser, supabase } from '../utils/supabase';
 
 export interface AppNotification {
   id: string;
@@ -111,18 +111,18 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
     loadNotificationSetting();
   }, []);
 
-  const setNotificationsEnabled = async (enabled: boolean) => {
+  const setNotificationsEnabled = useCallback(async (enabled: boolean) => {
     setNotificationsEnabledState(enabled);
     try {
       await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, String(enabled));
     } catch (error) {
       console.error('Error saving notifications preference:', error);
     }
-  };
+  }, []);
 
   useEffect(() => {
     const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getSessionUser();
       if (user) {
         setUserId(user.id);
         setHasMoreState(false);
@@ -156,7 +156,7 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
     };
   }, []);
 
-  const loadNotifications = async (uid: string, isNextPage = false) => {
+  const loadNotifications = useCallback(async (uid: string, isNextPage = false) => {
     if (isLoadingRef.current || (isNextPage && !hasMoreRef.current)) return;
     isLoadingRef.current = true;
     setIsLoading(true);
@@ -213,24 +213,24 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
       isLoadingRef.current = false;
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const loadMore = () => {
+  const loadMore = useCallback(() => {
     if (userId && hasMoreRef.current && !isLoadingRef.current) {
-      loadNotifications(userId, true);
+      void loadNotifications(userId, true);
     }
-  };
+  }, [loadNotifications, userId]);
 
-  const refreshNotifications = async () => {
+  const refreshNotifications = useCallback(async () => {
     if (userId) {
       setHasMoreState(false);
       setPageState(0);
       await loadNotifications(userId, false);
     }
-  };
+  }, [loadNotifications, userId]);
 
-  const ensurePublicUser = async (uid: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
+  const ensurePublicUser = useCallback(async (uid: string) => {
+    const user = await getSessionUser();
     if (!user) return false;
 
     const { error } = await supabase
@@ -248,11 +248,11 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
     }
 
     return true;
-  };
+  }, []);
 
 
 
-  const addNotification = async (title: string, message: string, type: AppNotification['type']) => {
+  const addNotification = useCallback(async (title: string, message: string, type: AppNotification['type']) => {
     if (!notificationsEnabled) return;
     if (!userId) return;
 
@@ -306,9 +306,9 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
         )
       );
     }
-  };
+  }, [ensurePublicUser, notificationsEnabled, userId]);
 
-  const markAsRead = async (id: string) => {
+  const markAsRead = useCallback(async (id: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
     if (!userId) return;
 
@@ -318,9 +318,9 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
       .eq('id', id);
 
     if (error) console.error('Error marking notification as read in Supabase:', error);
-  };
+  }, [userId]);
 
-  const markAllAsRead = async () => {
+  const markAllAsRead = useCallback(async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     if (!userId) return;
 
@@ -331,9 +331,9 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
       .eq('read', false);
 
     if (error) console.error('Error marking all notifications as read in Supabase:', error);
-  };
+  }, [userId]);
 
-  const clearAll = async () => {
+  const clearAll = useCallback(async () => {
     setNotifications([]);
     setHasMoreState(false);
     setPageState(0);
@@ -345,7 +345,7 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
       .eq('user_id', userId);
 
     if (error) console.error('Error clearing notifications from Supabase:', error);
-  };
+  }, [userId]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 

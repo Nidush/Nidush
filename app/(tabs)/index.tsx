@@ -20,11 +20,11 @@ import { resolveCatalogImage } from '@/constants/data/catalogAssets';
 import { useBiometrics } from '@/context/BiometricsContext';
 import {
   AiActivityIdea,
-  fetchAiActivityIdeas,
+  isAiRateLimitError,
   saveAiActivityIdea,
 } from '@/utils/aiActivities';
 import { getDynamicRecommendations } from '@/utils/recommendationEngine';
-import { supabase } from '@/utils/supabase';
+import { getSessionUser, supabase } from '@/utils/supabase';
 import {
   fetchActivityTemplates,
   mapUserActivity,
@@ -92,15 +92,14 @@ export default function Index() {
   const [isEditingShortcuts, setIsEditingShortcuts] = useState(false);
   const [isSavingShortcutOrder, setIsSavingShortcutOrder] = useState(false);
   const [draggingShortcutId, setDraggingShortcutId] = useState<number | null>(null);
-  const [shortcutLayouts, setShortcutLayouts] = useState<Record<number, ShortcutLayout>>({});
   const shortcutDragOffsets = useRef(new Map<number, Animated.ValueXY>()).current;
+  const shortcutLayoutsRef = useRef<Record<number, ShortcutLayout>>({});
 
 
   // O userName deve ser atualizado quando ganhamos foco também
   const fetchUserName = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const user = session?.user;
+      const user = await getSessionUser();
       
       if (user) {
         setAvatarUrl(user.user_metadata?.avatar_url || null);
@@ -118,30 +117,8 @@ export default function Index() {
           const hooks = raw.replace(/[\[\]"]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
           setUserHobbies(Array.from(new Set(hooks)));
         }
-
       } else {
-        // Tentar getUser() se session for null
-        const { data: { user: verifiedUser } } = await supabase.auth.getUser();
-        if (verifiedUser) {
-          setAvatarUrl(verifiedUser.user_metadata?.avatar_url || null);
-          setUserName(verifiedUser.user_metadata?.first_name || verifiedUser.email?.split('@')[0] || 'Utilizador');
-          
-          const { data: dbUser } = await supabase
-            .from('users')
-            .select('hobbies')
-            .eq('email', verifiedUser.email)
-            .maybeSingle();
-            
-          if (dbUser?.hobbies) {
-            const raw = Array.isArray(dbUser.hobbies) ? dbUser.hobbies.join(',') : String(dbUser.hobbies);
-            const hooks = raw.replace(/[\[\]"]/g, '').split(',').map((s: string) => s.trim()).filter(Boolean);
-            setUserHobbies(Array.from(new Set(hooks)));
-          }
-
-
-        } else {
-          setUserName('Visitante');
-        }
+        setUserName('Visitante');
       }
 
     } catch (e) {
@@ -172,13 +149,7 @@ export default function Index() {
   useFocusEffect(
     useCallback(() => {
       const loadActivities = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        let user = session?.user ?? null;
-
-        if (!user) {
-          const { data: { user: verifiedUser } } = await supabase.auth.getUser();
-          user = verifiedUser ?? null;
-        }
+        const user = await getSessionUser();
 
         if (!user) {
           setMyActivities([]); // Importante: Limpar se não houver user
@@ -270,27 +241,6 @@ export default function Index() {
     }, [])
   );
 
-  const loadAiHomeIdeas = useCallback(async () => {
-    try {
-      const ideas = await fetchAiActivityIdeas({
-        mood: currentState,
-        activeFilter: 'Home',
-        prompt: userHobbies.length > 0 ? `Prioritize these hobbies: ${userHobbies.join(', ')}` : '',
-      });
-
-      setAiHomeIdeas(ideas.slice(0, 6));
-    } catch (error) {
-      console.warn('Failed to load AI home recommendations:', error);
-      setAiHomeIdeas([]);
-    }
-  }, [currentState, userHobbies]);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadAiHomeIdeas();
-    }, [loadAiHomeIdeas]),
-  );
-
   const saveHomeAiIdea = useCallback(async (idea: AiActivityIdea) => {
     if (isSavingAiHomeIdeaId) return;
 
@@ -308,7 +258,9 @@ export default function Index() {
         },
       });
     } catch (error) {
-      console.error('Failed to save AI home recommendation:', error);
+      if (!(await isAiRateLimitError(error))) {
+        console.error('Failed to save AI home recommendation:', error);
+      }
     } finally {
       setIsSavingAiHomeIdeaId(null);
     }
@@ -473,7 +425,7 @@ export default function Index() {
   };
 
   const handleShortcutDrop = (shortcutId: number, dx: number, dy: number) => {
-    const currentLayout = shortcutLayouts[shortcutId];
+    const currentLayout = shortcutLayoutsRef.current[shortcutId];
     if (!currentLayout) return;
 
     const dropCenter = {
@@ -483,7 +435,7 @@ export default function Index() {
 
     const closestShortcut = shortcuts.reduce<{ id: number; distance: number } | null>(
       (closest, shortcut) => {
-        const layout = shortcutLayouts[shortcut.shortcutId];
+        const layout = shortcutLayoutsRef.current[shortcut.shortcutId];
         if (!layout) return closest;
 
         const layoutCenter = {
@@ -504,6 +456,25 @@ export default function Index() {
       reorderShortcut(shortcutId, closestShortcut.id);
     }
   };
+
+  const updateShortcutLayout = useCallback(
+    (shortcutId: number, layout: ShortcutLayout) => {
+      const current = shortcutLayoutsRef.current[shortcutId];
+
+      if (
+        current &&
+        current.x === layout.x &&
+        current.y === layout.y &&
+        current.width === layout.width &&
+        current.height === layout.height
+      ) {
+        return;
+      }
+
+      shortcutLayoutsRef.current[shortcutId] = layout;
+    },
+    [],
+  );
 
   const createShortcutPanResponder = (shortcutId: number) =>
     PanResponder.create({
@@ -618,10 +589,7 @@ export default function Index() {
                   className="w-[48%] mb-4"
                   onLayout={(event) => {
                     const { x, y, width, height } = event.nativeEvent.layout;
-                    setShortcutLayouts((prev) => ({
-                      ...prev,
-                      [item.shortcutId]: { x, y, width, height },
-                    }));
+                    updateShortcutLayout(item.shortcutId, { x, y, width, height });
                   }}
                   style={{
                     transform: dragOffset.getTranslateTransform(),

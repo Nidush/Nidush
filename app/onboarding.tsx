@@ -271,7 +271,7 @@ export default function Onboarding() {
     }).start(() => {
       // Removido o AsyncStorage.setItem daqui.
       // O utilizador só "viu" o onboarding quando terminar a configuração.
-      router.replace('/signup');
+      router.replace('/pre-signup-consent');
     });
   }, [router, fadeAnim]);
 

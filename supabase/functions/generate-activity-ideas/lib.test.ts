@@ -1,4 +1,6 @@
 import {
+  clampPositiveInteger,
+  evaluateRateLimit,
   fallbackIdeas,
   getMoodDirective,
   normalizeIdeas,
@@ -90,5 +92,55 @@ Deno.test('focused mood directive keeps concentration-specific guidance', () => 
 
   if (!directive.guidance.some((line) => line.toLowerCase().includes('concentration'))) {
     throw new Error('Expected focused guidance to mention concentration support.')
+  }
+})
+
+Deno.test('clampPositiveInteger falls back for invalid values and enforces bounds', () => {
+  if (clampPositiveInteger('abc', 10) !== 10) {
+    throw new Error('Expected invalid numeric values to use the fallback.')
+  }
+
+  if (clampPositiveInteger('-5', 10, 1, 20) !== 1) {
+    throw new Error('Expected lower values to clamp to the minimum.')
+  }
+
+  if (clampPositiveInteger('99', 10, 1, 20) !== 20) {
+    throw new Error('Expected higher values to clamp to the maximum.')
+  }
+})
+
+Deno.test('evaluateRateLimit blocks requests inside the cooldown window', () => {
+  const decision = evaluateRateLimit({
+    recentRequestCount: 0,
+    maxRequestsPerHour: 10,
+    minSecondsBetweenRequests: 30,
+    lastRequestAt: '2026-06-03T12:00:10.000Z',
+    now: new Date('2026-06-03T12:00:20.000Z'),
+  })
+
+  if (decision.allowed) {
+    throw new Error('Expected the cooldown window to block the request.')
+  }
+
+  if (decision.reason !== 'cooldown' || decision.retryAfterSeconds !== 20) {
+    throw new Error(`Unexpected cooldown decision: ${JSON.stringify(decision)}`)
+  }
+})
+
+Deno.test('evaluateRateLimit blocks requests after reaching the hourly quota', () => {
+  const decision = evaluateRateLimit({
+    recentRequestCount: 10,
+    maxRequestsPerHour: 10,
+    minSecondsBetweenRequests: 30,
+    lastRequestAt: '2026-06-03T10:00:00.000Z',
+    now: new Date('2026-06-03T12:00:20.000Z'),
+  })
+
+  if (decision.allowed) {
+    throw new Error('Expected the hourly quota to block the request.')
+  }
+
+  if (decision.reason !== 'hourly_quota' || decision.retryAfterSeconds !== 3600) {
+    throw new Error(`Unexpected hourly quota decision: ${JSON.stringify(decision)}`)
   }
 })

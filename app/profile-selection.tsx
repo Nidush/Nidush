@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { supabase } from '../utils/supabase';
+import { getSessionUser, supabase } from '../utils/supabase';
 
 const { width } = Dimensions.get('window');
 
@@ -41,8 +41,7 @@ export default function ProfileSelection() {
     const fetchResidents = async () => {
       if (isMounted) setIsLoading(true);
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const user = session?.user;
+        const user = await getSessionUser();
 
         if (!user) {
           router.replace('/login');

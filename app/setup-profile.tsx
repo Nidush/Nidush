@@ -20,12 +20,19 @@ import {
 
 // Onboarding Components
 import ActivitySelection from '../components/Onboarding/ActivitySelection';
+import ConsentStep from '../components/Onboarding/ConsentStep';
 import FinalLoading from '../components/Onboarding/FinalLoading';
 import HouseName from '../components/Onboarding/HouseName';
 import SpotifyConnect from '../components/Onboarding/SpotifyConnect';
 import WearableSync from '../components/Onboarding/WearableSync';
 import WelcomeUser from '../components/Onboarding/WelcomeUser';
 import { CustomAlert } from '../components/CustomAlert';
+import { LEGAL_CONSENT_KEY } from '../components/legal/LegalContent';
+import {
+  ONBOARDING_CONSENTS_KEY,
+  persistStoredOnboardingConsents,
+  setStoredHealthConsent,
+} from '../utils/legal';
 
 export default function SetupProfile() {
   const [fontsLoaded] = useFonts({
@@ -39,6 +46,7 @@ export default function SetupProfile() {
 
   const [currentStep, setCurrentStep] = useState('welcome');
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
 
   // State
   const [firstName, setFirstName] = useState('');
@@ -48,6 +56,12 @@ export default function SetupProfile() {
   const [houseId, setHouseId] = useState('');
   const [homeMode, setHomeMode] = useState<'create' | 'join'>('create');
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
+  const [consents, setConsents] = useState({
+    health: false,
+    spotify: false,
+    app: false,
+  });
+  const [hasAcceptedLegalConsent, setHasAcceptedLegalConsent] = useState(false);
   const [loading, setLoading] = useState(true);
   const [alertConfig, setAlertConfig] = useState({
     visible: false,
@@ -58,10 +72,30 @@ export default function SetupProfile() {
   const openAlert = (title: string, message: string) =>
     setAlertConfig({ visible: true, title, message });
 
+  const triggerWelcomeEmail = React.useCallback(async (userId: string, firstNameValue: string, emailValue: string) => {
+    const storageKey = `@welcome_email_requested:${userId}`;
+    const alreadyRequested = await AsyncStorage.getItem(storageKey);
+    if (alreadyRequested === 'true') return;
+
+    try {
+      await invokeFunction('welcome-user', {
+        name: firstNameValue,
+        email: emailValue,
+      });
+      await AsyncStorage.setItem(storageKey, 'true');
+    } catch (error) {
+      logger.warn('Could not trigger welcome email during setup-profile.', error);
+    }
+  }, []);
+
   const loadUserData = React.useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
+        const userFirstName = user.user_metadata?.first_name || '';
+        const userLastName = user.user_metadata?.last_name || '';
+        const userEmail = user.email || '';
+
         // Double check if user is already registered with a home to bypass setup
         const { data: homeAssociation } = await supabase
           .from('user_homes')
@@ -71,15 +105,19 @@ export default function SetupProfile() {
           .limit(1)
           .maybeSingle();
 
+        await triggerWelcomeEmail(user.id, userFirstName, userEmail);
+
         if (homeAssociation?.home_id) {
           await AsyncStorage.setItem('@viewedOnboarding', 'true');
           router.replace('/(tabs)');
           return;
         }
 
-        setFirstName(user.user_metadata?.first_name || '');
-        setLastName(user.user_metadata?.last_name || '');
-        setEmail(user.email || '');
+        setFirstName(userFirstName);
+        setLastName(userLastName);
+        setEmail(userEmail);
+        const legalConsent = await AsyncStorage.getItem(LEGAL_CONSENT_KEY);
+        setHasAcceptedLegalConsent(legalConsent === 'accepted');
         
         // Restore mid-flow onboarding progress (but never restore 'loading' as it
         // means the previous attempt failed \u2014 start from 'house' in that case)
@@ -94,6 +132,12 @@ export default function SetupProfile() {
             if (data?.houseId) setHouseId(data.houseId);
             if (data?.homeMode) setHomeMode(data.homeMode || 'create');
             if (data?.selectedActivities) setSelectedActivities(data.selectedActivities);
+            if (data?.consents) {
+              setConsents((prev) => ({
+                ...prev,
+                ...data.consents,
+              }));
+            }
           } else {
             // Stale or invalid progress \u2014 clear it and start fresh
             await AsyncStorage.removeItem('@onboarding_progress');
@@ -108,7 +152,7 @@ export default function SetupProfile() {
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, triggerWelcomeEmail]);
 
   useEffect(() => {
     loadUserData();
@@ -123,6 +167,7 @@ export default function SetupProfile() {
           houseId,
           homeMode,
           selectedActivities,
+          consents,
           ...extraData
         }
       };
@@ -134,23 +179,55 @@ export default function SetupProfile() {
 
   const transitionTo = (nextStep: string, extraData = {}) => {
     saveProgress(nextStep, extraData);
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 500,
-      useNativeDriver: true,
-    }).start(() => {
-      setCurrentStep(nextStep);
+    Animated.parallel([
       Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 500,
+        toValue: 0,
+        duration: 220,
         useNativeDriver: true,
-      }).start();
+      }),
+      Animated.timing(slideAnim, {
+        toValue: -24,
+        duration: 220,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setCurrentStep(nextStep);
+      slideAnim.setValue(48);
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 320,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 320,
+          useNativeDriver: true,
+        }),
+      ]).start();
     });
+  };
+
+  const persistConsents = async (nextConsents: typeof consents) => {
+    setConsents(nextConsents);
+    await AsyncStorage.setItem(
+      ONBOARDING_CONSENTS_KEY,
+      JSON.stringify(nextConsents),
+    );
+    return nextConsents;
   };
 
   const renderStep = (content: React.ReactNode) => (
     <>
-      {content}
+      <Animated.View
+        style={{
+          flex: 1,
+          opacity: fadeAnim,
+          transform: [{ translateX: slideAnim }],
+        }}
+      >
+        {content}
+      </Animated.View>
       <CustomAlert
         visible={alertConfig.visible}
         title={alertConfig.title}
@@ -193,52 +270,132 @@ export default function SetupProfile() {
 
   if (currentStep === 'house') {
     return renderStep(
-      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <HouseName 
-          houseName={houseName} 
-          setHouseName={setHouseName} 
+      <HouseName
+          houseName={houseName}
+          setHouseName={setHouseName}
           houseId={houseId}
           setHouseId={setHouseId}
           homeMode={homeMode}
           setHomeMode={setHomeMode}
-          onNext={() => transitionTo('wearable')} 
+          onNext={() => transitionTo('health-consent')}
         />
-      </Animated.View>
+    );
+  }
+
+  if (currentStep === 'health-consent') {
+    return renderStep(
+      <ConsentStep
+          title="Health data, only with your say-so"
+          description="Before connecting Health Connect, here is the consent notice for the health data Nidush may use."
+          bullets={[
+            'Nidush only uses the Health Connect data needed for stress and recovery features.',
+            'You can connect now or leave it for later in your profile.',
+            'You stay in control and can review or revoke permissions at any time in Android settings.',
+          ]}
+          badgeText="Health consent"
+          icon="heart-pulse"
+          accentColor="#5C8D58"
+          primaryLabel="Continue"
+          secondaryLabel="Skip for now"
+          note="Review this before opening the Health Connect step."
+          onPrimary={async () => {
+            await setStoredHealthConsent(true);
+            const nextConsents = await persistConsents({
+              ...consents,
+              health: true,
+            });
+            transitionTo('wearable', { consents: nextConsents });
+          }}
+          onSecondary={() => transitionTo('wearable')}
+        />
     );
   }
 
   if (currentStep === 'wearable') {
     return renderStep(
-      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <WearableSync
-          onNext={() => transitionTo('spotify')}
-          onSkip={() => transitionTo('spotify')}
+      <WearableSync
+          onNext={() => transitionTo('spotify-consent')}
+          onSkip={() => transitionTo('spotify-consent')}
         />
-      </Animated.View>
+    );
+  }
+
+  if (currentStep === 'spotify-consent') {
+    return renderStep(
+      <ConsentStep
+          title="Spotify data and playback notice"
+          description="Before connecting Spotify, here is the consent notice for how Nidush may use music data in your routines."
+          bullets={[
+            'Nidush may use your Spotify profile, playback state, playlists, and active devices to launch music for a scenario.',
+            'Skipping Spotify does not block your onboarding or your access to the app.',
+            'You can disconnect Spotify later in your profile whenever you want.',
+          ]}
+          badgeText="Spotify consent"
+          icon="spotify"
+          accentColor="#1DB954"
+          primaryLabel="Continue"
+          secondaryLabel="Skip for now"
+          note="Review this before opening the Spotify connection step."
+          onPrimary={async () => {
+            const nextConsents = await persistConsents({
+              ...consents,
+              spotify: true,
+            });
+            transitionTo('spotify', { consents: nextConsents });
+          }}
+          onSecondary={() => transitionTo('spotify')}
+        />
     );
   }
 
   if (currentStep === 'spotify') {
     return renderStep(
-      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <SpotifyConnect
+      <SpotifyConnect
           onNext={() => transitionTo('activities')}
           onSkip={() => transitionTo('activities')}
         />
-      </Animated.View>
     );
   }
 
   if (currentStep === 'activities') {
     return renderStep(
-      <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
-        <ActivitySelection
+      <ActivitySelection
           onFinish={(activities) => {
             setSelectedActivities(activities);
-            transitionTo('loading', { selectedActivities: activities });
+            transitionTo(
+              hasAcceptedLegalConsent ? 'loading' : 'app-consent',
+              { selectedActivities: activities },
+            );
           }}
         />
-      </Animated.View>
+    );
+  }
+
+  if (currentStep === 'app-consent') {
+    return renderStep(
+      <ConsentStep
+          title="One last consent before you enter"
+          description="Before Nidush finishes your setup, please confirm that you agree with the app privacy terms and the way we use your account, preferences, and optional integrations."
+          bullets={[
+            'Nidush stores essential app data such as onboarding progress, preferences, and account setup details on your device.',
+            'Your profile and selected activities are used to personalize routines, device suggestions, and content inside the app.',
+            'Optional services like Health Connect and Spotify remain under your control and can be changed later.',
+          ]}
+          badgeText="Privacy and app consent"
+          icon="shield-account"
+          accentColor="#3E545C"
+          primaryLabel="Accept and enter Nidush"
+          note="This confirms the app privacy notice and terms of service for this device."
+          onPrimary={async () => {
+            const nextConsents = await persistConsents({
+              ...consents,
+              app: true,
+            });
+            await AsyncStorage.setItem(LEGAL_CONSENT_KEY, 'accepted');
+            setHasAcceptedLegalConsent(true);
+            transitionTo('loading', { consents: nextConsents });
+          }}
+        />
     );
   }
 
@@ -400,12 +557,15 @@ export default function SetupProfile() {
                     logger.debug('[Onboarding] User joined home as resident:', finalHomeId);
                   }
                 }
+
               }
             }
 
             if (!hasError) {
+              await persistStoredOnboardingConsents();
               await AsyncStorage.setItem('@viewedOnboarding', 'true');
               await AsyncStorage.removeItem('@onboarding_progress');
+              await AsyncStorage.removeItem(ONBOARDING_CONSENTS_KEY);
               router.replace('/(tabs)');
             } else {
               setCurrentStep('house');

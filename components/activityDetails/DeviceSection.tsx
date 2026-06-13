@@ -1,5 +1,6 @@
 import { ScenarioDeviceState } from '@/constants/data';
 import { DeviceType, SMART_HOME_DEVICES } from '@/constants/devices';
+import { getScenarioDeviceMeta } from '@/utils/activityDeviceConfigs';
 import {
   Feather,
   MaterialCommunityIcons,
@@ -54,7 +55,17 @@ export const DeviceSection = ({ devices }: DeviceSectionProps) => {
       </Text>
       <View className="flex-row flex-wrap gap-3">
         {devices.map((config, i) => {
-          const realDevice = SMART_HOME_DEVICES[config.deviceId];
+          const fallbackMeta = getScenarioDeviceMeta(config);
+          const realDevice = SMART_HOME_DEVICES[config.deviceId] ?? (
+            fallbackMeta.type
+              ? {
+                  id: config.deviceId,
+                  name: fallbackMeta.name,
+                  type: fallbackMeta.type,
+                  room: '',
+                }
+              : null
+          );
           if (!realDevice) return null;
 
           const isLight = realDevice.type === 'light';

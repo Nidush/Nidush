@@ -56,7 +56,15 @@ We implement appropriate security measures to protect your personal information 
 
 ## 7. Data Retention
 
-We retain your information for as long as necessary to provide our services and comply with legal obligations.
+We retain your information for as long as necessary to provide our services and comply with legal obligations. Our default retention periods are:
+- Account profile data: while your account remains active
+- Consent records: while your account remains active, so we can demonstrate what was accepted and when
+- Biometric readings and derived wellness signals: up to 30 days
+- In-app notifications: up to 90 days
+- Device discovery request logs: up to 30 days
+- Internal API sync run logs: up to 180 days
+
+We may retain specific records longer if required by law, to resolve disputes, or to protect the security and integrity of the service.
 
 ## 8. Your Rights
 

@@ -1,9 +1,15 @@
-import { MaterialIcons } from '@expo/vector-icons';
-import React from 'react';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import React, { useEffect, useState } from 'react';
 import { Image, ImageSourcePropType, Text, TouchableOpacity, View } from 'react-native';
 import Animated, {
   SharedValue,
+  cancelAnimation,
+  Easing,
   useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
 } from 'react-native-reanimated';
 
 interface SessionControlsProps {
@@ -18,8 +24,17 @@ interface SessionControlsProps {
   progress: SharedValue<number>;
   onToggleSession: () => void;
   onToggleMusic: () => void;
+  onNextTrack: () => void;
+  onPreviousTrack: () => void;
+  onOpenSpotify: () => void;
   onNextStep: () => void;
-  currentTrack?: { title: string; artist: string } | null;
+  currentTrack?: {
+    title: string;
+    artist: string;
+    album?: string;
+    imageUrl?: string | null;
+    externalUrl?: string | null;
+  } | null;
 }
 
 export const SessionControls = ({
@@ -32,22 +47,67 @@ export const SessionControls = ({
   progress,
   onToggleSession,
   onToggleMusic,
+  onNextTrack,
+  onPreviousTrack,
+  onOpenSpotify,
   onNextStep,
   currentTrack,
 }: SessionControlsProps) => {
+  const [titleContainerWidth, setTitleContainerWidth] = useState(0);
+  const [titleTextWidth, setTitleTextWidth] = useState(0);
+  const titleTranslateX = useSharedValue(0);
+
   const animatedProgressStyle = useAnimatedStyle(() => ({
     width: `${progress.value}%`,
   }));
 
+  const titleAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: titleTranslateX.value }],
+  }));
+
   const imageSource =
-    typeof image === 'string'
-      ? { uri: image }
-      : image || { uri: 'https://picsum.photos/seed/meditate/100/100' };
+    currentTrack?.imageUrl
+      ? { uri: currentTrack.imageUrl }
+      : typeof image === 'string'
+        ? { uri: image }
+        : image || { uri: 'https://picsum.photos/seed/meditate/100/100' };
+
+  const minutesLeft = Math.floor(secondsLeft / 60);
+  const remainingSeconds = (secondsLeft % 60).toString().padStart(2, '0');
+  const currentTitle = currentTrack?.title || 'Music';
+
+  useEffect(() => {
+    const overflow = titleTextWidth - titleContainerWidth;
+
+    cancelAnimation(titleTranslateX);
+    titleTranslateX.value = 0;
+
+    if (overflow <= 12) return;
+
+    titleTranslateX.value = withRepeat(
+      withSequence(
+        withTiming(0, { duration: 1200 }),
+        withTiming(-overflow, {
+          duration: Math.max(overflow * 45, 3500),
+          easing: Easing.linear,
+        }),
+        withTiming(-overflow, { duration: 1000 }),
+        withTiming(0, { duration: 900, easing: Easing.out(Easing.ease) }),
+      ),
+      -1,
+      false,
+    );
+
+    return () => {
+      cancelAnimation(titleTranslateX);
+      titleTranslateX.value = 0;
+    };
+  }, [currentTitle, titleContainerWidth, titleTextWidth, titleTranslateX]);
 
   return (
     <View className="bg-[#F1F4EE] px-10 pb-8">
       {/* ÁREA CENTRAL: Timer OU Botão Next */}
-      <View className="items-center mb-6 h-20 justify-center">
+      <View className="items-center mb-6 min-h-[108px] justify-center">
         {isManualStep ? (
           // --- MODO MANUAL: MOSTRA O BOTÃO ---
           <TouchableOpacity
@@ -76,22 +136,43 @@ export const SessionControls = ({
           </TouchableOpacity>
         ) : (
           // --- MODO TEMPO: MOSTRA O CRONÓMETRO ---
-          <Text
-            maxFontSizeMultiplier={1.2}
-            className="text-[#354F52] text-6xl tabular-nums"
-            style={{ fontFamily: 'Nunito_700Bold' }}
+          <View
+            className="items-center"
             accessible={true}
-            // Isto diz ao VoiceOver/TalkBack como lidar com conteúdo que muda muito rápido
             accessibilityRole="timer"
           >
-            {Math.floor(secondsLeft / 60)}:
-            {(secondsLeft % 60).toString().padStart(2, '0')}
-          </Text>
+            <View className="flex-row items-end">
+              <Text
+                maxFontSizeMultiplier={1.2}
+                className="text-[#354F52] text-6xl tabular-nums leading-[64px]"
+                style={{ fontFamily: 'Nunito_700Bold' }}
+                importantForAccessibility="no-hide-descendants"
+              >
+                {minutesLeft}:{remainingSeconds}
+              </Text>
+              <Text
+                maxFontSizeMultiplier={1.2}
+                className="text-[#354F52] text-2xl ml-2 mb-1"
+                style={{ fontFamily: 'Nunito_700Bold' }}
+                importantForAccessibility="no-hide-descendants"
+              >
+                min
+              </Text>
+            </View>
+            <Text
+              maxFontSizeMultiplier={1.2}
+              className="text-[#354F52]/85 text-lg -mt-1"
+              style={{ fontFamily: 'Nunito_600SemiBold' }}
+              importantForAccessibility="no-hide-descendants"
+            >
+              remaining
+            </Text>
+          </View>
         )}
 
         {/* Barra de Progresso (Sempre visível para contextualizar) */}
         <View
-          className="w-full h-1.5 bg-[#DDE5D7] mt-6 rounded-full overflow-hidden"
+          className="w-full h-1.5 bg-[#D7D9D5] mt-6 rounded-full overflow-hidden"
           importantForAccessibility="no-hide-descendants"
           accessibilityElementsHidden={true}
         >
@@ -104,52 +185,103 @@ export const SessionControls = ({
 
       {/* Info Card (Player de Música) */}
       <View
-        className="flex-row items-center border border-[#7DA87B]/20 p-4 rounded-3xl mb-8"
+        className="border border-[#9DC598] px-4 py-4 rounded-[20px] mb-10 bg-[#F8FAF6]"
         accessible={false}
       >
-        <Image
-          source={imageSource}
-          className="w-12 h-12 rounded-lg"
-          importantForAccessibility="no"
-        />
-        <View
-          className="flex-1 ml-4"
-          accessible={true}
-          accessibilityRole="text"
-          accessibilityLabel={`Background music: 'Music'}`}
-        >
-          <Text
-            maxFontSizeMultiplier={1.2}
-            className="text-[#354F52]"
-            style={{ fontFamily: 'Nunito_700Bold' }}
-            importantForAccessibility="no-hide-descendants"
-          >
-            {currentTrack?.title || 'Music'}
-          </Text>
-          <Text
-            maxFontSizeMultiplier={1.2}
-            className="text-[#354F52]/60 text-xs"
-            style={{ fontFamily: 'Nunito_600SemiBold' }}
-            importantForAccessibility="no-hide-descendants"
-          >
-            {currentTrack?.artist || 'Artist'}
-          </Text>
-        </View>
-        <TouchableOpacity
-          onPress={onToggleMusic}
-          accessible={true}
-          accessibilityRole="button"
-          accessibilityLabel={
-            isMusicPlaying ? 'Pause background music' : 'Play background music'
-          }
-        >
-          <MaterialIcons
-            name={isMusicPlaying ? 'pause-circle-filled' : 'play-circle-filled'}
-            size={44}
-            color="#548F53"
+        <View className="flex-row items-center">
+          <Image
+            source={imageSource}
+            className="w-14 h-14 rounded-xl"
             importantForAccessibility="no"
           />
-        </TouchableOpacity>
+
+          <View className="flex-1 ml-4 pr-3">
+            <View
+              accessible={true}
+              accessibilityRole="text"
+              accessibilityLabel={`Background music: ${currentTrack?.title || 'Music'} by ${currentTrack?.artist || 'Artist'}`}
+            >
+              <View
+                className="overflow-hidden"
+                onLayout={(event) =>
+                  setTitleContainerWidth(event.nativeEvent.layout.width)
+                }
+              >
+                <Animated.Text
+                  maxFontSizeMultiplier={1.2}
+                  className="text-[#354F52] text-[17px]"
+                  style={[{ fontFamily: 'Nunito_700Bold' }, titleAnimatedStyle]}
+                  importantForAccessibility="no-hide-descendants"
+                  numberOfLines={1}
+                  onLayout={(event) =>
+                    setTitleTextWidth(event.nativeEvent.layout.width)
+                  }
+                >
+                  {currentTitle}
+                </Animated.Text>
+              </View>
+              <Text
+                maxFontSizeMultiplier={1.2}
+                className="text-[#354F52]/70 text-sm"
+                style={{ fontFamily: 'Nunito_600SemiBold' }}
+                importantForAccessibility="no-hide-descendants"
+                numberOfLines={1}
+              >
+                {currentTrack?.artist || 'Artist'}
+              </Text>
+            </View>
+          </View>
+
+          <View className="flex-row items-center shrink-0">
+            <TouchableOpacity
+              onPress={onPreviousTrack}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Play previous Spotify track"
+              className="px-1 py-1"
+            >
+              <Ionicons
+                name="play-skip-back-sharp"
+                size={26}
+                color="#5A9A57"
+                importantForAccessibility="no"
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={onToggleMusic}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={
+                isMusicPlaying ? 'Pause background music' : 'Play background music'
+              }
+              className="mx-2"
+            >
+              <View className="w-12 h-12 rounded-full border-[2.5px] border-[#5A9A57] items-center justify-center">
+                <MaterialIcons
+                  name={isMusicPlaying ? 'pause' : 'play-arrow'}
+                  size={28}
+                  color="#5A9A57"
+                  importantForAccessibility="no"
+                />
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={onNextTrack}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Play next Spotify track"
+              className="px-1 py-1"
+            >
+              <Ionicons
+                name="play-skip-forward-sharp"
+                size={26}
+                color="#5A9A57"
+                importantForAccessibility="no"
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
       </View>
 
       {/* Botão Grande (Pause/Resume Sessão) */}

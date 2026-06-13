@@ -29,6 +29,8 @@ export interface ScenarioDeviceState {
   state: 'on' | 'off';
   value?: number | string;
   brightness?: string;
+  deviceName?: string;
+  deviceType?: string;
 }
 
 export interface Scenario {

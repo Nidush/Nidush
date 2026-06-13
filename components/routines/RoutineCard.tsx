@@ -11,17 +11,19 @@ interface RoutineCardProps {
   room: string;
   isActive: boolean;
   image: ImageSourcePropType;
+  onPress?: () => void;
   onToggle: () => void;
   onLongPress?: () => void;
   testID?: string;
 }
 
-const RoutineCard = ({ title, days, time, room, isActive, image, onToggle, onLongPress, testID }: RoutineCardProps) => {
+const RoutineCard = ({ title, days, time, room, isActive, image, onPress, onToggle, onLongPress, testID }: RoutineCardProps) => {
   return (
     <Pressable
+      onPress={onPress}
       onLongPress={onLongPress}
       delayLongPress={300}
-      accessibilityHint="Long press to manage this routine."
+      accessibilityHint="Tap to view and manage this routine."
     >
     <View 
       className="w-full mb-5 relative overflow-hidden rounded-[25px] bg-[#2C3A35]" 
