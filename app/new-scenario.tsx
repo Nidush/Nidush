@@ -13,7 +13,7 @@ import {
   Nunito_700Bold,
   useFonts,
 } from '@expo-google-fonts/nunito';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Feather, Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -22,6 +22,7 @@ import {
   ImageSourcePropType,
   Keyboard,
   KeyboardAvoidingView,
+  LayoutChangeEvent,
   Platform,
   ScrollView,
   Switch,
@@ -32,6 +33,7 @@ import {
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { captureException, trackEvent } from '@/utils/observability';
+import { normalizeScenarioDeviceType } from '@/utils/activityDeviceConfigs';
 import { getRoomIconName } from '@/utils/roomIcons';
 import { supabase, uploadImage } from '@/utils/supabase';
 
@@ -44,6 +46,14 @@ type RoomDeviceRow = {
   id: number;
   name: string;
   type: string;
+};
+
+type DeviceControlDraft = {
+  state: 'on' | 'off';
+  value?: string | number;
+  brightness?: string;
+  deviceName: string;
+  deviceType: string;
 };
 
 type PlaylistItem = {
@@ -76,6 +86,27 @@ const getImageUri = (value: unknown) =>
       ? value
       : '';
 
+const getDeviceIcon = (type: string) => {
+  switch (normalizeScenarioDeviceType(type)) {
+    case 'light':
+      return <MaterialIcons name="lightbulb-outline" size={20} color="#548F53" />;
+    case 'thermostat':
+      return <MaterialCommunityIcons name="thermometer" size={20} color="#548F53" />;
+    case 'speaker':
+      return <MaterialIcons name="speaker" size={20} color="#548F53" />;
+    case 'tv':
+      return <MaterialIcons name="tv" size={20} color="#548F53" />;
+    case 'blind':
+      return <MaterialCommunityIcons name="blinds" size={20} color="#548F53" />;
+    case 'diffuser':
+      return <MaterialCommunityIcons name="air-humidifier" size={20} color="#548F53" />;
+    case 'purifier':
+      return <MaterialCommunityIcons name="air-filter" size={20} color="#548F53" />;
+    default:
+      return <Feather name="cpu" size={20} color="#548F53" />;
+  }
+};
+
 const getMissingColumnName = (error: unknown) => {
   if (!error || typeof error !== 'object') return null;
 
@@ -93,6 +124,83 @@ const omitKeys = <T extends Record<string, unknown>>(payload: T, keys: string[])
 
   return nextPayload;
 };
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value));
+
+const getDefaultDeviceDraft = (device: RoomDeviceRow): DeviceControlDraft => {
+  const normalizedType = normalizeScenarioDeviceType(device.type);
+
+  if (normalizedType === 'thermostat') {
+    return {
+      state: 'on',
+      value: 22,
+      deviceName: device.name,
+      deviceType: device.type,
+    };
+  }
+
+  if (normalizedType === 'light') {
+    return {
+      state: 'on',
+      value: '70%',
+      brightness: '70%',
+      deviceName: device.name,
+      deviceType: device.type,
+    };
+  }
+
+  return {
+    state: 'on',
+    value: '70%',
+    deviceName: device.name,
+    deviceType: device.type,
+  };
+};
+
+const getDeviceControlConfig = (type: string) => {
+  const normalizedType = normalizeScenarioDeviceType(type);
+
+  switch (normalizedType) {
+    case 'light':
+      return { label: 'Brightness', min: 0, max: 100, step: 1, unit: '%' };
+    case 'speaker':
+      return { label: 'Volume', min: 0, max: 100, step: 1, unit: '%' };
+    case 'tv':
+      return { label: 'Volume', min: 0, max: 100, step: 1, unit: '%' };
+    case 'purifier':
+      return { label: 'Power', min: 0, max: 100, step: 1, unit: '%' };
+    case 'diffuser':
+      return { label: 'Intensity', min: 0, max: 100, step: 1, unit: '%' };
+    case 'blind':
+      return { label: 'Open level', min: 0, max: 100, step: 1, unit: '%' };
+    case 'thermostat':
+      return { label: 'Temperature', min: 16, max: 30, step: 1, unit: 'ºC' };
+    default:
+      return { label: 'Level', min: 0, max: 100, step: 1, unit: '%' };
+  }
+};
+
+const parseDraftNumericValue = (draft: DeviceControlDraft, fallback: number) => {
+  if (typeof draft.value === 'number') return draft.value;
+  if (typeof draft.value === 'string') {
+    const parsed = Number.parseInt(draft.value.replace(/[^0-9-]/g, ''), 10);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  if (typeof draft.brightness === 'string') {
+    const parsed = Number.parseInt(draft.brightness.replace(/[^0-9-]/g, ''), 10);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+};
+
+const getControlFillPercentage = (value: number, min: number, max: number) => {
+  if (max <= min) return 0;
+  return clamp(((value - min) / (max - min)) * 100, 0, 100);
+};
+
+const formatControlValue = (value: number, unit: string) =>
+  unit === '%' ? `${value}%` : value;
 
 function NewScenarioContent() {
   const [fontsLoaded] = useFonts({
@@ -120,6 +228,8 @@ function NewScenarioContent() {
   const [focusMode, setFocusMode] = useState(false);
   const [roomDevices, setRoomDevices] = useState<RoomDeviceRow[]>([]);
   const [selectedDeviceIds, setSelectedDeviceIds] = useState<Set<number>>(new Set());
+  const [deviceDrafts, setDeviceDrafts] = useState<Record<number, DeviceControlDraft>>({});
+  const [sliderWidths, setSliderWidths] = useState<Record<number, number>>({});
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -135,6 +245,11 @@ function NewScenarioContent() {
   const defaultScenarioImage = useMemo(
     () => getDefaultScenarioImage(selectedRoom?.name ?? null),
     [selectedRoom?.name],
+  );
+
+  const selectedDevices = useMemo(
+    () => roomDevices.filter((device) => selectedDeviceIds.has(device.id)),
+    [roomDevices, selectedDeviceIds],
   );
 
   useEffect(() => {
@@ -254,6 +369,7 @@ function NewScenarioContent() {
       if (!selectedRoomId) {
         setRoomDevices([]);
         setSelectedDeviceIds(new Set());
+        setDeviceDrafts({});
         return;
       }
       try {
@@ -270,11 +386,16 @@ function NewScenarioContent() {
           
         if (devices) {
           setRoomDevices(devices);
-          // By default select all devices in the room
           setSelectedDeviceIds(new Set(devices.map(d => d.id)));
+          setDeviceDrafts(
+            Object.fromEntries(
+              devices.map((device) => [device.id, getDefaultDeviceDraft(device)]),
+            ),
+          );
         } else {
           setRoomDevices([]);
           setSelectedDeviceIds(new Set());
+          setDeviceDrafts({});
         }
       } catch (error) {
         console.error('Failed to load room devices:', error);
@@ -325,6 +446,85 @@ function NewScenarioContent() {
       else newSet.add(deviceId);
       return newSet;
     });
+
+    setDeviceDrafts((prev) => {
+      if (prev[deviceId]) return prev;
+      const device = roomDevices.find((item) => item.id === deviceId);
+      if (!device) return prev;
+      return {
+        ...prev,
+        [deviceId]: getDefaultDeviceDraft(device),
+      };
+    });
+  };
+
+  const updateDeviceDraftValue = (deviceId: number, direction: -1 | 1) => {
+    const device = roomDevices.find((item) => item.id === deviceId);
+    if (!device) return;
+
+    const control = getDeviceControlConfig(device.type);
+
+    setDeviceDrafts((prev) => {
+      const current = prev[deviceId] ?? getDefaultDeviceDraft(device);
+      const currentNumericValue = parseDraftNumericValue(current, control.max);
+      const nextNumericValue = clamp(
+        currentNumericValue + direction * control.step,
+        control.min,
+        control.max,
+      );
+
+      return {
+        ...prev,
+        [deviceId]: {
+          ...current,
+          value: formatControlValue(nextNumericValue, control.unit),
+          brightness:
+            normalizeScenarioDeviceType(device.type) === 'light'
+              ? `${nextNumericValue}%`
+              : current.brightness,
+        },
+      };
+    });
+  };
+
+  const setDeviceDraftFromPercentage = (deviceId: number, percentage: number) => {
+    const device = roomDevices.find((item) => item.id === deviceId);
+    if (!device) return;
+
+    const control = getDeviceControlConfig(device.type);
+    const boundedPercentage = clamp(percentage, 0, 100);
+    const rawValue =
+      control.min + (boundedPercentage / 100) * (control.max - control.min);
+    const steppedValue =
+      Math.round(rawValue / control.step) * control.step;
+    const nextNumericValue = clamp(steppedValue, control.min, control.max);
+
+    setDeviceDrafts((prev) => {
+      const current = prev[deviceId] ?? getDefaultDeviceDraft(device);
+      return {
+        ...prev,
+        [deviceId]: {
+          ...current,
+          value: formatControlValue(nextNumericValue, control.unit),
+          brightness:
+            normalizeScenarioDeviceType(device.type) === 'light'
+              ? `${nextNumericValue}%`
+              : current.brightness,
+        },
+      };
+    });
+  };
+
+  const handleSliderLayout = (deviceId: number, event: LayoutChangeEvent) => {
+    const width = event.nativeEvent.layout.width;
+    setSliderWidths((prev) => (prev[deviceId] === width ? prev : { ...prev, [deviceId]: width }));
+  };
+
+  const handleSliderGesture = (deviceId: number, locationX: number) => {
+    const width = sliderWidths[deviceId];
+    if (!width || width <= 0) return;
+    const percentage = (locationX / width) * 100;
+    setDeviceDraftFromPercentage(deviceId, percentage);
   };
 
   const handleSave = async () => {
@@ -351,7 +551,7 @@ function NewScenarioContent() {
         .filter(d => selectedDeviceIds.has(d.id))
         .map(d => ({
           deviceId: `db-${d.id}`,
-          state: 'on',
+          ...(deviceDrafts[d.id] ?? getDefaultDeviceDraft(d)),
           deviceName: d.name,
           deviceType: d.type
         }));
@@ -554,12 +754,25 @@ function NewScenarioContent() {
                               onPress={() => toggleDeviceSelection(device.id)}
                               className="flex-row items-center justify-between"
                             >
-                              <Text
-                                className="text-[#354F52] text-base flex-1"
-                                style={{ fontFamily: 'Nunito_600SemiBold' }}
-                              >
-                                {device.name}
-                              </Text>
+                              <View className="flex-row items-center flex-1 pr-3">
+                                <View className="w-10 h-10 rounded-full bg-[#EDF5EA] items-center justify-center mr-3">
+                                  {getDeviceIcon(device.type)}
+                                </View>
+                                <View className="flex-1">
+                                  <Text
+                                    className="text-[#354F52] text-base"
+                                    style={{ fontFamily: 'Nunito_600SemiBold' }}
+                                  >
+                                    {device.name}
+                                  </Text>
+                                  <Text
+                                    className="text-[#7A8C85] text-xs capitalize"
+                                    style={{ fontFamily: 'Nunito_400Regular' }}
+                                  >
+                                    {normalizeScenarioDeviceType(device.type) ?? device.type}
+                                  </Text>
+                                </View>
+                              </View>
                               <Switch
                                 value={selectedDeviceIds.has(device.id)}
                                 onValueChange={() => toggleDeviceSelection(device.id)}
@@ -569,6 +782,142 @@ function NewScenarioContent() {
                               />
                             </TouchableOpacity>
                           ))}
+                        </View>
+                      </View>
+                    )}
+
+                    {selectedDevices.length > 0 && (
+                      <View className="bg-[#F6F8F3] rounded-3xl border border-[#DDE5D7] p-5 mb-5">
+                        <Text
+                          className="text-[#354F52] text-lg mb-3"
+                          style={{ fontFamily: 'Nunito_700Bold' }}
+                        >
+                          Device adjustments
+                        </Text>
+                        <View className="gap-y-3">
+                          {selectedDevices.map((device) => {
+                            const control = getDeviceControlConfig(device.type);
+                            const draft = deviceDrafts[device.id] ?? getDefaultDeviceDraft(device);
+                            const numericValue = parseDraftNumericValue(draft, control.max);
+                            const fillPercentage = getControlFillPercentage(
+                              numericValue,
+                              control.min,
+                              control.max,
+                            );
+                            const displayValue =
+                              typeof draft.value === 'number'
+                                ? `${draft.value}${control.unit}`
+                                : draft.value;
+
+                            return (
+                              <View
+                                key={`draft-${device.id}`}
+                                className="rounded-[28px] border border-[#DDE5D7] bg-white px-4 py-4"
+                              >
+                                <View className="flex-row items-center justify-between mb-4">
+                                  <View className="flex-row items-center flex-1 pr-3">
+                                    <View className="w-12 h-12 rounded-2xl bg-[#EDF5EA] items-center justify-center mr-3">
+                                      {getDeviceIcon(device.type)}
+                                    </View>
+                                    <View className="flex-1">
+                                      <Text
+                                        className="text-[#354F52] text-base"
+                                        style={{ fontFamily: 'Nunito_700Bold' }}
+                                      >
+                                        {device.name}
+                                      </Text>
+                                      <Text
+                                        className="text-[#7A8C85] text-sm"
+                                        style={{ fontFamily: 'Nunito_400Regular' }}
+                                      >
+                                        Adjust {control.label.toLowerCase()}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                  <View className="rounded-2xl bg-[#EEF6EC] px-3 py-2 min-w-[78px] items-center">
+                                    <Text
+                                      className="text-[#548F53] text-base"
+                                      style={{ fontFamily: 'Nunito_700Bold' }}
+                                    >
+                                      {displayValue}
+                                    </Text>
+                                  </View>
+                                </View>
+
+                                <View className="mb-4">
+                                  <View
+                                    className="h-8 justify-center"
+                                    onLayout={(event) => handleSliderLayout(device.id, event)}
+                                    onStartShouldSetResponder={() => true}
+                                    onMoveShouldSetResponder={() => true}
+                                    onResponderGrant={(event) =>
+                                      handleSliderGesture(device.id, event.nativeEvent.locationX)
+                                    }
+                                    onResponderMove={(event) =>
+                                      handleSliderGesture(device.id, event.nativeEvent.locationX)
+                                    }
+                                    accessibilityRole="adjustable"
+                                    accessibilityLabel={`${control.label} slider for ${device.name}`}
+                                    accessibilityValue={{
+                                      min: control.min,
+                                      max: control.max,
+                                      now: numericValue,
+                                    }}
+                                  >
+                                    <View className="h-3 rounded-full bg-[#E6ECE2] overflow-hidden">
+                                      <View
+                                        className="h-3 rounded-full bg-[#548F53]"
+                                        style={{ width: `${fillPercentage}%` }}
+                                      />
+                                    </View>
+                                    <View
+                                      className="absolute w-6 h-6 rounded-full bg-white border-2 border-[#548F53]"
+                                      style={{
+                                        left: `${fillPercentage}%`,
+                                        marginLeft: -12,
+                                        top: 4,
+                                      }}
+                                    />
+                                  </View>
+                                  <View className="flex-row justify-between mt-2">
+                                    <Text
+                                      className="text-[#94A39B] text-xs"
+                                      style={{ fontFamily: 'Nunito_600SemiBold' }}
+                                    >
+                                      {control.min}
+                                      {control.unit}
+                                    </Text>
+                                    <Text
+                                      className="text-[#94A39B] text-xs"
+                                      style={{ fontFamily: 'Nunito_600SemiBold' }}
+                                    >
+                                      {control.max}
+                                      {control.unit}
+                                    </Text>
+                                  </View>
+                                </View>
+
+                                <View className="px-4 py-3 rounded-2xl bg-[#F8FAF6] border border-[#E4EBE0]">
+                                  <View className="flex-row items-center justify-center">
+                                    <Text
+                                      className="text-[#354F52] text-base"
+                                      style={{ fontFamily: 'Nunito_700Bold' }}
+                                    >
+                                      Drag the bar to adjust
+                                    </Text>
+                                  </View>
+                                  <View className="items-center mt-1">
+                                    <Text
+                                      className="text-[#6C7A74] text-xs"
+                                      style={{ fontFamily: 'Nunito_600SemiBold' }}
+                                    >
+                                      Slide left or right for precise control
+                                    </Text>
+                                  </View>
+                                </View>
+                              </View>
+                            );
+                          })}
                         </View>
                       </View>
                     )}
@@ -757,7 +1106,7 @@ function NewScenarioContent() {
                           .filter(d => selectedDeviceIds.has(d.id))
                           .map(d => ({
                             deviceId: `db-${d.id}`,
-                            state: 'on',
+                            ...(deviceDrafts[d.id] ?? getDefaultDeviceDraft(d)),
                             deviceName: d.name,
                             deviceType: d.type
                           })),

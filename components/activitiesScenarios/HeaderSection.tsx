@@ -1,12 +1,15 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import React from 'react';
 import { Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SearchAutocomplete } from '@/components/UI/SearchAutocomplete';
 
 interface HeaderSectionProps {
   viewMode: 'activities' | 'scenarios';
   setViewMode: (mode: 'activities' | 'scenarios') => void;
   searchQuery: string;
   setSearchQuery: (text: string) => void;
+  suggestions?: string[];
+  onSelectSuggestion?: (text: string) => void;
 }
 
 export const HeaderSection = ({
@@ -14,6 +17,8 @@ export const HeaderSection = ({
   setViewMode,
   searchQuery,
   setSearchQuery,
+  suggestions = [],
+  onSelectSuggestion,
 }: HeaderSectionProps) => {
   return (
     <View className="px-4">
@@ -95,7 +100,16 @@ export const HeaderSection = ({
           textAlignVertical="center"
           value={searchQuery}
           onChangeText={setSearchQuery}
+          autoCorrect={false}
+          autoCapitalize="none"
         />
+        {onSelectSuggestion ? (
+          <SearchAutocomplete
+            suggestions={suggestions}
+            query={searchQuery}
+            onSelect={onSelectSuggestion}
+          />
+        ) : null}
       </View>
     </View>
   );

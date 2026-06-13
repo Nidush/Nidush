@@ -31,6 +31,7 @@ import AddRoomDevice from '../../components/rooms/AddRoomDevice';
 import CategoryPill from '../../components/rooms/CategoryPill';
 import DeviceCard from '../../components/rooms/device-card';
 import { FeedbackState } from '../../components/UI/FeedbackState';
+import { SearchAutocomplete } from '../../components/UI/SearchAutocomplete';
 import {
   AppDevice,
   DeviceRecord,
@@ -191,11 +192,8 @@ export default function Rooms() {
       setAllDevices(mappedDevices);
       setAllActivities(loadedActivities);
       setLoadError(null);
-      setActiveRoomId((currentRoomId) => {
-        const nextRoomId = currentRoomId ?? loadedRooms[0]?.id ?? null;
-        roomsScreenCache.activeRoomId = nextRoomId;
-        return nextRoomId;
-      });
+      setActiveRoomId(null);
+      roomsScreenCache.activeRoomId = null;
       roomsScreenCache.rooms = loadedRooms;
       roomsScreenCache.allDevices = mappedDevices;
       roomsScreenCache.allActivities = loadedActivities;
@@ -575,6 +573,25 @@ export default function Rooms() {
     });
   }, [roomDevices, searchQuery]);
 
+  const searchSuggestions = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    if (normalizedQuery.length < 2) return [];
+
+    const seen = new Set<string>();
+    const suggestions: string[] = [];
+
+    for (const device of roomDevices) {
+      const name = device.name.trim();
+      if (!name.toLowerCase().includes(normalizedQuery)) continue;
+      if (seen.has(name.toLowerCase())) continue;
+      seen.add(name.toLowerCase());
+      suggestions.push(name);
+      if (suggestions.length >= 5) break;
+    }
+
+    return suggestions;
+  }, [roomDevices, searchQuery]);
+
   const openAddDeviceModal = () => {
     if (rooms.length === 0) {
       showFeedback('Create a room first, then assign your device to it.', 'info');
@@ -700,9 +717,8 @@ export default function Rooms() {
       });
       setActiveRoomId((current) => {
         if (current !== room.id) return current;
-        const nextRoomId = roomsScreenCache.rooms[0]?.id ?? null;
-        roomsScreenCache.activeRoomId = nextRoomId;
-        return nextRoomId;
+        roomsScreenCache.activeRoomId = null;
+        return null;
       });
       setRoomPendingDeletion((current) => (current === room.id ? null : current));
       showFeedback(`"${room.name}" was removed from your home.`, 'success');
@@ -813,6 +829,12 @@ export default function Rooms() {
             }}
             textAlignVertical="center"
             autoCorrect={false}
+            autoCapitalize="none"
+          />
+          <SearchAutocomplete
+            suggestions={searchSuggestions}
+            query={searchQuery}
+            onSelect={setSearchQuery}
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity

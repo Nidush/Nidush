@@ -177,7 +177,7 @@ export default function Index() {
             .maybeSingle(),
           supabase
             .from('activities')
-            .select('*')
+            .select('*, rooms(name)')
             .order('created_at', { ascending: false }),
           supabase
             .from('shortcuts')
@@ -194,13 +194,13 @@ export default function Index() {
         if (homeAssocResult.data?.home_id) {
           activitiesResult = await supabase
             .from('activities')
-            .select('*')
+            .select('*, rooms(name)')
             .eq('home_id', homeAssocResult.data.home_id)
             .order('created_at', { ascending: false });
         } else {
           activitiesResult = await supabase
             .from('activities')
-            .select('*')
+            .select('*, rooms(name)')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false });
         }

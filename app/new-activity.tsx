@@ -143,6 +143,7 @@ export default function NewActivityFlow() {
   const [dbContent, setDbContent] = useState<Content[]>([]);
   const [scenarioTemplates, setScenarioTemplates] = useState<Scenario[]>([]);
   const [homeRooms, setHomeRooms] = useState<HomeRoomRow[]>([]);
+  const [roomDeviceTypes, setRoomDeviceTypes] = useState<string[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -150,15 +151,14 @@ export default function NewActivityFlow() {
     if (!roomId) return;
 
     try {
-      const { data: tvDevices, error: devicesError } = await supabase
+      const { data: roomDevices, error: devicesError } = await supabase
         .from('devices')
         .select('id')
         .eq('home_id', homeId)
-        .eq('room_id', roomId)
-        .in('type', ['tv', 'display']);
+        .eq('room_id', roomId);
 
       if (devicesError) throw devicesError;
-      if (!tvDevices?.length) return;
+      if (!roomDevices?.length) return;
 
       const { data: existingLinks, error: existingError } = await supabase
         .from('activity_devices')
@@ -168,7 +168,7 @@ export default function NewActivityFlow() {
       if (existingError) throw existingError;
 
       const linkedDeviceIds = new Set((existingLinks || []).map((link) => link.device_id));
-      const linksToInsert = tvDevices
+      const linksToInsert = roomDevices
         .filter((device) => !linkedDeviceIds.has(device.id))
         .map((device) => ({
           activity_id: activityId,
@@ -183,7 +183,7 @@ export default function NewActivityFlow() {
 
       if (insertError) throw insertError;
     } catch (error) {
-      console.warn('Could not auto-link room TV devices to activity:', error);
+      console.warn('Could not auto-link room devices to activity:', error);
     }
   };
 
@@ -350,6 +350,42 @@ export default function NewActivityFlow() {
       setRoomId(matchedRoom.name);
     }
   }, [homeRooms, room_id]);
+
+  useEffect(() => {
+    const fetchRoomDevices = async () => {
+      if (!room_id || homeRooms.length === 0) {
+        setRoomDeviceTypes([]);
+        return;
+      }
+      
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        
+        const { data: homeAssoc } = await supabase.from('user_homes').select('home_id').eq('user_id', user.id).maybeSingle();
+        if (!homeAssoc?.home_id) return;
+
+        const matchedRoom = homeRooms.find((r) => r.name === room_id || String(r.id) === room_id);
+        if (!matchedRoom) return;
+
+        const { data: devices } = await supabase
+          .from('devices')
+          .select('type')
+          .eq('home_id', homeAssoc.home_id)
+          .eq('room_id', matchedRoom.id);
+
+        if (devices) {
+          const types = Array.from(new Set(devices.map(d => String(d.type).toLowerCase())));
+          setRoomDeviceTypes(types);
+        } else {
+          setRoomDeviceTypes([]);
+        }
+      } catch (e) {
+        console.error('Error fetching room devices:', e);
+      }
+    };
+    fetchRoomDevices();
+  }, [room_id, homeRooms]);
 
   const allContent = useMemo(() => {
     const combined = [...dbContent];
@@ -682,6 +718,7 @@ export default function NewActivityFlow() {
                       selected={selectedScenarioId}
                       onSelect={setSelectedScenarioId}
                       scenarios={scenarioTemplates}
+                      availableDeviceTypes={roomDeviceTypes}
                     />
                   )}
                   {step === 5 && (

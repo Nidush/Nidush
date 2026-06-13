@@ -26,6 +26,7 @@ import { captureException, trackEvent } from '../../utils/observability';
 import AddRoomDevice from '../../components/rooms/AddRoomDevice';
 import RoutineCard from '../../components/routines/RoutineCard';
 import { FeedbackState } from '../../components/UI/FeedbackState';
+import { SearchAutocomplete } from '../../components/UI/SearchAutocomplete';
 
 interface Routine {
   id: number;
@@ -428,6 +429,29 @@ export default function Routines() {
   const filteredRoutines = useMemo(() => {
     const searchLower = searchQuery.toLowerCase();
     return routines.filter((r) => r.title.toLowerCase().includes(searchLower) || r.room.toLowerCase().includes(searchLower));
+  }, [routines, searchQuery]);
+
+  const searchSuggestions = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    if (normalizedQuery.length < 2) return [];
+
+    const seen = new Set<string>();
+    const suggestions: string[] = [];
+
+    for (const routine of routines) {
+      const candidates = [routine.title, routine.room];
+
+      for (const candidate of candidates) {
+        const value = candidate.trim();
+        if (!value.toLowerCase().includes(normalizedQuery)) continue;
+        if (seen.has(value.toLowerCase())) continue;
+        seen.add(value.toLowerCase());
+        suggestions.push(value);
+        if (suggestions.length >= 5) return suggestions;
+      }
+    }
+
+    return suggestions;
   }, [routines, searchQuery]);
 
   const toggleRoutineDay = (day: string) => {
@@ -851,6 +875,13 @@ export default function Routines() {
             accessibilityLabel="Search routines"
             accessibilityHint="Type to search for a specific routine"
             accessibilityRole="search"
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          <SearchAutocomplete
+            suggestions={searchSuggestions}
+            query={searchQuery}
+            onSelect={setSearchQuery}
           />
         </View>
       </View>
