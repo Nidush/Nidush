@@ -271,6 +271,7 @@ const createIdeasPrompt = ({
     'The emotional state is the main driver of your suggestion. Adapt intensity, duration, room choice, and wording to match it.',
     ...moodDirective.guidance,
     'Prefer rooms and devices that match the user routines when they are available.',
+    'CRITICAL: In the "description" field, you MUST explicitly mention the names of the real devices from the provided list that will be used (e.g., "Playing relaxing audio on the Living Room Speaker and dimming the Ceiling Light").',
     'Return JSON only with this shape:',
     '{"ideas":[{"title":"string","description":"string","type":"Cooking|Meditation|Workout|Audiobooks|Yoga|Reading|other","roomName":"one of the provided room names","durationMinutes":number,"image":"one of the allowed image keys","reason":"short reason","devicePlan":["short action"]}]}',
     `Allowed image keys: ${IMAGE_KEYS.join(', ')}`,
