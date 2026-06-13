@@ -40,6 +40,12 @@ type RoomRow = {
   name: string;
 };
 
+type RoomDeviceRow = {
+  id: number;
+  name: string;
+  type: string;
+};
+
 type PlaylistItem = {
   id: string;
   name: string;
@@ -70,6 +76,24 @@ const getImageUri = (value: unknown) =>
       ? value
       : '';
 
+const getMissingColumnName = (error: unknown) => {
+  if (!error || typeof error !== 'object') return null;
+
+  const message = 'message' in error && typeof error.message === 'string' ? error.message : '';
+  const match = message.match(/Could not find the '([^']+)' column/i);
+  return match?.[1] ?? null;
+};
+
+const omitKeys = <T extends Record<string, unknown>>(payload: T, keys: string[]) => {
+  const nextPayload = { ...payload };
+
+  for (const key of keys) {
+    delete nextPayload[key as keyof T];
+  }
+
+  return nextPayload;
+};
+
 function NewScenarioContent() {
   const [fontsLoaded] = useFonts({
     Nunito_700Bold,
@@ -94,6 +118,8 @@ function NewScenarioContent() {
   const [description, setDescription] = useState('');
   const [scenarioImage, setScenarioImage] = useState<string | ImageSourcePropType | null>(null);
   const [focusMode, setFocusMode] = useState(false);
+  const [roomDevices, setRoomDevices] = useState<RoomDeviceRow[]>([]);
+  const [selectedDeviceIds, setSelectedDeviceIds] = useState<Set<number>>(new Set());
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -223,6 +249,40 @@ function NewScenarioContent() {
     loadRooms();
   }, [roomNameParam]);
 
+  useEffect(() => {
+    const loadRoomDevices = async () => {
+      if (!selectedRoomId) {
+        setRoomDevices([]);
+        setSelectedDeviceIds(new Set());
+        return;
+      }
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data: homeAssoc } = await supabase.from('user_homes').select('home_id').eq('user_id', user.id).maybeSingle();
+        if (!homeAssoc?.home_id) return;
+        
+        const { data: devices } = await supabase
+          .from('devices')
+          .select('id, name, type')
+          .eq('home_id', homeAssoc.home_id)
+          .eq('room_id', selectedRoomId);
+          
+        if (devices) {
+          setRoomDevices(devices);
+          // By default select all devices in the room
+          setSelectedDeviceIds(new Set(devices.map(d => d.id)));
+        } else {
+          setRoomDevices([]);
+          setSelectedDeviceIds(new Set());
+        }
+      } catch (error) {
+        console.error('Failed to load room devices:', error);
+      }
+    };
+    loadRoomDevices();
+  }, [selectedRoomId]);
+
   const nextStep = () => {
     if (step < TOTAL_STEPS) setStep((current) => current + 1);
   };
@@ -258,6 +318,15 @@ function NewScenarioContent() {
     setSelectedPlaylistName('');
   };
 
+  const toggleDeviceSelection = (deviceId: number) => {
+    setSelectedDeviceIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(deviceId)) newSet.delete(deviceId);
+      else newSet.add(deviceId);
+      return newSet;
+    });
+  };
+
   const handleSave = async () => {
     if (isSaving || !selectedRoomId || !selectedRoom) return;
 
@@ -278,10 +347,20 @@ function NewScenarioContent() {
 
       const persistedImage = imageUrl || getDefaultScenarioImageKey(selectedRoom.name);
 
+      const scenarioDevices = roomDevices
+        .filter(d => selectedDeviceIds.has(d.id))
+        .map(d => ({
+          deviceId: `db-${d.id}`,
+          state: 'on',
+          deviceName: d.name,
+          deviceType: d.type
+        }));
+
       const basePayload = {
         name: scenarioName.trim(),
         room_id: selectedRoomId,
         playlist_id: selectedPlaylistId || null,
+        devices: scenarioDevices
       };
 
       const fullPayload = {
@@ -293,19 +372,36 @@ function NewScenarioContent() {
         shortcuts: false,
       };
 
+      let payloadToInsert: Record<string, unknown> = fullPayload;
       let insertResult = await supabase
         .from('scenarios')
-        .insert(fullPayload)
+        .insert(payloadToInsert)
         .select('id')
         .single();
 
-      if (
-        insertResult.error &&
-        (insertResult.error.code === '42703' || insertResult.error.code === 'PGRST204')
-      ) {
+      const unsupportedColumnErrorCodes = new Set(['42703', 'PGRST204']);
+      const fallbackColumnOrder = [
+        'devices',
+        'playlist_name',
+        'description',
+        'image',
+        'focus_mode_enabled',
+        'shortcuts',
+      ];
+
+      while (insertResult.error && unsupportedColumnErrorCodes.has(insertResult.error.code ?? '')) {
+        const missingColumn = getMissingColumnName(insertResult.error);
+        const columnsToRemove = missingColumn
+          ? [missingColumn]
+          : fallbackColumnOrder.filter(column => column in payloadToInsert);
+
+        if (columnsToRemove.length === 0) break;
+
+        payloadToInsert = omitKeys(payloadToInsert, columnsToRemove);
+
         insertResult = await supabase
           .from('scenarios')
-          .insert(basePayload)
+          .insert(payloadToInsert)
           .select('id')
           .single();
       }
@@ -440,9 +536,43 @@ function NewScenarioContent() {
 
                 {step === 2 && (
                   <StepWrapper
-                    title="Music and mood"
-                    subtitle="Optionally connect a Spotify playlist to launch with the scenario."
+                    title="Devices and mood"
+                    subtitle="Select the devices to control and optionally connect a Spotify playlist."
                   >
+                    {roomDevices.length > 0 && (
+                      <View className="bg-white rounded-3xl border border-[#DDE5D7] p-5 mb-5">
+                        <Text
+                          className="text-[#354F52] text-lg mb-3"
+                          style={{ fontFamily: 'Nunito_700Bold' }}
+                        >
+                          Devices to control
+                        </Text>
+                        <View className="gap-y-3">
+                          {roomDevices.map((device) => (
+                            <TouchableOpacity
+                              key={device.id}
+                              onPress={() => toggleDeviceSelection(device.id)}
+                              className="flex-row items-center justify-between"
+                            >
+                              <Text
+                                className="text-[#354F52] text-base flex-1"
+                                style={{ fontFamily: 'Nunito_600SemiBold' }}
+                              >
+                                {device.name}
+                              </Text>
+                              <Switch
+                                value={selectedDeviceIds.has(device.id)}
+                                onValueChange={() => toggleDeviceSelection(device.id)}
+                                trackColor={{ false: '#D1D9C5', true: '#BFD9B9' }}
+                                thumbColor={selectedDeviceIds.has(device.id) ? '#548F53' : '#F4F6F1'}
+                                accessibilityLabel={`Toggle ${device.name}`}
+                              />
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+
                     <View className="bg-white rounded-3xl border border-[#DDE5D7] p-5 mb-5">
                       <View className="flex-row items-center justify-between">
                         <View className="flex-1 pr-4">
@@ -623,7 +753,14 @@ function NewScenarioContent() {
                         title: scenarioName || 'Untitled scenario',
                         playlist: selectedPlaylistName || undefined,
                         focusMode,
-                        devices: [],
+                        devices: roomDevices
+                          .filter(d => selectedDeviceIds.has(d.id))
+                          .map(d => ({
+                            deviceId: `db-${d.id}`,
+                            state: 'on',
+                            deviceName: d.name,
+                            deviceType: d.type
+                          })),
                       }}
                       onEdit={() => setStep(2)}
                     />

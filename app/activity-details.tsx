@@ -64,6 +64,7 @@ type ScenarioRow = {
   playlist_id: string | null;
   playlist_name?: string | null;
   focus_mode_enabled?: boolean | null;
+  devices?: ScenarioDeviceState[] | null;
   rooms?: { name?: string | null } | null;
 };
 
@@ -196,7 +197,7 @@ export default function ActivityDetails() {
         apiLog('SELECT', 'activities', { id });
         const { data, error } = await supabase
           .from('activities')
-          .select('*')
+          .select('*, rooms(name)')
           .eq('id', id)
           .single();
 
@@ -278,7 +279,7 @@ export default function ActivityDetails() {
                     playlist_id: scenData.playlist_id,
                     focusMode: scenData.focus_mode_enabled === true,
                     shortcuts: false,
-                    devices: [],
+                    devices: Array.isArray(scenData.devices) ? scenData.devices : [],
                     room: scenData.rooms?.name || undefined,
                     image: resolveCatalogImage(scenData.image || 'Scenarios/moonlight_bay.png'),
                   } as Scenario;
@@ -345,7 +346,7 @@ export default function ActivityDetails() {
         } else if (isUserScenarioRouteId(id)) {
           const { data: scenData } = await supabase
             .from('scenarios')
-            .select('id, name, description, image, playlist_id, playlist_name, focus_mode_enabled, rooms(name)')
+            .select('id, name, description, image, playlist_id, playlist_name, focus_mode_enabled, devices, rooms(name)')
             .eq('id', id.replace(/^scenario:/, ''))
             .maybeSingle<ScenarioRow>();
 
@@ -358,7 +359,7 @@ export default function ActivityDetails() {
               playlist_id: scenData.playlist_id || undefined,
               focusMode: scenData.focus_mode_enabled === true,
               shortcuts: false,
-              devices: [],
+              devices: Array.isArray(scenData.devices) ? scenData.devices : [],
               room: scenData.rooms?.name || undefined,
               image: resolveCatalogImage(scenData.image || 'Scenarios/moonlight_bay.png'),
             };

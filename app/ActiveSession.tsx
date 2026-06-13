@@ -305,7 +305,7 @@ export default function ActiveSession() {
         const scenarioDbId = parseUserScenarioDbId(sId);
         const { data: scenData } = await supabase
           .from('scenarios')
-          .select('id, name, description, image, playlist_id, playlist_name, focus_mode_enabled, rooms(name)')
+          .select('id, name, description, image, playlist_id, playlist_name, focus_mode_enabled, devices, rooms(name)')
           .eq('id', scenarioDbId)
           .maybeSingle();
 
@@ -318,7 +318,7 @@ export default function ActiveSession() {
             playlist_id: scenData.playlist_id || undefined,
             focusMode: scenData.focus_mode_enabled === true,
             shortcuts: false,
-            devices: [],
+            devices: Array.isArray(scenData.devices) ? scenData.devices : [],
             room: getJoinedRoomName(scenData.rooms) || undefined,
             image: resolveCatalogImage(scenData.image || 'Scenarios/moonlight_bay.png'),
           } as Scenario;
