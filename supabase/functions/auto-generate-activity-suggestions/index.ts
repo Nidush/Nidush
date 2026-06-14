@@ -9,7 +9,6 @@ import {
   getMoodDirective,
   normalizeIdeas,
   parseJsonObject,
-  slugify,
 } from '../generate-activity-ideas/lib.ts'
 
 const corsHeaders = {

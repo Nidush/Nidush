@@ -111,6 +111,9 @@
   "homepage": "https://github.com/Nidush/Nidush#readme",
   "jest": {
     "preset": "jest-expo",
+    "setupFilesAfterEnv": [
+      "<rootDir>/jest.setup.js"
+    ],
     "modulePathIgnorePatterns": [
       "<rootDir>/selenium/"
     ],
