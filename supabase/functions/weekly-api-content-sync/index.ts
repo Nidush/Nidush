@@ -171,9 +171,9 @@ const fetchMealContent = async (): Promise<ContentPayload | null> => {
   return {
     id: `api_mealdb_${meal.idMeal}`,
     title: meal.strMeal,
-    description: `${meal.strArea || 'Recipe'} recipe. ${meal.strCategory ? `Original category: ${meal.strCategory}.` : ''}`.trim(),
+    description: `${meal.strArea || 'Recipe'} recipe.`.trim(),
     type: 'recipe',
-    category: 'cooking',
+    category: String(meal.strCategory ?? '').trim() || 'cooking',
     duration: '30 min',
     image: meal.strMealThumb || null,
     instructions,

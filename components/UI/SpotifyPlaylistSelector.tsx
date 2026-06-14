@@ -21,11 +21,13 @@ type PlaylistItem = {
 interface SpotifyPlaylistSelectorProps {
   onSelect: (playlist: PlaylistItem) => void;
   selectedId?: string;
+  onBeforeConnect?: () => Promise<void> | void;
 }
 
 export default function SpotifyPlaylistSelector({
   onSelect,
   selectedId,
+  onBeforeConnect,
 }: SpotifyPlaylistSelectorProps) {
   const { getUserPlaylists, isAuthenticated, login } = useSpotify();
   const [playlists, setPlaylists] = useState<PlaylistItem[]>([]);
@@ -52,7 +54,10 @@ export default function SpotifyPlaylistSelector({
           Connect Spotify to use your music
         </Text>
         <TouchableOpacity
-          onPress={login}
+          onPress={async () => {
+            await onBeforeConnect?.();
+            await login();
+          }}
           className="bg-[#1DB954] px-8 py-3 rounded-full mt-4"
         >
           <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-white">Connect Now</Text>

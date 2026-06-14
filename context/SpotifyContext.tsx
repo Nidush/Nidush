@@ -310,6 +310,18 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
         logger.warn('[Spotify] Missing code or codeVerifier. Request ready:', !!request);
       }
     } else if (response?.type === 'error') {
+      const errorCode =
+        typeof response.error === 'string'
+          ? response.error
+          : response.params && typeof response.params.error === 'string'
+            ? response.params.error
+            : '';
+
+      if (errorCode === 'access_denied') {
+        logger.info('[Spotify] Authorization was denied or cancelled by the user.');
+        return;
+      }
+
       logger.error('[Spotify] Auth response error:', response.error);
     }
   }, [exchangeCodeForToken, request, response]);

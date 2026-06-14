@@ -391,11 +391,14 @@ const saveIdea = async ({
   userId: string
   roomDevices: DeviceRow[]
 }): Promise<SavedSuggestion> => {
-  const { data: matchedContents } = await supabase
+  const contentQuery = supabase
     .from('contents')
     .select('id')
-    .eq('category', idea.contentCategory)
     .limit(50)
+
+  const { data: matchedContents } = idea.contentCategory === 'cooking'
+    ? await contentQuery.eq('type', 'recipe')
+    : await contentQuery.eq('category', idea.contentCategory)
 
   let finalContentId = ''
   if (matchedContents && matchedContents.length > 0) {

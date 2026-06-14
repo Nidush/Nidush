@@ -22,6 +22,11 @@ interface ScenarioDevice {
   state: string;
   value?: string | number;
   brightness?: string;
+  color?: string;
+  temperature?: number;
+  mode?: string;
+  deviceName?: string;
+  deviceType?: string;
 }
 
 interface ScenarioEnvironment {
@@ -45,6 +50,28 @@ const getDeviceIcon = (id: string): React.ComponentProps<typeof MaterialIcons>['
   if (id.includes('diffuser')) return 'air';
   if (id.includes('purifier')) return 'filter-vintage';
   return 'devices';
+};
+
+const getDeviceSummary = (device: ScenarioDevice) => {
+  const rawType = `${device.deviceType ?? device.deviceId}`.toLowerCase();
+
+  if (rawType.includes('light')) {
+    const warmth =
+      typeof device.temperature === 'number'
+        ? device.temperature <= 35
+          ? 'Warm'
+          : device.temperature <= 65
+            ? 'Balanced'
+            : 'Cool'
+        : null;
+    return [device.mode, warmth, device.brightness].filter(Boolean).join(' • ') || 'Configured';
+  }
+
+  if (rawType.includes('thermostat')) {
+    return [device.value ? `${device.value}ºC` : null, device.mode].filter(Boolean).join(' • ') || 'Configured';
+  }
+
+  return [device.value?.toString(), device.mode].filter(Boolean).join(' • ') || 'On';
 };
 
 export const ScenarioReviewCard = ({
@@ -166,7 +193,7 @@ export const ScenarioReviewCard = ({
                   className="ml-2 text-sm text-[#2F4F4F]"
                   style={{ fontFamily: 'Nunito_600SemiBold' }}
                 >
-                  {device.deviceId
+                  {(device.deviceName || device.deviceId)
                     .replace('dev_', '')
                     .replace('_', ' ')
                     .replace(/\b\w/g, (l) => l.toUpperCase())}
@@ -178,7 +205,7 @@ export const ScenarioReviewCard = ({
                 style={{ fontFamily: 'Nunito_700Bold' }}
                 importantForAccessibility="no"
               >
-                {device.value ? device.value.toString() : 'On'}
+                {getDeviceSummary(device)}
               </Text>
             </View>
           ))}

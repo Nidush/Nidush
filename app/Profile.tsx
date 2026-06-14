@@ -31,6 +31,8 @@ import {
 import { LEGAL_POLICY_VERSION, setHealthConnectEnabled } from '../utils/legal';
 import { captureException, trackEvent } from '../utils/observability';
 
+const SPOTIFY_RETURN_ROUTE_KEY = '@spotify_return_route';
+
 export default function Profile() {
   const router = useRouter();
   const { isAuthenticated, login, logout, userProfile } = useSpotify();
@@ -74,6 +76,11 @@ export default function Profile() {
     shortcutsCount: 0,
   });
   const [healthConnectStatus, setHealthConnectStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
+
+  const handleSpotifyConnectFromProfile = useCallback(async () => {
+    await AsyncStorage.setItem(SPOTIFY_RETURN_ROUTE_KEY, '/Profile');
+    await login();
+  }, [login]);
 
 const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
@@ -1228,7 +1235,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
         <View className="bg-[#F5F7F0] rounded-[24px] px-2 mb-4 border border-[#D1D9C5]">
           <TouchableOpacity
             className="flex-row justify-between items-center py-5 px-4"
-            onPress={isAuthenticated ? logout : login}
+            onPress={isAuthenticated ? logout : handleSpotifyConnectFromProfile}
           >
             <View className="flex-row items-center">
               <MaterialCommunityIcons name="spotify" size={28} color={isAuthenticated ? "#1DB954" : "#4A5D4E"} />
