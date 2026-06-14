@@ -1,21 +1,22 @@
 import { Content, CONTENTS } from '@/constants/data';
-import { Activity, Scenario } from '@/constants/data/types';
 import { resolveCatalogImage } from '@/constants/data/catalogAssets';
+import { Activity, Scenario } from '@/constants/data/types';
 import {
   Nunito_400Regular,
   Nunito_600SemiBold,
   Nunito_700Bold,
   useFonts,
 } from '@expo-google-fonts/nunito';
-import { supabase, uploadImage, apiLog } from '../utils/supabase';
+import { apiLog, supabase, uploadImage } from '../utils/supabase';
 
-import { router, Stack, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNotifications } from '@/context/NotificationsContext';
 import { fetchScenarioTemplates } from '@/utils/catalogTemplates';
 import { captureException, trackEvent } from '@/utils/observability';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
+  ImageSourcePropType,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -23,7 +24,6 @@ import {
   Text,
   TouchableOpacity,
   View,
-  ImageSourcePropType,
 } from 'react-native';
 import {
   SafeAreaProvider,
@@ -40,7 +40,9 @@ import {
   Step6_Review,
 } from '@/components/newActivityFlow';
 
-const dbTypeToActivityType = (type: string | null | undefined): Activity['type'] => {
+const dbTypeToActivityType = (
+  type: string | null | undefined,
+): Activity['type'] => {
   const normalized = String(type ?? 'other').toLowerCase();
   if (normalized === 'audiobook') return 'audiobooks';
   if (
@@ -80,12 +82,16 @@ type ContentRow = {
   author?: string | null;
 };
 
-const normalizeContentInstructions = (value: unknown): Content['instructions'] => {
+const normalizeContentInstructions = (
+  value: unknown,
+): Content['instructions'] => {
   if (!Array.isArray(value)) return undefined;
   return value as Content['instructions'];
 };
 
-const normalizeContentIngredients = (value: unknown): Content['ingredients'] => {
+const normalizeContentIngredients = (
+  value: unknown,
+): Content['ingredients'] => {
   if (!Array.isArray(value)) return undefined;
   return value as Content['ingredients'];
 };
@@ -120,12 +126,18 @@ export default function NewActivityFlow() {
   const [selectedScenarioId, setSelectedScenarioId] = useState('');
   const [activityName, setActivityName] = useState('');
   const [description, setDescription] = useState('');
-  const [activityImage, setActivityImage] = useState<ImageSourcePropType | string | null>(null);
+  const [activityImage, setActivityImage] = useState<
+    ImageSourcePropType | string | null
+  >(null);
   const [dbContent, setDbContent] = useState<Content[]>([]);
   const [scenarioTemplates, setScenarioTemplates] = useState<Scenario[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
-  const linkRoomTvDevices = async (activityId: number, homeId: number, roomId: number | null) => {
+  const linkRoomTvDevices = async (
+    activityId: number,
+    homeId: number,
+    roomId: number | null,
+  ) => {
     if (!roomId) return;
 
     try {
@@ -146,7 +158,9 @@ export default function NewActivityFlow() {
 
       if (existingError) throw existingError;
 
-      const linkedDeviceIds = new Set((existingLinks || []).map((link) => link.device_id));
+      const linkedDeviceIds = new Set(
+        (existingLinks || []).map((link) => link.device_id),
+      );
       const linksToInsert = tvDevices
         .filter((device) => !linkedDeviceIds.has(device.id))
         .map((device) => ({
@@ -197,28 +211,32 @@ export default function NewActivityFlow() {
 
   useEffect(() => {
     const fetchContent = async () => {
-      const { data, error } = await supabase
-        .from('contents')
-        .select('*');
-      
-      if (data && !error) {
-        setDbContent((data as ContentRow[]).map((c) => {
-          const localContent = CONTENTS[c.id as keyof typeof CONTENTS];
+      const { data, error } = await supabase.from('contents').select('*');
 
-          return {
-            id: c.id,
-            title: c.title || localContent?.title,
-            type: c.type || localContent?.type,
-            category: c.category || localContent?.category,
-            description: c.description || localContent?.description,
-            duration: c.duration || localContent?.duration,
-            image: resolveCatalogImage(c.image || localContent?.image),
-            instructions: normalizeContentInstructions(c.instructions) || localContent?.instructions,
-            ingredients: normalizeContentIngredients(c.ingredients) || localContent?.ingredients,
-            videoUrl: localContent?.videoUrl || c.video_url || undefined,
-            author: c.author || localContent?.author,
-          };
-        }));
+      if (data && !error) {
+        setDbContent(
+          (data as ContentRow[]).map((c) => {
+            const localContent = CONTENTS[c.id as keyof typeof CONTENTS];
+
+            return {
+              id: c.id,
+              title: c.title || localContent?.title,
+              type: c.type || localContent?.type,
+              category: c.category || localContent?.category,
+              description: c.description || localContent?.description,
+              duration: c.duration || localContent?.duration,
+              image: resolveCatalogImage(c.image || localContent?.image),
+              instructions:
+                normalizeContentInstructions(c.instructions) ||
+                localContent?.instructions,
+              ingredients:
+                normalizeContentIngredients(c.ingredients) ||
+                localContent?.ingredients,
+              videoUrl: localContent?.videoUrl || c.video_url || undefined,
+              author: c.author || localContent?.author,
+            };
+          }),
+        );
       }
     };
     fetchContent();
@@ -238,11 +256,18 @@ export default function NewActivityFlow() {
   }, []);
 
   useEffect(() => {
-    if (!isEditMode || room_id || !selectedScenarioId || scenarioTemplates.length === 0) {
+    if (
+      !isEditMode ||
+      room_id ||
+      !selectedScenarioId ||
+      scenarioTemplates.length === 0
+    ) {
       return;
     }
 
-    const selectedScenario = scenarioTemplates.find((scenario) => scenario.id === selectedScenarioId);
+    const selectedScenario = scenarioTemplates.find(
+      (scenario) => scenario.id === selectedScenarioId,
+    );
     if (selectedScenario?.room || selectedScenario?.room_id) {
       setRoomId(selectedScenario.room || selectedScenario.room_id || '');
     }
@@ -326,9 +351,7 @@ export default function NewActivityFlow() {
   const handleSave = async () => {
     if (isSaving) return;
 
-    const contentObj = allContent.find(
-      (c) => c.id === selectedContentId,
-    );
+    const contentObj = allContent.find((c) => c.id === selectedContentId);
 
     let finalImage;
 
@@ -345,12 +368,19 @@ export default function NewActivityFlow() {
 
     try {
       setIsSaving(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Utilizador não autenticado!");
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error('Utilizador não autenticado!');
 
       // 1. Upload da imagem para o Storage (se for uma nova imagem local)
       let imageUrl = getImageUri(finalImage) || finalImage;
-      if (typeof imageUrl === 'string' && (imageUrl.startsWith('data:') || imageUrl.startsWith('file:') || imageUrl.startsWith('blob:'))) {
+      if (
+        typeof imageUrl === 'string' &&
+        (imageUrl.startsWith('data:') ||
+          imageUrl.startsWith('file:') ||
+          imageUrl.startsWith('blob:'))
+      ) {
         const uploadedUrl = await uploadImage(imageUrl);
         if (uploadedUrl) imageUrl = uploadedUrl;
       }
@@ -364,7 +394,7 @@ export default function NewActivityFlow() {
         reading: 'Reading',
         yoga: 'Yoga',
         other: 'other',
-        general: 'other'
+        general: 'other',
       };
       const formattedType = typeMapping[activityType] || 'other';
 
@@ -407,30 +437,32 @@ export default function NewActivityFlow() {
         category: 'My creations',
         type: formattedType,
         content_id: selectedContentId || null,
-        scenario_id: selectedScenarioId ? parseInt(selectedScenarioId.toString().replace(/\D/g, '')) : 1,
+        scenario_id: selectedScenarioId
+          ? parseInt(selectedScenarioId.toString().replace(/\D/g, ''))
+          : 1,
         room_id: dbRoomId,
         home_id: currentHomeId,
       };
 
-      const { data, error } = isEditMode && editId
-        ? await supabase
-            .from('activities')
-            .update(saveData)
-            .eq('id', editId)
-            .eq('user_id', user.id)
-            .select('*, id')
-            .single()
-        : await supabase
-            .from('activities')
-            .insert({ ...saveData, user_id: user.id })
-            .select('*, id')
-            .single();
+      const { data, error } =
+        isEditMode && editId
+          ? await supabase
+              .from('activities')
+              .update(saveData)
+              .eq('id', editId)
+              .eq('user_id', user.id)
+              .select('*, id')
+              .single()
+          : await supabase
+              .from('activities')
+              .insert({ ...saveData, user_id: user.id })
+              .select('*, id')
+              .single();
 
       apiLog(isEditMode ? 'UPDATE' : 'INSERT', 'activities', {
         id: editId,
         ...saveData,
       });
-
 
       if (error) {
         console.error('Erro no Supabase:', error);
@@ -452,14 +484,18 @@ export default function NewActivityFlow() {
         isEditMode
           ? `"${activityName || 'Untitled Activity'}" has been updated.`
           : `Great job! "${activityName || 'Untitled Activity'}" has been added to your creations.`,
-        'creation'
+        'creation',
       );
       trackEvent(isEditMode ? 'activity-updated' : 'activity-created', {
         area: 'activities',
         screen: 'new-activity',
         action: isEditMode ? 'update-activity' : 'create-activity',
         userId: user.id,
-        metadata: { activityId: data.id, roomId: dbRoomId, homeId: currentHomeId },
+        metadata: {
+          activityId: data.id,
+          roomId: dbRoomId,
+          homeId: currentHomeId,
+        },
       });
 
       // Se tudo correu bem, avançar para os detalhes usando o ID gerado pelo Supabase
@@ -484,10 +520,10 @@ export default function NewActivityFlow() {
 
   if (!fontsLoaded) return null;
 
-  const reviewContent = allContent.find(
-    (c) => c.id === selectedContentId,
+  const reviewContent = allContent.find((c) => c.id === selectedContentId);
+  const reviewScenario = scenarioTemplates.find(
+    (s) => s.id === selectedScenarioId,
   );
-  const reviewScenario = scenarioTemplates.find((s) => s.id === selectedScenarioId);
 
   return (
     <SafeAreaProvider>
@@ -536,10 +572,11 @@ export default function NewActivityFlow() {
                   activityType={activityType}
                   selectedContentId={selectedContentId}
                   onSelect={handleContentSelect}
-                  contentList={allContent}
                 />
               )}
-              {step === 3 && <Step3_Room selected={room_id} onSelect={setRoomId} />}
+              {step === 3 && (
+                <Step3_Room selected={room_id} onSelect={setRoomId} />
+              )}
               {step === 4 && (
                 <Step4_Environment
                   roomName={room_id}
@@ -597,7 +634,9 @@ export default function NewActivityFlow() {
                   accessible={true}
                   accessibilityRole="button"
                   // Informa o leitor de ecrã (VoiceOver/TalkBack) que o botão está inativo
-                  accessibilityState={{ disabled: isNextDisabled() || isSaving }}
+                  accessibilityState={{
+                    disabled: isNextDisabled() || isSaving,
+                  }}
                   accessibilityLabel={
                     step === 6
                       ? isEditMode
@@ -617,7 +656,13 @@ export default function NewActivityFlow() {
                     className="text-white text-2xl"
                     style={{ fontFamily: 'Nunito_700Bold' }}
                   >
-                    {step === 6 ? (isSaving ? 'Saving...' : isEditMode ? 'Update' : 'Save') : 'Continue'}
+                    {step === 6
+                      ? isSaving
+                        ? 'Saving...'
+                        : isEditMode
+                          ? 'Update'
+                          : 'Save'
+                      : 'Continue'}
                   </Text>
                 </TouchableOpacity>
               </View>
