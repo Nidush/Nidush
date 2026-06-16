@@ -14,6 +14,10 @@ type MembershipRow = {
   created_at: string | null
 }
 
+type HomeRoomRow = {
+  id: number
+}
+
 Deno.serve(async (req) => {
   const log = createFunctionLogger('delete-account', req)
   if (req.method === 'OPTIONS') {
@@ -45,6 +49,10 @@ Deno.serve(async (req) => {
       .order('created_at', { ascending: true })
 
     if (membershipsError) throw membershipsError
+
+    const memberHomeIds = Array.from(
+      new Set(((memberships ?? []) as MembershipRow[]).map((membership) => membership.home_id)),
+    )
 
     for (const membership of ((memberships ?? []) as MembershipRow[])) {
       if (membership.role !== 'admin') continue
@@ -102,6 +110,19 @@ Deno.serve(async (req) => {
       if (error) throw error
     }
 
+    const deleteRowsByHomeIds = async (table: string, column: string, homeIds: number[]) => {
+      if (homeIds.length === 0) return
+
+      const { error } = await supabase
+        .from(table)
+        .delete()
+        .in(column, homeIds)
+
+      if (error) throw error
+    }
+
+    await deleteOwnRows('ai_auto_generated_activities')
+    await deleteOwnRows('ai_generation_requests')
     await deleteOwnRows('activities')
     await deleteOwnRows('routines')
     await deleteOwnRows('shortcuts')
@@ -109,6 +130,29 @@ Deno.serve(async (req) => {
     await deleteOwnRows('biometric_readings')
     await deleteOwnRows('notifications')
     await deleteOwnRows('user_consents')
+
+    if (memberHomeIds.length > 0) {
+      const { data: roomRows, error: roomsError } = await supabase
+        .from('rooms')
+        .select('id')
+        .in('home_id', memberHomeIds)
+
+      if (roomsError) throw roomsError
+
+      const roomIds = ((roomRows ?? []) as HomeRoomRow[]).map((room) => room.id)
+      if (roomIds.length > 0) {
+        const { error: scenariosError } = await supabase
+          .from('scenarios')
+          .delete()
+          .in('room_id', roomIds)
+
+        if (scenariosError) throw scenariosError
+      }
+
+      await deleteRowsByHomeIds('ai_auto_generated_activities', 'home_id', memberHomeIds)
+      await deleteRowsByHomeIds('ai_generation_requests', 'home_id', memberHomeIds)
+    }
+
     await deleteOwnRows('user_homes')
 
     const { data: avatarFiles, error: avatarListError } = await supabase.storage

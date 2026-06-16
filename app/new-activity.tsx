@@ -1,6 +1,7 @@
 import { Content, CONTENTS } from '@/constants/data';
 import { Activity, Scenario } from '@/constants/data/types';
 import { resolveCatalogImage } from '@/constants/data/catalogAssets';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Nunito_400Regular,
   Nunito_600SemiBold,
@@ -10,7 +11,7 @@ import {
 import { supabase, uploadImage, apiLog } from '../utils/supabase';
 
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNotifications } from '@/context/NotificationsContext';
 import {
   fetchScenarioTemplates,
@@ -71,6 +72,17 @@ const scenarioIdToTemplateId = (value: unknown) => {
   return raw.startsWith('s') ? raw : `s${raw}`;
 };
 
+type ActivityDraftPayload = {
+  step: number;
+  activityType: Activity['type'];
+  selectedContentId: string;
+  room_id: string;
+  selectedScenarioId: string;
+  activityName: string;
+  description: string;
+  activityImageUri: string | null;
+};
+
 type ContentRow = {
   id: string;
   title: string;
@@ -125,13 +137,19 @@ export default function NewActivityFlow() {
 
   const { editId } = useLocalSearchParams<{ editId?: string }>();
   const isEditMode = Boolean(editId);
+  const draftKey = useMemo(
+    () => `@new_activity_draft:${editId ?? 'create'}`,
+    [editId],
+  );
   const [step, setStep] = useState(1);
   const { addNotification } = useNotifications();
   const totalSteps = 6;
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const [didRestoreDraft, setDidRestoreDraft] = useState(false);
 
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
+  const hasHydratedDraftRef = useRef(false);
 
   const [activityType, setActivityType] = useState<Activity['type']>('other');
   const [selectedContentId, setSelectedContentId] = useState('');
@@ -143,22 +161,60 @@ export default function NewActivityFlow() {
   const [dbContent, setDbContent] = useState<Content[]>([]);
   const [scenarioTemplates, setScenarioTemplates] = useState<Scenario[]>([]);
   const [homeRooms, setHomeRooms] = useState<HomeRoomRow[]>([]);
+  const [roomDeviceTypes, setRoomDeviceTypes] = useState<string[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  const serializeActivityImage = (value: ImageSourcePropType | string | null) =>
+    typeof value === 'string'
+      ? value
+      : value && typeof value === 'object' && 'uri' in value
+        ? String(value.uri ?? '') || null
+        : null;
+
+  const buildDraftPayload = useCallback(
+    (): ActivityDraftPayload => ({
+      step,
+      activityType,
+      selectedContentId,
+      room_id,
+      selectedScenarioId,
+      activityName,
+      description,
+      activityImageUri: serializeActivityImage(activityImage),
+    }),
+    [
+      activityImage,
+      activityName,
+      activityType,
+      description,
+      room_id,
+      selectedContentId,
+      selectedScenarioId,
+      step,
+    ],
+  );
+
+  const saveActivityDraft = useCallback(async () => {
+    await AsyncStorage.setItem(draftKey, JSON.stringify(buildDraftPayload()));
+  }, [buildDraftPayload, draftKey]);
+
+  const discardActivityDraft = useCallback(async () => {
+    await AsyncStorage.removeItem(draftKey);
+  }, [draftKey]);
 
   const linkRoomTvDevices = async (activityId: number, homeId: number, roomId: number | null) => {
     if (!roomId) return;
 
     try {
-      const { data: tvDevices, error: devicesError } = await supabase
+      const { data: roomDevices, error: devicesError } = await supabase
         .from('devices')
         .select('id')
         .eq('home_id', homeId)
-        .eq('room_id', roomId)
-        .in('type', ['tv', 'display']);
+        .eq('room_id', roomId);
 
       if (devicesError) throw devicesError;
-      if (!tvDevices?.length) return;
+      if (!roomDevices?.length) return;
 
       const { data: existingLinks, error: existingError } = await supabase
         .from('activity_devices')
@@ -168,7 +224,7 @@ export default function NewActivityFlow() {
       if (existingError) throw existingError;
 
       const linkedDeviceIds = new Set((existingLinks || []).map((link) => link.device_id));
-      const linksToInsert = tvDevices
+      const linksToInsert = roomDevices
         .filter((device) => !linkedDeviceIds.has(device.id))
         .map((device) => ({
           activity_id: activityId,
@@ -183,9 +239,37 @@ export default function NewActivityFlow() {
 
       if (insertError) throw insertError;
     } catch (error) {
-      console.warn('Could not auto-link room TV devices to activity:', error);
+      console.warn('Could not auto-link room devices to activity:', error);
     }
   };
+
+  useEffect(() => {
+    const loadDraft = async () => {
+      try {
+        const raw = await AsyncStorage.getItem(draftKey);
+        if (!raw) return;
+
+        const draft = JSON.parse(raw) as ActivityDraftPayload;
+        setStep(typeof draft.step === 'number' ? draft.step : 1);
+        setActivityType(draft.activityType ?? 'other');
+        setSelectedContentId(draft.selectedContentId ?? '');
+        setRoomId(draft.room_id ?? '');
+        setSelectedScenarioId(draft.selectedScenarioId ?? '');
+        setActivityName(draft.activityName ?? '');
+        setDescription(draft.description ?? '');
+        if (draft.activityImageUri) {
+          setActivityImage(draft.activityImageUri);
+        }
+        setDidRestoreDraft(true);
+      } catch (error) {
+        console.error('Failed to restore activity draft:', error);
+      } finally {
+        hasHydratedDraftRef.current = true;
+      }
+    };
+
+    void loadDraft();
+  }, [draftKey]);
 
   useEffect(() => {
     if (!editId) return;
@@ -351,6 +435,42 @@ export default function NewActivityFlow() {
     }
   }, [homeRooms, room_id]);
 
+  useEffect(() => {
+    const fetchRoomDevices = async () => {
+      if (!room_id || homeRooms.length === 0) {
+        setRoomDeviceTypes([]);
+        return;
+      }
+      
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        
+        const { data: homeAssoc } = await supabase.from('user_homes').select('home_id').eq('user_id', user.id).maybeSingle();
+        if (!homeAssoc?.home_id) return;
+
+        const matchedRoom = homeRooms.find((r) => r.name === room_id || String(r.id) === room_id);
+        if (!matchedRoom) return;
+
+        const { data: devices } = await supabase
+          .from('devices')
+          .select('type')
+          .eq('home_id', homeAssoc.home_id)
+          .eq('room_id', matchedRoom.id);
+
+        if (devices) {
+          const types = Array.from(new Set(devices.map(d => String(d.type).toLowerCase())));
+          setRoomDeviceTypes(types);
+        } else {
+          setRoomDeviceTypes([]);
+        }
+      } catch (e) {
+        console.error('Error fetching room devices:', e);
+      }
+    };
+    fetchRoomDevices();
+  }, [room_id, homeRooms]);
+
   const allContent = useMemo(() => {
     const combined = [...dbContent];
     Object.values(CONTENTS).forEach((local: Content) => {
@@ -364,6 +484,45 @@ export default function NewActivityFlow() {
   useEffect(() => {
     AccessibilityInfo.announceForAccessibility(`Step ${step} of ${totalSteps}`);
   }, [step]);
+
+  useEffect(() => {
+    if (!hasHydratedDraftRef.current) return;
+
+    const shouldPersist =
+      step > 1 ||
+      !!selectedContentId ||
+      !!room_id ||
+      !!selectedScenarioId ||
+      !!activityName.trim() ||
+      !!description.trim() ||
+      !!activityImage;
+
+    const persistDraft = async () => {
+      try {
+        if (!shouldPersist) {
+          await AsyncStorage.removeItem(draftKey);
+          return;
+        }
+
+        await saveActivityDraft();
+      } catch (error) {
+        console.error('Failed to persist activity draft:', error);
+      }
+    };
+
+    void persistDraft();
+  }, [
+    activityImage,
+    activityName,
+    activityType,
+    description,
+    draftKey,
+    room_id,
+    saveActivityDraft,
+    selectedContentId,
+    selectedScenarioId,
+    step,
+  ]);
 
   useEffect(() => {
     const keyboardShowListener = Keyboard.addListener(
@@ -401,10 +560,18 @@ export default function NewActivityFlow() {
   const nextStep = () => {
     if (step < totalSteps) setStep(step + 1);
   };
-  const prevStep = () => {
+  const prevStep = async () => {
     if (step > 1) setStep(step - 1);
-    else router.back();
+    else {
+      await discardActivityDraft();
+      router.back();
+    }
   };
+
+  const handleCancel = useCallback(async () => {
+    await discardActivityDraft();
+    router.back();
+  }, [discardActivityDraft]);
 
   const isNextDisabled = () => {
     if (step === 1 && !activityType) return true;
@@ -551,6 +718,8 @@ export default function NewActivityFlow() {
         await linkRoomTvDevices(Number(data.id), currentHomeId, dbRoomId);
       }
 
+      await AsyncStorage.removeItem(draftKey);
+
       // 3. Trigger Notification
       addNotification(
         isEditMode ? 'Activity Updated' : 'New Activity Created',
@@ -621,6 +790,7 @@ export default function NewActivityFlow() {
             step={step}
             totalSteps={totalSteps}
             onBack={prevStep}
+            onCancel={handleCancel}
           />
         </View>
         <KeyboardAvoidingView
@@ -655,6 +825,22 @@ export default function NewActivityFlow() {
                 </View>
               ) : (
                 <>
+                  {didRestoreDraft && (
+                    <View className="bg-[#EEF6EC] rounded-3xl border border-[#D7E7D2] p-4 mt-4 mb-2">
+                      <Text
+                        className="text-[#354F52] text-base"
+                        style={{ fontFamily: 'Nunito_700Bold' }}
+                      >
+                        Restored your activity draft
+                      </Text>
+                      <Text
+                        className="text-[#6C7A74] text-sm mt-1"
+                        style={{ fontFamily: 'Nunito_400Regular' }}
+                      >
+                        We brought back what you had already filled in so you can continue from where you stopped.
+                      </Text>
+                    </View>
+                  )}
                   {step === 1 && (
                     <Step1_Type
                       selected={activityType}
@@ -682,6 +868,7 @@ export default function NewActivityFlow() {
                       selected={selectedScenarioId}
                       onSelect={setSelectedScenarioId}
                       scenarios={scenarioTemplates}
+                      availableDeviceTypes={roomDeviceTypes}
                     />
                   )}
                   {step === 5 && (

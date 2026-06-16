@@ -186,7 +186,7 @@ describe('Routines Screen', () => {
     await openRoutineModal(screen);
     fireEvent.press(await screen.findByText('Save Routine'));
 
-    expect(await screen.findByText('Give your routine a name first.')).toBeTruthy();
+    expect(await screen.findByText('Routine name is required.')).toBeTruthy();
   });
 
   it('creates a routine successfully with the default selections', async () => {

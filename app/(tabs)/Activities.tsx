@@ -134,7 +134,7 @@ const UnifiedActivitiesScreen = () => {
 
     let query = supabase
       .from('activities')
-      .select('*', { count: 'exact' })
+      .select('*, rooms(name)', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(start, end);
 
@@ -266,6 +266,31 @@ const UnifiedActivitiesScreen = () => {
       isEmpty: filteredUserActivities.length + filteredCatalog.length === 0,
     };
   }, [viewMode, activeFilter, searchQuery, myActivities, activityTemplates, scenarioTemplates, currentState]);
+
+  const searchSuggestions = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    if (normalizedQuery.length < 2) return [];
+
+    const sourceItems =
+      viewMode === 'activities'
+        ? [...myActivities, ...activityTemplates]
+        : scenarioTemplates;
+
+    const seen = new Set<string>();
+    const suggestions: string[] = [];
+
+    for (const item of sourceItems) {
+      const title = item.title?.trim();
+      if (!title) continue;
+      if (!title.toLowerCase().includes(normalizedQuery)) continue;
+      if (seen.has(title.toLowerCase())) continue;
+      seen.add(title.toLowerCase());
+      suggestions.push(title);
+      if (suggestions.length >= 5) break;
+    }
+
+    return suggestions;
+  }, [activityTemplates, myActivities, scenarioTemplates, searchQuery, viewMode]);
 
   const handleViewModeChange = (mode: 'activities' | 'scenarios') => {
     setViewMode(mode);
@@ -406,6 +431,8 @@ const UnifiedActivitiesScreen = () => {
           setViewMode={handleViewModeChange}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
+          suggestions={searchSuggestions}
+          onSelectSuggestion={setSearchQuery}
         />
 
         <FilterBar
@@ -447,7 +474,7 @@ const UnifiedActivitiesScreen = () => {
 
             {(recommendedData.length > 0 || isLoadingAiRecommendations) && (
               <CarouselSection
-                title={viewMode === 'activities' ? 'AI recommended' : 'Recommended'}
+                title="Recommended"
                 data={recommendedData}
                 showTime={viewMode === 'activities'}
                 isLoadingMore={isLoadingAiRecommendations}

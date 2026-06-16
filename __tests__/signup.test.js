@@ -87,6 +87,7 @@ describe('SignUp Screen', () => {
         email: 'laura@example.com',
         password: 'StrongPass123!',
         options: {
+          emailRedirectTo: 'nidush://login',
           data: {
             first_name: 'Laura',
             last_name: 'Rossi',

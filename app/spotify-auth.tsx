@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../utils/supabase';
+const SPOTIFY_RETURN_ROUTE_KEY = '@spotify_return_route';
 
 export default function SpotifyAuthCatcher() {
   const router = useRouter();
@@ -9,11 +10,18 @@ export default function SpotifyAuthCatcher() {
   useEffect(() => {
     const handleRedirect = async () => {
       const savedProgress = await AsyncStorage.getItem('@onboarding_progress');
+      const savedReturnRoute = await AsyncStorage.getItem(SPOTIFY_RETURN_ROUTE_KEY);
       const viewed = await AsyncStorage.getItem('@viewedOnboarding');
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
         router.replace('/login');
+        return;
+      }
+
+      if (savedReturnRoute) {
+        await AsyncStorage.removeItem(SPOTIFY_RETURN_ROUTE_KEY);
+        router.replace(savedReturnRoute as '/new-scenario' | '/setup-profile' | '/Profile');
         return;
       }
 

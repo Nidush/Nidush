@@ -19,6 +19,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSpotify } from '../../context/SpotifyContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const SPOTIFY_RETURN_ROUTE_KEY = '@spotify_return_route';
 
 export default function SpotifyConnect({
   onNext,
@@ -82,6 +85,7 @@ export default function SpotifyConnect({
   const handleConnect = async () => {
     setIsConnecting(true);
     try {
+      await AsyncStorage.setItem(SPOTIFY_RETURN_ROUTE_KEY, '/setup-profile');
       await login();
     } catch (error) {
       console.error('Spotify login failed', error);

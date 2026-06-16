@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 
@@ -8,9 +7,10 @@ type FlowHeaderProps = {
   step: number;
   totalSteps: number;
   onBack: () => void;
+  onCancel: () => void | Promise<void>;
 };
 
-export const FlowHeader = ({ title, step, totalSteps, onBack }: FlowHeaderProps) => (
+export const FlowHeader = ({ title, step, totalSteps, onBack, onCancel }: FlowHeaderProps) => (
   <View>
     <View className="flex-row justify-between items-center h-[60px] mt-2">
       <TouchableOpacity
@@ -38,7 +38,7 @@ export const FlowHeader = ({ title, step, totalSteps, onBack }: FlowHeaderProps)
       </Text>
 
       <TouchableOpacity
-        onPress={() => router.back()}
+        onPress={onCancel}
         accessible={true}
         accessibilityRole="button"
         accessibilityLabel="Cancel"

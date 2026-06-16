@@ -13,6 +13,7 @@ interface Step4Props {
   onSelect: (id: string) => void;
   roomName: string;
   scenarios: Scenario[];
+  availableDeviceTypes?: string[];
 }
 
 export const Step4_Environment = ({
@@ -20,6 +21,7 @@ export const Step4_Environment = ({
   onSelect,
   roomName,
   scenarios,
+  availableDeviceTypes = [],
 }: Step4Props) => {
   const filteredScenarios = useMemo(() => {
     if (!roomName) return [];
@@ -34,10 +36,33 @@ export const Step4_Environment = ({
     [filteredScenarios],
   );
 
-  const templateScenarios = useMemo(
-    () => filteredScenarios.filter((scenario) => !isUserScenarioRouteId(scenario.id)),
-    [filteredScenarios],
-  );
+  const templateScenarios = useMemo(() => {
+    const templates = filteredScenarios.filter((scenario) => !isUserScenarioRouteId(scenario.id));
+    if (!availableDeviceTypes || availableDeviceTypes.length === 0) {
+      return templates; // If we don't know what devices they have, we show them anyway or we could hide them
+    }
+    
+    return templates.filter(scenario => {
+      if (!scenario.devices || scenario.devices.length === 0) return true;
+      
+      return scenario.devices.every(reqDevice => {
+        // reqDevice is ScenarioDeviceState, it has deviceId which maps to SMART_HOME_DEVICES.
+        // But since we just have deviceId (e.g. 'dev_speaker_living'), we can infer the type.
+        // Let's do a simple check: if the deviceId contains 'speaker', require 'speaker' type, etc.
+        const id = reqDevice.deviceId.toLowerCase();
+        let type = 'unknown';
+        if (id.includes('tv') || id.includes('display')) type = 'tv';
+        else if (id.includes('speaker')) type = 'speaker';
+        else if (id.includes('light')) type = 'light';
+        else if (id.includes('diffuser')) type = 'diffuser';
+        else if (id.includes('purifier')) type = 'purifier';
+        else if (id.includes('blind')) type = 'blind';
+        else if (id.includes('thermostat')) type = 'thermostat';
+        
+        return type === 'unknown' || availableDeviceTypes.includes(type);
+      });
+    });
+  }, [filteredScenarios, availableDeviceTypes]);
 
   return (
     <StepWrapper

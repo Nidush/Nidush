@@ -1,12 +1,11 @@
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
+import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import {
   DimensionValue,
-  Image,
   ImageSourcePropType,
-  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -52,11 +51,11 @@ export const UnifiedCard = ({
       accessibilityHint={`Press to go to the details of ${title}`}
     >
       <View style={StyleSheet.absoluteFill}>
-        <Image
+        <ExpoImage
           source={imageSource}
           style={StyleSheet.absoluteFill}
-          resizeMode="cover"
-          blurRadius={Platform.OS === 'ios' ? 70 : 50}
+          contentFit="cover"
+          cachePolicy="memory-disk"
         />
         <View className="absolute inset-0 " />
       </View>
@@ -71,10 +70,12 @@ export const UnifiedCard = ({
           />
         }
       >
-        <Image
+        <ExpoImage
           source={imageSource}
           style={StyleSheet.absoluteFill}
-          resizeMode="cover"
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={200}
         />
       </MaskedView>
 

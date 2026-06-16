@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getSessionUser, supabase } from '../utils/supabase';
+import { getAvatarSource } from '../utils/avatarSource';
 
 const { width } = Dimensions.get('window');
 
@@ -168,7 +169,7 @@ export default function ProfileSelection() {
               >
                 <View className="w-[130px] h-[130px] rounded-full overflow-hidden mb-3 bg-white shadow-sm border-[3px] border-transparent" style={{borderColor: '#E8F3E8'}}>
                   <Image
-                    source={profile.avatarUrl ? { uri: profile.avatarUrl } : require('./../assets/avatars/profile.png')}
+                    source={getAvatarSource(profile.avatarUrl)}
                     className="w-full h-full"
                     resizeMode="cover"
                     accessible={false}

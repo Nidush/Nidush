@@ -43,6 +43,18 @@ jest.mock('../components/Onboarding/WelcomeUser', () => (props) => {
   );
 });
 
+jest.mock('../components/Onboarding/ProfileAvatarStep', () => (props) => {
+  const { Text, TouchableOpacity, View } = require('react-native');
+  return (
+    <View>
+      <Text>{`avatar-step:${props.userName}|${props.avatarValue}`}</Text>
+      <TouchableOpacity testID="avatar-continue-button" onPress={props.onNext}>
+        <Text>avatar-continue</Text>
+      </TouchableOpacity>
+    </View>
+  );
+});
+
 jest.mock('../components/Onboarding/HouseName', () => (props) => {
   const { Text, TouchableOpacity, View } = require('react-native');
   return (
@@ -299,6 +311,7 @@ describe('SetupProfile Screen', () => {
     const { getByTestId, findByText } = renderScreen();
 
     fireEvent.press(await findByText('welcome-step:Laura'));
+    fireEvent.press(getByTestId('avatar-continue-button'));
     fireEvent.press(getByTestId('house-continue-button'));
 
     expect(await findByText('consent-step:Health consent')).toBeTruthy();
@@ -308,6 +321,7 @@ describe('SetupProfile Screen', () => {
     const { getByTestId, findByText, findByTestId } = renderScreen();
 
     fireEvent.press(await findByText('welcome-step:Laura'));
+    fireEvent.press(getByTestId('avatar-continue-button'));
     fireEvent.press(getByTestId('house-continue-button'));
     fireEvent.press(getByTestId('consent-primary-Health consent'));
     fireEvent.press(await findByTestId('wearable-step-button'));

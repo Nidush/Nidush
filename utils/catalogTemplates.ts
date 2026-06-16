@@ -41,6 +41,7 @@ type UserScenarioRow = {
   playlist_name?: string | null;
   focus_mode_enabled?: boolean | null;
   shortcuts?: boolean | string | null;
+  devices?: ScenarioDeviceState[] | null;
   rooms?: { name?: string | null } | null;
 };
 
@@ -57,6 +58,7 @@ type UserActivityRow = {
   shortcuts?: boolean | string | null;
   created_at?: string;
   updated_at?: string;
+  rooms?: { name?: string | null } | null;
 };
 
 type FetchCatalogOptions = {
@@ -370,7 +372,7 @@ export const mapUserScenario = (row: UserScenarioRow): Scenario => ({
   room_id: row.room_id !== null && row.room_id !== undefined ? String(row.room_id) : undefined,
   image: resolveCatalogImage(row.image || 'Scenarios/moonlight_bay.png'),
   category: 'My creations',
-  devices: [],
+  devices: Array.isArray(row.devices) ? row.devices : [],
   playlist: row.playlist_name ?? (row.playlist_id ? 'Spotify Music' : undefined),
   playlist_id: row.playlist_id ?? undefined,
   focusMode: row.focus_mode_enabled === true,
@@ -382,8 +384,8 @@ export const mapUserActivity = (row: UserActivityRow): Activity => ({
   id: String(row.id),
   title: row.title,
   description: row.description ?? '',
-  room_id: row.room_id ?? undefined,
-  room: row.room_id ?? undefined,
+  room_id: row.room_id !== null && row.room_id !== undefined ? String(row.room_id) : undefined,
+  room: row.rooms?.name ?? (row.room_id !== null && row.room_id !== undefined ? String(row.room_id) : undefined),
   image: resolveCatalogImage(row.image),
   category: row.category ?? undefined,
   type: normalizeActivityType(row.type),
@@ -477,7 +479,7 @@ export const fetchScenarioTemplates = async ({ forceRefresh = false }: FetchCata
 export const fetchUserScenarios = async (): Promise<Scenario[]> => {
   const { data, error } = await supabase
     .from('scenarios')
-    .select('id, name, description, room_id, image, playlist_id, playlist_name, focus_mode_enabled, shortcuts, rooms(name)')
+    .select('id, name, description, room_id, image, playlist_id, playlist_name, focus_mode_enabled, shortcuts, devices, rooms(name)')
     .order('id', { ascending: false });
 
   if (error) throw error;
@@ -512,7 +514,7 @@ export const fetchScenarioTemplateById = async (id: string) => {
     const scenarioId = parseUserScenarioDbId(id);
     const { data, error } = await supabase
       .from('scenarios')
-      .select('id, name, description, room_id, image, playlist_id, playlist_name, focus_mode_enabled, shortcuts, rooms(name)')
+      .select('id, name, description, room_id, image, playlist_id, playlist_name, focus_mode_enabled, shortcuts, devices, rooms(name)')
       .eq('id', scenarioId)
       .maybeSingle();
 
