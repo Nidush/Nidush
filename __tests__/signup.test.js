@@ -29,6 +29,10 @@ jest.mock('expo-router', () => ({
   }),
 }));
 
+jest.mock('expo-linking', () => ({
+  createURL: jest.fn((path) => `nidush://${String(path).replace(/^\//, '')}`),
+}));
+
 jest.mock('../utils/supabase', () => ({
   supabase: {
     auth: {
@@ -87,6 +91,7 @@ describe('SignUp Screen', () => {
         email: 'laura@example.com',
         password: 'StrongPass123!',
         options: {
+          emailRedirectTo: 'nidush://login',
           data: {
             first_name: 'Laura',
             last_name: 'Rossi',
