@@ -1,5 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import React from 'react';
+import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Image,
   ImageSourcePropType,
@@ -29,6 +30,8 @@ interface SessionControlsProps {
   onNextStep: () => void;
   currentTrack?: { title: string; artist: string } | null;
   showPauseButton?: boolean;
+  guideText?: string;
+  guideAudioUrl?: string;
 }
 
 export const SessionControls = ({
@@ -46,7 +49,12 @@ export const SessionControls = ({
   onNextStep,
   currentTrack,
   showPauseButton = true,
+  guideText,
+  guideAudioUrl,
 }: SessionControlsProps) => {
+  const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
+  const playerRef = useRef<any>(null);
+
   const animatedProgressStyle = useAnimatedStyle(() => ({
     width: `${progress.value}%`,
   }));
@@ -56,17 +64,71 @@ export const SessionControls = ({
       ? { uri: image }
       : image || { uri: 'https://picsum.photos/seed/meditate/100/100' };
 
+  // === 1. EFEITO DE SINCRONIZAÇÃO (Pausa/Play) ===
+  useEffect(() => {
+    if (playerRef.current) {
+      if (!isActive || !isVoiceEnabled) {
+        playerRef.current.pause();
+      } else if (isActive && isVoiceEnabled) {
+        playerRef.current.play();
+      }
+    }
+  }, [isActive, isVoiceEnabled]);
+
+  // === 2. CARREGAMENTO DE ÁUDIO ===
+  useEffect(() => {
+    if (!guideAudioUrl) return;
+
+    let timer: ReturnType<typeof setTimeout>;
+
+    // Limpa o player anterior se existir
+    if (playerRef.current) {
+      playerRef.current.pause();
+      playerRef.current.release();
+      playerRef.current = null;
+    }
+
+    const playAudioSequence = async () => {
+      try {
+        await setAudioModeAsync({ playsInSilentMode: true });
+
+        const newPlayer = createAudioPlayer(guideAudioUrl);
+        playerRef.current = newPlayer;
+
+        // Toca apenas se a sessão estiver ativa e a voz ativada
+        if (isVoiceEnabled && isActive) {
+          newPlayer.play();
+        }
+      } catch (error) {
+        console.log('Erro ao carregar áudio do Supabase:', error);
+      }
+    };
+
+    timer = setTimeout(() => {
+      playAudioSequence();
+    }, 500);
+
+    return () => {
+      clearTimeout(timer);
+      if (playerRef.current) {
+        playerRef.current.pause();
+        playerRef.current.release();
+        playerRef.current = null;
+      }
+    };
+  }, [guideAudioUrl]); // Removida a dependência do guideText
+
   return (
     <View className="bg-[#F1F4EE] px-10 pb-8">
       {/* ÁREA DOS BOTÕES E TEMPORIZADOR */}
       <View className="items-center mb-6 h-20 justify-center w-full">
         <View className="flex-row items-center justify-between w-full relative h-full">
-          {/* TEMPORIZADOR (Centrado em absoluto para não desalinhar os botões) */}
+          {/* TEMPORIZADOR */}
           {!isManualStep && (
             <View className="absolute inset-0 items-center justify-center pointer-events-none">
               <Text
                 maxFontSizeMultiplier={1.2}
-                className="text-[#354F52] text-4xl tabular-nums"
+                className="text-[#354F52] text-5xl tabular-nums"
                 style={{ fontFamily: 'Nunito_700Bold' }}
                 accessible={true}
                 accessibilityRole="timer"
@@ -77,48 +139,26 @@ export const SessionControls = ({
             </View>
           )}
 
-          {/* ÁREA ESQUERDA: BOTÃO PREVIOUS */}
+          {/* BOTÃO PREVIOUS */}
           <View className="flex-1 items-start z-10">
             {!isFirstStep && (
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={onPrevStep}
                 className="px-5 py-3 rounded-full flex-row items-center shadow-sm bg-[#548F53]"
-                accessible={true}
-                accessibilityRole="button"
-                accessibilityLabel="Go to previous step"
               >
                 <MaterialIcons name="arrow-back" size={24} color="white" />
-                <Text
-                  maxFontSizeMultiplier={1.2}
-                  className="text-white text-lg ml-1"
-                  style={{ fontFamily: 'Nunito_700Bold' }}
-                >
-                  Back
-                </Text>
               </TouchableOpacity>
             )}
           </View>
 
-          {/* ÁREA DIREITA: BOTÃO NEXT / SKIP */}
+          {/* BOTÃO NEXT / SKIP */}
           <View className="flex-1 items-end z-10">
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={onNextStep}
               className="px-5 py-3 rounded-full flex-row items-center shadow-sm bg-[#548F53]"
-              accessible={true}
-              accessibilityRole="button"
-              accessibilityLabel={
-                isLastStep ? 'Finish session' : 'Go to next step'
-              }
             >
-              <Text
-                maxFontSizeMultiplier={1.2}
-                className="text-white text-lg mr-1"
-                style={{ fontFamily: 'Nunito_700Bold' }}
-              >
-                {isLastStep ? 'Finish' : isManualStep ? 'Next' : 'Skip'}
-              </Text>
               <MaterialIcons
                 name={
                   isLastStep
@@ -129,18 +169,13 @@ export const SessionControls = ({
                 }
                 size={24}
                 color="white"
-                importantForAccessibility="no"
               />
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Barra de Progresso */}
-        <View
-          className="w-full h-1.5 bg-[#DDE5D7] mt-6 rounded-full overflow-hidden"
-          importantForAccessibility="no-hide-descendants"
-          accessibilityElementsHidden={true}
-        >
+        <View className="w-full h-1.5 bg-[#DDE5D7] mt-6 rounded-full overflow-hidden">
           <Animated.View
             style={[animatedProgressStyle]}
             className="h-full bg-[#548F53]"
@@ -149,79 +184,71 @@ export const SessionControls = ({
       </View>
 
       {/* Info Card (Player de Música) */}
-      <View
-        className="flex-row items-center border border-[#7DA87B]/20 p-4 rounded-3xl mb-8"
-        accessible={false}
-      >
-        <Image
-          source={imageSource}
-          className="w-12 h-12 rounded-lg"
-          importantForAccessibility="no"
-        />
-        <View
-          className="flex-1 ml-4"
-          accessible={true}
-          accessibilityRole="text"
-          accessibilityLabel={`Background music: 'Music'}`}
-        >
+      <View className="flex-row items-center border border-[#7DA87B]/20 p-4 rounded-3xl mb-8">
+        <Image source={imageSource} className="w-12 h-12 rounded-lg" />
+        <View className="flex-1 ml-4">
           <Text
-            maxFontSizeMultiplier={1.2}
             className="text-[#354F52]"
             style={{ fontFamily: 'Nunito_700Bold' }}
-            importantForAccessibility="no-hide-descendants"
           >
             {currentTrack?.title || 'Music'}
           </Text>
           <Text
-            maxFontSizeMultiplier={1.2}
             className="text-[#354F52]/60 text-xs"
             style={{ fontFamily: 'Nunito_600SemiBold' }}
-            importantForAccessibility="no-hide-descendants"
           >
             {currentTrack?.artist || 'Artist'}
           </Text>
         </View>
-        <TouchableOpacity
-          onPress={onToggleMusic}
-          accessible={true}
-          accessibilityRole="button"
-          accessibilityLabel={
-            isMusicPlaying ? 'Pause background music' : 'Play background music'
-          }
-        >
+        <TouchableOpacity onPress={onToggleMusic}>
           <MaterialIcons
             name={isMusicPlaying ? 'pause-circle-filled' : 'play-circle-filled'}
             size={44}
             color="#548F53"
-            importantForAccessibility="no"
           />
         </TouchableOpacity>
       </View>
 
-      {/* Botão Grande (Pause/Resume Sessão) */}
-      {showPauseButton && (
-        <TouchableOpacity
-          onPress={onToggleSession}
-          className="bg-[#548F53] py-4 rounded-full items-center w-52 self-center shadow-lg flex-row justify-center"
-          accessible={true}
-          accessibilityRole="button"
-          accessibilityLabel={isActive ? 'Pause session' : 'Resume session'}
-        >
-          <Text
-            maxFontSizeMultiplier={1.2}
-            className="text-white text-2xl mr-3"
-            style={{ fontFamily: 'Nunito_700Bold' }}
+      {/* ÁREA CENTRAL INFERIOR: Botão Play/Pause E Botão de Voz */}
+      <View className="flex-row items-center justify-center w-full gap-8">
+        {/* Botão Principal da Sessão */}
+        {showPauseButton && (
+          <TouchableOpacity
+            onPress={onToggleSession}
+            className="bg-[#548F53] py-4 rounded-full items-center w-52 shadow-lg flex-row justify-center"
           >
-            {isActive ? 'Pause' : 'Play'}
-          </Text>
-          <MaterialIcons
-            name={isActive ? 'pause' : 'play-arrow'}
-            size={28}
-            color="white"
-            importantForAccessibility="no"
-          />
-        </TouchableOpacity>
-      )}
+            <Text
+              className="text-white text-2xl mr-3"
+              style={{ fontFamily: 'Nunito_700Bold' }}
+            >
+              {isActive ? 'Pause' : 'Play'}
+            </Text>
+            <MaterialIcons
+              name={isActive ? 'pause' : 'play-arrow'}
+              size={28}
+              color="white"
+            />
+          </TouchableOpacity>
+        )}
+
+        {/* Botão de Controlo de Voz */}
+        {guideText && (
+          <TouchableOpacity
+            onPress={() => setIsVoiceEnabled((prev) => !prev)}
+            className="bg-[#548F53] p-4 rounded-full shadow-lg justify-center items-center"
+            accessibilityRole="button"
+            accessibilityLabel={
+              isVoiceEnabled ? 'Mute guide voice' : 'Enable guide voice'
+            }
+          >
+            <MaterialIcons
+              name={isVoiceEnabled ? 'record-voice-over' : 'voice-over-off'}
+              size={28}
+              color="white"
+            />
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 };

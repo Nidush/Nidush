@@ -57,26 +57,34 @@ export const Step2_Content = ({
     });
   }, [activityType, dbContent]);
 
-  // 3. Separar as Receitas por Categoria
-  const groupedRecipes = useMemo(() => {
+  // 3. Separar Receitas e Meditações por Categoria
+  const groupedContents = useMemo(() => {
     const groups: Record<string, Content[]> = {};
 
     filteredContent.forEach((content) => {
       const isRecipe =
         content.type === 'recipe' ||
         content.category?.toLowerCase() === 'cooking';
+      const isMeditation = content.type === 'meditation';
 
-      if (isRecipe) {
-        // Se a categoria for "cooking", chamamos apenas "Recipes". Caso contrário, usamos a categoria real.
-        const rawCat =
-          content.category?.toLowerCase() === 'cooking'
-            ? 'Recipes'
-            : content.category;
+      if (isRecipe || isMeditation) {
+        let rawCat = content.category;
 
-        // Capitalizamos a primeira letra ou usamos um Fallback
+        // Limpeza de nomes genéricos
+        if (isRecipe && rawCat?.toLowerCase() === 'cooking') {
+          rawCat = 'Recipes';
+        } else if (isMeditation && rawCat?.toLowerCase() === 'meditation') {
+          rawCat = 'Meditations';
+        }
+
+        const fallbackName = isMeditation
+          ? 'Other Meditations'
+          : 'Other Recipes';
+
+        // Capitalizamos a primeira letra ou usamos o Fallback correspondente
         const categoryName = rawCat
           ? rawCat.charAt(0).toUpperCase() + rawCat.slice(1)
-          : 'Other Recipes';
+          : fallbackName;
 
         if (!groups[categoryName]) {
           groups[categoryName] = [];
@@ -88,15 +96,16 @@ export const Step2_Content = ({
     return groups;
   }, [filteredContent]);
 
-  // 4. Separar Vídeos e Áudios (mantêm-se iguais)
+  // 4. Separar Vídeos e Áudios
   const videos = filteredContent.filter(
     (c) => c.type === 'video' || c.type === 'workout' || c.type === 'exercise',
   );
+
+  // Removido o tipo "meditation" daqui para evitar que apareçam duplicadas no carrossel de Áudios
   const audios = filteredContent.filter(
     (c) =>
-      c.type === 'audio' ||
-      c.category?.toLowerCase() === 'audiobook' ||
-      c.type === 'meditation',
+      (c.type === 'audio' || c.category?.toLowerCase() === 'audiobook') &&
+      c.type !== 'meditation',
   );
 
   const renderCarousel = (title: string, data: typeof filteredContent) => {
@@ -158,8 +167,8 @@ export const Step2_Content = ({
             </View>
           )}
 
-          {/* Renderiza um carrossel dinâmico para cada categoria de receita */}
-          {Object.entries(groupedRecipes).map(([category, items]) =>
+          {/* Renderiza um carrossel dinâmico para cada categoria de receita/meditação */}
+          {Object.entries(groupedContents).map(([category, items]) =>
             renderCarousel(category, items),
           )}
 

@@ -3,9 +3,7 @@ import {
   FontAwesome5,
   MaterialCommunityIcons,
 } from '@expo/vector-icons';
-import { createAudioPlayer, setAudioModeAsync } from 'expo-audio'; // <-- IMPORTAÇÃO ATUALIZADA
-import * as Speech from 'expo-speech';
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Text, View } from 'react-native';
 import Animated, {
   interpolate,
@@ -13,9 +11,9 @@ import Animated, {
   useAnimatedStyle,
 } from 'react-native-reanimated';
 
+// Removida a propriedade audioUrl porque já não é necessária aqui
 interface SessionVisualsProps {
   text: string;
-  audioUrl?: string;
   stepIndex: number;
   pulseScale: SharedValue<number>;
   contentOpacity: SharedValue<number>;
@@ -115,8 +113,6 @@ const getMeditationIcon = (text: string) => {
 
 export const SessionVisuals = ({
   text,
-  audioUrl,
-  stepIndex,
   pulseScale,
   contentOpacity,
 }: SessionVisualsProps) => {
@@ -128,58 +124,6 @@ export const SessionVisuals = ({
   const animatedContentStyle = useAnimatedStyle(() => ({
     opacity: contentOpacity.value,
   }));
-
-  // === LÓGICA ATUALIZADA COM EXPO-AUDIO ===
-  useEffect(() => {
-    // Usamos 'any' ou o tipo correto se estiveres a usar TypeScript estrito (AudioPlayer)
-    let player: any = null;
-    Speech.stop();
-
-    const playAudioSequence = async () => {
-      const speakOptions = {
-        language: 'en-US',
-        pitch: 0.9,
-        rate: 0.75,
-      };
-
-      if (audioUrl) {
-        try {
-          // No novo expo-audio, a propriedade chama-se apenas 'playsInSilentMode'
-          await setAudioModeAsync({
-            playsInSilentMode: true,
-          });
-
-          // Cria e reproduz o ficheiro do Supabase nativamente
-          player = createAudioPlayer(audioUrl);
-          player.play();
-        } catch (error) {
-          console.log(
-            'Erro ao carregar áudio do Supabase, a usar TTS...',
-            error,
-          );
-          Speech.speak(text, speakOptions);
-        }
-      } else {
-        // Fallback direto
-        Speech.speak(text, speakOptions);
-      }
-    };
-
-    const timer = setTimeout(() => {
-      playAudioSequence();
-    }, 500);
-
-    // Limpeza rigorosa
-    return () => {
-      clearTimeout(timer);
-      Speech.stop();
-      if (player) {
-        player.pause();
-        player.release(); // <-- CRUCIAL no expo-audio para libertar memória do telemóvel
-      }
-    };
-  }, [text, audioUrl]);
-  // ==================================
 
   return (
     <View className="flex-1 items-center justify-center px-10">
@@ -197,7 +141,7 @@ export const SessionVisuals = ({
         </View>
         <Text
           maxFontSizeMultiplier={1.2}
-          className="text-[#354F52] text-3xl text-center leading-10"
+          className="text-[#354F52] text-2xl text-center leading-10"
           style={{ fontFamily: 'Nunito_700Bold' }}
         >
           {text}

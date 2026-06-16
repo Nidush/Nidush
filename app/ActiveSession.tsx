@@ -59,6 +59,7 @@ type SessionData = {
   tvDeviceName?: string;
   activityType: string;
   ingredients?: any[];
+  contentImageUrl?: string;
 };
 
 type StoredActivityLike = Partial<Activity> & {
@@ -81,6 +82,7 @@ type ContentRow = {
   instructions?: unknown;
   video_url?: string | null;
   ingredients?: unknown;
+  image?: string | null;
 };
 
 const isStoredActivityLike = (value: unknown): value is StoredActivityLike =>
@@ -377,6 +379,7 @@ export default function ActiveSession() {
         tvDeviceName: connectedTvName,
         activityType: activityType,
         ingredients: parsedIngredients,
+        contentImageUrl: contentData?.image || undefined,
       });
 
       // Tocar música no Spotify só em sessões sem vídeo.
@@ -666,6 +669,12 @@ export default function ActiveSession() {
               step={currentStep}
               stepIndex={currentStepIndex}
               contentOpacity={contentOpacity}
+              imageUrl={
+                sessionData.contentImageUrl ||
+                (typeof sessionData.image === 'string'
+                  ? sessionData.image
+                  : undefined)
+              }
             />
           ) : (
             <MeditationVisuals
@@ -693,6 +702,8 @@ export default function ActiveSession() {
             onToggleMusic={handleToggleMusic}
             currentTrack={currentTrack}
             showPauseButton={!isCooking && !isWorkout}
+            guideText={!isCooking && !isWorkout ? currentStep.text : undefined}
+            guideAudioUrl={currentStep.audio_url}
           />
         </>
       )}
