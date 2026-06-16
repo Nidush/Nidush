@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
@@ -73,6 +74,17 @@ export default function SignUp() {
     ensureLegalConsent();
   }, [router]);
 
+  const getEmailRedirectUrl = () => {
+    const configuredRedirect = process.env.EXPO_PUBLIC_AUTH_REDIRECT_URL?.trim();
+    if (configuredRedirect) return configuredRedirect;
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      return `${window.location.origin}/login`;
+    }
+
+    return Linking.createURL('/login');
+  };
+
   const handleSignUp = async () => {
     if (!email || !password || !firstName || !lastName) {
       setErrorMsg('Por favor preenche todos os campos.');
@@ -94,6 +106,7 @@ export default function SignUp() {
       email,
       password,
       options: {
+        emailRedirectTo: getEmailRedirectUrl(),
         data: {
           first_name: firstName,
           last_name: lastName,

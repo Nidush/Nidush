@@ -186,6 +186,7 @@ export default function Rooms() {
       const loadedActivities = activitiesData || [];
       const mappedDevices: Device[] = (devicesData || [])
         .filter((device: DeviceRecord) => isRealHomeDevice(device))
+        .filter((device: DeviceRecord) => device.source?.toLowerCase() !== 'health_connect')
         .map((device: DeviceRecord) => mapDeviceRecordToAppDevice(device));
 
       setRooms(loadedRooms);
@@ -856,7 +857,7 @@ export default function Rooms() {
       </View>
 
       {/* Categories (Original style: h-10 mb-9) */}
-      <View className="h-10 mb-9 flex justify-center items-center">
+      <View className="h-10 mb-9 justify-center">
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -905,10 +906,21 @@ export default function Rooms() {
         // Render devices section title in ListHeaderComponent
         ListHeaderComponent={
           activeRoom || activeRoomId === null ? (
-            <View className="mb-6">
-              <Text className="text-xl font-bold text-[#354F52] mb-1" style={{ fontFamily: 'Nunito_700Bold' }}>
+            <View className="mb-4 flex-row items-center">
+              <Text
+                maxFontSizeMultiplier={1.2}
+                className="text-2xl text-[#354F52]"
+                style={{ fontFamily: 'Nunito_600SemiBold' }}
+                accessibilityRole="header"
+              >
                 Smart Home Devices ({filteredDevices.length})
               </Text>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color="#548F53"
+                importantForAccessibility="no"
+              />
             </View>
           ) : null
         }

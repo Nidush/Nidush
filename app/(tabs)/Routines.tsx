@@ -52,6 +52,13 @@ interface RoutineImageOption {
   source: ImageSourcePropType;
 }
 
+type AddRoutineErrors = {
+  name?: string;
+  time?: string;
+  days?: string;
+  room?: string;
+};
+
 type RoutineRow = {
   id: number;
   name: string;
@@ -206,6 +213,8 @@ export default function Routines() {
   const [newRoutineRoomId, setNewRoutineRoomId] = useState<number | null>(null);
   const [newRoutineDays, setNewRoutineDays] = useState<string[]>(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
   const [newRoutineImageKey, setNewRoutineImageKey] = useState<string>(ROUTINE_IMAGE_OPTIONS[0].key);
+  const [addRoutineErrors, setAddRoutineErrors] = useState<AddRoutineErrors>({});
+  const [hasSelectedRoutineImage, setHasSelectedRoutineImage] = useState(false);
   const [isSavingRoutine, setIsSavingRoutine] = useState(false);
   const [selectedRoutine, setSelectedRoutine] = useState<Routine | null>(null);
   const [isDeletingRoutine, setIsDeletingRoutine] = useState(false);
@@ -460,6 +469,7 @@ export default function Routines() {
         ? current.filter((value) => value !== day)
         : [...current, day],
     );
+    setAddRoutineErrors((current) => ({ ...current, days: undefined }));
   };
 
   const openAddRoutineModal = () => {
@@ -473,28 +483,41 @@ export default function Routines() {
     setNewRoutineDays(['Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
     setNewRoutineImageKey(ROUTINE_IMAGE_OPTIONS[0].key);
     setNewRoutineRoomId(rooms[0]?.id ?? null);
+    setAddRoutineErrors({});
+    setHasSelectedRoutineImage(false);
     setIsAddRoutineModalVisible(true);
+    routinePanelTranslateX.setValue(900);
+    Animated.timing(routinePanelTranslateX, {
+      toValue: 0,
+      duration: 260,
+      useNativeDriver: true,
+    }).start();
   };
 
   const closeAddRoutineModal = () => {
-    setIsAddRoutineModalVisible(false);
-    setIsSavingRoutine(false);
+    Animated.timing(routinePanelTranslateX, {
+      toValue: 900,
+      duration: 220,
+      useNativeDriver: true,
+    }).start(() => {
+      setIsAddRoutineModalVisible(false);
+      setIsSavingRoutine(false);
+    });
   };
 
   const handleCreateRoutine = async () => {
+    const nextErrors: AddRoutineErrors = {};
+
     if (!newRoutineName.trim()) {
-      showFeedback('Give your routine a name first.', 'error');
-      return;
+      nextErrors.name = 'Routine name is required.';
     }
 
     if (!newRoutineRoomId) {
-      showFeedback('Choose the room for this routine.', 'error');
-      return;
+      nextErrors.room = 'Room selection is required.';
     }
 
     if (newRoutineDays.length === 0) {
-      showFeedback('Choose at least one day for this routine.', 'error');
-      return;
+      nextErrors.days = 'Choose at least one day.';
     }
 
     if (!userHomeId) {
@@ -504,10 +527,15 @@ export default function Routines() {
 
     const executionTime = toDatabaseTime(newRoutineTime);
     if (!executionTime) {
-      showFeedback('Use the HH:MM format, for example 07:30.', 'error');
+      nextErrors.time = 'Use the HH:MM format, for example 07:30.';
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setAddRoutineErrors(nextErrors);
       return;
     }
 
+    setAddRoutineErrors({});
     setIsSavingRoutine(true);
 
     try {
@@ -957,191 +985,254 @@ export default function Routines() {
       <Modal
         visible={isAddRoutineModalVisible}
         transparent={true}
-        animationType="slide"
+        animationType="none"
         onRequestClose={closeAddRoutineModal}
       >
-        <KeyboardAvoidingView
-          className="flex-1 bg-black/40 px-5 pt-14 pb-6"
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
-        >
-          <View className="bg-white rounded-[34px] px-6 pt-5 pb-6 max-h-[82%] shadow-xl">
-            <View className="items-center mb-4">
-              <View className="w-12 h-1.5 rounded-full bg-[#D7DED6]" />
-            </View>
-
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 16 }}
+        <View className="flex-1 bg-black/35">
+          <Animated.View
+            className="absolute inset-0 bg-[#F6F8F2] shadow-2xl"
+            style={{ transform: [{ translateX: routinePanelTranslateX }] }}
+          >
+            <KeyboardAvoidingView
+              className="flex-1"
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
             >
-              <View className="flex-row items-center justify-between mb-2">
+              <ScrollView
+                className="flex-1"
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ padding: 20, paddingTop: 52, paddingBottom: 0 }}
+              >
+                <View className="flex-row items-center justify-between mb-2">
+                  <Text
+                    className="text-[26px] text-[#354F52]"
+                    style={{ fontFamily: 'Nunito_700Bold' }}
+                  >
+                    Add Routine
+                  </Text>
+                  <TouchableOpacity onPress={closeAddRoutineModal} hitSlop={12}>
+                    <MaterialIcons name="close" size={24} color="#7A8C85" />
+                  </TouchableOpacity>
+                </View>
+
                 <Text
-                  className="text-[26px] text-[#354F52]"
-                  style={{ fontFamily: 'Nunito_700Bold' }}
+                  className="text-[#6B7C76] text-sm mb-4"
+                  style={{ fontFamily: 'Nunito_600SemiBold' }}
                 >
-                  Add Routine
+                  Save a routine for your home so everyone in the house can see and use it.
                 </Text>
-                <TouchableOpacity onPress={closeAddRoutineModal} hitSlop={12}>
-                  <MaterialIcons name="close" size={24} color="#7A8C85" />
-                </TouchableOpacity>
-              </View>
 
-              <Text
-                className="text-[#6B7C76] text-sm mb-5"
-                style={{ fontFamily: 'Nunito_600SemiBold' }}
-              >
-                Save a routine for your home so everyone in the house can see and use it.
-              </Text>
-
-              <Text className="text-[#354F52] text-sm mb-2" style={{ fontFamily: 'Nunito_600SemiBold' }}>
-                Routine Name
-              </Text>
-              <TextInput
-                placeholder="e.g. Morning Kitchen Prep"
-                placeholderTextColor="#6B7C76"
-                value={newRoutineName}
-                onChangeText={setNewRoutineName}
-                className="bg-[#F1F3EA] border border-[#BDC7C2] rounded-2xl px-4 py-4 text-base text-[#2C3A35] mb-5"
-                style={{ fontFamily: 'Nunito_700Bold', color: '#1F2A24' }}
-                selectionColor="#548F53"
-              />
-
-              <Text className="text-[#354F52] text-sm mb-3" style={{ fontFamily: 'Nunito_600SemiBold' }}>
-                Cover Image
-              </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                contentContainerStyle={{ paddingBottom: 8 }}
-              >
-                {ROUTINE_IMAGE_OPTIONS.map((option) => {
-                  const isSelected = newRoutineImageKey === option.key;
-
-                  return (
-                    <TouchableOpacity
-                      key={option.key}
-                      onPress={() => setNewRoutineImageKey(option.key)}
-                      className="mr-3 w-[116px]"
-                    >
-                      <View
-                        className={`rounded-[24px] overflow-hidden border-2 ${
-                          isSelected ? 'border-[#548F53]' : 'border-[#D8DFD5]'
-                        }`}
-                      >
-                        <Image source={option.source} className="w-full h-[82px]" resizeMode="cover" />
-                      </View>
-                      <Text
-                        className={`mt-2 text-center text-xs ${isSelected ? 'text-[#354F52]' : 'text-[#6B7C76]'}`}
-                        style={{ fontFamily: isSelected ? 'Nunito_700Bold' : 'Nunito_600SemiBold' }}
-                      >
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-
-              <Text className="text-[#354F52] text-sm mb-2" style={{ fontFamily: 'Nunito_600SemiBold' }}>
-                Time
-              </Text>
-              <TextInput
-                placeholder="07:30"
-                placeholderTextColor="#6B7C76"
-                value={newRoutineTime}
-                onChangeText={(value) => setNewRoutineTime(normalizeTimeInput(value))}
-                keyboardType="number-pad"
-                maxLength={5}
-                className="bg-[#F1F3EA] border border-[#BDC7C2] rounded-2xl px-4 py-4 text-base text-[#2C3A35] mb-5"
-                style={{ fontFamily: 'Nunito_700Bold', color: '#1F2A24' }}
-                selectionColor="#548F53"
-              />
-
-              <Text className="text-[#354F52] text-sm mb-3" style={{ fontFamily: 'Nunito_600SemiBold' }}>
-                Days
-              </Text>
-              <View className="flex-row flex-wrap mb-5">
-                {DAY_OPTIONS.map((day) => {
-                  const isSelected = newRoutineDays.includes(day);
-
-                  return (
-                    <TouchableOpacity
-                      key={day}
-                      onPress={() => toggleRoutineDay(day)}
-                      className={`mr-3 mb-3 px-4 py-3 rounded-2xl border ${
-                        isSelected ? 'bg-[#BBE6BA] border-transparent' : 'bg-transparent border-[#BDC7C2]'
-                      }`}
-                    >
-                      <Text
-                        className="text-[#354F52] font-bold"
-                        style={{ fontFamily: 'Nunito_700Bold' }}
-                      >
-                        {day}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <Text className="text-[#354F52] text-sm mb-3" style={{ fontFamily: 'Nunito_600SemiBold' }}>
-                Room
-              </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                contentContainerStyle={{ paddingBottom: 8 }}
-              >
-                {rooms.map((room) => {
-                  const isSelected = newRoutineRoomId === room.id;
-
-                  return (
-                    <TouchableOpacity
-                      key={room.id}
-                      onPress={() => setNewRoutineRoomId(room.id)}
-                      className={`mr-3 px-4 py-3 rounded-2xl border ${
-                        isSelected ? 'bg-[#BBE6BA] border-transparent' : 'bg-transparent border-[#BDC7C2]'
-                      }`}
-                    >
-                      <Text
-                        className="text-[#354F52] font-bold"
-                        style={{ fontFamily: 'Nunito_700Bold' }}
-                      >
-                        {room.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </ScrollView>
-
-            <View className="flex-row justify-between mt-4">
-              <TouchableOpacity
-                onPress={closeAddRoutineModal}
-                className="w-[48%] py-4 bg-[#F1F3EA] rounded-full items-center"
-              >
-                <Text className="text-[#354F52] text-base font-bold" style={{ fontFamily: 'Nunito_700Bold' }}>
-                  Cancel
+                <Text className="text-[#354F52] text-sm mb-1.5" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                  Routine Name
                 </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={handleCreateRoutine}
-                disabled={isSavingRoutine}
-                className="w-[48%] py-4 bg-[#548F53] rounded-full items-center flex-row justify-center"
-              >
-                {isSavingRoutine ? (
-                  <ActivityIndicator size="small" color="white" />
+                <TextInput
+                  placeholder="e.g. Morning Kitchen Prep"
+                  placeholderTextColor="#6B7C76"
+                  value={newRoutineName}
+                  onChangeText={(value) => {
+                    setNewRoutineName(value);
+                    setAddRoutineErrors((current) => ({ ...current, name: undefined }));
+                  }}
+                  className={`bg-white border rounded-2xl px-4 py-3 text-base text-[#2C3A35] ${
+                    addRoutineErrors.name ? 'border-[#D7655C]' : 'border-[#BDC7C2]'
+                  }`}
+                  style={{ fontFamily: 'Nunito_700Bold', color: '#1F2A24' }}
+                  selectionColor="#548F53"
+                />
+                {addRoutineErrors.name ? (
+                  <Text className="text-[#D7655C] text-xs mt-1.5 mb-4" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                    {addRoutineErrors.name}
+                  </Text>
                 ) : (
-                  <Text className="text-white text-base font-bold" style={{ fontFamily: 'Nunito_700Bold' }}>
-                    Save Routine
+                  <Text className="text-[#6B7C76] text-xs mt-1.5 mb-4" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                    Required field.
                   </Text>
                 )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
+
+                <Text className="text-[#354F52] text-sm mb-2" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                  Cover Image
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={{ paddingBottom: 6 }}
+                >
+                  {ROUTINE_IMAGE_OPTIONS.map((option) => {
+                    const isSelected = newRoutineImageKey === option.key;
+
+                    return (
+                      <TouchableOpacity
+                        key={option.key}
+                        onPress={() => {
+                          setNewRoutineImageKey(option.key);
+                          setHasSelectedRoutineImage(true);
+                        }}
+                        className="mr-2.5 w-[88px]"
+                      >
+                        <View
+                          className={`rounded-[18px] overflow-hidden border-2 ${
+                            isSelected ? 'border-[#548F53]' : 'border-[#D8DFD5]'
+                          }`}
+                        >
+                          <View className="relative">
+                            <Image source={option.source} className="w-full h-[64px]" resizeMode="cover" />
+                            {!isSelected && hasSelectedRoutineImage ? (
+                              <View className="absolute inset-0 bg-[#1F2A24]/35" />
+                            ) : null}
+                          </View>
+                        </View>
+                        <Text
+                          className={`mt-2 text-center text-xs ${isSelected ? 'text-[#354F52]' : 'text-[#6B7C76]'}`}
+                          style={{ fontFamily: isSelected ? 'Nunito_700Bold' : 'Nunito_600SemiBold' }}
+                        >
+                          {option.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+
+                <Text className="text-[#354F52] text-sm mb-1.5 mt-3" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                  Time
+                </Text>
+                <TextInput
+                  placeholder="07:30"
+                  placeholderTextColor="#6B7C76"
+                  value={newRoutineTime}
+                  onChangeText={(value) => {
+                    setNewRoutineTime(normalizeTimeInput(value));
+                    setAddRoutineErrors((current) => ({ ...current, time: undefined }));
+                  }}
+                  keyboardType="number-pad"
+                  maxLength={5}
+                  className={`bg-white border rounded-2xl px-4 py-3 text-base text-[#2C3A35] ${
+                    addRoutineErrors.time ? 'border-[#D7655C]' : 'border-[#BDC7C2]'
+                  }`}
+                  style={{ fontFamily: 'Nunito_700Bold', color: '#1F2A24' }}
+                  selectionColor="#548F53"
+                />
+                {addRoutineErrors.time ? (
+                  <Text className="text-[#D7655C] text-xs mt-1.5 mb-4" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                    {addRoutineErrors.time}
+                  </Text>
+                ) : (
+                  <Text className="text-[#6B7C76] text-xs mt-1.5 mb-4" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                    Required field. Format: HH:MM.
+                  </Text>
+                )}
+
+                <Text className="text-[#354F52] text-sm mb-2" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                  Days
+                </Text>
+                <View className="flex-row flex-wrap">
+                  {DAY_OPTIONS.map((day) => {
+                    const isSelected = newRoutineDays.includes(day);
+
+                    return (
+                      <TouchableOpacity
+                        key={day}
+                        onPress={() => toggleRoutineDay(day)}
+                        className={`mr-2 mb-2 px-3 py-2.5 rounded-2xl border ${
+                          isSelected ? 'bg-[#BBE6BA] border-transparent' : 'bg-transparent border-[#BDC7C2]'
+                        }`}
+                      >
+                        <Text
+                          className="text-[#354F52] font-bold"
+                          style={{ fontFamily: 'Nunito_700Bold' }}
+                        >
+                          {day}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                {addRoutineErrors.days ? (
+                  <Text className="text-[#D7655C] text-xs mt-1.5 mb-4" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                    {addRoutineErrors.days}
+                  </Text>
+                ) : (
+                  <Text className="text-[#6B7C76] text-xs mt-1.5 mb-4" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                    Required field. Select at least one day.
+                  </Text>
+                )}
+
+                <Text className="text-[#354F52] text-sm mb-2" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                  Room
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={{ paddingBottom: 6 }}
+                >
+                  {rooms.map((room) => {
+                    const isSelected = newRoutineRoomId === room.id;
+
+                    return (
+                      <TouchableOpacity
+                      key={room.id}
+                      onPress={() => {
+                        setNewRoutineRoomId(room.id);
+                        setAddRoutineErrors((current) => ({ ...current, room: undefined }));
+                      }}
+                      className={`mr-2.5 px-3 py-2.5 rounded-2xl border ${
+                        isSelected
+                          ? 'bg-[#BBE6BA] border-transparent'
+                          : addRoutineErrors.room
+                            ? 'bg-transparent border-[#D7655C]'
+                            : 'bg-transparent border-[#BDC7C2]'
+                      }`}
+                    >
+                        <Text
+                          className="text-[#354F52] font-bold"
+                          style={{ fontFamily: 'Nunito_700Bold' }}
+                        >
+                          {room.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+                {addRoutineErrors.room ? (
+                  <Text className="text-[#D7655C] text-xs mt-1.5 mb-2" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                    {addRoutineErrors.room}
+                  </Text>
+                ) : (
+                  <Text className="text-[#6B7C76] text-xs mt-1.5 mb-2" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                    Required field.
+                  </Text>
+                )}
+
+                <View className="flex-row justify-between mt-0">
+                  <TouchableOpacity
+                    onPress={closeAddRoutineModal}
+                    className="w-[48%] py-3.5 bg-[#E9EEE5] rounded-full items-center"
+                  >
+                    <Text className="text-[#354F52] text-base font-bold" style={{ fontFamily: 'Nunito_700Bold' }}>
+                      Cancel
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={handleCreateRoutine}
+                    disabled={isSavingRoutine}
+                    className="w-[48%] py-3.5 bg-[#548F53] rounded-full items-center flex-row justify-center"
+                  >
+                    {isSavingRoutine ? (
+                      <ActivityIndicator size="small" color="white" />
+                    ) : (
+                      <Text className="text-white text-base font-bold" style={{ fontFamily: 'Nunito_700Bold' }}>
+                        Save Routine
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
+            </KeyboardAvoidingView>
+          </Animated.View>
+        </View>
       </Modal>
 
       <Modal

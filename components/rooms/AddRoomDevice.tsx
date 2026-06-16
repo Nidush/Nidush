@@ -24,6 +24,11 @@ export default function AddRoomDevice({
 
   // Função o clique no tbn
   const handlePress = () => {
+    if (actions.length === 1) {
+      actions[0]?.onPress?.();
+      return;
+    }
+
     if (!isStatic) {
       setIsMenuOpen(!isMenuOpen);
     }
@@ -78,6 +83,8 @@ export default function AddRoomDevice({
         accessibilityLabel={
           isStatic
             ? 'Add menu (unavailable)'
+            : actions.length === 1
+              ? `Add ${actions[0]?.label ?? 'item'}`
             : isMenuOpen
               ? 'Close add menu'
               : 'Open add menu'
@@ -85,6 +92,8 @@ export default function AddRoomDevice({
         accessibilityHint={
           isStatic
             ? 'This action is not available on this screen.'
+            : actions.length === 1
+              ? `Creates a new ${(actions[0]?.label ?? 'item').toLowerCase()}.`
             : 'Shows options to add a device or a room.'
         }
         accessibilityState={{ disabled: isStatic, expanded: !isStatic && isMenuOpen }}
