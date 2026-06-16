@@ -117,8 +117,8 @@ export const BiometricsProvider = ({
   const notifyStateChange = (newState: UserState) => {
     if (newState !== lastStateRef.current) {
       addNotification(
-        'Mood Update',
-        `You're now feeling ${newState.toLowerCase()}`,
+        'Activity recommendation',
+        `You're feeling ${newState.toLowerCase()}. Check Nidush for an activity that fits this moment.`,
         'state_change'
       );
       lastStateRef.current = newState;

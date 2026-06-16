@@ -1,6 +1,17 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSessionUser, supabase } from '../utils/supabase';
+import { Platform } from 'react-native';
+import {
+  clearStoredPushToken,
+  getCurrentPushPermissionStatus,
+  getExpoPushToken,
+  getStoredPushToken,
+  preparePushNotifications,
+  presentLocalNotification,
+  requestPushPermissions,
+  storePushToken,
+} from '../utils/pushNotifications';
 
 export interface AppNotification {
   id: string;
@@ -77,10 +88,11 @@ const isRangeExhaustedError = (error: ErrorWithStatus) => {
 export const NotificationsProvider = ({ children }: { children: React.ReactNode }) => {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
-  const [notificationsEnabled, setNotificationsEnabledState] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabledState] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const pushTokenRef = useRef<string | null>(null);
   const isLoadingRef = useRef(false);
   const hasMoreRef = useRef(false);
   const pageRef = useRef(0);
@@ -97,6 +109,10 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
   };
 
   useEffect(() => {
+    void preparePushNotifications().catch((error) => {
+      console.error('Error preparing push notifications:', error);
+    });
+
     const loadNotificationSetting = async () => {
       try {
         const stored = await AsyncStorage.getItem(NOTIFICATIONS_ENABLED_KEY);
@@ -111,14 +127,86 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
     loadNotificationSetting();
   }, []);
 
-  const setNotificationsEnabled = useCallback(async (enabled: boolean) => {
-    setNotificationsEnabledState(enabled);
+  const syncPushTokenForUser = useCallback(async (uid: string, token: string) => {
+    const { error } = await supabase
+      .from('user_push_tokens')
+      .upsert({
+        user_id: uid,
+        expo_push_token: token,
+        platform: Platform.OS,
+        last_seen_at: new Date().toISOString(),
+      }, { onConflict: 'expo_push_token' });
+
+    if (error) {
+      console.error('Error saving push token:', error);
+      return false;
+    }
+
+    pushTokenRef.current = token;
+    await storePushToken(token);
+    return true;
+  }, []);
+
+  const removePushTokenForUser = useCallback(async (uid: string) => {
+    const token = pushTokenRef.current ?? await getStoredPushToken();
+    if (!token) return;
+
+    const { error } = await supabase
+      .from('user_push_tokens')
+      .delete()
+      .eq('user_id', uid)
+      .eq('expo_push_token', token);
+
+    if (error) {
+      console.error('Error deleting push token:', error);
+      return;
+    }
+
+    pushTokenRef.current = null;
+    await clearStoredPushToken();
+  }, []);
+
+  const ensurePushRegistration = useCallback(async (uid: string, promptForPermission: boolean) => {
+    if (Platform.OS === 'web') return false;
+
     try {
+      const permission = promptForPermission
+        ? await requestPushPermissions()
+        : await getCurrentPushPermissionStatus().then((status) => ({ status }));
+
+      if (permission.status !== 'granted') {
+        return false;
+      }
+
+      const token = await getExpoPushToken();
+      if (!token) return false;
+
+      return syncPushTokenForUser(uid, token);
+    } catch (error) {
+      console.error('Error registering push notifications:', error);
+      return false;
+    }
+  }, [syncPushTokenForUser]);
+
+  const setNotificationsEnabled = useCallback(async (enabled: boolean) => {
+    try {
+      if (enabled && userId) {
+        const didRegister = await ensurePushRegistration(userId, true);
+        setNotificationsEnabledState(didRegister);
+        await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, String(didRegister));
+        return;
+      }
+
+      if (!enabled && userId) {
+        await removePushTokenForUser(userId);
+      }
+
+      setNotificationsEnabledState(enabled);
       await AsyncStorage.setItem(NOTIFICATIONS_ENABLED_KEY, String(enabled));
     } catch (error) {
       console.error('Error saving notifications preference:', error);
     }
-  }, []);
+  }, [ensurePushRegistration, removePushTokenForUser, userId]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -280,6 +368,8 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
     if (!notificationsEnabled) return;
     if (!userId) return;
 
+    void presentLocalNotification(title, message, { type, source: 'local-app' });
+
     // We can optimistically add it locally based on a temporary ID, or just insert and reload.
     // Optimistic UI update:
     const tempId = Date.now().toString();
@@ -329,6 +419,17 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
             : n,
         )
       );
+
+      void supabase.functions.invoke('send-push-notification', {
+        body: {
+          title,
+          message,
+          data: {
+            type,
+            notificationId: (data as NotificationInsertResult).id,
+          },
+        },
+      });
     }
   }, [ensurePublicUser, notificationsEnabled, userId]);
 

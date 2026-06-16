@@ -21,12 +21,14 @@
     },
     "android": {
       "package": "com.nidush.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/Icon-Padded.png"
       },
       "edgeToEdgeEnabled": true,
         "permissions": [
+          "android.permission.POST_NOTIFICATIONS",
           "android.permission.RECORD_AUDIO",
           "android.permission.MODIFY_AUDIO_SETTINGS",
           "android.permission.health.READ_HEART_RATE",
@@ -44,6 +46,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-notifications",
       [
         "expo-splash-screen",
         {

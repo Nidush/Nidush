@@ -10,6 +10,7 @@ import {
   normalizeIdeas,
   parseJsonObject,
 } from '../generate-activity-ideas/lib.ts'
+import { sendPushNotificationsForUser } from '../_shared/pushNotifications.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -718,12 +719,26 @@ Deno.serve(async (req) => {
 
       const { error: notificationError } = await supabase.from('notifications').insert({
         user_id: candidate.userId,
-        title: 'New activity ready',
-        message: `"${saved.title}" was created for your ${bucket} routine.`,
+        title: 'Activity recommended',
+        message: `"${saved.title}" matches your ${bucket} routine right now.`,
         type: 'creation',
         read: false,
       })
       if (notificationError) throw notificationError
+
+      try {
+        await sendPushNotificationsForUser({
+          userId: candidate.userId,
+          title: 'Activity recommended',
+          body: `"${saved.title}" matches your ${bucket} routine right now.`,
+          data: {
+            type: 'creation',
+            source: 'auto-generate-activity-suggestions',
+          },
+        })
+      } catch (pushError) {
+        console.error('Push notification send failed:', pushError)
+      }
 
       const { error: historyError } = await supabase.from('ai_auto_generated_activities').insert({
         user_id: candidate.userId,

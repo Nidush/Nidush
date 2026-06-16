@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "255769957445",
+    "project_id": "nidushwebsite",
+    "storage_bucket": "nidushwebsite.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:255769957445:android:371d6ec464a73683ffbf2c",
+        "android_client_info": {
+          "package_name": "com.nidush.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDCCOqKk6lhe3XyE224RzsQDnG-0V_RNg0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
