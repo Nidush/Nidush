@@ -6,6 +6,7 @@ import { AppState, Image, Modal, ScrollView, Switch, Text, TextInput, TouchableO
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { pickImage } from '../utils/imagePicker';
 import { supabase, uploadImage } from '../utils/supabase';
+import { getAvatarSource } from '../utils/avatarSource';
 import {
   DeviceRecord,
   isRealHomeDevice,
@@ -947,7 +948,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
               <View className="w-32 h-32 rounded-full bg-[#E8EDDF]" />
             ) : (
               <Image
-                source={avatarUrl ? { uri: avatarUrl } : require('@/assets/avatars/profile.png')}
+                source={getAvatarSource(avatarUrl)}
                 className="w-32 h-32 rounded-full"
                 accessible
                 accessibilityRole="image"

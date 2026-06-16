@@ -29,10 +29,6 @@ jest.mock('expo-router', () => ({
   }),
 }));
 
-jest.mock('expo-linking', () => ({
-  createURL: jest.fn((path) => `nidush://${String(path).replace(/^\//, '')}`),
-}));
-
 jest.mock('../utils/supabase', () => ({
   supabase: {
     auth: {

@@ -78,11 +78,7 @@ export default function SignUp() {
     const configuredRedirect = process.env.EXPO_PUBLIC_AUTH_REDIRECT_URL?.trim();
     if (configuredRedirect) return configuredRedirect;
 
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      return `${window.location.origin}/login`;
-    }
-
-    return Linking.createURL('/login');
+    return 'nidush://login';
   };
 
   const handleSignUp = async () => {
