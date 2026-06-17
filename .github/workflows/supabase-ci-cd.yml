@@ -94,6 +94,11 @@ jobs:
       - name: Verify native Android project is present
         run: test -f android/gradlew
 
+      - name: Prepare Firebase config for Android build
+        run: |
+          test -f google-services.json
+          cp google-services.json android/app/google-services.json
+
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 
