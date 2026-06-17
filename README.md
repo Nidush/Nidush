@@ -338,7 +338,15 @@ The function fetches:
 
 - Recipes from **TheMealDB**
 - 10 exercises from **WorkoutX**
+- 8 **English audiobooks** from **LibriVox**
 - Workout GIFs are uploaded once per exercise to the public Supabase Storage bucket `api-content-media`
+
+LibriVox notes:
+
+- The API does not support a direct `language` query parameter on the `audiobooks` endpoint, so the function fetches extended audiobook records and filters them locally to `English`
+- Audiobook metadata comes from `https://librivox.org/api/feed/audiobooks`
+- Audiotracks are fetched separately from `https://librivox.org/api/feed/audiotracks`
+- We store title, cleaned description, year, language, total duration, track list, cover art, and author
 
 It avoids duplicates by:
 
@@ -346,6 +354,12 @@ It avoids duplicates by:
 - Checking existing records by `title + author`
 - Reusing previously uploaded Supabase Storage GIF URLs when the exercise already exists
 - Using Supabase `upsert` on `contents.id`
+
+Optional content-volume overrides:
+
+- `API_CONTENT_SYNC_MEALS`
+- `API_CONTENT_SYNC_EXERCISES`
+- `API_CONTENT_SYNC_AUDIOBOOKS`
 
 Manual test:
 

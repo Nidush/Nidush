@@ -40,6 +40,7 @@ import {
   parseUserScenarioDbId,
 } from '@/utils/catalogTemplates';
 import { getScenarioDeviceMeta, mapLinkedDeviceToScenarioState } from '@/utils/activityDeviceConfigs';
+import { applyScenarioDeviceStates } from '@/utils/deviceExecution';
 
 type FormattedInstruction = {
   text: string;
@@ -166,6 +167,11 @@ const getPlaylistId = (item: StoredActivityLike | Activity | Scenario) =>
 const getItemDevices = (item: StoredActivityLike | Activity | Scenario) =>
   ('devices' in item && Array.isArray(item.devices) ? item.devices : []) as ScenarioDeviceState[];
 
+const resolveConfiguredDevices = (
+  activityDevices: ScenarioDeviceState[],
+  scenarioDevices: ScenarioDeviceState[],
+) => (scenarioDevices.length > 0 ? scenarioDevices : activityDevices);
+
 const getNumericRoomId = (item: StoredActivityLike | Activity | Scenario) => {
   if (typeof item.room_id === 'number') return item.room_id;
 
@@ -201,6 +207,7 @@ export default function ActiveSession() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [showExitModal, setShowExitModal] = useState(false);
   const startedPlaybackForSessionRef = useRef<string | null>(null);
+  const cleanedUpSessionRef = useRef(false);
 
   const progress = useSharedValue(0);
   const contentOpacity = useSharedValue(1);
@@ -380,6 +387,11 @@ export default function ActiveSession() {
         });
       }
 
+      const configuredDevices = resolveConfiguredDevices(
+        getItemDevices(foundItem),
+        Array.isArray(relatedScenario?.devices) ? relatedScenario.devices : [],
+      );
+
       setSessionData({
         title: foundItem.title || 'Session',
         room: getActivityRoom(foundItem),
@@ -388,7 +400,7 @@ export default function ActiveSession() {
         instructions: formattedInstructions,
         type: contentType,
         videoUrl: videoUrl,
-        devices: relatedScenario?.devices || getItemDevices(foundItem),
+        devices: configuredDevices,
         tvDeviceName: connectedTvName,
       });
 
@@ -430,8 +442,10 @@ export default function ActiveSession() {
           if (!pId) pId = '37i9dQZF1DX76W9kuv1Z0g';
         }
         
-        const sessionDevices =
-          relatedScenario?.devices?.length ? relatedScenario.devices : getItemDevices(foundItem);
+        const sessionDevices = resolveConfiguredDevices(
+          getItemDevices(foundItem),
+          Array.isArray(relatedScenario?.devices) ? relatedScenario.devices : [],
+        );
         const hasScenarioTv = sessionDevices.some((config: ScenarioDeviceState) => {
           const device = SMART_HOME_DEVICES[config.deviceId];
           const fallbackMeta = getScenarioDeviceMeta(config);
@@ -493,6 +507,7 @@ export default function ActiveSession() {
 
   useEffect(() => {
     startedPlaybackForSessionRef.current = null;
+    cleanedUpSessionRef.current = false;
     loadData();
   }, [id, loadData]);
 
@@ -512,6 +527,44 @@ export default function ActiveSession() {
     }
   }, [isActive, isVideoSession, pulseScale]);
 
+  const handleToggleSession = () => {
+    const newState = !isActive;
+    setIsActive(newState);
+    setIsMusicPlaying(newState);
+  };
+
+  const handleToggleMusic = () => {
+    if (isMusicPlaying) {
+      pausePlayback();
+    } else {
+      resumePlayback();
+    }
+    setIsMusicPlaying((prev) => !prev);
+  };
+
+  const cleanupSessionDevices = useCallback(async () => {
+    if (cleanedUpSessionRef.current) return;
+    if (!sessionData?.devices?.length) {
+      cleanedUpSessionRef.current = true;
+      return;
+    }
+
+    try {
+      await applyScenarioDeviceStates(sessionData.devices, { forcePowerOn: false });
+    } catch (error) {
+      console.error('Failed to turn off session devices on exit:', error);
+    } finally {
+      cleanedUpSessionRef.current = true;
+    }
+  }, [sessionData]);
+
+  const exitSession = useCallback(async () => {
+    setIsActive(false);
+    setIsMusicPlaying(false);
+    await cleanupSessionDevices();
+    router.replace('/Activities');
+  }, [cleanupSessionDevices]);
+
   const handleNextStep = useCallback(() => {
     if (!sessionData) return;
     const totalSteps = sessionData.instructions.length;
@@ -528,9 +581,9 @@ export default function ActiveSession() {
         setSecondsLeft(nextDuration || 0);
       }, 300);
     } else {
-      router.replace('/Activities');
+      void exitSession();
     }
-  }, [currentStepIndex, sessionData, contentOpacity]);
+  }, [currentStepIndex, sessionData, contentOpacity, exitSession]);
 
   useEffect(() => {
     if (sessionData && currentStepIndex > 0 && !isVideoSession) {
@@ -574,21 +627,6 @@ export default function ActiveSession() {
     }
   }, [currentStepIndex, sessionData, isVideoSession, progress]);
 
-  const handleToggleSession = () => {
-    const newState = !isActive;
-    setIsActive(newState);
-    setIsMusicPlaying(newState);
-  };
-
-  const handleToggleMusic = () => {
-    if (isMusicPlaying) {
-      pausePlayback();
-    } else {
-      resumePlayback();
-    }
-    setIsMusicPlaying((prev) => !prev);
-  };
-
   const handleCancel = () => {
     setIsActive(false);
     setIsMusicPlaying(false);
@@ -630,12 +668,16 @@ export default function ActiveSession() {
       <ExitModal
         visible={showExitModal}
         onResume={handleResume}
-        onEnd={() => router.replace('/Activities')}
+        onEnd={() => {
+          void exitSession();
+        }}
       />
 
       <SessionHeader
         title={sessionData.title}
-        onBack={() => router.back()}
+        onBack={() => {
+          void exitSession();
+        }}
         onCancel={handleCancel}
       />
 

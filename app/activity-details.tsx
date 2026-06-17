@@ -37,6 +37,7 @@ import {
   parseUserScenarioDbId,
 } from '@/utils/catalogTemplates';
 import { getScenarioDeviceMeta, mapLinkedDeviceToScenarioState } from '@/utils/activityDeviceConfigs';
+import { applyScenarioDeviceStates } from '@/utils/deviceExecution';
 
 type AlertConfigState = {
   visible: boolean;
@@ -143,6 +144,11 @@ const getItemTypeKey = (item: Activity | Scenario) =>
 
 const getItemDevices = (item: Activity | Scenario) =>
   ('devices' in item && Array.isArray(item.devices) ? item.devices : []) as ScenarioDeviceState[];
+
+const resolveConfiguredDevices = (
+  activityDevices: ScenarioDeviceState[],
+  scenarioDevices: ScenarioDeviceState[],
+) => (scenarioDevices.length > 0 ? scenarioDevices : activityDevices);
 
 const normalizeLinkedDevice = (value: unknown) => {
   if (Array.isArray(value)) return value[0] ?? null;
@@ -386,12 +392,42 @@ export default function ActivityDetails() {
   const closeAlert = () =>
     setAlertConfig((prev) => ({ ...prev, visible: false }));
 
-  const handleStartPress = () => {
+  const handleStartPress = async () => {
     if (!mainItem) return;
 
-    // Permitir todas as atividades e cenários avançarem para o ecrã de execução
-    if (mainItem) {
-      // 🎵 Removido daqui para tocar apenas no ecrã de exercício (como pedido)
+    try {
+      const activityLinkedDevices =
+        isActivity && Array.isArray((mainItem as Activity & { devices?: ScenarioDeviceState[] }).devices)
+          ? (mainItem as Activity & { devices?: ScenarioDeviceState[] }).devices ?? []
+          : [];
+      const scenarioDevices = !isActivity && Array.isArray((mainItem as Scenario).devices)
+        ? (mainItem as Scenario).devices
+        : Array.isArray(relatedScenario?.devices)
+          ? relatedScenario.devices
+          : [];
+
+      const configuredDevices = resolveConfiguredDevices(
+        activityLinkedDevices,
+        scenarioDevices,
+      );
+
+      const devicesToApply = configuredDevices.map((device) => ({
+        ...device,
+        state: 'on' as const,
+      }));
+
+      if (devicesToApply.length > 0) {
+        const result = await applyScenarioDeviceStates(devicesToApply, {
+          forcePowerOn: isActivity ? true : undefined,
+        });
+
+        if (result.skippedUnsupportedControls > 0) {
+          console.warn(
+            `Skipped ${result.skippedUnsupportedControls} Google Home device(s) because direct on/off control is not supported for those types yet.`,
+          );
+        }
+      }
+
       router.push({
         pathname: '/LoadingActivity',
         params: {
@@ -401,11 +437,12 @@ export default function ActivityDetails() {
           focusMode: focusEnabled.toString(),
         },
       });
-    } else {
+    } catch (error) {
+      console.error('Failed to prepare devices before starting session:', error);
       setAlertConfig({
         visible: true,
         title: 'Error',
-        message: 'Could not load item details. Please try again.',
+        message: 'We could not prepare the room devices for this session. Please try again.',
         confirmText: 'OK',
         cancelText: '',
         isDestructive: false,
@@ -629,8 +666,10 @@ export default function ActivityDetails() {
       ? { uri: imgObj }
       : imgObj || { uri: 'https://picsum.photos/400/600' };
 
-  const devicesToShow: ScenarioDeviceState[] =
-    relatedScenario?.devices?.length ? relatedScenario.devices : getItemDevices(mainItem);
+  const devicesToShow: ScenarioDeviceState[] = resolveConfiguredDevices(
+    getItemDevices(mainItem),
+    Array.isArray(relatedScenario?.devices) ? relatedScenario.devices : [],
+  );
 
   const activeSpeakerConfig = devicesToShow.find((config) => {
     const device = SMART_HOME_DEVICES[config.deviceId];

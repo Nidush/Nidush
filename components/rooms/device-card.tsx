@@ -193,7 +193,7 @@ const GetDeviceIcon = ({ type, size = 40, color, isFilled }: IconProps) => {
     default:
       return (
         <MaterialIcons
-          name="lightbulb-outline"
+          name="devices"
           size={size}
           color={color}
           accessible={false}
@@ -216,6 +216,12 @@ const DeviceCard = ({
 
   const stateRef = useRef({ isOn, isDimmable, level });
   const dragStartLevelRef = useRef(level);
+  const isAdjustingRef = useRef(false);
+
+  useEffect(() => {
+    if (isAdjustingRef.current) return;
+    setLevel(item.level ?? 100);
+  }, [item.level]);
 
   useEffect(() => {
     stateRef.current = { isOn, isDimmable, level };
@@ -237,6 +243,7 @@ const DeviceCard = ({
       },
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
+        isAdjustingRef.current = true;
         dragStartLevelRef.current = stateRef.current.level;
         onAdjustingChange?.(true);
       },
@@ -251,10 +258,12 @@ const DeviceCard = ({
       },
 
       onPanResponderRelease: () => {
+        isAdjustingRef.current = false;
         onUpdateLevel(Math.round(stateRef.current.level));
         onAdjustingChange?.(false);
       },
       onPanResponderTerminate: () => {
+        isAdjustingRef.current = false;
         onAdjustingChange?.(false);
       },
     }),
@@ -280,11 +289,13 @@ const DeviceCard = ({
       {...panResponder.panHandlers}
       onTouchStart={() => {
         if (isOn && isDimmable) {
+          isAdjustingRef.current = true;
           onAdjustingChange?.(true);
         }
       }}
       onTouchEnd={() => {
         if (isOn && isDimmable) {
+          isAdjustingRef.current = false;
           onAdjustingChange?.(false);
         }
       }}
@@ -330,6 +341,7 @@ const DeviceCard = ({
             case 'increment': // Quando o utilizador faz "swipe up"
               if (isOn && isDimmable) {
                 const newLevel = Math.min(100, level + 10);
+                isAdjustingRef.current = false;
                 setLevel(newLevel);
                 onUpdateLevel(newLevel);
               }
@@ -337,6 +349,7 @@ const DeviceCard = ({
             case 'decrement': // Quando o utilizador faz "swipe down"
               if (isOn && isDimmable) {
                 const newLevel = Math.max(0, level - 10);
+                isAdjustingRef.current = false;
                 setLevel(newLevel);
                 onUpdateLevel(newLevel);
               }

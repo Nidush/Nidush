@@ -42,6 +42,34 @@ app-example
 # generated native folders
 /ios
 /android
+!/android/
+/android/*
+!/android/build.gradle
+!/android/settings.gradle
+!/android/gradle.properties
+!/android/local-home-sdk/
+/android/local-home-sdk/*
+!/android/local-home-sdk/README.md
+!/android/app/
+/android/app/*
+!/android/app/build.gradle
+!/android/app/src/
+/android/app/src/*
+!/android/app/src/main/
+/android/app/src/main/*
+!/android/app/src/main/AndroidManifest.xml
+!/android/app/src/main/java/
+/android/app/src/main/java/*
+!/android/app/src/main/java/com/
+/android/app/src/main/java/com/*
+!/android/app/src/main/java/com/nidush/
+/android/app/src/main/java/com/nidush/*
+!/android/app/src/main/java/com/nidush/app/
+/android/app/src/main/java/com/nidush/app/*
+!/android/app/src/main/java/com/nidush/app/MainActivity.kt
+!/android/app/src/main/java/com/nidush/app/MainApplication.kt
+!/android/app/src/main/java/com/nidush/app/GoogleHomeModule.kt
+!/android/app/src/main/java/com/nidush/app/GoogleHomePackage.kt
 
 # Local Netlify folder
 .netlify

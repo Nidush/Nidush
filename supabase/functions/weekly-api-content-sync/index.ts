@@ -47,9 +47,45 @@ type WorkoutXExercise = {
   gif_url?: string | null
 }
 
+type LibrivoxAuthor = {
+  id?: string | number | null
+  first_name?: string | null
+  last_name?: string | null
+  dob?: string | null
+  dod?: string | null
+}
+
+type LibrivoxBook = {
+  id?: string | number | null
+  title?: string | null
+  description?: string | null
+  language?: string | null
+  copyright_year?: string | number | null
+  num_sections?: string | number | null
+  totaltime?: string | null
+  totaltimesecs?: string | number | null
+  url_librivox?: string | null
+  url_zip_file?: string | null
+  coverart_jpg?: string | null
+  coverart_thumbnail?: string | null
+  authors?: LibrivoxAuthor[] | null
+}
+
+type LibrivoxTrack = {
+  id?: string | number | null
+  section_number?: string | number | null
+  title?: string | null
+  listen_url?: string | null
+  language?: string | null
+  playtime?: string | number | null
+  file_name?: string | null
+}
+
 const THE_MEAL_DB_RANDOM_URL = 'https://www.themealdb.com/api/json/v1/1/random.php'
 const WORKOUTX_EXERCISES_URL = 'https://api.workoutxapp.com/v1/exercises'
 const WORKOUTX_GIFS_URL = 'https://api.workoutxapp.com/v1/gifs'
+const LIBRIVOX_AUDIOBOOKS_URL = 'https://librivox.org/api/feed/audiobooks'
+const LIBRIVOX_AUDIOTRACKS_URL = 'https://librivox.org/api/feed/audiotracks'
 const WORKOUTX_AUTHOR = 'WorkoutX'
 const API_MEDIA_BUCKET = 'api-content-media'
 
@@ -114,6 +150,20 @@ const splitInstructionText = (value: string | null | undefined) =>
 const parseInstructions = (value: string | null | undefined) =>
   splitInstructionText(value).map((line) => line.replace(/\s+/g, ' ').trim())
 
+const stripHtml = (value: string | null | undefined) =>
+  String(value ?? '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/\s+/g, ' ')
+    .trim()
+
 const summarizePayloadShape = (value: unknown) => {
   if (Array.isArray(value)) return `array(${value.length})`
   if (!value || typeof value !== 'object') return typeof value
@@ -149,6 +199,144 @@ const normalizeExerciseId = (exercise: WorkoutXExercise) => {
   }
 
   return name ? slugify(name) : ''
+}
+
+const normalizeLibrivoxBookId = (book: LibrivoxBook) => {
+  const rawId = book.id
+  const title = String(book.title ?? '').trim()
+
+  if (rawId !== null && rawId !== undefined && String(rawId).trim()) {
+    return String(rawId).trim()
+  }
+
+  return title ? slugify(title) : ''
+}
+
+const formatLibrivoxAuthor = (author: LibrivoxAuthor) => {
+  const name = [author.first_name, author.last_name]
+    .map((value) => String(value ?? '').trim())
+    .filter(Boolean)
+    .join(' ')
+
+  return name || 'LibriVox'
+}
+
+const formatLibrivoxAuthors = (authors: LibrivoxAuthor[] | null | undefined) => {
+  const names = (authors ?? [])
+    .map(formatLibrivoxAuthor)
+    .filter(Boolean)
+
+  return names.length > 0 ? names.join(', ') : 'LibriVox'
+}
+
+const isEnglishLibrivoxBook = (book: LibrivoxBook) =>
+  String(book.language ?? '').trim().toLowerCase() === 'english'
+
+const buildLibrivoxDescription = (book: LibrivoxBook, author: string, trackCount: number) => {
+  const summary = stripHtml(book.description)
+  const metadata = [
+    author ? `Author: ${author}` : null,
+    book.copyright_year ? `Year: ${book.copyright_year}` : null,
+    book.language ? `Language: ${book.language}` : null,
+    trackCount > 0 ? `Tracks: ${trackCount}` : null,
+  ].filter(Boolean)
+
+  if (!summary) return metadata.join(' | ') || null
+  if (metadata.length === 0) return summary
+  return `${summary} | ${metadata.join(' | ')}`
+}
+
+const fetchLibrivoxTracks = async (projectId: string): Promise<unknown[]> => {
+  const params = new URLSearchParams({
+    project_id: projectId,
+    format: 'json',
+  })
+
+  const payload = await fetchJson<{ sections?: LibrivoxTrack[] | null }>(
+    `${LIBRIVOX_AUDIOTRACKS_URL}/?${params.toString()}`,
+  )
+
+  return (payload.sections ?? [])
+    .map((track) => {
+      const sectionNumber = String(track.section_number ?? '').trim()
+      const title = String(track.title ?? '').trim() || `Track ${sectionNumber || '?'}`
+      const duration = Number(track.playtime ?? 0)
+      const cleanDuration = Number.isFinite(duration) && duration > 0 ? duration : undefined
+
+      return {
+        text: sectionNumber ? `Track ${sectionNumber}: ${title}` : title,
+        duration: cleanDuration,
+      }
+    })
+    .filter((track) => String((track as { text?: string }).text ?? '').trim())
+}
+
+const fetchLibrivoxAudiobooks = async (requestedAudiobooks: number): Promise<ContentPayload[]> => {
+  if (requestedAudiobooks <= 0) return []
+
+  const weekSeed = currentWeekSeed()
+  const pageSize = Math.max(requestedAudiobooks * 4, 20)
+  const baseOffset = weekSeed % 2000
+  const candidates = new Map<string, LibrivoxBook>()
+
+  for (let page = 0; page < 4 && candidates.size < requestedAudiobooks * 2; page += 1) {
+    const params = new URLSearchParams({
+      format: 'json',
+      extended: '1',
+      coverart: '1',
+      limit: String(pageSize),
+      offset: String(baseOffset + page * pageSize),
+    })
+
+    params.append('fields[]', 'id')
+    params.append('fields[]', 'title')
+    params.append('fields[]', 'description')
+    params.append('fields[]', 'language')
+    params.append('fields[]', 'copyright_year')
+    params.append('fields[]', 'num_sections')
+    params.append('fields[]', 'totaltime')
+    params.append('fields[]', 'totaltimesecs')
+    params.append('fields[]', 'url_librivox')
+    params.append('fields[]', 'url_zip_file')
+    params.append('fields[]', 'coverart_jpg')
+    params.append('fields[]', 'coverart_thumbnail')
+    params.append('fields[]', 'authors')
+
+    const payload = await fetchJson<{ books?: LibrivoxBook[] | null }>(
+      `${LIBRIVOX_AUDIOBOOKS_URL}/?${params.toString()}`,
+    )
+
+    const books = (payload.books ?? []).filter(isEnglishLibrivoxBook)
+    for (const book of books) {
+      const bookId = normalizeLibrivoxBookId(book)
+      const title = String(book.title ?? '').trim()
+      if (!bookId || !title) continue
+      candidates.set(bookId, book)
+    }
+  }
+
+  const selectedBooks = shuffleWithSeed(Array.from(candidates.values()), weekSeed)
+    .slice(0, requestedAudiobooks)
+
+  return await Promise.all(selectedBooks.map(async (book) => {
+    const bookId = normalizeLibrivoxBookId(book)
+    const author = formatLibrivoxAuthors(book.authors)
+    const tracks = await fetchLibrivoxTracks(bookId)
+
+    return {
+      id: `librivox_audiobook_${bookId}`,
+      title: String(book.title ?? '').trim(),
+      description: buildLibrivoxDescription(book, author, tracks.length),
+      type: 'audio',
+      category: 'audiobook',
+      duration: String(book.totaltime ?? '').trim() || null,
+      image: String(book.coverart_thumbnail ?? book.coverart_jpg ?? '').trim() || null,
+      instructions: tracks,
+      ingredients: null,
+      video_url: null,
+      author,
+    }
+  }))
 }
 
 const fetchMealContent = async (): Promise<ContentPayload | null> => {
@@ -358,6 +546,7 @@ Deno.serve(async (req: Request) => {
 
     const requestedMeals = Number(Deno.env.get('API_CONTENT_SYNC_MEALS') ?? 5)
     const requestedExercises = Number(Deno.env.get('API_CONTENT_SYNC_EXERCISES') ?? 10)
+    const requestedAudiobooks = Number(Deno.env.get('API_CONTENT_SYNC_AUDIOBOOKS') ?? 8)
     const workoutXKey = Deno.env.get('WORKOUTX_API_KEY')
     const collected = new Map<string, ContentPayload>()
     const errors: string[] = []
@@ -380,6 +569,13 @@ Deno.serve(async (req: Request) => {
       }
     } else {
       errors.push('WORKOUTX_API_KEY not configured; skipped exercises')
+    }
+
+    try {
+      const audiobooks = await fetchLibrivoxAudiobooks(requestedAudiobooks)
+      audiobooks.forEach((audiobook) => collected.set(audiobook.id, audiobook))
+    } catch (error) {
+      errors.push(`LibriVox: ${error instanceof Error ? error.message : String(error)}`)
     }
 
     const contents = Array.from(collected.values())

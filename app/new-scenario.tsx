@@ -41,6 +41,7 @@ import { captureException, trackEvent } from '@/utils/observability';
 import { normalizeScenarioDeviceType } from '@/utils/activityDeviceConfigs';
 import { getRoomIconName } from '@/utils/roomIcons';
 import { supabase, uploadImage } from '@/utils/supabase';
+import { reconcileDeviceRoomAssignments } from '@/utils/homeSetup';
 
 type RoomRow = {
   id: number;
@@ -595,6 +596,8 @@ function NewScenarioContent() {
         }
 
         setHomeId(userHome.home_id);
+
+        await reconcileDeviceRoomAssignments(userHome.home_id);
 
         const { data: roomRows, error: roomsError } = await supabase
           .from('rooms')

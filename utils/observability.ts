@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { logger, sanitizeForLogs } from './logger';
+import { isInvalidRefreshTokenError } from './supabase';
 
 type ObservabilityLevel = 'info' | 'warn' | 'error';
 
@@ -110,6 +111,11 @@ export const installGlobalErrorHandlers = () => {
   const previousHandler = errorUtils?.getGlobalHandler?.();
 
   errorUtils?.setGlobalHandler?.((error, isFatal) => {
+    if (isInvalidRefreshTokenError(error)) {
+      logger.warn('Ignoring stale Supabase refresh token error after session recovery.');
+      return;
+    }
+
     captureException(error, {
       area: 'runtime',
       action: isFatal ? 'fatal-js-error' : 'js-error',
@@ -120,6 +126,11 @@ export const installGlobalErrorHandlers = () => {
 
   if (typeof globalThis.addEventListener === 'function') {
     globalThis.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
+      if (isInvalidRefreshTokenError(event.reason)) {
+        logger.warn('Ignoring stale Supabase refresh token rejection after session recovery.');
+        return;
+      }
+
       captureException(event.reason, {
         area: 'runtime',
         action: 'unhandled-promise-rejection',
