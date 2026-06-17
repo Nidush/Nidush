@@ -54,8 +54,7 @@ app-example
 !/android/gradle/wrapper/
 !/android/gradle/wrapper/*
 !/android/local-home-sdk/
-/android/local-home-sdk/*
-!/android/local-home-sdk/README.md
+android/local-home-sdk/**/*-javadoc.jar
 !/android/app/
 /android/app/*
 !/android/app/build.gradle
