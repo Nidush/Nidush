@@ -47,6 +47,12 @@ app-example
 !/android/build.gradle
 !/android/settings.gradle
 !/android/gradle.properties
+!/android/gradlew
+!/android/gradlew.bat
+!/android/gradle/
+/android/gradle/*
+!/android/gradle/wrapper/
+!/android/gradle/wrapper/*
 !/android/local-home-sdk/
 /android/local-home-sdk/*
 !/android/local-home-sdk/README.md
