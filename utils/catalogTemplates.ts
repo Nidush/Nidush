@@ -131,6 +131,21 @@ export const parseUserScenarioDbId = (value: unknown) => {
     : raw;
 };
 
+export const resolvePossibleUserScenarioDbIds = (value: unknown) => {
+  const raw = String(value ?? '').trim();
+  if (!raw) return [];
+
+  const candidates = new Set<string>();
+  const direct = parseUserScenarioDbId(raw).trim();
+  if (direct) candidates.add(direct);
+
+  if (/^s\d+$/i.test(raw)) {
+    candidates.add(raw.slice(1));
+  }
+
+  return Array.from(candidates);
+};
+
 const normalizeActivityTemplateId = (id: string) =>
   id.startsWith('template:') ? id.replace(/^template:/, '') : id;
 

@@ -17,10 +17,16 @@ export const Step2_Content = ({
   activityType,
   contentList,
 }: Step2Props) => {
+  const normalizeCategory = (value: string) => {
+    const normalized = value.toLowerCase().trim();
+    if (normalized === 'audiobooks') return 'audiobook';
+    return normalized;
+  };
+
   const filteredContent = useMemo(() => {
     if (activityType === 'general') return contentList;
 
-    const targetCategory = (activityType || '').toLowerCase();
+    const targetCategory = normalizeCategory(activityType || '');
 
     return contentList.filter(
       (content) => {
@@ -28,7 +34,7 @@ export const Step2_Content = ({
         if (targetCategory === 'cooking' && content.type === 'recipe') return true;
         if (targetCategory === 'workout' && content.type === 'exercise') return true;
 
-        const cat = (content.category || '').toLowerCase();
+        const cat = normalizeCategory(content.category || '');
         return cat === targetCategory || cat === 'general';
       }
     );

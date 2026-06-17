@@ -35,6 +35,7 @@ import {
   isUserScenarioRouteId,
   mapUserActivity,
   parseUserScenarioDbId,
+  resolvePossibleUserScenarioDbIds,
 } from '@/utils/catalogTemplates';
 import { getScenarioDeviceMeta, mapLinkedDeviceToScenarioState } from '@/utils/activityDeviceConfigs';
 import { applyScenarioDeviceStates } from '@/utils/deviceExecution';
@@ -155,6 +156,35 @@ const normalizeLinkedDevice = (value: unknown) => {
   return value;
 };
 
+const fetchScenarioFromDbCandidates = async (rawScenarioId: string) => {
+  const candidateIds = resolvePossibleUserScenarioDbIds(rawScenarioId);
+
+  for (const candidateId of candidateIds) {
+    const { data: scenData } = await supabase
+      .from('scenarios')
+      .select('*')
+      .eq('id', candidateId)
+      .maybeSingle<ScenarioRow>();
+
+    if (scenData) {
+      return {
+        id: `scenario:${scenData.id}`,
+        title: scenData.name,
+        description: scenData.description || '',
+        playlist: scenData.playlist_id ? 'Spotify Music' : (scenData.playlist_name || 'No music'),
+        playlist_id: scenData.playlist_id,
+        focusMode: scenData.focus_mode_enabled === true,
+        shortcuts: false,
+        devices: Array.isArray(scenData.devices) ? scenData.devices : [],
+        room: scenData.rooms?.name || undefined,
+        image: resolveCatalogImage(scenData.image || 'Scenarios/moonlight_bay.png'),
+      } as Scenario;
+    }
+  }
+
+  return null;
+};
+
 export default function ActivityDetails() {
   const { id, isNew, itemType } = useLocalSearchParams<{ id: string; isNew?: string; itemType?: string }>();
 
@@ -269,27 +299,7 @@ export default function ActivityDetails() {
 
               if (!scen) {
                 console.log('[ActivityDetails] Fetching scenario from DB:', foundActivity.scenario_id);
-                const scenarioDbId = parseUserScenarioDbId(foundActivity.scenario_id);
-                const { data: scenData } = await supabase
-                  .from('scenarios')
-                  .select('*')
-                  .eq('id', scenarioDbId)
-                  .maybeSingle<ScenarioRow>();
-
-                if (scenData) {
-                  scen = {
-                    id: `scenario:${scenData.id}`,
-                    title: scenData.name,
-                    description: scenData.description || '',
-                    playlist: scenData.playlist_id ? 'Spotify Music' : (scenData.playlist_name || 'No music'),
-                    playlist_id: scenData.playlist_id,
-                    focusMode: scenData.focus_mode_enabled === true,
-                    shortcuts: false,
-                    devices: Array.isArray(scenData.devices) ? scenData.devices : [],
-                    room: scenData.rooms?.name || undefined,
-                    image: resolveCatalogImage(scenData.image || 'Scenarios/moonlight_bay.png'),
-                  } as Scenario;
-                }
+                scen = await fetchScenarioFromDbCandidates(String(foundActivity.scenario_id));
               }
 
               return scen || null;
@@ -370,6 +380,13 @@ export default function ActivityDetails() {
               image: resolveCatalogImage(scenData.image || 'Scenarios/moonlight_bay.png'),
             };
 
+            setMainItem(dbScenario);
+            setRelatedScenario(dbScenario);
+            setFocusEnabled(dbScenario.focusMode);
+          }
+        } else {
+          const dbScenario = await fetchScenarioFromDbCandidates(id);
+          if (dbScenario) {
             setMainItem(dbScenario);
             setRelatedScenario(dbScenario);
             setFocusEnabled(dbScenario.focusMode);

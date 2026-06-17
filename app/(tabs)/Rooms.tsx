@@ -40,6 +40,7 @@ import {
   subscribeToHomeDeviceChanges,
 } from '../../utils/devices';
 import {
+  setGoogleHomeDeviceColor,
   setGoogleHomeDeviceBrightness,
   setGoogleHomeDevicePower,
 } from '../../utils/googleHome';
@@ -61,6 +62,15 @@ interface ActivityItem {
   image: string;
   room_id?: number | null;
 }
+
+const LIGHT_COLOR_OPTIONS = [
+  '#FFD65A',
+  '#F4A261',
+  '#F28482',
+  '#84A59D',
+  '#86B3EB',
+  '#CDB4DB',
+] as const;
 
 const normalizeRoomName = (value: string) => value.trim().toLowerCase();
 
@@ -134,6 +144,8 @@ export default function Rooms() {
   const [deviceDraftName, setDeviceDraftName] = useState('');
   const [deviceDraftRoomId, setDeviceDraftRoomId] = useState<number | null>(null);
   const [isSavingDeviceDetails, setIsSavingDeviceDetails] = useState(false);
+  const [selectedLightColor, setSelectedLightColor] = useState<string>(LIGHT_COLOR_OPTIONS[0]);
+  const [isUpdatingLightColor, setIsUpdatingLightColor] = useState(false);
 
   // --- Manage Linked Devices Modal State ---
   const [isManageModalVisible, setIsManageModalVisible] = useState(false);
@@ -409,6 +421,7 @@ export default function Rooms() {
     setSelectedDevice(device);
     setDeviceDraftName(device.name);
     setDeviceDraftRoomId(device.room_id ?? rooms[0]?.id ?? null);
+    setSelectedLightColor(LIGHT_COLOR_OPTIONS[0]);
   };
 
   const closeDeviceDetails = () => {
@@ -416,6 +429,39 @@ export default function Rooms() {
     setDeviceDraftName('');
     setDeviceDraftRoomId(null);
     setIsSavingDeviceDetails(false);
+    setIsUpdatingLightColor(false);
+  };
+
+  const handleSetDeviceColor = async (colorHex: string) => {
+    if (!selectedDevice) return;
+
+    if (selectedDevice.type !== 'light') {
+      showFeedback('Only lights support color changes here.', 'info');
+      return;
+    }
+
+    setSelectedLightColor(colorHex);
+
+    if (selectedDevice.source !== 'google_home' || !selectedDevice.external_id) {
+      showFeedback('This light does not expose Google Home color control yet.', 'info');
+      return;
+    }
+
+    setIsUpdatingLightColor(true);
+    try {
+      await setGoogleHomeDeviceColor(selectedDevice.external_id, colorHex);
+      showFeedback(`Updated ${selectedDevice.name} to ${colorHex}.`, 'success');
+    } catch (err) {
+      console.error('Failed to update device color:', err);
+      showFeedback(
+        err instanceof Error
+          ? err.message
+          : 'Could not change this light color right now.',
+        'error',
+      );
+    } finally {
+      setIsUpdatingLightColor(false);
+    }
   };
 
   const handleSaveDeviceDetails = async () => {
@@ -1510,6 +1556,55 @@ export default function Rooms() {
                   );
                 })}
               </ScrollView>
+
+              {selectedDevice?.type === 'light' ? (
+                <View className="mb-2">
+                  <View className="flex-row items-center justify-between mb-3">
+                    <Text className="text-[#354F52] text-sm" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                      Light Color
+                    </Text>
+                    {isUpdatingLightColor ? (
+                      <ActivityIndicator size="small" color="#548F53" />
+                    ) : (
+                      <Text className="text-[#6B7C76] text-xs" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                        Applies instantly
+                      </Text>
+                    )}
+                  </View>
+
+                  <View className="flex-row flex-wrap gap-y-3">
+                    {LIGHT_COLOR_OPTIONS.map((color) => {
+                      const selected = selectedLightColor === color;
+
+                      return (
+                        <TouchableOpacity
+                          key={color}
+                          onPress={() => {
+                            void handleSetDeviceColor(color);
+                          }}
+                          disabled={isUpdatingLightColor}
+                          className="mr-3"
+                          style={{
+                            width: 44,
+                            height: 44,
+                            borderRadius: 22,
+                            backgroundColor: color,
+                            borderWidth: selected ? 3 : 1,
+                            borderColor: selected ? '#354F52' : '#D7DED6',
+                            opacity: isUpdatingLightColor ? 0.7 : 1,
+                          }}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Set light color ${color}`}
+                        />
+                      );
+                    })}
+                  </View>
+
+                  <Text className="text-[#6B7C76] text-xs mt-3" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                    Works for Google Home lights that support RGB color control. White-only bulbs may reject this command.
+                  </Text>
+                </View>
+              ) : null}
             </ScrollView>
 
             <View className="flex-row justify-between mt-2 pt-2">
