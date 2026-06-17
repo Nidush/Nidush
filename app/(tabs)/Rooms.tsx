@@ -46,6 +46,7 @@ import {
 } from '../../utils/googleHome';
 import { updateDeviceStateRecord } from '../../utils/deviceExecution';
 import { createHomeRoom } from '../../utils/homeSetup';
+import { MAX_SEARCH_LENGTH, normalizeSearchInput } from '../../utils/searchSecurity';
 
 interface Room {
   id: number;
@@ -969,7 +970,7 @@ export default function Rooms() {
             accessibilityHint="Type to filter devices by name."
             placeholderTextColor="#7A8C85"
             value={searchQuery}
-            onChangeText={setSearchQuery}
+            onChangeText={(value) => setSearchQuery(normalizeSearchInput(value))}
             className="flex-1 h-full text-base text-[#2C3A35]"
             style={{
               fontFamily: 'Nunito_600SemiBold',
@@ -978,6 +979,7 @@ export default function Rooms() {
             textAlignVertical="center"
             autoCorrect={false}
             autoCapitalize="none"
+            maxLength={MAX_SEARCH_LENGTH}
           />
           <SearchAutocomplete
             suggestions={searchSuggestions}

@@ -91,8 +91,8 @@ jobs:
       - name: Validate Expo app config
         run: npx expo config --type public
 
-      - name: Generate native Android project
-        run: npx expo prebuild --platform android --non-interactive
+      - name: Verify native Android project is present
+        run: test -f android/gradlew
 
       - name: Make Gradle executable
         run: chmod +x android/gradlew

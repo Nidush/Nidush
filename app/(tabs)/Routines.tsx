@@ -22,6 +22,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { supabase } from '../../utils/supabase';
 import { captureException, trackEvent } from '../../utils/observability';
+import { MAX_SEARCH_LENGTH, normalizeSearchInput } from '../../utils/searchSecurity';
 
 import AddRoomDevice from '../../components/rooms/AddRoomDevice';
 import RoutineCard from '../../components/routines/RoutineCard';
@@ -895,7 +896,7 @@ export default function Routines() {
             placeholder="Search routines..."
             placeholderTextColor="#7A8C85"
             value={searchQuery}
-            onChangeText={setSearchQuery}
+            onChangeText={(value) => setSearchQuery(normalizeSearchInput(value))}
             className="flex-1 text-base text-[#2C3A35]"
             style={{ fontFamily: 'Nunito_600SemiBold' }}
             maxFontSizeMultiplier={1.3}
@@ -905,6 +906,7 @@ export default function Routines() {
             accessibilityRole="search"
             autoCorrect={false}
             autoCapitalize="none"
+            maxLength={MAX_SEARCH_LENGTH}
           />
           <SearchAutocomplete
             suggestions={searchSuggestions}

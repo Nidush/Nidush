@@ -41,6 +41,11 @@ import {
   mapUserActivity,
 } from '@/utils/catalogTemplates';
 import {
+  buildSafeContainsPattern,
+  MAX_SEARCH_LENGTH,
+  normalizeSearchInput,
+} from '@/utils/searchSecurity';
+import {
   AiActivityIdea,
   fetchAiActivityIdeas,
   getNidushAiErrorMessage,
@@ -90,7 +95,7 @@ const UnifiedActivitiesScreen = () => {
   // Debounce search query
   useEffect(() => {
     const handler = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
+      setDebouncedSearchQuery(normalizeSearchInput(searchQuery));
     }, 500);
     return () => clearTimeout(handler);
   }, [searchQuery]);
@@ -143,10 +148,8 @@ const UnifiedActivitiesScreen = () => {
     } else {
       query = query.eq('user_id', user.id);
     }
-
-
     if (debouncedSearchQuery) {
-      query = query.ilike('title', `%${debouncedSearchQuery}%`);
+      query = query.ilike('title', buildSafeContainsPattern(debouncedSearchQuery));
     }
 
     const { data, error, count } = await query;
