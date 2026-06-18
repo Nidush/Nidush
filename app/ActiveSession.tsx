@@ -16,6 +16,7 @@ import {
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AudiobookVisuals } from '@/components/activeSession/AudiobookVisuals';
 import { CookingVisuals } from '@/components/activeSession/CookingVisuals';
 import { ExitModal } from '@/components/activeSession/ExitModal';
 import { MeditationVisuals } from '@/components/activeSession/MeditationVisuals';
@@ -45,6 +46,7 @@ type FormattedInstruction = {
   description?: string;
   isIngredientsStep?: boolean;
   audio_url?: string;
+  isChapterListStep?: boolean;
 };
 
 type SessionData = {
@@ -109,7 +111,6 @@ const normalizeIngredients = (value: unknown): any[] => {
   const parsed = parseArrayValue<any>(value);
 
   return parsed.map((entry) => {
-    // Se já for um objeto no formato correto
     if (entry && typeof entry === 'object' && 'item' in entry) {
       return {
         item: String((entry as { item?: unknown }).item ?? ''),
@@ -124,7 +125,6 @@ const normalizeIngredients = (value: unknown): any[] => {
     // Se não tiver espaços, é apenas o ingrediente
     if (spaceIdx === -1) return { item: text, amount: '' };
 
-    // Divide pela primeira palavra (normalmente a quantidade) e o resto é o item
     return { amount: text.slice(0, spaceIdx), item: text.slice(spaceIdx + 1) };
   });
 };
@@ -175,6 +175,7 @@ export default function ActiveSession() {
   const progress = useSharedValue(0);
   const contentOpacity = useSharedValue(1);
   const pulseScale = useSharedValue(1);
+  const [isMediaReady, setIsMediaReady] = useState(false);
 
   const isVideoSession = sessionData?.type === 'video';
 
@@ -311,7 +312,7 @@ export default function ActiveSession() {
             text: String(step.text ?? ''),
             duration: step.duration,
             description: step.description,
-            audio_url: step.audio_url, // <--- 2. PUXAR O LINK DA BASE DE DADOS AQUI
+            audio_url: step.url || step.audio_url, // <--- 2. PUXAR O LINK DA BASE DE DADOS AQUI
           };
         })
         .flatMap((stepObj) => {
@@ -365,6 +366,14 @@ export default function ActiveSession() {
           isIngredientsStep: true,
         });
       }
+      if (activityType === 'audiobooks' && formattedInstructions.length > 0) {
+        formattedInstructions.unshift({
+          text: 'Table of Contents',
+          duration: undefined, // Sem tempo, controlado manualmente
+          description: undefined,
+          isChapterListStep: true,
+        });
+      }
 
       // 2. Atualizamos o estado da sessão com os ingredientes extraídos
       setSessionData({
@@ -383,7 +392,11 @@ export default function ActiveSession() {
       });
 
       // Tocar música no Spotify só em sessões sem vídeo.
-      if (isAuthenticated && contentType !== 'video') {
+      if (
+        isAuthenticated &&
+        contentType !== 'video' &&
+        activityType !== 'audiobooks'
+      ) {
         let pId = getPlaylistId(foundItem);
 
         if (!pId) {
@@ -502,6 +515,7 @@ export default function ActiveSession() {
   }, [isActive, isVideoSession, pulseScale]);
 
   const handleNextStep = useCallback(() => {
+    setIsMediaReady(false);
     if (!sessionData) return;
     const totalSteps = sessionData.instructions.length;
 
@@ -522,6 +536,7 @@ export default function ActiveSession() {
   }, [currentStepIndex, sessionData, contentOpacity]);
 
   const handlePreviousStep = useCallback(() => {
+    setIsMediaReady(false);
     if (!sessionData || currentStepIndex === 0) return;
 
     const prevIndex = currentStepIndex - 1;
@@ -538,7 +553,27 @@ export default function ActiveSession() {
       setSecondsLeft(prevDuration || 0);
     }, 300);
   }, [currentStepIndex, sessionData, contentOpacity]);
+  const handleJumpToStep = useCallback(
+    (index: number) => {
+      setIsMediaReady(false);
+      setIsActive(true);
+      setIsMusicPlaying(false);
 
+      if (!sessionData) return;
+
+      contentOpacity.value = withSequence(
+        withTiming(0, { duration: 300 }),
+        withTiming(1, { duration: 300 }),
+      );
+
+      setTimeout(() => {
+        setCurrentStepIndex(index);
+        const targetDuration = sessionData.instructions[index].duration;
+        setSecondsLeft(targetDuration || 0);
+      }, 300);
+    },
+    [sessionData, contentOpacity],
+  );
   useEffect(() => {
     if (sessionData && currentStepIndex > 0 && !isVideoSession) {
       const currentInstruction =
@@ -551,25 +586,41 @@ export default function ActiveSession() {
 
   useEffect(() => {
     if (isVideoSession) return;
-    let interval: ReturnType<typeof setInterval> | null = null;
     const currentStep = sessionData?.instructions[currentStepIndex];
     const isTimedStep = currentStep?.duration !== undefined;
 
-    if (isActive && isTimedStep && secondsLeft > 0) {
-      interval = setInterval(() => setSecondsLeft((prev) => prev - 1), 1000);
-    } else if (isActive && isTimedStep && secondsLeft === 0) {
-      handleNextStep();
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    if (isActive && isTimedStep && isMediaReady) {
+      if (secondsLeft > 0) {
+        interval = setInterval(() => {
+          setSecondsLeft((prev) => {
+            // Se chegou a 1, o próximo é 0, logo avança!
+            if (prev <= 1) {
+              if (interval) clearInterval(interval);
+              setTimeout(() => handleNextStep(), 0);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      } else {
+        // Se já for zero
+        handleNextStep();
+      }
     }
+
     return () => {
       if (interval) clearInterval(interval);
     };
   }, [
     isActive,
-    secondsLeft,
-    sessionData,
-    currentStepIndex,
-    handleNextStep,
+    isMediaReady,
     isVideoSession,
+    currentStepIndex,
+    sessionData,
+    handleNextStep,
+    secondsLeft,
   ]);
 
   useEffect(() => {
@@ -586,6 +637,9 @@ export default function ActiveSession() {
     setIsActive(newState);
     setIsMusicPlaying(newState);
   };
+  const handleAudioReady = useCallback(() => {
+    setIsMediaReady(true);
+  }, []);
 
   const handleToggleMusic = () => {
     if (isMusicPlaying) {
@@ -628,6 +682,8 @@ export default function ActiveSession() {
   // Variáveis auxiliares para legibilidade do fluxo condicional
   const isCooking = sessionData.activityType === 'cooking';
   const isWorkout = sessionData.activityType === 'workout';
+  const isAudiobook = sessionData.activityType === 'audiobooks';
+  const isMeditation = sessionData.activityType === 'meditation';
 
   return (
     <SafeAreaView className="flex-1 bg-[#F1F4EE]" accessibilityLanguage="en-US">
@@ -663,6 +719,21 @@ export default function ActiveSession() {
               ingredients={sessionData.ingredients ?? []}
               stepIndex={currentStepIndex}
               contentOpacity={contentOpacity}
+            />
+          ) : isAudiobook ? ( // <--- ADICIONAR A VERIFICAÇÃO DO AUDIOBOOK AQUI
+            <AudiobookVisuals
+              step={currentStep}
+              instructions={sessionData.instructions}
+              stepIndex={currentStepIndex}
+              contentOpacity={contentOpacity}
+              isActive={isActive} // <--- Passar se está em Play ou Pause
+              imageUrl={
+                sessionData.contentImageUrl ||
+                (typeof sessionData.image === 'string'
+                  ? sessionData.image
+                  : undefined)
+              }
+              onSelectChapter={handleJumpToStep}
             />
           ) : isWorkout ? (
             <WorkoutVisuals
@@ -701,9 +772,13 @@ export default function ActiveSession() {
             onToggleSession={handleToggleSession}
             onToggleMusic={handleToggleMusic}
             currentTrack={currentTrack}
-            showPauseButton={!isCooking && !isWorkout}
-            guideText={!isCooking && !isWorkout ? currentStep.text : undefined}
+            stepIndex={currentStepIndex}
+            showPauseButton={
+              !isCooking && !isWorkout && !currentStep.isChapterListStep
+            }
+            guideText={isMeditation ? currentStep.text : undefined}
             guideAudioUrl={currentStep.audio_url}
+            onAudioReady={handleAudioReady}
           />
         </>
       )}

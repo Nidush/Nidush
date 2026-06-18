@@ -32,6 +32,8 @@ interface SessionControlsProps {
   showPauseButton?: boolean;
   guideText?: string;
   guideAudioUrl?: string;
+  onAudioReady?: () => void;
+  stepIndex: number; // <--- 1. NOVA PROP AQUI
 }
 
 export const SessionControls = ({
@@ -51,6 +53,8 @@ export const SessionControls = ({
   showPauseButton = true,
   guideText,
   guideAudioUrl,
+  onAudioReady,
+  stepIndex, // <--- EXTRAÍDA AQUI
 }: SessionControlsProps) => {
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
   const playerRef = useRef<any>(null);
@@ -77,11 +81,13 @@ export const SessionControls = ({
 
   // === 2. CARREGAMENTO DE ÁUDIO ===
   useEffect(() => {
-    if (!guideAudioUrl) return;
+    if (!guideAudioUrl) {
+      if (onAudioReady) onAudioReady();
+      return;
+    }
 
     let timer: ReturnType<typeof setTimeout>;
 
-    // Limpa o player anterior se existir
     if (playerRef.current) {
       playerRef.current.pause();
       playerRef.current.release();
@@ -95,12 +101,14 @@ export const SessionControls = ({
         const newPlayer = createAudioPlayer(guideAudioUrl);
         playerRef.current = newPlayer;
 
-        // Toca apenas se a sessão estiver ativa e a voz ativada
         if (isVoiceEnabled && isActive) {
           newPlayer.play();
         }
+
+        if (onAudioReady) onAudioReady();
       } catch (error) {
-        console.log('Erro ao carregar áudio do Supabase:', error);
+        console.log('Erro ao carregar áudio:', error);
+        if (onAudioReady) onAudioReady();
       }
     };
 
@@ -116,7 +124,7 @@ export const SessionControls = ({
         playerRef.current = null;
       }
     };
-  }, [guideAudioUrl]); // Removida a dependência do guideText
+  }, [guideAudioUrl, onAudioReady, stepIndex]); // <--- 2. ADICIONADO O stepIndex AQUI!
 
   return (
     <View className="bg-[#F1F4EE] px-10 pb-8">

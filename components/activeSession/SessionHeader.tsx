@@ -28,15 +28,18 @@ export const SessionHeader = ({
           importantForAccessibility="no"
         />
       </TouchableOpacity>
+
       <Text
-        className="text-[#354F52] text-2xl"
+        // Adicionámos flex-1 (para limitar o tamanho), text-center (para centrar) e mx-4 (para dar margem)
+        className="flex-1 text-center mx-4 text-[#354F52] text-2xl"
         style={{ fontFamily: 'Nunito_600SemiBold' }}
-        numberOfLines={1} // Garante que não empurra os botões se crescer
+        numberOfLines={1} // As reticências (...) vão aparecer automaticamente se o título passar do espaço do flex-1
         accessibilityRole="header"
         maxFontSizeMultiplier={1.2}
       >
         {title}
       </Text>
+
       <TouchableOpacity
         onPress={onCancel}
         accessible={true}

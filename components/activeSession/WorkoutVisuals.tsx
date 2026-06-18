@@ -38,7 +38,7 @@ export const WorkoutVisuals = ({
         <View className="mb-8 rounded-3xl overflow-hidden shadow-sm border border-[#548F53]/20 bg-[#F1F4EE]">
           <Image
             source={{ uri: imageUrl }}
-            className="w-64 h-64" // Podes ajustar o tamanho conforme o rácio dos teus GIFs
+            className="w-72 h-72" // Podes ajustar o tamanho conforme o rácio dos teus GIFs
             resizeMode="cover"
           />
         </View>

@@ -1,5 +1,5 @@
 import { Activity, Content } from '@/constants/data/types';
-import { supabase } from '@/utils/supabase'; // <-- Importação do Supabase
+import { supabase } from '@/utils/supabase';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 import { ContentCard } from '../ContentCard';
@@ -19,7 +19,6 @@ export const Step2_Content = ({
   const [dbContent, setDbContent] = useState<Content[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 1. Ir buscar APENAS à base de dados quando o componente monta
   useEffect(() => {
     const fetchContents = async () => {
       setLoading(true);
@@ -36,11 +35,13 @@ export const Step2_Content = ({
     fetchContents();
   }, []);
 
-  // 2. Filtrar o conteúdo que veio da base de dados com base na atividade selecionada
   const filteredContent = useMemo(() => {
-    if (activityType === 'general') return dbContent;
-
     const targetCategory = (activityType || '').toLowerCase();
+
+    if (targetCategory === 'general') {
+      // Exclui audiobooks da vista "general". Só aparecem quando a atividade for "audiobooks"
+      return dbContent.filter((content) => content.type !== 'audiobooks');
+    }
 
     return dbContent.filter((content) => {
       if (targetCategory === 'cooking' && content.type === 'recipe')
@@ -57,7 +58,6 @@ export const Step2_Content = ({
     });
   }, [activityType, dbContent]);
 
-  // 3. Separar Receitas e Meditações por Categoria
   const groupedContents = useMemo(() => {
     const groups: Record<string, Content[]> = {};
 
@@ -66,22 +66,26 @@ export const Step2_Content = ({
         content.type === 'recipe' ||
         content.category?.toLowerCase() === 'cooking';
       const isMeditation = content.type === 'meditation';
+      // Ajustado para apanhar 'audiobooks'
+      const isAudiobook = content.type === 'audiobooks';
 
-      if (isRecipe || isMeditation) {
+      // Agrupa Receitas, Meditações e Audiobooks
+      if (isRecipe || isMeditation || isAudiobook) {
         let rawCat = content.category;
 
-        // Limpeza de nomes genéricos
-        if (isRecipe && rawCat?.toLowerCase() === 'cooking') {
+        // Se for um audiobook mas o campo category estiver vazio ou apenas disser "audiobooks"
+        if (isAudiobook && (!rawCat || rawCat.toLowerCase() === 'audiobooks')) {
+          rawCat = 'Audiobooks';
+        } else if (isRecipe && rawCat?.toLowerCase() === 'cooking') {
           rawCat = 'Recipes';
         } else if (isMeditation && rawCat?.toLowerCase() === 'meditation') {
           rawCat = 'Meditations';
         }
 
-        const fallbackName = isMeditation
-          ? 'Other Meditations'
-          : 'Other Recipes';
+        let fallbackName = 'Other Recipes';
+        if (isMeditation) fallbackName = 'Other Meditations';
+        if (isAudiobook) fallbackName = 'Other Audiobooks';
 
-        // Capitalizamos a primeira letra ou usamos o Fallback correspondente
         const categoryName = rawCat
           ? rawCat.charAt(0).toUpperCase() + rawCat.slice(1)
           : fallbackName;
@@ -96,17 +100,11 @@ export const Step2_Content = ({
     return groups;
   }, [filteredContent]);
 
-  // 4. Separar Vídeos e Áudios
   const videos = filteredContent.filter(
     (c) => c.type === 'video' || c.type === 'workout' || c.type === 'exercise',
   );
 
-  // Removido o tipo "meditation" daqui para evitar que apareçam duplicadas no carrossel de Áudios
-  const audios = filteredContent.filter(
-    (c) =>
-      (c.type === 'audio' || c.category?.toLowerCase() === 'audiobook') &&
-      c.type !== 'meditation',
-  );
+  const audios = filteredContent.filter((c) => c.type === 'audio');
 
   const renderCarousel = (title: string, data: typeof filteredContent) => {
     if (data.length === 0) return null;
@@ -147,7 +145,7 @@ export const Step2_Content = ({
   return (
     <StepWrapper
       title="Choose your content"
-      subtitle={`Required: Select content for your ${activityType} session.`}
+      subtitle={`Required: Select content for your session.`}
     >
       {loading ? (
         <View className="items-center mt-10">
@@ -167,12 +165,10 @@ export const Step2_Content = ({
             </View>
           )}
 
-          {/* Renderiza um carrossel dinâmico para cada categoria de receita/meditação */}
           {Object.entries(groupedContents).map(([category, items]) =>
             renderCarousel(category, items),
           )}
 
-          {/* Renderiza os restantes */}
           {renderCarousel('Video sessions', videos)}
           {renderCarousel('Audio sessions', audios)}
         </>
