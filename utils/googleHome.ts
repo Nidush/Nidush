@@ -101,6 +101,9 @@ const normalizeDetailedSyncResult = (
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const hasPendingPermissionPropagation = (message: string) =>
+  message.toLowerCase().includes('permissions have not been granted yet')
+
 const normalizeGoogleHomeMessage = (message: string) => {
   const normalized = message.trim();
   const lower = normalized.toLowerCase();
@@ -229,9 +232,7 @@ export const syncGoogleHomeSnapshot = async () => {
             ? error
             : '';
 
-      const shouldRetry =
-        message.toLowerCase().includes('permissions have not been granted yet') &&
-        attempt < maxAttempts;
+      const shouldRetry = hasPendingPermissionPropagation(message) && attempt < maxAttempts;
 
       if (shouldRetry) {
         await sleep(600 * attempt);
@@ -252,12 +253,30 @@ export const setGoogleHomeDevicePower = async (externalId: string, powerOn: bool
     throw new Error('Missing Google Home device id.');
   }
 
-  try {
-    const result = await GoogleHomeModule?.setDevicePower?.(externalId, powerOn);
-    return Boolean(result?.success);
-  } catch (error) {
-    throw toFriendlyError(error, 'Could not control the Google Home device.');
+  const maxAttempts = 4;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const result = await GoogleHomeModule?.setDevicePower?.(externalId, powerOn);
+      return Boolean(result?.success);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'string'
+            ? error
+            : '';
+
+      if (hasPendingPermissionPropagation(message) && attempt < maxAttempts) {
+        await sleep(600 * attempt);
+        continue;
+      }
+
+      throw toFriendlyError(error, 'Could not control the Google Home device.');
+    }
   }
+
+  throw new Error('Could not control the Google Home device.');
 };
 
 export const setGoogleHomeDeviceBrightness = async (externalId: string, level: number) => {
@@ -269,12 +288,30 @@ export const setGoogleHomeDeviceBrightness = async (externalId: string, level: n
 
   const normalizedLevel = Math.max(0, Math.min(100, Math.round(level)));
 
-  try {
-    const result = await GoogleHomeModule?.setDeviceBrightness?.(externalId, normalizedLevel);
-    return Boolean(result?.success);
-  } catch (error) {
-    throw toFriendlyError(error, 'Could not change the Google Home device brightness.');
+  const maxAttempts = 4;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const result = await GoogleHomeModule?.setDeviceBrightness?.(externalId, normalizedLevel);
+      return Boolean(result?.success);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'string'
+            ? error
+            : '';
+
+      if (hasPendingPermissionPropagation(message) && attempt < maxAttempts) {
+        await sleep(600 * attempt);
+        continue;
+      }
+
+      throw toFriendlyError(error, 'Could not change the Google Home device brightness.');
+    }
   }
+
+  throw new Error('Could not change the Google Home device brightness.');
 };
 
 export const setGoogleHomeDeviceColor = async (externalId: string, colorHex: string) => {
@@ -288,10 +325,28 @@ export const setGoogleHomeDeviceColor = async (externalId: string, colorHex: str
     throw new Error('Missing Google Home color value.');
   }
 
-  try {
-    const result = await GoogleHomeModule?.setDeviceColor?.(externalId, colorHex.trim());
-    return Boolean(result?.success);
-  } catch (error) {
-    throw toFriendlyError(error, 'Could not change the Google Home device color.');
+  const maxAttempts = 4;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const result = await GoogleHomeModule?.setDeviceColor?.(externalId, colorHex.trim());
+      return Boolean(result?.success);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'string'
+            ? error
+            : '';
+
+      if (hasPendingPermissionPropagation(message) && attempt < maxAttempts) {
+        await sleep(600 * attempt);
+        continue;
+      }
+
+      throw toFriendlyError(error, 'Could not change the Google Home device color.');
+    }
   }
+
+  throw new Error('Could not change the Google Home device color.');
 };

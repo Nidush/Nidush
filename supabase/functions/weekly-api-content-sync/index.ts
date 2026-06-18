@@ -271,7 +271,10 @@ const fetchLibrivoxTracks = async (projectId: string): Promise<unknown[]> => {
     .filter((track) => String((track as { text?: string }).text ?? '').trim())
 }
 
-const fetchLibrivoxAudiobooks = async (requestedAudiobooks: number): Promise<ContentPayload[]> => {
+const fetchLibrivoxAudiobooks = async (
+  requestedAudiobooks: number,
+  existingAudiobookIds: Set<string> = new Set(),
+): Promise<ContentPayload[]> => {
   if (requestedAudiobooks <= 0) return []
 
   const weekSeed = currentWeekSeed()
@@ -315,7 +318,17 @@ const fetchLibrivoxAudiobooks = async (requestedAudiobooks: number): Promise<Con
     }
   }
 
-  const selectedBooks = shuffleWithSeed(Array.from(candidates.values()), weekSeed)
+  const shuffledBooks = shuffleWithSeed(Array.from(candidates.values()), weekSeed)
+  const unseenBooks = shuffledBooks.filter((book) => {
+    const bookId = normalizeLibrivoxBookId(book)
+    return !existingAudiobookIds.has(`librivox_audiobook_${bookId}`)
+  })
+
+  const selectedBooks = [...unseenBooks, ...shuffledBooks]
+    .filter((book, index, array) => {
+      const bookId = normalizeLibrivoxBookId(book)
+      return array.findIndex((candidate) => normalizeLibrivoxBookId(candidate) === bookId) === index
+    })
     .slice(0, requestedAudiobooks)
 
   return await Promise.all(selectedBooks.map(async (book) => {
@@ -546,10 +559,23 @@ Deno.serve(async (req: Request) => {
 
     const requestedMeals = Number(Deno.env.get('API_CONTENT_SYNC_MEALS') ?? 5)
     const requestedExercises = Number(Deno.env.get('API_CONTENT_SYNC_EXERCISES') ?? 10)
-    const requestedAudiobooks = Number(Deno.env.get('API_CONTENT_SYNC_AUDIOBOOKS') ?? 8)
+    const requestedAudiobooks = Number(Deno.env.get('API_CONTENT_SYNC_AUDIOBOOKS') ?? 10)
     const workoutXKey = Deno.env.get('WORKOUTX_API_KEY')
     const collected = new Map<string, ContentPayload>()
     const errors: string[] = []
+    const existingAudiobookIds = new Set<string>()
+
+    if (requestedAudiobooks > 0) {
+      const { data: existingAudiobooks, error: existingAudiobooksError } = await supabase
+        .from('contents')
+        .select('id')
+        .eq('category', 'audiobook')
+
+      if (existingAudiobooksError) throw existingAudiobooksError
+      existingAudiobooks?.forEach((row) => {
+        if (row.id) existingAudiobookIds.add(String(row.id))
+      })
+    }
 
     for (let i = 0; i < requestedMeals; i += 1) {
       try {
@@ -572,7 +598,7 @@ Deno.serve(async (req: Request) => {
     }
 
     try {
-      const audiobooks = await fetchLibrivoxAudiobooks(requestedAudiobooks)
+      const audiobooks = await fetchLibrivoxAudiobooks(requestedAudiobooks, existingAudiobookIds)
       audiobooks.forEach((audiobook) => collected.set(audiobook.id, audiobook))
     } catch (error) {
       errors.push(`LibriVox: ${error instanceof Error ? error.message : String(error)}`)

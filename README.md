@@ -338,12 +338,14 @@ The function fetches:
 
 - Recipes from **TheMealDB**
 - 10 exercises from **WorkoutX**
-- 8 **English audiobooks** from **LibriVox**
+- 10 **English audiobooks** from **LibriVox**
 - Workout GIFs are uploaded once per exercise to the public Supabase Storage bucket `api-content-media`
 
 LibriVox notes:
 
 - The API does not support a direct `language` query parameter on the `audiobooks` endpoint, so the function fetches extended audiobook records and filters them locally to `English`
+- Audiobooks are stored in `public.contents` with `type = 'audio'` and `category = 'audiobook'`
+- The weekly sync prefers audiobooks that are not already in the database, so each week tends to bring different titles until the available pool is exhausted
 - Audiobook metadata comes from `https://librivox.org/api/feed/audiobooks`
 - Audiotracks are fetched separately from `https://librivox.org/api/feed/audiotracks`
 - We store title, cleaned description, year, language, total duration, track list, cover art, and author
