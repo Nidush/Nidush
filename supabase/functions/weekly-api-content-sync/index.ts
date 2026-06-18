@@ -262,10 +262,12 @@ const fetchLibrivoxTracks = async (projectId: string): Promise<unknown[]> => {
       const title = String(track.title ?? '').trim() || `Track ${sectionNumber || '?'}`
       const duration = Number(track.playtime ?? 0)
       const cleanDuration = Number.isFinite(duration) && duration > 0 ? duration : undefined
+      const listenUrl = String(track.listen_url ?? '').trim() || undefined
 
       return {
         text: sectionNumber ? `Track ${sectionNumber}: ${title}` : title,
         duration: cleanDuration,
+        url: listenUrl,
       }
     })
     .filter((track) => String((track as { text?: string }).text ?? '').trim())
@@ -346,7 +348,7 @@ const fetchLibrivoxAudiobooks = async (
       image: String(book.coverart_thumbnail ?? book.coverart_jpg ?? '').trim() || null,
       instructions: tracks,
       ingredients: null,
-      video_url: null,
+      video_url: String(book.url_librivox ?? '').trim() || null,
       author,
     }
   }))

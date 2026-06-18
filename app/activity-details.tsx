@@ -778,6 +778,8 @@ export default function ActivityDetails() {
           <ContentSection
             ingredients={ingredients}
             instructions={instructions}
+            mediaUrl={relatedContent?.videoUrl}
+            mediaLabel={relatedContent?.type === 'audiobooks' ? 'Open audiobook' : undefined}
           />
         </View>
       </ScrollView>
