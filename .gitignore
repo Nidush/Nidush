@@ -77,6 +77,7 @@ android/local-home-sdk/**/*-javadoc.jar
 !/android/app/src/main/java/com/nidush/app/MainApplication.kt
 !/android/app/src/main/java/com/nidush/app/GoogleHomeModule.kt
 !/android/app/src/main/java/com/nidush/app/GoogleHomePackage.kt
+!/android/app/src/main/java/com/nidush/app/GoogleHomeClientRegistry.kt
 
 # Local Netlify folder
 .netlify

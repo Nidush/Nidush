@@ -25,7 +25,9 @@ class MainActivity : ReactActivity() {
     super.onCreate(null)
     HealthConnectPermissionDelegate.setPermissionDelegate(this)
     RNGCCastContext.getSharedInstance(this)
-    GoogleHomeClientRegistry.prepare(this)
+    if (BuildConfig.GOOGLE_HOME_SERVER_CLIENT_ID.isNotBlank()) {
+      GoogleHomeClientRegistry.prepare(this)
+    }
   }
 
   /**
