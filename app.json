@@ -3,9 +3,7 @@
     "name": "Nidush",
     "slug": "Nidush",
     "version": "1.0.0",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/Icon-Padded.png",
     "scheme": "nidush",
@@ -92,7 +90,7 @@
         {
           "android": {
             "minSdkVersion": 26,
-            "compileSdkVersion": 35,
+            "compileSdkVersion": 36,
             "targetSdkVersion": 35
           }
         }

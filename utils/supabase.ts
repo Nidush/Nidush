@@ -53,14 +53,25 @@ type LogPayload = Record<string, unknown> | string | number | boolean | null;
 
 type FunctionInvokeBody = Record<string, unknown> | undefined;
 
+const SUPABASE_PROJECT_REF = (() => {
+  try {
+    return new URL(SUPABASE_URL).hostname.split('.')[0] ?? 'project';
+  } catch {
+    return 'project';
+  }
+})();
+
+const SUPABASE_STORAGE_KEY = `sb-${SUPABASE_PROJECT_REF}-auth-token`;
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     storage: customStorage,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
-    lock: Platform.OS === 'web' ? processLock : undefined,
-  },
+    lock: processLock,
+    lockAcquireTimeout: 15000,
+  } as typeof createClient extends (...args: any[]) => any ? any : never,
   global: {
     fetch: customFetch as typeof fetch,
   }
@@ -71,6 +82,14 @@ const isInvalidRefreshTokenMessage = (message: string) => {
   return (
     normalized.includes('invalid refresh token') ||
     normalized.includes('refresh token') && normalized.includes('already used')
+  );
+};
+
+const isLockTimeoutMessage = (message: string) => {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('acquiring process lock') ||
+    normalized.includes('lock "') && normalized.includes('timed out')
   );
 };
 
@@ -86,37 +105,76 @@ export const isInvalidRefreshTokenError = (error: unknown) => {
   return isInvalidRefreshTokenMessage(message);
 };
 
+export const isSupabaseLockTimeoutError = (error: unknown) => {
+  if (!error) return false;
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : String((error as { message?: unknown }).message || error);
+
+  return isLockTimeoutMessage(message);
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export const clearLocalSupabaseSession = async () => {
   try {
+    await customStorage.removeItem(SUPABASE_STORAGE_KEY);
     await supabase.auth.signOut({ scope: 'local' });
   } catch (error) {
     logger.warn('Failed to clear local Supabase session.', error);
   }
 };
 
-export const getSessionUser = async () => {
-  try {
-    const { data, error } = await supabase.auth.getSession();
+const resolveSessionUser = async () => {
+  const maxAttempts = 3;
 
-    if (error) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const { data, error } = await supabase.auth.getSession();
+
+      if (error) {
+        if (isInvalidRefreshTokenError(error)) {
+          logger.warn('Supabase session refresh token became invalid. Clearing local session.');
+          await clearLocalSupabaseSession();
+          return null;
+        }
+        throw error;
+      }
+
+      return data.session?.user ?? null;
+    } catch (error) {
       if (isInvalidRefreshTokenError(error)) {
-        logger.warn('Supabase session refresh token became invalid. Clearing local session.');
+        logger.warn('Supabase session refresh token was already used. Clearing local session.');
         await clearLocalSupabaseSession();
         return null;
       }
+
+      if (isSupabaseLockTimeoutError(error) && attempt < maxAttempts) {
+        logger.warn(`Supabase auth lock was busy. Retrying session recovery (attempt ${attempt + 1}/${maxAttempts}).`);
+        await sleep(250 * attempt);
+        continue;
+      }
+
       throw error;
     }
-
-    return data.session?.user ?? null;
-  } catch (error) {
-    if (isInvalidRefreshTokenError(error)) {
-      logger.warn('Supabase session refresh token was already used. Clearing local session.');
-      await clearLocalSupabaseSession();
-      return null;
-    }
-
-    throw error;
   }
+
+  return null;
+};
+
+let sessionRecoveryPromise: Promise<Awaited<ReturnType<typeof resolveSessionUser>>> | null = null;
+
+export const getSessionUser = async () => {
+  if (!sessionRecoveryPromise) {
+    sessionRecoveryPromise = resolveSessionUser().finally(() => {
+      sessionRecoveryPromise = null;
+    });
+  }
+
+  return sessionRecoveryPromise;
 };
 
 export const touchUserAppPresence = async (force = false) => {

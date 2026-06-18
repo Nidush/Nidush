@@ -8,6 +8,7 @@ export type InstructionStep = {
   text: string;
   duration?: number;
   description?: string;
+  url?: string;
 };
 
 export interface Content {

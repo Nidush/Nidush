@@ -37,9 +37,10 @@ import {
   fetchScenarioTemplateById,
   mapUserActivity,
   normalizeScenarioTemplateId,
-  parseUserScenarioDbId,
+  resolvePossibleUserScenarioDbIds,
 } from '@/utils/catalogTemplates';
 import { getScenarioDeviceMeta, mapLinkedDeviceToScenarioState } from '@/utils/activityDeviceConfigs';
+import { applyScenarioDeviceStates } from '@/utils/deviceExecution';
 
 type FormattedInstruction = {
   text: string;
@@ -80,6 +81,8 @@ type ContentRow = {
   video_url?: string | null;
 };
 
+const DEVICE_ENFORCEMENT_INTERVAL_MS = 15000;
+
 const getJoinedRoomName = (value: unknown) => {
   if (Array.isArray(value)) {
     const first = value[0];
@@ -93,6 +96,49 @@ const getJoinedRoomName = (value: unknown) => {
   }
 
   return '';
+};
+
+const getEnforcedLightDevices = (devices: ScenarioDeviceState[]) =>
+  devices.filter((config) => {
+    const device = SMART_HOME_DEVICES[config.deviceId];
+    const fallbackMeta = getScenarioDeviceMeta(config);
+    const isLight = device?.type === 'light' || fallbackMeta.type === 'light';
+    const hasConfiguredVisualState =
+      typeof config.color === 'string' ||
+      typeof config.brightness === 'string' ||
+      typeof config.value === 'string' ||
+      typeof config.value === 'number';
+
+    return isLight && hasConfiguredVisualState;
+  });
+
+const fetchScenarioFromDbCandidates = async (rawScenarioId: string) => {
+  const candidateIds = resolvePossibleUserScenarioDbIds(rawScenarioId);
+
+  for (const candidateId of candidateIds) {
+    const { data: scenData } = await supabase
+      .from('scenarios')
+      .select('id, name, description, image, playlist_id, playlist_name, focus_mode_enabled, devices, rooms(name)')
+      .eq('id', candidateId)
+      .maybeSingle();
+
+    if (scenData) {
+      return {
+        id: `scenario:${scenData.id}`,
+        title: scenData.name,
+        description: scenData.description || '',
+        playlist: scenData.playlist_name || (scenData.playlist_id ? 'Spotify Music' : undefined),
+        playlist_id: scenData.playlist_id || undefined,
+        focusMode: scenData.focus_mode_enabled === true,
+        shortcuts: false,
+        devices: Array.isArray(scenData.devices) ? scenData.devices : [],
+        room: getJoinedRoomName(scenData.rooms) || undefined,
+        image: resolveCatalogImage(scenData.image || 'Scenarios/moonlight_bay.png'),
+      } as Scenario;
+    }
+  }
+
+  return null;
 };
 
 const isStoredActivityLike = (value: unknown): value is StoredActivityLike =>
@@ -166,6 +212,11 @@ const getPlaylistId = (item: StoredActivityLike | Activity | Scenario) =>
 const getItemDevices = (item: StoredActivityLike | Activity | Scenario) =>
   ('devices' in item && Array.isArray(item.devices) ? item.devices : []) as ScenarioDeviceState[];
 
+const resolveConfiguredDevices = (
+  activityDevices: ScenarioDeviceState[],
+  scenarioDevices: ScenarioDeviceState[],
+) => (scenarioDevices.length > 0 ? scenarioDevices : activityDevices);
+
 const getNumericRoomId = (item: StoredActivityLike | Activity | Scenario) => {
   if (typeof item.room_id === 'number') return item.room_id;
 
@@ -201,6 +252,7 @@ export default function ActiveSession() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [showExitModal, setShowExitModal] = useState(false);
   const startedPlaybackForSessionRef = useRef<string | null>(null);
+  const cleanedUpSessionRef = useRef(false);
 
   const progress = useSharedValue(0);
   const contentOpacity = useSharedValue(1);
@@ -302,27 +354,7 @@ export default function ActiveSession() {
       const sId = getScenarioId(foundItem);
       relatedScenario = sId ? await fetchScenarioTemplateById(String(sId)) : null;
       if (!relatedScenario && sId) {
-        const scenarioDbId = parseUserScenarioDbId(sId);
-        const { data: scenData } = await supabase
-          .from('scenarios')
-          .select('id, name, description, image, playlist_id, playlist_name, focus_mode_enabled, devices, rooms(name)')
-          .eq('id', scenarioDbId)
-          .maybeSingle();
-
-        if (scenData) {
-          relatedScenario = {
-            id: `scenario:${scenData.id}`,
-            title: scenData.name,
-            description: scenData.description || '',
-            playlist: scenData.playlist_name || (scenData.playlist_id ? 'Spotify Music' : undefined),
-            playlist_id: scenData.playlist_id || undefined,
-            focusMode: scenData.focus_mode_enabled === true,
-            shortcuts: false,
-            devices: Array.isArray(scenData.devices) ? scenData.devices : [],
-            room: getJoinedRoomName(scenData.rooms) || undefined,
-            image: resolveCatalogImage(scenData.image || 'Scenarios/moonlight_bay.png'),
-          } as Scenario;
-        }
+        relatedScenario = await fetchScenarioFromDbCandidates(String(sId));
       }
       if (contentType !== 'video' && relatedScenario?.playlist) {
         playlistName = relatedScenario.playlist;
@@ -380,6 +412,11 @@ export default function ActiveSession() {
         });
       }
 
+      const configuredDevices = resolveConfiguredDevices(
+        getItemDevices(foundItem),
+        Array.isArray(relatedScenario?.devices) ? relatedScenario.devices : [],
+      );
+
       setSessionData({
         title: foundItem.title || 'Session',
         room: getActivityRoom(foundItem),
@@ -388,7 +425,7 @@ export default function ActiveSession() {
         instructions: formattedInstructions,
         type: contentType,
         videoUrl: videoUrl,
-        devices: relatedScenario?.devices || getItemDevices(foundItem),
+        devices: configuredDevices,
         tvDeviceName: connectedTvName,
       });
 
@@ -430,8 +467,10 @@ export default function ActiveSession() {
           if (!pId) pId = '37i9dQZF1DX76W9kuv1Z0g';
         }
         
-        const sessionDevices =
-          relatedScenario?.devices?.length ? relatedScenario.devices : getItemDevices(foundItem);
+        const sessionDevices = resolveConfiguredDevices(
+          getItemDevices(foundItem),
+          Array.isArray(relatedScenario?.devices) ? relatedScenario.devices : [],
+        );
         const hasScenarioTv = sessionDevices.some((config: ScenarioDeviceState) => {
           const device = SMART_HOME_DEVICES[config.deviceId];
           const fallbackMeta = getScenarioDeviceMeta(config);
@@ -493,6 +532,7 @@ export default function ActiveSession() {
 
   useEffect(() => {
     startedPlaybackForSessionRef.current = null;
+    cleanedUpSessionRef.current = false;
     loadData();
   }, [id, loadData]);
 
@@ -512,6 +552,77 @@ export default function ActiveSession() {
     }
   }, [isActive, isVideoSession, pulseScale]);
 
+  const handleToggleSession = () => {
+    const newState = !isActive;
+    setIsActive(newState);
+    setIsMusicPlaying(newState);
+  };
+
+  const handleToggleMusic = () => {
+    if (isMusicPlaying) {
+      pausePlayback();
+    } else {
+      resumePlayback();
+    }
+    setIsMusicPlaying((prev) => !prev);
+  };
+
+  const cleanupSessionDevices = useCallback(async () => {
+    if (cleanedUpSessionRef.current) return;
+    if (!sessionData?.devices?.length) {
+      cleanedUpSessionRef.current = true;
+      return;
+    }
+
+    try {
+      await applyScenarioDeviceStates(sessionData.devices, { forcePowerOn: false });
+    } catch (error) {
+      console.error('Failed to turn off session devices on exit:', error);
+    } finally {
+      cleanedUpSessionRef.current = true;
+    }
+  }, [sessionData]);
+
+  useEffect(() => {
+    if (!isActive || !sessionData?.devices?.length) return;
+
+    const devicesToEnforce = getEnforcedLightDevices(sessionData.devices).map((device) => ({
+      ...device,
+      state: 'on' as const,
+    }));
+
+    if (devicesToEnforce.length === 0) return;
+
+    let cancelled = false;
+
+    const enforceLightingState = async () => {
+      try {
+        await applyScenarioDeviceStates(devicesToEnforce, { forcePowerOn: true });
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Failed to reapply session lighting state:', error);
+        }
+      }
+    };
+
+    void enforceLightingState();
+    const interval = setInterval(() => {
+      void enforceLightingState();
+    }, DEVICE_ENFORCEMENT_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [isActive, sessionData]);
+
+  const exitSession = useCallback(async () => {
+    setIsActive(false);
+    setIsMusicPlaying(false);
+    await cleanupSessionDevices();
+    router.replace('/Activities');
+  }, [cleanupSessionDevices]);
+
   const handleNextStep = useCallback(() => {
     if (!sessionData) return;
     const totalSteps = sessionData.instructions.length;
@@ -528,9 +639,9 @@ export default function ActiveSession() {
         setSecondsLeft(nextDuration || 0);
       }, 300);
     } else {
-      router.replace('/Activities');
+      void exitSession();
     }
-  }, [currentStepIndex, sessionData, contentOpacity]);
+  }, [currentStepIndex, sessionData, contentOpacity, exitSession]);
 
   useEffect(() => {
     if (sessionData && currentStepIndex > 0 && !isVideoSession) {
@@ -574,21 +685,6 @@ export default function ActiveSession() {
     }
   }, [currentStepIndex, sessionData, isVideoSession, progress]);
 
-  const handleToggleSession = () => {
-    const newState = !isActive;
-    setIsActive(newState);
-    setIsMusicPlaying(newState);
-  };
-
-  const handleToggleMusic = () => {
-    if (isMusicPlaying) {
-      pausePlayback();
-    } else {
-      resumePlayback();
-    }
-    setIsMusicPlaying((prev) => !prev);
-  };
-
   const handleCancel = () => {
     setIsActive(false);
     setIsMusicPlaying(false);
@@ -630,12 +726,16 @@ export default function ActiveSession() {
       <ExitModal
         visible={showExitModal}
         onResume={handleResume}
-        onEnd={() => router.replace('/Activities')}
+        onEnd={() => {
+          void exitSession();
+        }}
       />
 
       <SessionHeader
         title={sessionData.title}
-        onBack={() => router.back()}
+        onBack={() => {
+          void exitSession();
+        }}
         onCancel={handleCancel}
       />
 

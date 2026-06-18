@@ -17,18 +17,25 @@ export const Step2_Content = ({
   activityType,
   contentList,
 }: Step2Props) => {
+  const normalizeCategory = (value: string) => {
+    const normalized = value.toLowerCase().trim();
+    if (normalized === 'audiobooks' || normalized === 'audiobook') return 'audio';
+    return normalized;
+  };
+
   const filteredContent = useMemo(() => {
     if (activityType === 'general') return contentList;
 
-    const targetCategory = (activityType || '').toLowerCase();
+    const targetCategory = normalizeCategory(activityType || '');
 
     return contentList.filter(
       (content) => {
         // Fallback checks for API data
         if (targetCategory === 'cooking' && content.type === 'recipe') return true;
         if (targetCategory === 'workout' && content.type === 'exercise') return true;
+        if (targetCategory === 'audio' && (content.type === 'audiobooks' || content.type === 'audio')) return true;
 
-        const cat = (content.category || '').toLowerCase();
+        const cat = normalizeCategory(content.category || '');
         return cat === targetCategory || cat === 'general';
       }
     );
@@ -38,7 +45,9 @@ export const Step2_Content = ({
   const videos = filteredContent.filter(
     (c) => c.type === 'video' || c.type === 'workout' || c.type === 'exercise'
   );
-  const audios = filteredContent.filter((c) => c.type === 'audio' || c.category?.toLowerCase() === 'audiobook');
+  const audios = filteredContent.filter(
+    (c) => c.type === 'audiobooks' || c.type === 'audio' || c.category?.toLowerCase() === 'audio'
+  );
 
   const renderCarousel = (title: string, data: typeof filteredContent) => {
     if (data.length === 0) return null;

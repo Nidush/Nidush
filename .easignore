@@ -1,0 +1,8 @@
+node_modules
+.git
+.expo
+dist
+coverage
+supabase/.temp
+.tmp-gh-home-classes.jar
+.tmp-gh-home-types-classes.jar

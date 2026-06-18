@@ -8,6 +8,7 @@ jest.mock('../utils/supabase', () => ({
 }));
 
 import {
+  getDeviceSourceLabel,
   isRealHomeDevice,
   normalizeDeviceStatus,
   normalizeDeviceType,
@@ -57,5 +58,11 @@ describe('devices utils', () => {
     ]);
 
     expect(sorted.map((device) => device.id)).toEqual([2, 1, 3]);
+  });
+
+  it('formats friendly labels for device sources', () => {
+    expect(getDeviceSourceLabel('google_home')).toBe('Google Home');
+    expect(getDeviceSourceLabel('health_connect')).toBe('Health Connect');
+    expect(getDeviceSourceLabel('network')).toBe('Network');
   });
 });

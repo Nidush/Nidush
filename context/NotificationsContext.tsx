@@ -209,6 +209,16 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
   }, [ensurePushRegistration, removePushTokenForUser, userId]);
 
   useEffect(() => {
+    if (!userId || !notificationsEnabled || Platform.OS === 'web') return;
+
+    void ensurePushRegistration(userId, false).then((didRegister) => {
+      if (!didRegister) {
+        console.warn('Push notifications are enabled locally but no valid push token is currently registered.');
+      }
+    });
+  }, [ensurePushRegistration, notificationsEnabled, userId]);
+
+  useEffect(() => {
     const fetchUser = async () => {
       const user = await getSessionUser();
       if (user) {

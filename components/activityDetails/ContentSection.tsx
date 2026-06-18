@@ -1,21 +1,26 @@
 import { Ingredient } from '@/constants/data';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Linking, Text, TouchableOpacity, View } from 'react-native';
 
 type InstructionStep = {
   text: string;
   duration?: number;
+  url?: string;
 };
 
 interface ContentSectionProps {
   ingredients?: Ingredient[];
   instructions: (string | InstructionStep)[];
+  mediaUrl?: string;
+  mediaLabel?: string;
 }
 
 export const ContentSection = ({
   ingredients,
   instructions,
+  mediaUrl,
+  mediaLabel,
 }: ContentSectionProps) => {
   return (
     <>
@@ -79,6 +84,9 @@ export const ContentSection = ({
             const duration = isObject
               ? (step as InstructionStep).duration
               : null;
+            const stepUrl = isObject
+              ? (step as InstructionStep).url
+              : null;
 
             return (
               <View
@@ -134,12 +142,44 @@ export const ContentSection = ({
                       </Text>
                     </View>
                   )}
+
+                  {stepUrl ? (
+                    <TouchableOpacity
+                      className="mt-2 self-start"
+                      onPress={() => Linking.openURL(stepUrl).catch(() => {})}
+                    >
+                      <Text
+                        maxFontSizeMultiplier={1.2}
+                        className="text-[#548F53] text-sm underline"
+                        style={{ fontFamily: 'Nunito_700Bold' }}
+                      >
+                        Open track
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               </View>
             );
           })}
         </View>
       )}
+
+      {mediaUrl ? (
+        <View className="mb-6">
+          <TouchableOpacity
+            className="rounded-2xl border border-[#548f537f] px-4 py-3 self-start bg-[#F6FBF6]"
+            onPress={() => Linking.openURL(mediaUrl).catch(() => {})}
+          >
+            <Text
+              maxFontSizeMultiplier={1.2}
+              className="text-[#548F53]"
+              style={{ fontFamily: 'Nunito_700Bold' }}
+            >
+              {mediaLabel || 'Open audiobook'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </>
   );
 };

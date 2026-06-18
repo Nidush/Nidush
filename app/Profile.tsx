@@ -5,10 +5,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { AppState, Image, Modal, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { pickImage } from '../utils/imagePicker';
-import { supabase, uploadImage } from '../utils/supabase';
+import { getSessionUser, supabase, uploadImage } from '../utils/supabase';
 import { getAvatarSource } from '../utils/avatarSource';
 import {
   DeviceRecord,
+  getDeviceSourceLabel,
   isRealHomeDevice,
   SmartDeviceStatus,
   sortDevicesByFreshness,
@@ -31,6 +32,13 @@ import {
 } from '../utils/healthConnectSync';
 import { LEGAL_POLICY_VERSION, setHealthConnectEnabled } from '../utils/legal';
 import { captureException, trackEvent } from '../utils/observability';
+import {
+  GoogleHomeDiagnostics,
+  GoogleHomeSyncedDevice,
+  requestGoogleHomeAccess,
+  setGoogleHomeDevicePower,
+  syncGoogleHomeSnapshot,
+} from '../utils/googleHome';
 
 const SPOTIFY_RETURN_ROUTE_KEY = '@spotify_return_route';
 
@@ -127,17 +135,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     status?: string | null;
     external_id?: string | null;
     last_seen?: string | null;
-    home_id?: number | string | null;
-  };
-
-  type DeviceDiscoveryResult = {
-    discovered?: number;
-  };
-
-  type DeviceDiscoveryRequestRow = {
-    status?: string | null;
-    error_message?: string | null;
-    result?: DeviceDiscoveryResult | null;
+    home_id?: number | null;
   };
 
   type ProfileCacheSnapshot = {
@@ -198,7 +196,10 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
   const [discoveredDevices, setDiscoveredDevices] = useState<ConnectedDevice[]>([]);
   const [isRefreshingDevices, setIsRefreshingDevices] = useState(false);
   const [isRequestingDiscovery, setIsRequestingDiscovery] = useState(false);
+  const [togglingDeviceId, setTogglingDeviceId] = useState<number | null>(null);
   const [hardwareError, setHardwareError] = useState<string | null>(null);
+  const [googleHomeDiagnostics, setGoogleHomeDiagnostics] = useState<GoogleHomeDiagnostics | null>(null);
+  const [lastGoogleHomeDevices, setLastGoogleHomeDevices] = useState<GoogleHomeSyncedDevice[]>([]);
   const openDeviceScanModal = (title: string, message: string) => {
     setDeviceScanModalTitle(title);
     setDeviceScanModalMessage(message);
@@ -244,6 +245,8 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
     return `${source}:${slug || 'device'}`;
   };
+
+  const normalizeRoomName = (value: string) => value.trim().toLowerCase();
 
   const loadConnectedDevices = useCallback(async (userId: string, homeId: number | string | null) => {
     const buildQuery = (selectClause: string) => {
@@ -307,139 +310,252 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     }
   };
 
+  const syncGoogleHomeDevicesToDb = useCallback(async (
+    userId: string,
+    homeId: number | string | null,
+    devices: GoogleHomeSyncedDevice[],
+  ) => {
+    const normalizedHomeId = homeId ? Number(homeId) : null;
+    const seenExternalIds = new Set<string>();
+    const now = new Date().toISOString();
+    const roomIdByName = new Map<string, number>();
+
+    if (normalizedHomeId) {
+      const { data: existingRooms, error: roomsError } = await supabase
+        .from('rooms')
+        .select('id, name')
+        .eq('home_id', normalizedHomeId)
+        .order('id', { ascending: true });
+
+      if (roomsError) throw roomsError;
+
+      for (const room of existingRooms ?? []) {
+        if (!room?.name) continue;
+        roomIdByName.set(normalizeRoomName(room.name), room.id);
+      }
+    }
+
+    for (const device of devices) {
+      const externalId = String(device.externalId ?? '').trim();
+      const name = String(device.name ?? '').trim();
+      if (!externalId || !name) continue;
+
+      seenExternalIds.add(externalId);
+
+      const googleRoomName =
+        String(device.roomName ?? device.roomHint ?? '')
+          .trim();
+
+      let roomId: number | null = null;
+
+      if (normalizedHomeId && googleRoomName) {
+        const normalizedRoomName = normalizeRoomName(googleRoomName);
+        roomId = roomIdByName.get(normalizedRoomName) ?? null;
+
+        if (roomId == null) {
+          const { data: createdRoom, error: createRoomError } = await supabase
+            .from('rooms')
+            .insert({
+              home_id: normalizedHomeId,
+              name: googleRoomName,
+            })
+            .select('id, name')
+            .single();
+
+          if (createRoomError) throw createRoomError;
+
+          roomId = createdRoom.id;
+          roomIdByName.set(normalizedRoomName, createdRoom.id);
+        }
+      }
+
+      const payload = {
+        name,
+        type: device.type || 'unknown',
+        source: 'google_home',
+        status: device.isOn ? 'On' : 'Off',
+        connectivity_status: device.isOnline === false ? 'offline' : 'online',
+        discovery_method: 'integration',
+        sync_source: 'google_home',
+        user_id: userId,
+        home_id: normalizedHomeId,
+        external_id: externalId,
+        last_seen: now,
+        manufacturer: device.manufacturer ?? null,
+        model: device.model ?? null,
+        room_id: roomId,
+        room_hint: googleRoomName || null,
+        metadata: {
+          roomName: device.roomName ?? null,
+          roomHint: device.roomHint ?? null,
+          traits: device.traits ?? [],
+          provider: 'google_home',
+          ...((device.metadata ?? {}) as Record<string, unknown>),
+        },
+      };
+
+      const legacyPayload = {
+        name,
+        type: device.type || 'unknown',
+        source: 'google_home',
+        status: device.isOn ? 'On' : 'Off',
+        user_id: userId,
+        home_id: normalizedHomeId,
+        external_id: externalId,
+        last_seen: now,
+        room_id: roomId,
+      };
+
+      const { data: existing, error: existingError } = await supabase
+        .from('devices')
+        .select('id')
+        .eq('home_id', normalizedHomeId)
+        .eq('source', 'google_home')
+        .eq('external_id', externalId)
+        .limit(1)
+        .maybeSingle();
+
+      if (existingError) throw existingError;
+
+      const request = existing
+        ? supabase.from('devices').update(payload).eq('id', existing.id)
+        : supabase.from('devices').insert(payload);
+
+      let { error } = await request;
+
+      if (error?.code === '42703') {
+        const fallbackRequest = existing
+          ? supabase.from('devices').update(legacyPayload).eq('id', existing.id)
+          : supabase.from('devices').insert(legacyPayload);
+
+        const fallbackResult = await fallbackRequest;
+        error = fallbackResult.error;
+      }
+
+      if (error) throw error;
+    }
+
+    if (!normalizedHomeId) return;
+
+    let { data: existingGoogleHomeDevices, error: loadExistingError } = await supabase
+      .from('devices')
+      .select('id, external_id')
+      .eq('home_id', normalizedHomeId)
+      .eq('source', 'google_home');
+
+    if (loadExistingError?.code === '42703') {
+      existingGoogleHomeDevices = [];
+      loadExistingError = null;
+    }
+
+    if (loadExistingError) throw loadExistingError;
+
+    for (const existing of existingGoogleHomeDevices ?? []) {
+      const existingExternalId = String(existing.external_id ?? '').trim();
+      if (!existingExternalId || seenExternalIds.has(existingExternalId)) continue;
+
+      await supabase
+        .from('devices')
+        .update({
+          status: 'Off',
+          connectivity_status: 'offline',
+        })
+        .eq('id', existing.id);
+    }
+  }, []);
+
   const requestAutomaticDiscovery = async () => {
     setIsRequestingDiscovery(true);
-    trackEvent('requested-device-discovery', {
+    trackEvent('requested-google-home-sync', {
       area: 'devices',
       screen: 'profile',
-      action: 'request-scan',
+      action: 'connect-google-home',
     });
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getSessionUser();
       if (!user) throw new Error('Session not found.');
 
       const resolvedHomeId = userHomeId ?? (await getCurrentUserHomeId(user.id));
       if (!resolvedHomeId) throw new Error('No home connected to this user.');
 
-      const { data, error } = await supabase.functions.invoke('request-device-discovery', {
-        body: {},
-      });
-
-      if (error) throw error;
-
-      console.log('[Profile][DeviceDiscovery] Request response:', data);
-
-      const requestId = Number(data?.request?.id);
-      if (!requestId) {
-        console.log('[Profile][DeviceDiscovery] No request id returned. Refreshing current devices.');
-        await refreshConnectedDevices(user.id, resolvedHomeId);
-        trackEvent('device-discovery-reused-existing-sync', {
+      const access = await requestGoogleHomeAccess();
+      console.log('[GoogleHome] access result', access);
+      if (!access.granted) {
+        const reason = access.reason || 'Google Home access was not granted.';
+        trackEvent('google-home-access-denied', {
           area: 'devices',
           screen: 'profile',
-          action: 'request-scan',
-          userId: user.id,
-          metadata: { homeId: resolvedHomeId },
-        });
+          action: 'connect-google-home',
+          metadata: { reason },
+        }, 'warn');
+        openDeviceScanModal('Google Home setup required', reason);
+        setHardwareError(reason);
         return;
       }
 
-      const startedAt = Date.now();
-      let latestStatus = String(data?.request?.status ?? 'pending').toLowerCase();
-      console.log(
-        `[Profile][DeviceDiscovery] Waiting for request ${requestId} on home ${resolvedHomeId}. Initial status: ${latestStatus}`,
-      );
+      const snapshot = await syncGoogleHomeSnapshot();
+      const devices = snapshot.devices;
+      setGoogleHomeDiagnostics(snapshot.diagnostics ?? null);
+      setLastGoogleHomeDevices(devices);
+      console.log('[GoogleHome] synced devices', devices.length, devices);
+      await syncGoogleHomeDevicesToDb(user.id, resolvedHomeId, devices);
+      const refreshedDevices = await loadConnectedDevices(user.id, resolvedHomeId);
 
-      while (Date.now() - startedAt < 45000) {
-        const { data: requestRow, error: requestError } = await supabase
-          .from('device_discovery_requests')
-          .select('status, error_message, result')
-          .eq('id', requestId)
-          .eq('home_id', Number(resolvedHomeId))
-          .maybeSingle();
-
-        if (requestError) throw requestError;
-
-        latestStatus = String(requestRow?.status ?? latestStatus).toLowerCase();
-        console.log(
-          `[Profile][DeviceDiscovery] Poll request ${requestId}: status=${latestStatus}`,
-          requestRow,
+      if (devices.length === 0 || refreshedDevices.length === 0) {
+        openDeviceScanModal(
+          'No devices found',
+          'We connected to your Google Home household, but this Google Home API build did not receive any rooms or compatible devices for this account. This usually means the home was found, but your current devices are not exposed by this SDK layer yet, often because they are cloud-linked or not Matter-compatible. Your existing Nidush internet-connected devices can still keep working normally.',
         );
-
-        if (latestStatus === 'completed') {
-          console.log(`[Profile][DeviceDiscovery] Request ${requestId} completed. Refreshing devices.`);
-          const refreshedDevices = await loadConnectedDevices(user.id, resolvedHomeId);
-          const typedRequestRow = requestRow as DeviceDiscoveryRequestRow | null;
-          const discoveredCount = Number(
-            typedRequestRow?.result?.discovered ?? refreshedDevices.length ?? 0,
-          );
-
-          if (discoveredCount === 0 || refreshedDevices.length === 0) {
-            trackEvent('device-discovery-completed-no-devices', {
-              area: 'devices',
-              screen: 'profile',
-              action: 'poll-scan',
-              userId: user.id,
-              metadata: { requestId, homeId: resolvedHomeId },
-            });
-            openDeviceScanModal(
-              'No devices found',
-              'We scanned your home network but did not find any compatible smart devices this time. Make sure the devices are turned on and connected to the same Wi-Fi, then try again.',
-            );
-          }
-          return;
-        }
-
-        if (latestStatus === 'failed') {
-          const failureMessage = requestRow?.error_message
-            ? String(requestRow.error_message)
-            : 'The smart device scan failed.';
-          captureException(new Error(failureMessage), {
-            area: 'devices',
-            screen: 'profile',
-            action: 'poll-scan',
-            userId: user.id,
-            metadata: { requestId, homeId: resolvedHomeId, status: latestStatus },
-          });
-          openDeviceScanModal(
-            'Scan failed',
-            `${failureMessage} Please wait a moment and try again.`,
-          );
-          throw new Error(failureMessage);
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, 2500));
       }
-
-      console.log(
-        `[Profile][DeviceDiscovery] Request ${requestId} is still running after 45s. Refreshing current devices.`,
-      );
-      await refreshConnectedDevices(user.id, resolvedHomeId);
-      setHardwareError('The scan is still running. Pull to refresh again in a few seconds.');
-      trackEvent('device-discovery-timeout-refresh', {
-        area: 'devices',
-        screen: 'profile',
-        action: 'poll-scan',
-        userId: user.id,
-        metadata: { requestId, homeId: resolvedHomeId },
-      });
-      openDeviceScanModal(
-        'Scan still running',
-        'We started the smart device scan, but it is taking longer than expected. Please wait a few seconds and tap refresh again.',
-      );
     } catch (error: unknown) {
-      console.error('Failed to request automatic discovery:', error);
+      console.error('Failed to sync Google Home devices:', error);
       const errorMessage =
-        error instanceof Error ? error.message : 'Could not scan smart devices.';
+        error instanceof Error ? error.message : 'Could not sync Google Home devices.';
       setHardwareError(errorMessage);
       captureException(error, {
         area: 'devices',
         screen: 'profile',
-        action: 'request-scan',
+        action: 'connect-google-home',
       });
     } finally {
       setIsRequestingDiscovery(false);
     }
   };
+
+  const toggleGoogleHomeDevice = useCallback(async (device: ConnectedDevice) => {
+    if (!device.id || device.source !== 'google_home') return;
+
+    const nextPowerState = !isDeviceCurrentlyConnected(device);
+    setTogglingDeviceId(device.id);
+    try {
+      await setGoogleHomeDevicePower(String(device.external_id ?? ''), nextPowerState);
+      await supabase
+        .from('devices')
+        .update({
+          status: nextPowerState ? 'On' : 'Off',
+          connectivity_status: nextPowerState ? 'online' : 'offline',
+          last_seen: new Date().toISOString(),
+        })
+        .eq('id', device.id);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await refreshConnectedDevices(user.id, userHomeId);
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Could not control this Google Home device.';
+      setHardwareError(errorMessage);
+      captureException(error, {
+        area: 'devices',
+        screen: 'profile',
+        action: 'toggle-google-home-device',
+        metadata: { deviceId: device.id, externalId: device.external_id },
+      });
+    } finally {
+      setTogglingDeviceId(null);
+    }
+  }, [isDeviceCurrentlyConnected, refreshConnectedDevices, userHomeId]);
 
   // Função para sincronizar dispositivos com o Supabase
   const syncDeviceToDB = useCallback(async (name: string, type: string, source: string, externalId?: string) => {
@@ -528,7 +644,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
     const fetchUser = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = await getSessionUser();
         if (user) {
           try {
             const cachedProfile = await AsyncStorage.getItem(getProfileCacheKey(user.id));
@@ -1040,7 +1156,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
                 className="text-xs text-[#71806F] mt-1"
                 style={{ fontFamily: 'Nunito_400Regular' }}
               >
-                Real home devices synced from your local network agent.
+                Smart home devices synced from your Google Home household.
               </Text>
             </View>
             {isRefreshingDevices && (
@@ -1080,10 +1196,30 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
                     <Text className="text-[#4A5D4E] font-bold">{device.name}</Text>
                     <Text className="text-gray-500 text-xs">
                       {device.status === 'connected' || device.status === 'On'
-                        ? 'Online on your home network'
+                        ? device.source === 'google_home'
+                          ? 'Online in Google Home'
+                          : 'Online on your home network'
                         : 'Offline or waiting for the next sync'}
                     </Text>
                   </View>
+                  {device.source === 'google_home' && (
+                    <TouchableOpacity
+                      onPress={() => toggleGoogleHomeDevice(device)}
+                      disabled={togglingDeviceId === device.id}
+                      testID={`toggle-google-home-device-${device.id ?? index}`}
+                      className={`mr-3 px-3 py-1.5 rounded-full border border-[#D1D9C5] ${
+                        togglingDeviceId === device.id ? 'opacity-50' : ''
+                      }`}
+                    >
+                      <Text className="text-[#4A5D4E] text-xs font-bold">
+                        {togglingDeviceId === device.id
+                          ? '...'
+                          : isDeviceCurrentlyConnected(device)
+                            ? 'Turn Off'
+                            : 'Turn On'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                   <View className="ml-auto items-end">
                     <View
                       className={`w-2.5 h-2.5 rounded-full ${
@@ -1093,14 +1229,14 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
                       }`}
                     />
                     <Text className="text-[10px] text-gray-400 mt-1">
-                      {device.source || 'network'}
+                      {getDeviceSourceLabel(device.source)}
                     </Text>
                   </View>
                 </View>
               ))
             ) : (
               <Text className="text-gray-400 italic text-center">
-                No real smart home devices synced yet.
+                No Google Home devices synced yet.
               </Text>
             )}
           </View>
@@ -1112,7 +1248,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
             className={`mt-4 py-3 items-center bg-[#5B8C51] rounded-full ${isRequestingDiscovery ? 'opacity-50' : ''}`}
           >
             <Text className="text-white font-bold">
-              {isRequestingDiscovery ? 'Requesting Scan...' : 'Scan Smart Devices'}
+              {isRequestingDiscovery ? 'Syncing Google Home...' : 'Connect Google Home & Sync Devices'}
             </Text>
           </TouchableOpacity>
 
@@ -1130,6 +1266,75 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
               {isRefreshingDevices ? 'Refreshing Devices...' : 'Refresh Synced Devices'}
             </Text>
           </TouchableOpacity>
+
+          {(googleHomeDiagnostics || lastGoogleHomeDevices.length > 0) && (
+            <View className="mt-4 rounded-[20px] border border-[#D1D9C5] bg-white/60 p-4" testID="google-home-debug-card">
+              <Text
+                maxFontSizeMultiplier={1.2}
+                className="text-base text-[#4A5D4E]"
+                style={{ fontFamily: 'Nunito_600SemiBold' }}
+              >
+                Google Home SDK Debug
+              </Text>
+              <Text
+                className="text-xs text-[#71806F] mt-1"
+                style={{ fontFamily: 'Nunito_400Regular' }}
+              >
+                This shows the exact home data that the Google Home Android SDK returned to Nidush.
+              </Text>
+
+              <View className="mt-3 gap-y-2">
+                <Text className="text-xs text-[#4A5D4E]">
+                  Structures found: {googleHomeDiagnostics?.structureCount ?? 0}
+                </Text>
+                <Text className="text-xs text-[#4A5D4E]">
+                  Rooms found: {googleHomeDiagnostics?.roomCount ?? 0}
+                </Text>
+                <Text className="text-xs text-[#4A5D4E]">
+                  Devices returned by SDK: {lastGoogleHomeDevices.length}
+                </Text>
+              </View>
+
+              <View className="mt-3">
+                <Text className="text-xs font-bold text-[#4A5D4E]">Structures</Text>
+                {googleHomeDiagnostics?.structures?.length ? (
+                  googleHomeDiagnostics.structures.map((structure) => (
+                    <Text key={structure.id} className="text-xs text-[#71806F] mt-1">
+                      {structure.name} ({structure.id})
+                    </Text>
+                  ))
+                ) : (
+                  <Text className="text-xs text-[#A0AA9A] mt-1">No structures details returned.</Text>
+                )}
+              </View>
+
+              <View className="mt-3">
+                <Text className="text-xs font-bold text-[#4A5D4E]">Rooms</Text>
+                {googleHomeDiagnostics?.rooms?.length ? (
+                  googleHomeDiagnostics.rooms.map((room) => (
+                    <Text key={room.id} className="text-xs text-[#71806F] mt-1">
+                      {room.name} ({room.id})
+                    </Text>
+                  ))
+                ) : (
+                  <Text className="text-xs text-[#A0AA9A] mt-1">No rooms were returned by the SDK.</Text>
+                )}
+              </View>
+
+              <View className="mt-3">
+                <Text className="text-xs font-bold text-[#4A5D4E]">Devices</Text>
+                {lastGoogleHomeDevices.length ? (
+                  lastGoogleHomeDevices.map((device) => (
+                    <Text key={device.externalId} className="text-xs text-[#71806F] mt-1">
+                      {device.name} [{device.type}] {device.roomName ? `- room: ${device.roomName}` : ''}
+                    </Text>
+                  ))
+                ) : (
+                  <Text className="text-xs text-[#A0AA9A] mt-1">No devices were returned by the SDK.</Text>
+                )}
+              </View>
+            </View>
+          )}
         </View>
 
         {/* Wearables */}

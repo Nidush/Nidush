@@ -17,6 +17,7 @@ import {
   fetchScenarioTemplates,
   fetchUserScenarios,
   parseUserScenarioDbId,
+  resolvePossibleUserScenarioDbIds,
 } from '@/utils/catalogTemplates';
 import { captureException, trackEvent } from '@/utils/observability';
 import { getRoomIconName } from '@/utils/roomIcons';
@@ -69,6 +70,7 @@ const dbTypeToActivityType = (type: string | null | undefined): Activity['type']
 const scenarioIdToTemplateId = (value: unknown) => {
   if (value === null || value === undefined || value === '') return '';
   const raw = String(value);
+  if (raw.startsWith('scenario:')) return raw;
   return raw.startsWith('s') ? raw : `s${raw}`;
 };
 
@@ -411,6 +413,20 @@ export default function NewActivityFlow() {
 
     fetchScenarios();
   }, []);
+
+  useEffect(() => {
+    if (!selectedScenarioId || scenarioTemplates.length === 0) return;
+    if (scenarioTemplates.some((scenario) => scenario.id === selectedScenarioId)) return;
+
+    const candidateIds = resolvePossibleUserScenarioDbIds(selectedScenarioId);
+    const matchingUserScenario = scenarioTemplates.find((scenario) =>
+      candidateIds.some((candidateId) => scenario.id === `scenario:${candidateId}`),
+    );
+
+    if (matchingUserScenario) {
+      setSelectedScenarioId(matchingUserScenario.id);
+    }
+  }, [scenarioTemplates, selectedScenarioId]);
 
   useEffect(() => {
     if (!isEditMode || room_id || !selectedScenarioId || scenarioTemplates.length === 0) {
