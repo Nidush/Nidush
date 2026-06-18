@@ -344,7 +344,7 @@ The function fetches:
 LibriVox notes:
 
 - The API does not support a direct `language` query parameter on the `audiobooks` endpoint, so the function fetches extended audiobook records and filters them locally to `English`
-- Audiobooks are stored in `public.contents` with `type = 'audio'` and `category = 'audiobook'`
+- Audiobooks are stored in `public.contents` with `type = 'audiobooks'` and `category = 'audio'`
 - The weekly sync prefers audiobooks that are not already in the database, so each week tends to bring different titles until the available pool is exhausted
 - Audiobook metadata comes from `https://librivox.org/api/feed/audiobooks`
 - Audiotracks are fetched separately from `https://librivox.org/api/feed/audiotracks`

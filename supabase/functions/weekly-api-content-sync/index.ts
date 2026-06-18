@@ -340,8 +340,8 @@ const fetchLibrivoxAudiobooks = async (
       id: `librivox_audiobook_${bookId}`,
       title: String(book.title ?? '').trim(),
       description: buildLibrivoxDescription(book, author, tracks.length),
-      type: 'audio',
-      category: 'audiobook',
+      type: 'audiobooks',
+      category: 'audio',
       duration: String(book.totaltime ?? '').trim() || null,
       image: String(book.coverart_thumbnail ?? book.coverart_jpg ?? '').trim() || null,
       instructions: tracks,
@@ -569,7 +569,7 @@ Deno.serve(async (req: Request) => {
       const { data: existingAudiobooks, error: existingAudiobooksError } = await supabase
         .from('contents')
         .select('id')
-        .eq('category', 'audiobook')
+        .eq('type', 'audiobooks')
 
       if (existingAudiobooksError) throw existingAudiobooksError
       existingAudiobooks?.forEach((row) => {
