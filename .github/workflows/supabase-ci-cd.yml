@@ -108,6 +108,20 @@ jobs:
           test -f google-services.json
           cp google-services.json android/app/google-services.json
 
+      - name: Generate Android debug keystore
+        run: |
+          keytool -genkeypair \
+            -v \
+            -storetype PKCS12 \
+            -keystore android/app/debug.keystore \
+            -storepass android \
+            -keypass android \
+            -alias androiddebugkey \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
       - name: Make Gradle executable
         run: chmod +x android/gradlew
 
