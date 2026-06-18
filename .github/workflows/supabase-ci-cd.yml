@@ -149,7 +149,7 @@ jobs:
         run: deno lint supabase/functions
 
       - name: Type-check Edge Functions
-        run: find supabase/functions -name "index.ts" -print0 | xargs -0 deno check
+        run: find supabase/functions -name "index.ts" -print0 | xargs -0 -I{} deno check --config supabase/functions/deno.json "{}"
 
       - name: Stop local Supabase
         if: always()
