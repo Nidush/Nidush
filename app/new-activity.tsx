@@ -44,6 +44,7 @@ import {
   Step5_Details,
   Step6_Review,
 } from '@/components/newActivityFlow';
+import { parseScenarioDeviceDbId } from '@/utils/deviceExecution';
 
 const dbTypeToActivityType = (
   type: string | null | undefined,
@@ -219,6 +220,51 @@ export default function NewActivityFlow() {
       if (insertError) throw insertError;
     } catch (error) {
       console.warn('Could not auto-link room devices to activity:', error);
+    }
+  };
+
+  const syncScenarioDevicesToActivity = async (
+    activityId: number,
+    scenarioDevices: Scenario['devices'] | undefined,
+  ) => {
+    const resolvedDeviceIds = Array.from(
+      new Set(
+        (scenarioDevices ?? [])
+          .map((device) => parseScenarioDeviceDbId(device.deviceId))
+          .filter((deviceId): deviceId is number => Number.isFinite(deviceId)),
+      ),
+    );
+
+    if (resolvedDeviceIds.length === 0) return;
+
+    try {
+      const { data: existingLinks, error: existingError } = await supabase
+        .from('activity_devices')
+        .select('device_id')
+        .eq('activity_id', activityId);
+
+      if (existingError) throw existingError;
+
+      const linkedDeviceIds = new Set(
+        (existingLinks ?? []).map((link) => Number(link.device_id)),
+      );
+
+      const linksToInsert = resolvedDeviceIds
+        .filter((deviceId) => !linkedDeviceIds.has(deviceId))
+        .map((deviceId) => ({
+          activity_id: activityId,
+          device_id: deviceId,
+        }));
+
+      if (linksToInsert.length === 0) return;
+
+      const { error: insertError } = await supabase
+        .from('activity_devices')
+        .insert(linksToInsert);
+
+      if (insertError) throw insertError;
+    } catch (error) {
+      console.warn('Could not sync scenario devices to activity:', error);
     }
   };
 
@@ -619,6 +665,8 @@ export default function NewActivityFlow() {
     if (isSaving || loadError) return;
 
     const contentObj = allContent.find((c) => c.id === selectedContentId);
+    const selectedScenario =
+      scenarioTemplates.find((scenario) => scenario.id === selectedScenarioId) ?? null;
 
     let finalImage;
 
@@ -707,11 +755,25 @@ export default function NewActivityFlow() {
         scenario_id: selectedScenarioId
           ? parseInt(selectedScenarioId.toString().replace(/\D/g, ''))
           : 1,
+        playlist_id: selectedScenario?.playlist_id ?? null,
+        room_id: dbRoomId,
+        home_id: currentHomeId,
+      };
+      const legacySaveData = {
+        title: activityName || 'Untitled Activity',
+        description,
+        image: imageUrl,
+        category: 'My creations',
+        type: formattedType,
+        content_id: selectedContentId || null,
+        scenario_id: selectedScenarioId
+          ? parseInt(selectedScenarioId.toString().replace(/\D/g, ''))
+          : 1,
         room_id: dbRoomId,
         home_id: currentHomeId,
       };
 
-      const { data, error } =
+      let saveResult =
         isEditMode && editId
           ? await supabase
               .from('activities')
@@ -725,6 +787,29 @@ export default function NewActivityFlow() {
               .insert({ ...saveData, user_id: user.id })
               .select('*, id')
               .single();
+
+      if (
+        saveResult.error?.code === 'PGRST204' ||
+        saveResult.error?.code === '42703' ||
+        /playlist_id/i.test(String(saveResult.error?.message ?? ''))
+      ) {
+        saveResult =
+          isEditMode && editId
+            ? await supabase
+                .from('activities')
+                .update(legacySaveData)
+                .eq('id', editId)
+                .eq('user_id', user.id)
+                .select('*, id')
+                .single()
+            : await supabase
+                .from('activities')
+                .insert({ ...legacySaveData, user_id: user.id })
+                .select('*, id')
+                .single();
+      }
+
+      const { data, error } = saveResult;
 
       apiLog(isEditMode ? 'UPDATE' : 'INSERT', 'activities', {
         id: editId,
@@ -742,6 +827,7 @@ export default function NewActivityFlow() {
       }
 
       if (data?.id && currentHomeId) {
+        await syncScenarioDevicesToActivity(Number(data.id), selectedScenario?.devices);
         await linkRoomTvDevices(Number(data.id), currentHomeId, dbRoomId);
       }
 

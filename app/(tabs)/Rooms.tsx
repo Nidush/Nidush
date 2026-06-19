@@ -40,6 +40,8 @@ import {
   subscribeToHomeDeviceChanges,
 } from '../../utils/devices';
 import {
+  GoogleHomeSyncedDevice,
+  syncGoogleHomeSnapshot,
   setGoogleHomeDeviceColor,
   setGoogleHomeDeviceBrightness,
   setGoogleHomeDevicePower,
@@ -154,6 +156,139 @@ export default function Rooms() {
   const [tempLinkedDeviceIds, setTempLinkedDeviceIds] = useState<number[]>([]);
   const [isSavingLinks, setIsSavingLinks] = useState(false);
 
+  const syncGoogleHomeDevicesToDb = useCallback(
+    async (userId: string, homeId: number, devices: GoogleHomeSyncedDevice[]) => {
+      const seenExternalIds = new Set<string>();
+      const now = new Date().toISOString();
+      const roomIdByName = new Map<string, number>();
+
+      const { data: existingRooms, error: roomsError } = await supabase
+        .from('rooms')
+        .select('id, name')
+        .eq('home_id', homeId)
+        .order('id', { ascending: true });
+
+      if (roomsError) throw roomsError;
+
+      for (const room of existingRooms ?? []) {
+        if (!room?.name) continue;
+        roomIdByName.set(normalizeRoomName(room.name), room.id);
+      }
+
+      for (const device of devices) {
+        const externalId = String(device.externalId ?? '').trim();
+        const name = String(device.name ?? '').trim();
+        if (!externalId || !name) continue;
+
+        seenExternalIds.add(externalId);
+
+        const googleRoomName = String(device.roomName ?? device.roomHint ?? '').trim();
+        let roomId: number | null = null;
+
+        if (googleRoomName) {
+          const normalizedRoomName = normalizeRoomName(googleRoomName);
+          roomId = roomIdByName.get(normalizedRoomName) ?? null;
+
+          if (roomId == null) {
+            const { data: createdRoom, error: createRoomError } = await supabase
+              .from('rooms')
+              .insert({
+                home_id: homeId,
+                name: googleRoomName,
+              })
+              .select('id, name')
+              .single();
+
+            if (createRoomError) throw createRoomError;
+
+            roomId = createdRoom.id;
+            roomIdByName.set(normalizedRoomName, createdRoom.id);
+          }
+        }
+
+        const payload = {
+          name,
+          type: device.type || 'unknown',
+          source: 'google_home',
+          status: device.isOn ? 'On' : 'Off',
+          connectivity_status: device.isOnline === false ? 'offline' : 'online',
+          discovery_method: 'integration',
+          sync_source: 'google_home',
+          user_id: userId,
+          home_id: homeId,
+          external_id: externalId,
+          last_seen: now,
+          manufacturer: device.manufacturer ?? null,
+          model: device.model ?? null,
+          room_id: roomId,
+          room_hint: googleRoomName || null,
+          metadata: {
+            roomName: device.roomName ?? null,
+            roomHint: device.roomHint ?? null,
+            traits: device.traits ?? [],
+            provider: 'google_home',
+            ...((device.metadata ?? {}) as Record<string, unknown>),
+          },
+        };
+
+        const legacyPayload = {
+          name,
+          type: device.type || 'unknown',
+          source: 'google_home',
+          status: device.isOn ? 'On' : 'Off',
+          user_id: userId,
+          home_id: homeId,
+          external_id: externalId,
+          last_seen: now,
+          room_id: roomId,
+        };
+
+        const { data: existing, error: existingError } = await supabase
+          .from('devices')
+          .select('id')
+          .eq('home_id', homeId)
+          .eq('source', 'google_home')
+          .eq('external_id', externalId)
+          .limit(1)
+          .maybeSingle();
+
+        if (existingError) throw existingError;
+
+        const request = existing
+          ? supabase.from('devices').update(payload).eq('id', existing.id)
+          : supabase.from('devices').insert(payload);
+
+        let { error } = await request;
+
+        if (error?.code === '42703') {
+          const fallbackRequest = existing
+            ? supabase.from('devices').update(legacyPayload).eq('id', existing.id)
+            : supabase.from('devices').insert(legacyPayload);
+
+          const fallbackResult = await fallbackRequest;
+          error = fallbackResult.error;
+        }
+
+        if (error) throw error;
+      }
+
+      if (seenExternalIds.size > 0) {
+        await supabase
+          .from('devices')
+          .update({
+            status: 'Off',
+            connectivity_status: 'offline',
+          })
+          .eq('home_id', homeId)
+          .eq('source', 'google_home')
+          .not('external_id', 'in', `(${Array.from(seenExternalIds)
+            .map((value) => `"${value.replace(/"/g, '\\"')}"`)
+            .join(',')})`);
+      }
+    },
+    [],
+  );
+
   const showFeedback = useCallback((message: string, tone: 'error' | 'success' | 'info' = 'info') => {
     setFeedbackMessage(message);
     setFeedbackTone(tone);
@@ -191,6 +326,15 @@ export default function Rooms() {
       const homeId = homeAssoc.home_id;
       setUserHomeId(homeId);
       roomsScreenCache.userHomeId = homeId;
+
+      try {
+        const snapshot = await syncGoogleHomeSnapshot();
+        if (snapshot.devices.length > 0) {
+          await syncGoogleHomeDevicesToDb(user.id, homeId, snapshot.devices);
+        }
+      } catch (error) {
+        console.warn('Rooms screen could not refresh Google Home live state:', error);
+      }
 
       const [
         { data: roomsData, error: roomsErr },
@@ -315,7 +459,7 @@ export default function Rooms() {
       setHasLoadedOnce(true);
       setLoading(false);
     }
-  }, [hasLoadedOnce]);
+  }, [hasLoadedOnce, syncGoogleHomeDevicesToDb]);
 
   // Reload data when page gets focused
   useFocusEffect(

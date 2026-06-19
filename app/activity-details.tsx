@@ -176,7 +176,7 @@ const fetchScenarioFromDbCandidates = async (rawScenarioId: string) => {
         id: `scenario:${scenData.id}`,
         title: scenData.name,
         description: scenData.description || '',
-        playlist: scenData.playlist_id ? 'Spotify Music' : (scenData.playlist_name || 'No music'),
+        playlist: scenData.playlist_name || (scenData.playlist_id ? 'Spotify Music' : 'No music'),
         playlist_id: scenData.playlist_id,
         focusMode: scenData.focus_mode_enabled === true,
         shortcuts: false,
@@ -302,11 +302,38 @@ export default function ActivityDetails() {
 
         const scenarioPromise = foundActivity.scenario_id
           ? (async () => {
-              let scen = await fetchScenarioTemplateById(
-                foundActivity.scenario_id!,
-              );
+              let scen: Scenario | null = null;
+              const shouldPreferDbScenario =
+                !String(foundActivity.id).startsWith('template:');
+
+              if (shouldPreferDbScenario) {
+                const { data: scenData } = await supabase
+                  .from('scenarios')
+                  .select('*')
+                  .eq('id', Number(String(foundActivity.scenario_id).replace(/\D/g, '')))
+                  .maybeSingle<ScenarioRow>();
+
+                if (scenData) {
+                  scen = {
+                    id: `scenario:${scenData.id}`,
+                    title: scenData.name,
+                    description: scenData.description || '',
+                    playlist: scenData.playlist_name ||
+                      (scenData.playlist_id ? 'Spotify Music' : 'No music'),
+                    playlist_id: scenData.playlist_id,
+                    focusMode: scenData.focus_mode_enabled === true,
+                    shortcuts: false,
+                    devices: Array.isArray(scenData.devices) ? scenData.devices : [],
+                    image: resolveCatalogImage(scenData.image || 'Scenarios/moonlight_bay.png'),
+                  } as Scenario;
+                }
+              }
 
               if (!scen) {
+                scen = await fetchScenarioTemplateById(foundActivity.scenario_id!);
+              }
+
+              if (!scen && !shouldPreferDbScenario) {
                 console.log(
                   '[ActivityDetails] Fetching scenario from DB:',
                   foundActivity.scenario_id,
@@ -314,22 +341,21 @@ export default function ActivityDetails() {
                 const { data: scenData } = await supabase
                   .from('scenarios')
                   .select('*')
-                  .eq('id', foundActivity.scenario_id)
+                  .eq('id', Number(String(foundActivity.scenario_id).replace(/\D/g, '')))
                   .maybeSingle<ScenarioRow>();
 
                 if (scenData) {
                   scen = {
-                    id: scenData.id.toString(),
+                    id: `scenario:${scenData.id}`,
                     title: scenData.name,
                     description: scenData.description || '',
-                    playlist: scenData.playlist_id
-                      ? 'Spotify Music'
-                      : scenData.playlist_name || 'No music',
+                    playlist: scenData.playlist_name ||
+                      (scenData.playlist_id ? 'Spotify Music' : 'No music'),
                     playlist_id: scenData.playlist_id,
-                    focusMode: false, // Default fallback
+                    focusMode: scenData.focus_mode_enabled === true,
                     shortcuts: false,
-                    devices: [], // Fallback
-                    image: { uri: 'https://picsum.photos/200' }, // Fallback
+                    devices: Array.isArray(scenData.devices) ? scenData.devices : [],
+                    image: resolveCatalogImage(scenData.image || 'Scenarios/moonlight_bay.png'),
                   } as Scenario;
                 }
               }

@@ -55,6 +55,7 @@ type UserActivityRow = {
   type?: string | null;
   content_id?: string | null;
   scenario_id?: number | string | null;
+  playlist_id?: string | null;
   shortcuts?: boolean | string | null;
   created_at?: string;
   updated_at?: string;
@@ -408,6 +409,8 @@ export const mapUserActivity = (row: UserActivityRow): Activity => ({
   contentId: row.content_id ?? undefined,
   scenario_id: normalizeScenarioTemplateId(row.scenario_id),
   scenarioId: normalizeScenarioTemplateId(row.scenario_id),
+  playlist_id: row.playlist_id ?? undefined,
+  playlistId: row.playlist_id ?? undefined,
   shortcuts: row.shortcuts === true || row.shortcuts === 'true',
   created_at: row.created_at,
   updated_at: row.updated_at,

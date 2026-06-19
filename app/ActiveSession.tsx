@@ -89,10 +89,31 @@ type StoredActivityLike = Partial<Activity> & {
 type ContentRow = {
   title?: string | null;
   type?: string | null;
+  category?: string | null;
   instructions?: unknown;
   video_url?: string | null;
   ingredients?: unknown;
   image?: string | null;
+};
+
+const resolveInstructionAudioUrl = (step: Record<string, unknown>) => {
+  const candidates = [
+    step.audio_url,
+    step.audioUrl,
+    step.url,
+    step.voice_url,
+    step.voiceUrl,
+    step.sound_url,
+    step.soundUrl,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  return undefined;
 };
 
 const DEVICE_ENFORCEMENT_INTERVAL_MS = 15000;
@@ -197,6 +218,83 @@ const normalizeIngredients = (value: unknown): any[] => {
 
 const getActivityType = (item: Partial<Activity> | Partial<Scenario>) =>
   String(('type' in item ? item.type : '') ?? '').toLowerCase();
+
+const DEFAULT_SESSION_PLAYLISTS: Record<string, string> = {
+  workout: '37i9dQZF1DX76W9kuv1Z0g',
+  cooking: '37i9dQZF1DXdbChS9879u9',
+  meditation: '37i9dQZF1DWZ0XmS6AnY9s',
+  yoga: '37i9dQZF1DWVFeEut75IAL',
+  reading: '37i9dQZF1DX4E3UdUs7fUx',
+  general: '37i9dQZF1DX3Ogo9pFvBkY',
+  other: '37i9dQZF1DX3Ogo9pFvBkY',
+};
+
+const inferSessionActivityType = ({
+  foundItem,
+  relatedScenario,
+  contentCategory,
+  contentType,
+}: {
+  foundItem: StoredActivityLike | Activity | Scenario;
+  relatedScenario: Scenario | null;
+  contentCategory?: string | null;
+  contentType?: string | null;
+}): Activity['type'] => {
+  const directType = getActivityType(foundItem);
+  if (directType) {
+    return directType as Activity['type'];
+  }
+
+  const normalizedCategory = String(contentCategory ?? '').toLowerCase();
+  if (normalizedCategory === 'audiobook') return 'audiobooks';
+  if (
+    ['cooking', 'meditation', 'workout', 'audiobooks', 'general', 'reading', 'yoga', 'other'].includes(
+      normalizedCategory,
+    )
+  ) {
+    return normalizedCategory as Activity['type'];
+  }
+
+  const normalizedContentType = String(contentType ?? '').toLowerCase();
+  if (normalizedContentType === 'workout') return 'workout';
+
+  const scenarioHints = [
+    foundItem.title,
+    foundItem.description,
+    relatedScenario?.title,
+    relatedScenario?.description,
+    ...(relatedScenario?.keywords ?? []),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  if (
+    /meditat|breath|calm|relax|zen|mindful|gratitude|sleep/.test(
+      scenarioHints,
+    )
+  ) {
+    return 'meditation';
+  }
+
+  if (/cook|kitchen|recipe|dinner|baking|pasta|food/.test(scenarioHints)) {
+    return 'cooking';
+  }
+
+  if (/workout|train|exercise|fitness|cardio|gym/.test(scenarioHints)) {
+    return 'workout';
+  }
+
+  if (/book|audiobook|chapter|reading/.test(scenarioHints)) {
+    return 'audiobooks';
+  }
+
+  if (/yoga|stretch|flow/.test(scenarioHints)) {
+    return 'yoga';
+  }
+
+  return 'general';
+};
 
 const getActivityRoom = (item: StoredActivityLike | Activity | Scenario) =>
   item.room ??
@@ -356,8 +454,18 @@ export default function ActiveSession() {
       }
 
       const sId = getScenarioId(foundItem);
-      relatedScenario = sId ? await fetchScenarioTemplateById(String(sId)) : null;
+      const shouldPreferDbScenario =
+        !String(foundItem.id ?? '').startsWith('template:');
+
+      if (sId && shouldPreferDbScenario) {
+        relatedScenario = await fetchScenarioFromDbCandidates(String(sId));
+      }
+
       if (!relatedScenario && sId) {
+        relatedScenario = await fetchScenarioTemplateById(String(sId));
+      }
+
+      if (!relatedScenario && sId && !shouldPreferDbScenario) {
         relatedScenario = await fetchScenarioFromDbCandidates(String(sId));
       }
       if (contentType !== 'video' && relatedScenario?.playlist) {
@@ -410,7 +518,7 @@ export default function ActiveSession() {
             text: String(step.text ?? ''),
             duration: step.duration,
             description: step.description,
-            audio_url: step.url || step.audio_url,
+            audio_url: resolveInstructionAudioUrl(step),
           };
         })
         .flatMap((stepObj) => {
@@ -450,7 +558,12 @@ export default function ActiveSession() {
         [];
 
       const parsedIngredients = normalizeIngredients(robustIngredients);
-      const activityType = getActivityType(foundItem);
+      const activityType = inferSessionActivityType({
+        foundItem,
+        relatedScenario,
+        contentCategory: contentData?.category ?? localContent?.category,
+        contentType: contentData?.type ?? localContent?.type,
+      });
       const configuredDevices = resolveConfiguredDevices(
         getItemDevices(foundItem),
         relatedScenario ? getItemDevices(relatedScenario) : [],
@@ -493,10 +606,10 @@ export default function ActiveSession() {
         contentType !== 'video' &&
         activityType !== 'audiobooks'
       ) {
-        let pId = getPlaylistId(foundItem);
+        let pId = getPlaylistId(foundItem) || relatedScenario?.playlist_id;
 
         if (!pId) {
-          const type = getActivityType(foundItem);
+          const type = activityType;
           let sId = getScenarioId(foundItem);
 
           if (!sId || sId === 'null') {
@@ -525,58 +638,30 @@ export default function ActiveSession() {
             .maybeSingle();
           if (!pId) pId = scenData?.playlist_id;
 
-          if (!pId) pId = '37i9dQZF1DX76W9kuv1Z0g';
+          if (!pId) pId = DEFAULT_SESSION_PLAYLISTS[type] || DEFAULT_SESSION_PLAYLISTS.general;
         }
 
-        const sessionDevices =
-          relatedScenario?.devices || getItemDevices(foundItem);
-        const hasScenarioTv = sessionDevices.some(
-          (config: ScenarioDeviceState) => {
-            const device = SMART_HOME_DEVICES[config.deviceId];
-            return device?.type === 'tv';
-          },
-        );
-        const shouldPreferTv =
-          hasScenarioTv &&
-          ['meditation', 'yoga', 'general', 'other'].includes(
-            getActivityType(foundItem),
-          );
-        const basePlaybackOptions = {
+        const playbackOptions = {
           suppressAppOpen: false,
         };
-        const tvPlaybackOptions = shouldPreferTv
-          ? {
-              ...basePlaybackOptions,
-              preferredDeviceTypes: ['TV'],
-              preferredDeviceNameIncludes: [
-                connectedTvName || '',
-                'tv',
-                'samsung',
-                'lg',
-                'android tv',
-                'chromecast',
-              ].filter(Boolean),
-            }
-          : basePlaybackOptions;
 
         if (pId) {
           console.log(
             '[Spotify] A iniciar música no momento do Exercício:',
             pId,
           );
-          playPlaylist(pId, tvPlaybackOptions);
+          playPlaylist(pId, playbackOptions);
         } else {
-          // Fallback por tipo de atividade
-          const type = getActivityType(foundItem);
-          const fallbacks: Record<string, string> = {
-            workout: '37i9dQZF1DX76W9kuv1Z0g',
-            cooking: '37i9dQZF1DXdbChS9879u9',
-            meditation: '37i9dQZF1DWZ0XmS6AnY9s',
-          };
-          if (fallbacks[type] && startedPlaybackForSessionRef.current !== String(id)) {
+          const fallbackPlaylistId =
+            DEFAULT_SESSION_PLAYLISTS[activityType] ||
+            DEFAULT_SESSION_PLAYLISTS.general;
+          if (
+            fallbackPlaylistId &&
+            startedPlaybackForSessionRef.current !== String(id)
+          ) {
             startedPlaybackForSessionRef.current = String(id);
-            console.log('[Spotify] A usar fallback no Exercício:', type);
-            playPlaylist(fallbacks[type], tvPlaybackOptions);
+            console.log('[Spotify] A usar fallback no Exercício:', activityType);
+            playPlaylist(fallbackPlaylistId, playbackOptions);
           }
         }
       } else if (contentType !== 'video') {
@@ -614,19 +699,30 @@ export default function ActiveSession() {
     }
   }, [isActive, isVideoSession, pulseScale]);
 
-  const handleToggleSession = () => {
+  const handleToggleSession = async () => {
     const newState = !isActive;
+
+    if (sessionData?.type !== 'video') {
+      if (newState) {
+        await resumePlayback();
+        setIsMusicPlaying(true);
+      } else {
+        await pausePlayback();
+        setIsMusicPlaying(false);
+      }
+    }
+
     setIsActive(newState);
-    setIsMusicPlaying(newState);
   };
 
-  const handleToggleMusic = () => {
+  const handleToggleMusic = async () => {
     if (isMusicPlaying) {
-      pausePlayback();
+      await pausePlayback();
+      setIsMusicPlaying(false);
     } else {
-      resumePlayback();
+      await resumePlayback();
+      setIsMusicPlaying(true);
     }
-    setIsMusicPlaying((prev) => !prev);
   };
 
   const cleanupSessionDevices = useCallback(async () => {
@@ -639,7 +735,11 @@ export default function ActiveSession() {
     try {
       await applyScenarioDeviceStates(sessionData.devices, { forcePowerOn: false });
     } catch (error) {
-      if (isTransientDeviceExecutionNetworkError(error)) {
+      if (isGoogleHomeUnavailableDeviceListError(error)) {
+        console.warn(
+          'Skipped turning off session devices on exit because Google Home returned no valid device list for the connected account/home.',
+        );
+      } else if (isTransientDeviceExecutionNetworkError(error)) {
         console.warn(
           'Skipped turning off session devices on exit because the network was temporarily unavailable.',
         );

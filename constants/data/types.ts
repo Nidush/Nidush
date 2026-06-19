@@ -64,6 +64,8 @@ export interface Activity {
   type: 'cooking' | 'meditation' | 'workout' | 'audiobooks' | 'general' | 'reading' | 'yoga' | 'other';
   scenario_id?: string;
   scenarioId?: string; 
+  playlist_id?: string;
+  playlistId?: string;
   content_id?: string;
   contentId?: string;  
   shortcuts: boolean;

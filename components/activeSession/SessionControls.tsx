@@ -1,4 +1,5 @@
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { useSpotify } from '@/context/SpotifyContext';
 import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -72,11 +73,16 @@ export const SessionControls = ({
   showChaptersButton,
   onShowChapters,
 }: SessionControlsProps) => {
+  const { setPlaybackVolume } = useSpotify();
+  const DUCKED_SPOTIFY_VOLUME = 15;
+  const DEFAULT_SPOTIFY_VOLUME = 70;
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
   const playerRef = useRef<any>(null);
+  const playerSubscriptionRef = useRef<{ remove: () => void } | null>(null);
   const [titleContainerWidth, setTitleContainerWidth] = useState(0);
   const [titleTextWidth, setTitleTextWidth] = useState(0);
   const titleTranslateX = useSharedValue(0);
+  const isSpotifyDuckedRef = useRef(false);
 
   const animatedProgressStyle = useAnimatedStyle(() => ({
     width: `${progress.value}%`,
@@ -136,6 +142,23 @@ export const SessionControls = ({
     }
   }, [isActive, isVoiceEnabled]);
 
+  useEffect(() => {
+    if (!guideAudioUrl) return;
+
+    const shouldDuckSpotify = isActive && isVoiceEnabled;
+
+    if (shouldDuckSpotify && !isSpotifyDuckedRef.current) {
+      isSpotifyDuckedRef.current = true;
+      void setPlaybackVolume(DUCKED_SPOTIFY_VOLUME);
+      return;
+    }
+
+    if (!shouldDuckSpotify && isSpotifyDuckedRef.current) {
+      isSpotifyDuckedRef.current = false;
+      void setPlaybackVolume(DEFAULT_SPOTIFY_VOLUME);
+    }
+  }, [DEFAULT_SPOTIFY_VOLUME, DUCKED_SPOTIFY_VOLUME, guideAudioUrl, isActive, isVoiceEnabled, setPlaybackVolume]);
+
   // === 2. CARREGAMENTO DE ÁUDIO ===
   useEffect(() => {
     if (!guideAudioUrl) {
@@ -147,16 +170,34 @@ export const SessionControls = ({
 
     if (playerRef.current) {
       playerRef.current.pause();
+      playerSubscriptionRef.current?.remove();
+      playerSubscriptionRef.current = null;
       playerRef.current.release();
       playerRef.current = null;
     }
 
     const playAudioSequence = async () => {
       try {
-        await setAudioModeAsync({ playsInSilentMode: true });
+        await setAudioModeAsync({
+          playsInSilentMode: true,
+          interruptionMode: 'mixWithOthers',
+          allowsRecording: false,
+          shouldPlayInBackground: false,
+          shouldRouteThroughEarpiece: false,
+        });
 
         const newPlayer = createAudioPlayer(guideAudioUrl);
         playerRef.current = newPlayer;
+
+        playerSubscriptionRef.current = newPlayer.addListener(
+          'playbackStatusUpdate',
+          (status) => {
+            if (status.didJustFinish && isSpotifyDuckedRef.current) {
+              isSpotifyDuckedRef.current = false;
+              void setPlaybackVolume(DEFAULT_SPOTIFY_VOLUME);
+            }
+          },
+        );
 
         if (isVoiceEnabled && isActive) {
           newPlayer.play();
@@ -177,11 +218,17 @@ export const SessionControls = ({
       clearTimeout(timer);
       if (playerRef.current) {
         playerRef.current.pause();
+        playerSubscriptionRef.current?.remove();
+        playerSubscriptionRef.current = null;
+        if (isSpotifyDuckedRef.current) {
+          isSpotifyDuckedRef.current = false;
+          void setPlaybackVolume(DEFAULT_SPOTIFY_VOLUME);
+        }
         playerRef.current.release();
         playerRef.current = null;
       }
     };
-  }, [guideAudioUrl, onAudioReady, stepIndex]); // <--- 2. ADICIONADO O stepIndex AQUI!
+  }, [DEFAULT_SPOTIFY_VOLUME, guideAudioUrl, isActive, isVoiceEnabled, onAudioReady, setPlaybackVolume, stepIndex]);
 
   return (
     <View className="bg-[#F1F4EE] px-10 pb-8">
