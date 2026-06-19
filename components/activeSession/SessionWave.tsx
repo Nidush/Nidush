@@ -122,11 +122,11 @@ export const SessionWave = () => {
 
 const styles = StyleSheet.create({
   container: {
-    height: 120,
+    height: 108,
     width: '100%',
     justifyContent: 'flex-end',
     backgroundColor: 'transparent',
-    marginBottom: 20, // Mantém o espaço em relação às horas
+    marginBottom: 0,
   },
   waveContainer: {
     height: 180,

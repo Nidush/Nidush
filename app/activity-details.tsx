@@ -205,6 +205,12 @@ const fetchScenarioFromDbCandidates = async (rawScenarioId: string) => {
   return null;
 };
 
+const resolveScenarioForDisplay = async (rawScenarioId: string) => {
+  const dbScenario = await fetchScenarioFromDbCandidates(rawScenarioId);
+  if (dbScenario) return dbScenario;
+  return fetchScenarioTemplateById(rawScenarioId);
+};
+
 export default function ActivityDetails() {
   const { id, isNew, itemType } = useLocalSearchParams<{ id: string; isNew?: string; itemType?: string }>();
 
@@ -317,65 +323,7 @@ export default function ActivityDetails() {
 
         const scenarioPromise = foundActivity.scenario_id
           ? (async () => {
-              let scen: Scenario | null = null;
-              const shouldPreferDbScenario =
-                !String(foundActivity.id).startsWith('template:');
-
-              if (shouldPreferDbScenario) {
-                const { data: scenData } = await supabase
-                  .from('scenarios')
-                  .select('*')
-                  .eq('id', Number(String(foundActivity.scenario_id).replace(/\D/g, '')))
-                  .maybeSingle<ScenarioRow>();
-
-                if (scenData) {
-                  scen = {
-                    id: `scenario:${scenData.id}`,
-                    title: scenData.name,
-                    description: scenData.description || '',
-                    playlist: scenData.playlist_name ||
-                      (scenData.playlist_id ? 'Spotify Music' : 'No music'),
-                    playlist_id: scenData.playlist_id,
-                    focusMode: scenData.focus_mode_enabled === true,
-                    shortcuts: false,
-                    devices: Array.isArray(scenData.devices) ? scenData.devices : [],
-                    image: resolveCatalogImage(scenData.image || 'Scenarios/moonlight_bay.png'),
-                  } as Scenario;
-                }
-              }
-
-              if (!scen) {
-                scen = await fetchScenarioTemplateById(foundActivity.scenario_id!);
-              }
-
-              if (!scen && !shouldPreferDbScenario) {
-                console.log(
-                  '[ActivityDetails] Fetching scenario from DB:',
-                  foundActivity.scenario_id,
-                );
-                const { data: scenData } = await supabase
-                  .from('scenarios')
-                  .select('*')
-                  .eq('id', Number(String(foundActivity.scenario_id).replace(/\D/g, '')))
-                  .maybeSingle<ScenarioRow>();
-
-                if (scenData) {
-                  scen = {
-                    id: `scenario:${scenData.id}`,
-                    title: scenData.name,
-                    description: scenData.description || '',
-                    playlist: scenData.playlist_name ||
-                      (scenData.playlist_id ? 'Spotify Music' : 'No music'),
-                    playlist_id: scenData.playlist_id,
-                    focusMode: scenData.focus_mode_enabled === true,
-                    shortcuts: false,
-                    devices: Array.isArray(scenData.devices) ? scenData.devices : [],
-                    image: resolveCatalogImage(scenData.image || 'Scenarios/moonlight_bay.png'),
-                  } as Scenario;
-                }
-              }
-
-              return scen || null;
+              return resolveScenarioForDisplay(String(foundActivity.scenario_id));
             })()
           : Promise.resolve(null);
 
@@ -432,11 +380,11 @@ export default function ActivityDetails() {
         setRelatedContent(content);
         if (scen) setFocusEnabled(scen.focusMode);
       } else {
-        const foundScenario = await fetchScenarioTemplateById(id);
-        if (foundScenario) {
-          setMainItem(foundScenario);
-          setRelatedScenario(foundScenario);
-          setFocusEnabled(foundScenario.focusMode);
+        const resolvedScenario = await resolveScenarioForDisplay(id);
+        if (resolvedScenario) {
+          setMainItem(resolvedScenario);
+          setRelatedScenario(resolvedScenario);
+          setFocusEnabled(resolvedScenario.focusMode);
         } else if (isUserScenarioRouteId(id)) {
           const { data: scenData } = await supabase
             .from('scenarios')
@@ -475,6 +423,11 @@ export default function ActivityDetails() {
     };
     loadData();
   }, [id]);
+
+  const displayDescription =
+    !isActivity && relatedScenario?.description
+      ? relatedScenario.description
+      : mainItem?.description;
 
   const handleCustomBack = () => {
     if (isNew === 'true') {
@@ -882,7 +835,7 @@ export default function ActivityDetails() {
               className="text-[#586963] text-[16px] leading-6"
               style={{ fontFamily: 'Nunito_400Regular' }}
             >
-              {mainItem.description}
+              {displayDescription}
             </Text>
           </View>
 

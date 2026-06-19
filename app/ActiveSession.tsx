@@ -20,9 +20,12 @@ import { AudiobookVisuals } from '@/components/activeSession/AudiobookVisuals';
 import { CookingVisuals } from '@/components/activeSession/CookingVisuals';
 import { ExitModal } from '@/components/activeSession/ExitModal';
 import { MeditationVisuals } from '@/components/activeSession/MeditationVisuals';
+import { ScenarioControls } from '@/components/activeSession/ScenarioControls';
+import { ScenarioVisuals } from '@/components/activeSession/ScenarioVisuals';
 import { SessionControls } from '@/components/activeSession/SessionControls';
 import { SessionHeader } from '@/components/activeSession/SessionHeader';
 import { SessionVideo } from '@/components/activeSession/SessionVideo';
+import { SessionWave } from '@/components/activeSession/SessionWave';
 import { WorkoutVisuals } from '@/components/activeSession/WorkoutVisuals';
 import { useSpotify } from '@/context/SpotifyContext';
 
@@ -60,6 +63,7 @@ type FormattedInstruction = {
 type SessionData = {
   title: string;
   room: string;
+  isScenario: boolean;
   playlistName: string;
   image?: ImageSourcePropType;
   instructions: FormattedInstruction[];
@@ -454,19 +458,11 @@ export default function ActiveSession() {
       }
 
       const sId = getScenarioId(foundItem);
-      const shouldPreferDbScenario =
-        !String(foundItem.id ?? '').startsWith('template:');
-
-      if (sId && shouldPreferDbScenario) {
+      if (sId) {
         relatedScenario = await fetchScenarioFromDbCandidates(String(sId));
       }
-
       if (!relatedScenario && sId) {
         relatedScenario = await fetchScenarioTemplateById(String(sId));
-      }
-
-      if (!relatedScenario && sId && !shouldPreferDbScenario) {
-        relatedScenario = await fetchScenarioFromDbCandidates(String(sId));
       }
       if (contentType !== 'video' && relatedScenario?.playlist) {
         playlistName = relatedScenario.playlist;
@@ -589,6 +585,9 @@ export default function ActiveSession() {
       setSessionData({
         title: foundItem.title || 'Session',
         room: getActivityRoom(foundItem),
+        isScenario:
+          String(foundItem.id ?? '').startsWith('scenario:') ||
+          (!('type' in foundItem) && !getContentId(foundItem)),
         playlistName: playlistName,
         image: foundItem.image,
         instructions: formattedInstructions,
@@ -958,12 +957,17 @@ export default function ActiveSession() {
   };
 
   if (loading || !sessionData) {
+    const isScenarioLoading = String(id ?? '').startsWith('scenario:');
     return (
       <View className="flex-1 justify-center items-center bg-[#F1F4EE]">
         <ActivityIndicator
           size="large"
           color="#5E8C5D"
-          accessibilityLabel="Loading session data"
+          accessibilityLabel={
+            isScenarioLoading
+              ? 'Loading scenario session'
+              : 'Loading activity session'
+          }
         />
       </View>
     );
@@ -978,6 +982,7 @@ export default function ActiveSession() {
   const isWorkout = sessionData.activityType === 'workout';
   const isAudiobook = sessionData.activityType === 'audiobooks';
   const isMeditation = sessionData.activityType === 'meditation';
+  const isScenarioSession = sessionData.isScenario;
 
   return (
     <SafeAreaView className="flex-1 bg-[#F1F4EE]" accessibilityLanguage="en-US">
@@ -989,6 +994,7 @@ export default function ActiveSession() {
       />
       <ExitModal
         visible={showExitModal}
+        itemLabel={isScenarioSession ? 'scenario' : 'activity'}
         onResume={handleResume}
         onEnd={() => {
           void exitSession();
@@ -1010,7 +1016,25 @@ export default function ActiveSession() {
         />
       ) : (
         <>
-          {isCooking ? (
+          {isScenarioSession ? (
+            <View className="flex-1">
+              <ScenarioVisuals
+                title={sessionData.title}
+                room={sessionData.room}
+                devices={sessionData.devices}
+              />
+              <ScenarioControls
+                isActive={isActive}
+                isMusicPlaying={isMusicPlaying}
+                image={sessionData.image}
+                onToggleSession={handleToggleSession}
+                onToggleMusic={handleToggleMusic}
+                onNextTrack={nextTrack}
+                onPreviousTrack={previousTrack}
+                currentTrack={currentTrack}
+              />
+            </View>
+          ) : isCooking ? (
             <CookingVisuals
               step={currentStep}
               ingredients={sessionData.ingredients ?? []}
@@ -1053,35 +1077,45 @@ export default function ActiveSession() {
             />
           )}
 
-          <SessionControls
-            isActive={isActive}
-            isMusicPlaying={isMusicPlaying}
-            secondsLeft={secondsLeft}
-            isManualStep={currentStep.duration === undefined}
-            isLastStep={isLastStep}
-            onNextStep={handleNextStep}
-            isFirstStep={currentStepIndex === 0}
-            onPrevStep={handlePreviousStep}
-            playlistName={sessionData.playlistName}
-            room={sessionData.room}
-            image={sessionData.image}
-            progress={progress}
-            onToggleSession={handleToggleSession}
-            onToggleMusic={handleToggleMusic}
-            onNextTrack={nextTrack}
-            onPreviousTrack={previousTrack}
-            onOpenSpotify={openCurrentTrack}
-            currentTrack={currentTrack}
-            stepIndex={currentStepIndex}
-            showPauseButton={
-              !isCooking && !isWorkout && !currentStep.isChapterListStep
-            }
-            guideText={isMeditation ? currentStep.text : undefined}
-            guideAudioUrl={currentStep.audio_url}
-            onAudioReady={handleAudioReady}
-            showChaptersButton={isAudiobook && !currentStep.isChapterListStep}
-            onShowChapters={handleShowChapters}
-          />
+          {isScenarioSession ? (
+            <View
+              className="absolute bottom-0 left-0 right-0"
+              pointerEvents="none"
+              style={{ zIndex: 0 }}
+            >
+              <SessionWave />
+            </View>
+          ) : (
+            <SessionControls
+              isActive={isActive}
+              isMusicPlaying={isMusicPlaying}
+              secondsLeft={secondsLeft}
+              isManualStep={currentStep.duration === undefined}
+              isLastStep={isLastStep}
+              onNextStep={handleNextStep}
+              isFirstStep={currentStepIndex === 0}
+              onPrevStep={handlePreviousStep}
+              playlistName={sessionData.playlistName}
+              room={sessionData.room}
+              image={sessionData.image}
+              progress={progress}
+              onToggleSession={handleToggleSession}
+              onToggleMusic={handleToggleMusic}
+              onNextTrack={nextTrack}
+              onPreviousTrack={previousTrack}
+              onOpenSpotify={openCurrentTrack}
+              currentTrack={currentTrack}
+              stepIndex={currentStepIndex}
+              showPauseButton={
+                !isCooking && !isWorkout && !currentStep.isChapterListStep
+              }
+              guideText={isMeditation ? currentStep.text : undefined}
+              guideAudioUrl={currentStep.audio_url}
+              onAudioReady={handleAudioReady}
+              showChaptersButton={isAudiobook && !currentStep.isChapterListStep}
+              onShowChapters={handleShowChapters}
+            />
+          )}
         </>
       )}
     </SafeAreaView>
