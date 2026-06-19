@@ -61,16 +61,35 @@ export const Step2_Content = ({
   const groupedContents = useMemo(() => {
     const groups: Record<string, Content[]> = {};
 
+    const getWorkoutCategory = (content: Content) => {
+      const text = `${content.title || ''} ${content.description || ''}`.toLowerCase();
+
+      if (/yoga|pose|flow/.test(text)) return 'Yoga';
+      if (/stretch|flexibility|mobility/.test(text)) return 'Stretching';
+      if (/hiit|cardio|sprint|run|running/.test(text)) return 'Cardio';
+      if (/strength|muscle|full body|training/.test(text)) return 'Strength';
+      return 'Workout Sessions';
+    };
+
     filteredContent.forEach((content) => {
       const isRecipe =
         content.type === 'recipe' ||
         content.category?.toLowerCase() === 'cooking';
-      const isMeditation = content.type === 'meditation';
+      const isMeditation =
+        content.type === 'meditation' ||
+        content.category?.toLowerCase() === 'meditation';
       // Ajustado para apanhar 'audiobooks'
-      const isAudiobook = content.type === 'audiobooks';
+      const isAudiobook =
+        content.type === 'audiobooks' ||
+        content.category?.toLowerCase() === 'audiobook';
+      const isWorkout =
+        content.type === 'exercise' ||
+        content.type === 'workout' ||
+        content.type === 'video' ||
+        content.category?.toLowerCase() === 'workout';
 
-      // Agrupa Receitas, Meditações e Audiobooks
-      if (isRecipe || isMeditation || isAudiobook) {
+      // Agrupa Receitas, Meditações, Audiobooks e Workouts
+      if (isRecipe || isMeditation || isAudiobook || isWorkout) {
         let rawCat = content.category;
 
         // Se for um audiobook mas o campo category estiver vazio ou apenas disser "audiobooks"
@@ -80,11 +99,14 @@ export const Step2_Content = ({
           rawCat = 'Recipes';
         } else if (isMeditation && rawCat?.toLowerCase() === 'meditation') {
           rawCat = 'Meditations';
+        } else if (isWorkout) {
+          rawCat = getWorkoutCategory(content);
         }
 
         let fallbackName = 'Other Recipes';
         if (isMeditation) fallbackName = 'Other Meditations';
         if (isAudiobook) fallbackName = 'Other Audiobooks';
+        if (isWorkout) fallbackName = 'Workout Sessions';
 
         const categoryName = rawCat
           ? rawCat.charAt(0).toUpperCase() + rawCat.slice(1)
@@ -101,7 +123,9 @@ export const Step2_Content = ({
   }, [filteredContent]);
 
   const videos = filteredContent.filter(
-    (c) => c.type === 'video' || c.type === 'workout' || c.type === 'exercise',
+    (c) =>
+      activityType !== 'workout' &&
+      (c.type === 'video' || c.type === 'workout' || c.type === 'exercise'),
   );
 
   const audios = filteredContent.filter((c) => c.type === 'audio');

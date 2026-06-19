@@ -3,6 +3,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Text, View } from 'react-native';
 import { SelectionCard } from '../SelectionCard';
 import { StepWrapper } from '../StepWrapper';
+import { getRoomIconName } from '@/utils/roomIcons';
 
 type MaterialIconName = React.ComponentProps<typeof MaterialIcons>['name'];
 
@@ -41,7 +42,7 @@ export const Step3_Room = ({ selected, onSelect, options }: Step3Props) => {
             <SelectionCard
               key={r.id}
               label={r.name}
-              icon={r.icon || 'room'}
+              icon={r.icon || getRoomIconName(r.name)}
               isSelected={selected === r.id}
               onPress={() => onSelect(r.id)}
             />
