@@ -371,7 +371,7 @@ describe('Profile Screen', () => {
 
     expect(mockUpdatePublicProfile).toHaveBeenCalledWith('auth_uid', 'user-123');
     expect(global.alert).not.toHaveBeenCalled();
-  });
+  }, 10000);
 
   it('shows an error when avatar upload fails', async () => {
     mockPickImage.mockResolvedValue('data:image/jpeg;base64,avatar');

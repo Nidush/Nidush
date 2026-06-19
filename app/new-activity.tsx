@@ -975,6 +975,25 @@ export default function NewActivityFlow() {
               )}
             </ScrollView>
 
+            {loadError && (
+              <View className="px-8 pb-4 items-center">
+                <Text
+                  maxFontSizeMultiplier={1.2}
+                  className="text-[#354F52] text-lg text-center"
+                  style={{ fontFamily: 'Nunito_700Bold' }}
+                >
+                  Activity creation is not ready yet
+                </Text>
+                <Text
+                  maxFontSizeMultiplier={1.2}
+                  className="text-[#354F52]/75 text-sm text-center mt-2"
+                  style={{ fontFamily: 'Nunito_400Regular' }}
+                >
+                  {loadError}
+                </Text>
+              </View>
+            )}
+
             {/* Mantemos apenas a verificação do teclado para não o esconder */}
             {!isKeyboardVisible && (
               <View
