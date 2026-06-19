@@ -7,6 +7,7 @@ import {
   Nunito_700Bold,
   useFonts,
 } from '@expo-google-fonts/nunito';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiLog, supabase, uploadImage } from '../utils/supabase';
 
 import { useNotifications } from '@/context/NotificationsContext';
@@ -14,11 +15,10 @@ import {
   fetchScenarioTemplates,
   fetchUserScenarios,
   parseUserScenarioDbId,
-  resolvePossibleUserScenarioDbIds,
 } from '@/utils/catalogTemplates';
 import { captureException, trackEvent } from '@/utils/observability';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   ImageSourcePropType,
@@ -97,6 +97,11 @@ type ContentRow = {
   ingredients?: unknown;
   video_url?: string | null;
   author?: string | null;
+};
+
+type HomeRoomRow = {
+  id: number | string;
+  name: string;
 };
 
 const normalizeContentInstructions = (
@@ -178,7 +183,7 @@ export default function NewActivityFlow() {
     try {
       const { data: roomDevices, error: devicesError } = await supabase
         .from('devices')
-        .select('id')
+        .select('id, type')
         .eq('home_id', homeId)
         .eq('room_id', roomId);
 
@@ -194,6 +199,9 @@ export default function NewActivityFlow() {
 
       const linkedDeviceIds = new Set(
         (existingLinks || []).map((link) => link.device_id),
+      );
+      const tvDevices = roomDevices.filter((device) =>
+        ['tv', 'display'].includes(String(device.type).toLowerCase()),
       );
       const linksToInsert = tvDevices
         .filter((device) => !linkedDeviceIds.has(device.id))
@@ -466,6 +474,38 @@ export default function NewActivityFlow() {
   useEffect(() => {
     AccessibilityInfo.announceForAccessibility(`Step ${step} of ${totalSteps}`);
   }, [step]);
+
+  const saveActivityDraft = useCallback(async () => {
+    const payload: ActivityDraftPayload = {
+      step,
+      activityType,
+      selectedContentId,
+      room_id,
+      selectedScenarioId,
+      activityName,
+      description,
+      activityImageUri:
+        typeof activityImage === 'string'
+          ? activityImage
+          : getImageUri(activityImage) ?? null,
+    };
+
+    await AsyncStorage.setItem(draftKey, JSON.stringify(payload));
+  }, [
+    activityImage,
+    activityName,
+    activityType,
+    description,
+    draftKey,
+    room_id,
+    selectedContentId,
+    selectedScenarioId,
+    step,
+  ]);
+
+  const discardActivityDraft = useCallback(async () => {
+    await AsyncStorage.removeItem(draftKey);
+  }, [draftKey]);
 
   useEffect(() => {
     if (!hasHydratedDraftRef.current) return;
@@ -805,7 +845,14 @@ export default function NewActivityFlow() {
                 />
               )}
               {step === 3 && (
-                <Step3_Room selected={room_id} onSelect={setRoomId} />
+                <Step3_Room
+                  selected={room_id}
+                  onSelect={setRoomId}
+                  options={homeRooms.map((room) => ({
+                    id: room.name,
+                    name: room.name,
+                  }))}
+                />
               )}
               {step === 4 && (
                 <Step4_Environment

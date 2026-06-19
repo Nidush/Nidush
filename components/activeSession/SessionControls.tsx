@@ -1,4 +1,4 @@
-import { MaterialIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -37,7 +37,7 @@ interface SessionControlsProps {
   onPreviousTrack: () => void;
   onOpenSpotify: () => void;
   onNextStep: () => void;
-  currentTrack?: { title: string; artist: string } | null;
+  currentTrack?: { title: string; artist: string; imageUrl?: string | null } | null;
   showPauseButton?: boolean;
   guideText?: string;
   guideAudioUrl?: string;
@@ -74,6 +74,9 @@ export const SessionControls = ({
 }: SessionControlsProps) => {
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
   const playerRef = useRef<any>(null);
+  const [titleContainerWidth, setTitleContainerWidth] = useState(0);
+  const [titleTextWidth, setTitleTextWidth] = useState(0);
+  const titleTranslateX = useSharedValue(0);
 
   const animatedProgressStyle = useAnimatedStyle(() => ({
     width: `${progress.value}%`,
@@ -248,114 +251,92 @@ export const SessionControls = ({
       {/* Info Card (Player de Música) */}
       <View className="flex-row items-center border border-[#7DA87B]/20 p-4 rounded-3xl mb-8">
         <Image source={imageSource} className="w-12 h-12 rounded-lg" />
-        <View className="flex-1 ml-4">
-          <Text
-            className="text-[#354F52]"
-            style={{ fontFamily: 'Nunito_700Bold' }}
-          >
-            {currentTrack?.title || 'Music'}
-          </Text>
-          <Text
-            className="text-[#354F52]/60 text-xs"
-            style={{ fontFamily: 'Nunito_600SemiBold' }}
-          >
-            {currentTrack?.artist || 'Artist'}
-          </Text>
-        </View>
-        <TouchableOpacity onPress={onToggleMusic}>
-          <MaterialIcons
-            name={isMusicPlaying ? 'pause-circle-filled' : 'play-circle-filled'}
-            size={44}
-            color="#548F53"
-          />
 
-          <View className="flex-1 ml-4 pr-3">
+        <View className="flex-1 ml-4 pr-3">
+          <View
+            accessible={true}
+            accessibilityRole="text"
+            accessibilityLabel={`Background music: ${currentTrack?.title || 'Music'} by ${currentTrack?.artist || 'Artist'}`}
+          >
             <View
-              accessible={true}
-              accessibilityRole="text"
-              accessibilityLabel={`Background music: ${currentTrack?.title || 'Music'} by ${currentTrack?.artist || 'Artist'}`}
+              className="overflow-hidden"
+              onLayout={(event) =>
+                setTitleContainerWidth(event.nativeEvent.layout.width)
+              }
             >
-              <View
-                className="overflow-hidden"
-                onLayout={(event) =>
-                  setTitleContainerWidth(event.nativeEvent.layout.width)
-                }
-              >
-                <Animated.Text
-                  maxFontSizeMultiplier={1.2}
-                  className="text-[#354F52] text-[17px]"
-                  style={[{ fontFamily: 'Nunito_700Bold' }, titleAnimatedStyle]}
-                  importantForAccessibility="no-hide-descendants"
-                  numberOfLines={1}
-                  onLayout={(event) =>
-                    setTitleTextWidth(event.nativeEvent.layout.width)
-                  }
-                >
-                  {currentTitle}
-                </Animated.Text>
-              </View>
-              <Text
+              <Animated.Text
                 maxFontSizeMultiplier={1.2}
-                className="text-[#354F52]/70 text-sm"
-                style={{ fontFamily: 'Nunito_600SemiBold' }}
+                className="text-[#354F52] text-[17px]"
+                style={[{ fontFamily: 'Nunito_700Bold' }, titleAnimatedStyle]}
                 importantForAccessibility="no-hide-descendants"
                 numberOfLines={1}
+                onLayout={(event) =>
+                  setTitleTextWidth(event.nativeEvent.layout.width)
+                }
               >
-                {currentTrack?.artist || 'Artist'}
-              </Text>
+                {currentTitle}
+              </Animated.Text>
             </View>
-          </View>
-
-          <View className="flex-row items-center shrink-0">
-            <TouchableOpacity
-              onPress={onPreviousTrack}
-              accessible={true}
-              accessibilityRole="button"
-              accessibilityLabel="Play previous Spotify track"
-              className="px-1 py-1"
+            <Text
+              maxFontSizeMultiplier={1.2}
+              className="text-[#354F52]/70 text-sm"
+              style={{ fontFamily: 'Nunito_600SemiBold' }}
+              importantForAccessibility="no-hide-descendants"
+              numberOfLines={1}
             >
-              <Ionicons
-                name="play-skip-back-sharp"
-                size={26}
-                color="#5A9A57"
-                importantForAccessibility="no"
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={onToggleMusic}
-              accessible={true}
-              accessibilityRole="button"
-              accessibilityLabel={
-                isMusicPlaying ? 'Pause background music' : 'Play background music'
-              }
-              className="mx-2"
-            >
-              <View className="w-12 h-12 rounded-full border-[2.5px] border-[#5A9A57] items-center justify-center">
-                <MaterialIcons
-                  name={isMusicPlaying ? 'pause' : 'play-arrow'}
-                  size={28}
-                  color="#5A9A57"
-                  importantForAccessibility="no"
-                />
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={onNextTrack}
-              accessible={true}
-              accessibilityRole="button"
-              accessibilityLabel="Play next Spotify track"
-              className="px-1 py-1"
-            >
-              <Ionicons
-                name="play-skip-forward-sharp"
-                size={26}
-                color="#5A9A57"
-                importantForAccessibility="no"
-              />
-            </TouchableOpacity>
+              {currentTrack?.artist || 'Artist'}
+            </Text>
           </View>
         </View>
 
+        <View className="flex-row items-center shrink-0">
+          <TouchableOpacity
+            onPress={onPreviousTrack}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Play previous Spotify track"
+            className="px-1 py-1"
+          >
+            <Ionicons
+              name="play-skip-back-sharp"
+              size={26}
+              color="#5A9A57"
+              importantForAccessibility="no"
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={onToggleMusic}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel={
+              isMusicPlaying ? 'Pause background music' : 'Play background music'
+            }
+            className="mx-2"
+          >
+            <View className="w-12 h-12 rounded-full border-[2.5px] border-[#5A9A57] items-center justify-center">
+              <MaterialIcons
+                name={isMusicPlaying ? 'pause' : 'play-arrow'}
+                size={28}
+                color="#5A9A57"
+                importantForAccessibility="no"
+              />
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={onNextTrack}
+            accessible={true}
+            accessibilityRole="button"
+            accessibilityLabel="Play next Spotify track"
+            className="px-1 py-1"
+          >
+            <Ionicons
+              name="play-skip-forward-sharp"
+              size={26}
+              color="#5A9A57"
+              importantForAccessibility="no"
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* ÁREA CENTRAL INFERIOR: Botão Play/Pause E Botão de Voz */}

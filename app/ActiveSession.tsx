@@ -42,7 +42,11 @@ import {
   resolvePossibleUserScenarioDbIds,
 } from '@/utils/catalogTemplates';
 import { getScenarioDeviceMeta, mapLinkedDeviceToScenarioState } from '@/utils/activityDeviceConfigs';
-import { applyScenarioDeviceStates } from '@/utils/deviceExecution';
+import {
+  applyScenarioDeviceStates,
+  isTransientDeviceExecutionNetworkError,
+} from '@/utils/deviceExecution';
+import { isGoogleHomeUnavailableDeviceListError } from '@/utils/googleHome';
 
 type FormattedInstruction = {
   text: string;
@@ -231,6 +235,9 @@ export default function ActiveSession() {
     pausePlayback,
     resumePlayback,
     currentTrack,
+    nextTrack,
+    previousTrack,
+    openCurrentTrack,
     isAuthenticated,
   } = useSpotify();
 
@@ -444,6 +451,10 @@ export default function ActiveSession() {
 
       const parsedIngredients = normalizeIngredients(robustIngredients);
       const activityType = getActivityType(foundItem);
+      const configuredDevices = resolveConfiguredDevices(
+        getItemDevices(foundItem),
+        relatedScenario ? getItemDevices(relatedScenario) : [],
+      );
 
       if (activityType === 'cooking' && parsedIngredients.length > 0) {
         formattedInstructions.unshift({
@@ -531,7 +542,7 @@ export default function ActiveSession() {
             getActivityType(foundItem),
           );
         const basePlaybackOptions = {
-          suppressAppOpen: true,
+          suppressAppOpen: false,
         };
         const tvPlaybackOptions = shouldPreferTv
           ? {
@@ -628,7 +639,13 @@ export default function ActiveSession() {
     try {
       await applyScenarioDeviceStates(sessionData.devices, { forcePowerOn: false });
     } catch (error) {
-      console.error('Failed to turn off session devices on exit:', error);
+      if (isTransientDeviceExecutionNetworkError(error)) {
+        console.warn(
+          'Skipped turning off session devices on exit because the network was temporarily unavailable.',
+        );
+      } else {
+        console.error('Failed to turn off session devices on exit:', error);
+      }
     } finally {
       cleanedUpSessionRef.current = true;
     }
@@ -645,12 +662,30 @@ export default function ActiveSession() {
     if (devicesToEnforce.length === 0) return;
 
     let cancelled = false;
+    let shouldStopRetrying = false;
 
     const enforceLightingState = async () => {
+      if (shouldStopRetrying) return;
+
       try {
         await applyScenarioDeviceStates(devicesToEnforce, { forcePowerOn: true });
       } catch (error) {
         if (!cancelled) {
+          if (isGoogleHomeUnavailableDeviceListError(error)) {
+            shouldStopRetrying = true;
+            console.warn(
+              'Stopped reapplying session lighting state because Google Home returned no valid device list for the connected account/home.',
+            );
+            return;
+          }
+
+          if (isTransientDeviceExecutionNetworkError(error)) {
+            console.warn(
+              'Skipped reapplying session lighting state because the network was temporarily unavailable.',
+            );
+            return;
+          }
+
           console.error('Failed to reapply session lighting state:', error);
         }
       }
@@ -806,23 +841,9 @@ export default function ActiveSession() {
     }
   }, [currentStepIndex, sessionData, isVideoSession, progress]);
 
-  const handleToggleSession = () => {
-    const newState = !isActive;
-    setIsActive(newState);
-    setIsMusicPlaying(newState);
-  };
   const handleAudioReady = useCallback(() => {
     setIsMediaReady(true);
   }, []);
-
-  const handleToggleMusic = () => {
-    if (isMusicPlaying) {
-      pausePlayback();
-    } else {
-      resumePlayback();
-    }
-    setIsMusicPlaying((prev) => !prev);
-  };
 
   const handleCancel = () => {
     setIsActive(false);

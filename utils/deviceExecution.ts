@@ -97,6 +97,23 @@ type ApplyScenarioDeviceStatesOptions = {
   forcePowerOn?: boolean;
 };
 
+export const isTransientDeviceExecutionNetworkError = (error: unknown) => {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : String((error as { message?: unknown })?.message ?? '');
+
+  const lower = message.toLowerCase();
+
+  return (
+    lower.includes('network request failed') ||
+    lower.includes('fetch failed') ||
+    lower.includes('failed to fetch')
+  );
+};
+
 const isUnsupportedGoogleHomeControlError = (error: unknown) => {
   const message =
     error instanceof Error

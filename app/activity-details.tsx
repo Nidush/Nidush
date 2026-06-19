@@ -1,6 +1,5 @@
 import { apiLog, supabase } from '@/utils/supabase';
 import { Ionicons } from '@expo/vector-icons';
-import * as IntentLauncher from 'expo-intent-launcher';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -8,6 +7,7 @@ import {
   ActivityIndicator,
   Alert,
   ImageSourcePropType,
+  Linking,
   Platform,
   ScrollView,
   Text,
@@ -203,6 +203,10 @@ export default function ActivityDetails() {
   const [isUpdatingShortcut, setIsUpdatingShortcut] = useState(false);
 
   const isActivity = mainItem ? isActivityItem(mainItem) : false;
+  const creationMessage =
+    itemType === 'scenario'
+      ? 'Scenario created successfully!'
+      : 'Activity created successfully!';
 
   const [alertConfig, setAlertConfig] = useState<AlertConfigState>({
     visible: false,
@@ -216,7 +220,7 @@ export default function ActivityDetails() {
 
   useEffect(() => {
     if (isNew === 'true') {
-      setToastMessage('Activity created successfully!');
+      setToastMessage(creationMessage);
       setShowToast(true);
       AccessibilityInfo.announceForAccessibility(creationMessage);
       const timer = setTimeout(() => {
@@ -224,7 +228,7 @@ export default function ActivityDetails() {
       }, 5000);
       return () => clearTimeout(timer);
     }
-  }, [isNew, itemType]);
+  }, [creationMessage, isNew]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -483,9 +487,7 @@ export default function ActivityDetails() {
               text: 'Open Settings',
               onPress: async () => {
                 try {
-                  await IntentLauncher.startActivityAsync(
-                    IntentLauncher.ActivityAction.ZEN_MODE_PRIORITY_SETTINGS,
-                  );
+                  await Linking.openSettings();
                 } catch (error) {
                   console.log('It was not possible to open settings', error);
                 } finally {

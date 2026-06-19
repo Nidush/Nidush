@@ -171,6 +171,25 @@ const normalizeGoogleHomeMessage = (message: string) => {
   return normalized;
 };
 
+export const isGoogleHomeUnavailableDeviceListError = (error: unknown) => {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : '';
+
+  const lower = message.toLowerCase();
+
+  return (
+    lower.includes('google não devolveu uma lista válida de dispositivos') ||
+    lower.includes('google did not return a valid device list') ||
+    lower.includes('command errors encountered') ||
+    lower.includes('sub-errors:') ||
+    lower.includes('primary error: code=19')
+  );
+};
+
 const toFriendlyError = (error: unknown, fallbackMessage: string) => {
   if (error instanceof Error && error.message.trim()) {
     return new Error(normalizeGoogleHomeMessage(error.message));
