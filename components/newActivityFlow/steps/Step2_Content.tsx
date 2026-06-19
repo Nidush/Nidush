@@ -1,6 +1,6 @@
 import { Activity, Content } from '@/constants/data/types';
 import { supabase } from '@/utils/supabase';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 import { ContentCard } from '../ContentCard';
 import { StepWrapper } from '../StepWrapper';
@@ -11,6 +11,8 @@ interface Step2Props {
   activityType: Activity['type'];
 }
 
+const PAGE_SIZE = 10;
+
 export const Step2_Content = ({
   selectedContentId,
   onSelect,
@@ -18,43 +20,39 @@ export const Step2_Content = ({
 }: Step2Props) => {
   const [dbContent, setDbContent] = useState<Content[]>([]);
   const [loading, setLoading] = useState(true);
+  const [visibleByCarousel, setVisibleByCarousel] = useState<Record<string, number>>({});
 
-  useEffect(() => {
-    const fetchContents = async () => {
+  const fetchContents = useCallback(async () => {
       setLoading(true);
-      const { data, error } = await supabase.from('contents').select('*');
-
+      const { data, error } = await supabase.from('contents').select('*').order('title', { ascending: true });
       if (error) {
         console.error('Erro ao carregar conteúdos do Supabase:', error);
       } else if (data) {
         setDbContent(data as Content[]);
       }
       setLoading(false);
-    };
+    }, []);
 
+  useEffect(() => {
+    setVisibleByCarousel({});
     fetchContents();
-  }, []);
+  }, [fetchContents]);
 
   const filteredContent = useMemo(() => {
     const targetCategory = (activityType || '').toLowerCase();
 
     if (targetCategory === 'general') {
-      // Exclui audiobooks da vista "general". Só aparecem quando a atividade for "audiobooks"
       return dbContent.filter((content) => content.type !== 'audiobooks');
     }
 
     return dbContent.filter((content) => {
-      if (targetCategory === 'cooking' && content.type === 'recipe')
-        return true;
-      if (targetCategory === 'workout' && content.type === 'exercise')
-        return true;
+      if (targetCategory === 'cooking' && content.type === 'recipe') return true;
+      if (targetCategory === 'workout' && content.type === 'exercise') return true;
 
       const cat = (content.category || '').toLowerCase();
       const type = (content.type || '').toLowerCase();
 
-      return (
-        cat === targetCategory || type === targetCategory || cat === 'general'
-      );
+      return cat === targetCategory || type === targetCategory || cat === 'general';
     });
   }, [activityType, dbContent]);
 
@@ -134,8 +132,22 @@ export const Step2_Content = ({
       (c.type === 'video' || c.type === 'workout' || c.type === 'exercise'),
   );
 
+  const loadMoreForCarousel = useCallback((title: string, total: number) => {
+    setVisibleByCarousel((current) => {
+      const currentVisible = current[title] ?? PAGE_SIZE;
+      if (currentVisible >= total) return current;
+      return {
+        ...current,
+        [title]: Math.min(currentVisible + PAGE_SIZE, total),
+      };
+    });
+  }, []);
+
   const renderCarousel = (title: string, data: typeof filteredContent) => {
     if (data.length === 0) return null;
+    const visibleCount = visibleByCarousel[title] ?? PAGE_SIZE;
+    const visibleItems = data.slice(0, visibleCount);
+    const hasMoreInCarousel = visibleItems.length < data.length;
 
     return (
       <View className="mb-8" key={title}>
@@ -149,12 +161,19 @@ export const Step2_Content = ({
         </Text>
 
         <FlatList
-          data={data}
+          data={visibleItems}
           horizontal
+          onEndReached={() => loadMoreForCarousel(title, data.length)}
+          onEndReachedThreshold={0.65}
           showsHorizontalScrollIndicator={false}
           className="-mx-5"
           contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
           keyExtractor={(item) => item.id}
+          ListFooterComponent={
+            hasMoreInCarousel ? (
+              <View className="w-2" />
+            ) : null
+          }
           renderItem={({ item }) => (
             <View className="w-[170px]">
               <ContentCard

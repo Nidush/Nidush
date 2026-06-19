@@ -86,6 +86,12 @@ type ActivityDraftPayload = {
   activityImageUri: string | null;
 };
 
+const ACTIVITY_DESCRIPTION_MAX_LENGTH = 1000;
+const ACTIVITY_TITLE_MAX_LENGTH = 255;
+const ACTIVITY_IMAGE_MAX_LENGTH = 1000;
+const ACTIVITY_CATEGORY_MAX_LENGTH = 255;
+const ACTIVITY_TYPE_MAX_LENGTH = 255;
+
 type ContentRow = {
   id: string;
   title: string;
@@ -125,6 +131,18 @@ const getImageUri = (value: ImageSourcePropType | string | null) =>
     : value && typeof value === 'object' && 'uri' in value
       ? value.uri
       : undefined;
+
+const normalizeActivityDescription = (value: string) =>
+  value.replace(/\s+/g, ' ').trim().slice(0, ACTIVITY_DESCRIPTION_MAX_LENGTH);
+
+const normalizeActivityTitle = (value: string) =>
+  value.replace(/\s+/g, ' ').trim().slice(0, ACTIVITY_TITLE_MAX_LENGTH);
+
+const normalizeActivityImage = (value: string | ImageSourcePropType | null) =>
+  (typeof value === 'string' ? value : getImageUri(value))?.trim().slice(0, ACTIVITY_IMAGE_MAX_LENGTH) || null;
+
+const normalizeShortText = (value: string, maxLength = ACTIVITY_CATEGORY_MAX_LENGTH) =>
+  value.replace(/\s+/g, ' ').trim().slice(0, maxLength);
 
 const resolveScenarioDbId = (value: string) => {
   if (typeof parseUserScenarioDbId === 'function') {
@@ -712,6 +730,11 @@ export default function NewActivityFlow() {
         general: 'other',
       };
       const formattedType = typeMapping[activityType] || 'other';
+      const safeTitle = normalizeActivityTitle(activityName || 'Untitled Activity');
+      const safeDescription = normalizeActivityDescription(description);
+      const safeImageUrl = normalizeActivityImage(imageUrl);
+      const safeCategory = normalizeShortText('My creations');
+      const safeType = normalizeShortText(formattedType, ACTIVITY_TYPE_MAX_LENGTH);
 
       // 2. Resolve room_id string to database room integer ID
       let dbRoomId = null;
@@ -746,11 +769,11 @@ export default function NewActivityFlow() {
 
       // 3. Tentar inserir/atualizar na DB
       const saveData = {
-        title: activityName || 'Untitled Activity',
-        description,
-        image: imageUrl,
-        category: 'My creations',
-        type: formattedType,
+        title: safeTitle,
+        description: safeDescription,
+        image: safeImageUrl,
+        category: safeCategory,
+        type: safeType,
         content_id: selectedContentId || null,
         scenario_id: selectedScenarioId
           ? parseInt(selectedScenarioId.toString().replace(/\D/g, ''))
@@ -760,11 +783,11 @@ export default function NewActivityFlow() {
         home_id: currentHomeId,
       };
       const legacySaveData = {
-        title: activityName || 'Untitled Activity',
-        description,
-        image: imageUrl,
-        category: 'My creations',
-        type: formattedType,
+        title: safeTitle,
+        description: safeDescription,
+        image: safeImageUrl,
+        category: safeCategory,
+        type: safeType,
         content_id: selectedContentId || null,
         scenario_id: selectedScenarioId
           ? parseInt(selectedScenarioId.toString().replace(/\D/g, ''))

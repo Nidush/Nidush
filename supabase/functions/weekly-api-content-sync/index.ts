@@ -95,6 +95,16 @@ const LIBRIVOX_AUDIOBOOKS_URL = 'https://librivox.org/api/feed/audiobooks'
 const LIBRIVOX_AUDIOTRACKS_URL = 'https://librivox.org/api/feed/audiotracks'
 const WORKOUTX_AUTHOR = 'WorkoutX'
 const API_MEDIA_BUCKET = 'api-content-media'
+const WORKOUTX_TARGET_CATEGORIES = [
+  'Yoga',
+  'Stretching',
+  'Cardio',
+  'Core',
+  'Lower Body',
+  'Upper Body',
+  'Strength',
+] as const
+const WORKOUTX_ITEMS_PER_CATEGORY = 2
 
 const slugify = (value: string) =>
   value
@@ -156,6 +166,50 @@ const splitInstructionText = (value: string | null | undefined) =>
 
 const parseInstructions = (value: string | null | undefined) =>
   splitInstructionText(value).map((line) => line.replace(/\s+/g, ' ').trim())
+
+const deriveWorkoutXCategory = (exercise: WorkoutXExercise) => {
+  const text = [
+    exercise.name,
+    exercise.description,
+    exercise.bodyPart,
+    exercise.target,
+    exercise.equipment,
+    exercise.difficulty,
+  ]
+    .map((value) => String(value ?? '').trim().toLowerCase())
+    .filter(Boolean)
+    .join(' ')
+
+  if (/yoga|pose|vinyasa|asana|sun salutation|flow/.test(text)) {
+    return 'Yoga'
+  }
+
+  if (/stretch|flexibility|mobility|warmup|cool down|cooldown/.test(text)) {
+    return 'Stretching'
+  }
+
+  if (/hiit|cardio|sprint|run|running|jump rope|cycling|bike|treadmill/.test(text)) {
+    return 'Cardio'
+  }
+
+  if (/core|abs|abdom/.test(text)) {
+    return 'Core'
+  }
+
+  if (/legs|glute|hamstring|quad|calf/.test(text)) {
+    return 'Lower Body'
+  }
+
+  if (/chest|back|shoulder|bicep|tricep|arm/.test(text)) {
+    return 'Upper Body'
+  }
+
+  if (/strength|muscle|barbell|dumbbell|kettlebell|resistance|full body|training/.test(text)) {
+    return 'Strength'
+  }
+
+  return 'Workout Sessions'
+}
 
 const stripHtml = (value: string | null | undefined) =>
   String(value ?? '')
@@ -415,31 +469,64 @@ const fetchWorkoutXExercises = async (
   requestedExercises: number,
 ): Promise<ContentPayload[]> => {
   const weekSeed = currentWeekSeed()
-  const limit = Math.max(requestedExercises * 3, 30)
-  const offset = weekSeed % 40
+  const minimumBalancedTotal =
+    WORKOUTX_TARGET_CATEGORIES.length * WORKOUTX_ITEMS_PER_CATEGORY
+  const desiredTotal = Math.max(requestedExercises, minimumBalancedTotal)
+  const limit = Math.max(desiredTotal * 4, 60)
+  const baseOffset = weekSeed % 120
+  const uniqueExercises = new Map<string, WorkoutXExercise>()
 
-  const payload = await fetchJson<unknown>(
-    `${WORKOUTX_EXERCISES_URL}?limit=${limit}&offset=${offset}`,
-    {
-      headers: { 'X-WorkoutX-Key': apiKey },
-    },
-  )
+  for (let page = 0; page < 4; page += 1) {
+    const offset = baseOffset + page * limit
+    const payload = await fetchJson<unknown>(
+      `${WORKOUTX_EXERCISES_URL}?limit=${limit}&offset=${offset}`,
+      {
+        headers: { 'X-WorkoutX-Key': apiKey },
+      },
+    )
 
-  const data = extractWorkoutXExercises(payload)
-  if (data.length === 0) {
-    throw new Error(`WorkoutX returned no exercises. Payload shape: ${summarizePayloadShape(payload)}`)
+    const data = extractWorkoutXExercises(payload)
+    if (data.length === 0 && page === 0) {
+      throw new Error(`WorkoutX returned no exercises. Payload shape: ${summarizePayloadShape(payload)}`)
+    }
+
+    data.forEach((exercise) => {
+      const exerciseId = normalizeExerciseId(exercise)
+      const exerciseName = String(exercise.name ?? '').trim()
+      if (!exerciseId || !exerciseName) return
+      uniqueExercises.set(exerciseId, exercise)
+    })
   }
 
-  const uniqueExercises = new Map<string, WorkoutXExercise>()
-  data.forEach((exercise) => {
-    const exerciseId = normalizeExerciseId(exercise)
-    const exerciseName = String(exercise.name ?? '').trim()
-    if (!exerciseId || !exerciseName) return
-    uniqueExercises.set(exerciseId, exercise)
+  const shuffledExercises = shuffleWithSeed(Array.from(uniqueExercises.values()), weekSeed)
+  const groupedByCategory = new Map<string, WorkoutXExercise[]>(
+    WORKOUTX_TARGET_CATEGORIES.map((category) => [category, []]),
+  )
+
+  shuffledExercises.forEach((exercise) => {
+    const category = deriveWorkoutXCategory(exercise)
+    if (groupedByCategory.has(category)) {
+      groupedByCategory.get(category)?.push(exercise)
+    }
   })
 
-  return shuffleWithSeed(Array.from(uniqueExercises.values()), weekSeed)
-    .slice(0, requestedExercises)
+  const balancedSelection: WorkoutXExercise[] = []
+  WORKOUTX_TARGET_CATEGORIES.forEach((category) => {
+    balancedSelection.push(
+      ...(groupedByCategory.get(category) ?? []).slice(0, WORKOUTX_ITEMS_PER_CATEGORY),
+    )
+  })
+
+  const seenIds = new Set(
+    balancedSelection.map((exercise) => normalizeExerciseId(exercise)),
+  )
+
+  const remainingExercises = shuffledExercises.filter(
+    (exercise) => !seenIds.has(normalizeExerciseId(exercise)),
+  )
+
+  return [...balancedSelection, ...remainingExercises]
+    .slice(0, desiredTotal)
     .map((exercise) => {
       const exerciseId = normalizeExerciseId(exercise)
       const directGifUrl = [exercise.gifUrl, exercise.gif_url]
@@ -456,7 +543,7 @@ const fetchWorkoutXExercises = async (
           exercise.equipment ? `Equipment: ${exercise.equipment}` : null,
         ].filter(Boolean).join(' | ') || null,
         type: 'exercise',
-        category: 'workout',
+        category: deriveWorkoutXCategory(exercise),
         duration: '10 min',
         image: directGifUrl,
         instructions: parseInstructions(exercise.instructions),
