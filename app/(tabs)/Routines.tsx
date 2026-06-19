@@ -690,7 +690,6 @@ export default function Routines() {
       ];
 
       closeAddRoutineModal();
-      showFeedback(`"${savedRoutine.name}" is now part of your routines.`, 'success');
     } catch (err: unknown) {
       console.error('Error creating routine:', err);
       captureException(err, {
@@ -801,8 +800,7 @@ export default function Routines() {
       routinesScreenCache.routines = routinesScreenCache.routines.map((item) => (item.id === nextRoutine.id ? nextRoutine : item));
       setSelectedRoutine(nextRoutine);
       setIsEditingRoutine(false);
-      showFeedback(`"${updatedRoutine.name}" was updated.`, 'success');
-    } catch (err: unknown) {
+      } catch (err: unknown) {
       console.error('Error updating routine:', err);
       showFeedback(
         err instanceof Error ? err.message : 'Could not update routine. Please try again.',
