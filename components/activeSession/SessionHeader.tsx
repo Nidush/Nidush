@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
+import TextTicker from 'react-native-text-ticker';
 
 interface SessionHeaderProps {
   title: string;
@@ -29,16 +30,25 @@ export const SessionHeader = ({
         />
       </TouchableOpacity>
 
-      <Text
-        // Adicionámos flex-1 (para limitar o tamanho), text-center (para centrar) e mx-4 (para dar margem)
-        className="flex-1 text-center mx-4 text-[#354F52] text-2xl"
-        style={{ fontFamily: 'Nunito_600SemiBold' }}
-        numberOfLines={1} // As reticências (...) vão aparecer automaticamente se o título passar do espaço do flex-1
-        accessibilityRole="header"
-        maxFontSizeMultiplier={1.2}
-      >
-        {title}
-      </Text>
+      <View className="flex-1 mx-4 overflow-hidden">
+        <TextTicker
+          style={{
+            fontFamily: 'Nunito_600SemiBold',
+            fontSize: 20,
+            color: '#354F52',
+            textAlign: 'center',
+          }}
+          duration={6000}
+          loop
+          bounce={false}
+          repeatSpacer={50}
+          marqueeDelay={1500}
+          maxFontSizeMultiplier={1.2}
+          accessibilityRole="header"
+        >
+          {title}
+        </TextTicker>
+      </View>
 
       <TouchableOpacity
         onPress={onCancel}

@@ -97,7 +97,6 @@ const AnimatedCookingIcon = ({
         true,
       );
     } else if (type === 'heat') {
-      // FERVURA: Pulsa de tamanho e dá pequenos saltos a imitar uma tampa a tremer
       scale.value = withRepeat(
         withSequence(
           withTiming(1.08, {
@@ -111,10 +110,10 @@ const AnimatedCookingIcon = ({
       );
       translateY.value = withRepeat(
         withSequence(
-          withTiming(-3, { duration: 80 }), // Tremor rápido 1
+          withTiming(-3, { duration: 80 }),
           withTiming(0, { duration: 80 }),
-          withTiming(-1.5, { duration: 80 }), // Tremor rápido 2
-          withTiming(0, { duration: 600 }), // Pausa entre as bolhas
+          withTiming(-1.5, { duration: 80 }),
+          withTiming(0, { duration: 600 }),
         ),
         -1,
         true,
@@ -281,7 +280,6 @@ export const CookingVisuals = ({
     );
   }
 
-  // VISTA B: Passos de Preparação (Instruções Reais)
   const iconsData = getStepIconsData(step.text);
   const iconColor = '#548F53';
   const iconSize = 80;

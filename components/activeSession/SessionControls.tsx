@@ -33,7 +33,9 @@ interface SessionControlsProps {
   guideText?: string;
   guideAudioUrl?: string;
   onAudioReady?: () => void;
-  stepIndex: number; // <--- 1. NOVA PROP AQUI
+  stepIndex: number;
+  showChaptersButton?: boolean;
+  onShowChapters?: () => void;
 }
 
 export const SessionControls = ({
@@ -54,7 +56,9 @@ export const SessionControls = ({
   guideText,
   guideAudioUrl,
   onAudioReady,
-  stepIndex, // <--- EXTRAÍDA AQUI
+  stepIndex,
+  showChaptersButton,
+  onShowChapters,
 }: SessionControlsProps) => {
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
   const playerRef = useRef<any>(null);
@@ -251,6 +255,20 @@ export const SessionControls = ({
           >
             <MaterialIcons
               name={isVoiceEnabled ? 'record-voice-over' : 'voice-over-off'}
+              size={28}
+              color="white"
+            />
+          </TouchableOpacity>
+        )}
+        {showChaptersButton && (
+          <TouchableOpacity
+            onPress={onShowChapters}
+            className="bg-[#548F53] p-4 rounded-full shadow-lg justify-center items-center"
+            accessibilityRole="button"
+            accessibilityLabel="Show Table of Contents"
+          >
+            <MaterialIcons
+              name="format-list-bulleted"
               size={28}
               color="white"
             />

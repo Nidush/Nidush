@@ -26,7 +26,7 @@ interface AudiobookVisualsProps {
   stepIndex: number;
   contentOpacity: SharedValue<number>;
   imageUrl?: string | null;
-  isActive: boolean; // <--- NOVA PROP
+  isActive: boolean;
   onSelectChapter: (index: number) => void;
 }
 
@@ -58,7 +58,6 @@ const AnimatedBar = ({
 
   useEffect(() => {
     if (isActive) {
-      // Movimento oscilatório contínuo
       height.value = withDelay(
         delay,
         withRepeat(
@@ -67,14 +66,13 @@ const AnimatedBar = ({
               duration,
               easing: Easing.inOut(Easing.ease),
             }),
-            withTiming(8, { duration, easing: Easing.inOut(Easing.ease) }), // Não desce a zero para manter vida
+            withTiming(8, { duration, easing: Easing.inOut(Easing.ease) }),
           ),
           -1,
           true,
         ),
       );
     } else {
-      // Quando pausa, a onda encolhe suavemente
       height.value = withTiming(4, { duration: 300 });
     }
   }, [isActive]);
@@ -91,12 +89,11 @@ const AnimatedBar = ({
 
 // === COMPONENTE DO CONJUNTO DE ONDAS ===
 const VoiceWave = ({ isActive }: { isActive: boolean }) => {
-  // Configuração simulada de frequências de voz para parecer natural
   const waveConfig = [
     { delay: 0, duration: 400, maxH: 24 },
     { delay: 100, duration: 300, maxH: 40 },
     { delay: 50, duration: 500, maxH: 32 },
-    { delay: 200, duration: 350, maxH: 52 }, // Pico central
+    { delay: 200, duration: 350, maxH: 52 },
     { delay: 150, duration: 450, maxH: 36 },
     { delay: 0, duration: 300, maxH: 28 },
     { delay: 100, duration: 500, maxH: 16 },
@@ -148,38 +145,40 @@ export const AudiobookVisuals = ({
           data={chapters}
           keyExtractor={(_, i) => i.toString()}
           showsVerticalScrollIndicator={false}
+          numColumns={2}
+          columnWrapperStyle={{ gap: 16, marginBottom: 16 }}
+          contentContainerStyle={{ paddingBottom: 20 }}
           renderItem={({ item, index }) => (
             <TouchableOpacity
               onPress={() => onSelectChapter(item.originalIndex)}
-              className="bg-white p-4 rounded-2xl mb-3 flex-row items-center border border-[#548F53]/20 shadow-sm"
+              className="flex-1 aspect-square bg-white p-4 rounded-3xl border border-[#548F53]/20 shadow-sm justify-between items-center"
             >
-              <View className="w-10 h-10 bg-[#548F53]/10 rounded-full items-center justify-center mr-4">
-                <Text className="text-[#548F53] font-bold">{index + 1}</Text>
-              </View>
-
-              <View className="flex-1">
-                <Text
-                  className="text-[#354F52] text-lg"
-                  style={{ fontFamily: 'Nunito_700Bold' }}
-                  numberOfLines={2}
-                >
-                  {item.text}
+              <View className="w-12 h-12 bg-[#548F53]/10 rounded-full items-center justify-center mt-2">
+                <Text className="text-[#548F53] font-bold text-lg">
+                  {index + 1}
                 </Text>
               </View>
 
-              <View className="items-end ml-2">
+              <Text
+                className="text-[#354F52] text-center"
+                style={{ fontFamily: 'Nunito_700Bold', fontSize: 15 }}
+                numberOfLines={3} // Limita o texto para não estragar o quadrado
+              >
+                {item.text}
+              </Text>
+
+              <View className="flex-row items-center mb-2 opacity-80">
+                <MaterialIcons
+                  name="play-circle-outline"
+                  size={18}
+                  color="#548F53"
+                />
                 <Text
-                  className="text-[#7DA87B]"
+                  className="text-[#7DA87B] ml-1 text-xs"
                   style={{ fontFamily: 'Nunito_600SemiBold' }}
                 >
                   {formatDuration(item.duration)}
                 </Text>
-                <MaterialIcons
-                  name="play-circle-outline"
-                  size={24}
-                  color="#548F53"
-                  className="mt-1"
-                />
               </View>
             </TouchableOpacity>
           )}
@@ -222,7 +221,6 @@ export const AudiobookVisuals = ({
         {step.text}
       </Text>
 
-      {/* Renderizamos a onda de voz dinâmica baseada no estado de Pause/Play */}
       <VoiceWave isActive={isActive} />
     </Animated.View>
   );

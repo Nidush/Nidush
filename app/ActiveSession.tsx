@@ -118,11 +118,9 @@ const normalizeIngredients = (value: unknown): any[] => {
       };
     }
 
-    // Se for uma string simples do The Meal Database
     const text = String(entry ?? '');
     const spaceIdx = text.indexOf(' ');
 
-    // Se não tiver espaços, é apenas o ingrediente
     if (spaceIdx === -1) return { item: text, amount: '' };
 
     return { amount: text.slice(0, spaceIdx), item: text.slice(spaceIdx + 1) };
@@ -197,8 +195,6 @@ export default function ActiveSession() {
         }
       }
       if (!foundItem) foundItem = await fetchScenarioTemplateById(id);
-
-      // Se não encontrou localmente, tentar no Supabase (atividades criadas pelo user)
       if (!foundItem) {
         const { data, error } = await supabase
           .from('activities')
@@ -228,7 +224,6 @@ export default function ActiveSession() {
       const localContent = contentId ? CONTENTS[String(contentId)] : null;
 
       if (foundItem && contentId) {
-        // Fetch content from Supabase
         const { data: contentRows } = await supabase
           .from('contents')
           .select('*')
@@ -247,7 +242,6 @@ export default function ActiveSession() {
               localContent?.videoUrl || contentData.video_url || undefined;
           }
         } else {
-          // Fallback to local CONTENTS
           if (localContent) {
             playlistName = localContent.title;
             if (localContent.type === 'video') {
@@ -301,8 +295,6 @@ export default function ActiveSession() {
         contentData?.instructions || localContent?.instructions || [],
       );
 
-      // NOVA LÓGICA DE DIVISÃO DOS PASSOS:
-      // NOVA LÓGICA DE DIVISÃO DOS PASSOS:
       const formattedInstructions: FormattedInstruction[] = rawInstructions
         .map((step: any) => {
           if (typeof step === 'string') {
@@ -312,7 +304,7 @@ export default function ActiveSession() {
             text: String(step.text ?? ''),
             duration: step.duration,
             description: step.description,
-            audio_url: step.url || step.audio_url, // <--- 2. PUXAR O LINK DA BASE DE DADOS AQUI
+            audio_url: step.url || step.audio_url,
           };
         })
         .flatMap((stepObj) => {
@@ -331,7 +323,6 @@ export default function ActiveSession() {
             text: sentence + '.',
             duration: index === 0 ? stepObj.duration : undefined,
             description: stepObj.description,
-            // 3. SE O TEXTO FOR DIVIDIDO, O ÁUDIO FICA NO 1º PEDAÇO DA FRASE
             audio_url: index === 0 ? stepObj.audio_url : undefined,
           }));
         });
@@ -344,7 +335,6 @@ export default function ActiveSession() {
         });
       }
 
-      // 1. Criamos um fallback robusto para procurar ingredientes em todo o lado
       const robustIngredients =
         contentData?.ingredients ??
         (foundItem as any)?.content?.ingredients ??
@@ -353,15 +343,13 @@ export default function ActiveSession() {
         localContent?.ingredients ??
         [];
 
-      // USAR O NORMALIZE AQUI EM VEZ DE parseArrayValue
       const parsedIngredients = normalizeIngredients(robustIngredients);
       const activityType = getActivityType(foundItem);
 
-      // INJETAR PASSO DE INGREDIENTES EXCLUSIVO NO INÍCIO DO ARRAY
       if (activityType === 'cooking' && parsedIngredients.length > 0) {
         formattedInstructions.unshift({
           text: 'Check and prepare all the required ingredients before starting the preparation.',
-          duration: undefined, // Sem duração fixa para ser controlado manualmente pelo botão Next
+          duration: undefined,
           description: undefined,
           isIngredientsStep: true,
         });
@@ -369,19 +357,18 @@ export default function ActiveSession() {
       if (activityType === 'audiobooks' && formattedInstructions.length > 0) {
         formattedInstructions.unshift({
           text: 'Table of Contents',
-          duration: undefined, // Sem tempo, controlado manualmente
+          duration: undefined,
           description: undefined,
           isChapterListStep: true,
         });
       }
 
-      // 2. Atualizamos o estado da sessão com os ingredientes extraídos
       setSessionData({
         title: foundItem.title || 'Session',
         room: getActivityRoom(foundItem),
         playlistName: playlistName,
         image: foundItem.image,
-        instructions: formattedInstructions, // Já inclui o passo de ingredientes no início
+        instructions: formattedInstructions,
         type: contentType,
         videoUrl: videoUrl,
         devices: relatedScenario?.devices || getItemDevices(foundItem),
@@ -391,7 +378,6 @@ export default function ActiveSession() {
         contentImageUrl: contentData?.image || undefined,
       });
 
-      // Tocar música no Spotify só em sessões sem vídeo.
       if (
         isAuthenticated &&
         contentType !== 'video' &&
@@ -404,7 +390,6 @@ export default function ActiveSession() {
           let sId = getScenarioId(foundItem);
 
           if (!sId || sId === 'null') {
-            // Tentar mapear o tipo para um cenário padrão local
             if (type === 'workout') sId = '1';
             else if (type === 'cooking') sId = '2';
             else if (type === 'meditation') sId = '3';
@@ -415,7 +400,6 @@ export default function ActiveSession() {
             `[Spotify] Traduzindo tipo "${type}" para cenário: ${sId}`,
           );
 
-          // 1. Tentar catálogo de cenários
           const templateScenarioId = normalizeScenarioTemplateId(sId);
           const templateScenario = templateScenarioId
             ? await fetchScenarioTemplateById(templateScenarioId)
@@ -431,7 +415,6 @@ export default function ActiveSession() {
             .maybeSingle();
           if (!pId) pId = scenData?.playlist_id;
 
-          // 3. Fallback Final (Workout)
           if (!pId) pId = '37i9dQZF1DX76W9kuv1Z0g';
         }
 
@@ -541,7 +524,6 @@ export default function ActiveSession() {
 
     const prevIndex = currentStepIndex - 1;
 
-    // Fazemos a mesma animação de fade-out / fade-in
     contentOpacity.value = withSequence(
       withTiming(0, { duration: 300 }),
       withTiming(1, { duration: 300 }),
@@ -574,6 +556,22 @@ export default function ActiveSession() {
     },
     [sessionData, contentOpacity],
   );
+  const handleShowChapters = useCallback(() => {
+    if (!sessionData) return;
+
+    setIsMediaReady(false);
+    setIsActive(false);
+
+    contentOpacity.value = withSequence(
+      withTiming(0, { duration: 300 }),
+      withTiming(1, { duration: 300 }),
+    );
+
+    setTimeout(() => {
+      setCurrentStepIndex(0);
+      setSecondsLeft(0);
+    }, 300);
+  }, [sessionData, contentOpacity]);
   useEffect(() => {
     if (sessionData && currentStepIndex > 0 && !isVideoSession) {
       const currentInstruction =
@@ -595,7 +593,6 @@ export default function ActiveSession() {
       if (secondsLeft > 0) {
         interval = setInterval(() => {
           setSecondsLeft((prev) => {
-            // Se chegou a 1, o próximo é 0, logo avança!
             if (prev <= 1) {
               if (interval) clearInterval(interval);
               setTimeout(() => handleNextStep(), 0);
@@ -674,7 +671,6 @@ export default function ActiveSession() {
     );
   }
 
-  // ... validações existentes ...
   const currentStep = sessionData.instructions[currentStepIndex];
   if (!currentStep && !isVideoSession) return null;
   const isLastStep = currentStepIndex === sessionData.instructions.length - 1;
@@ -712,7 +708,6 @@ export default function ActiveSession() {
         />
       ) : (
         <>
-          {/* Interfaces Dinâmicas por Tipo de Atividade */}
           {isCooking ? (
             <CookingVisuals
               step={currentStep}
@@ -720,13 +715,13 @@ export default function ActiveSession() {
               stepIndex={currentStepIndex}
               contentOpacity={contentOpacity}
             />
-          ) : isAudiobook ? ( // <--- ADICIONAR A VERIFICAÇÃO DO AUDIOBOOK AQUI
+          ) : isAudiobook ? (
             <AudiobookVisuals
               step={currentStep}
               instructions={sessionData.instructions}
               stepIndex={currentStepIndex}
               contentOpacity={contentOpacity}
-              isActive={isActive} // <--- Passar se está em Play ou Pause
+              isActive={isActive}
               imageUrl={
                 sessionData.contentImageUrl ||
                 (typeof sessionData.image === 'string'
@@ -779,6 +774,8 @@ export default function ActiveSession() {
             guideText={isMeditation ? currentStep.text : undefined}
             guideAudioUrl={currentStep.audio_url}
             onAudioReady={handleAudioReady}
+            showChaptersButton={isAudiobook && !currentStep.isChapterListStep}
+            onShowChapters={handleShowChapters}
           />
         </>
       )}
