@@ -7,7 +7,6 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
-  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -25,6 +24,7 @@ export const SessionHeader = ({
   const [titleContainerWidth, setTitleContainerWidth] = useState(0);
   const [titleTextWidth, setTitleTextWidth] = useState(0);
   const titleTranslateX = useSharedValue(0);
+  const titleGap = 32;
   const shouldForceMarquee = title.trim().length > 24;
   const measuredOverflow = titleTextWidth - titleContainerWidth;
   const isOverflowing = shouldForceMarquee || measuredOverflow > 12;
@@ -34,25 +34,19 @@ export const SessionHeader = ({
   }));
 
   useEffect(() => {
-    const overflow = shouldForceMarquee
-      ? Math.max(titleTextWidth - titleContainerWidth, 80)
-      : titleTextWidth - titleContainerWidth;
-
     cancelAnimation(titleTranslateX);
     titleTranslateX.value = 0;
 
-    if (overflow <= 12) return;
+    if (!isOverflowing || titleTextWidth <= 0) return;
+
+    const loopDistance =
+      Math.max(titleTextWidth, titleContainerWidth + 40) + titleGap;
 
     titleTranslateX.value = withRepeat(
-      withSequence(
-        withTiming(0, { duration: 1200 }),
-        withTiming(-overflow, {
-          duration: Math.max(overflow * 45, 3500),
-          easing: Easing.linear,
-        }),
-        withTiming(-overflow, { duration: 1000 }),
-        withTiming(0, { duration: 900, easing: Easing.out(Easing.ease) }),
-      ),
+      withTiming(-loopDistance, {
+        duration: Math.max(loopDistance * 35, 4500),
+        easing: Easing.linear,
+      }),
       -1,
       false,
     );
@@ -61,7 +55,14 @@ export const SessionHeader = ({
       cancelAnimation(titleTranslateX);
       titleTranslateX.value = 0;
     };
-  }, [shouldForceMarquee, title, titleContainerWidth, titleTextWidth, titleTranslateX]);
+  }, [
+    isOverflowing,
+    title,
+    titleContainerWidth,
+    titleGap,
+    titleTextWidth,
+    titleTranslateX,
+  ]);
 
   return (
     <View className="flex-row justify-between items-center px-6 py-2">
@@ -86,25 +87,55 @@ export const SessionHeader = ({
             setTitleContainerWidth(event.nativeEvent.layout.width)
           }
         >
-          <Animated.Text
-            maxFontSizeMultiplier={1.2}
+          <Animated.View
+            accessible
             accessibilityRole="header"
-            numberOfLines={1}
-            ellipsizeMode={isOverflowing ? 'clip' : 'tail'}
+            accessibilityLabel={title}
             style={[
               {
+                flexDirection: 'row',
+                alignItems: 'center',
+                width: isOverflowing ? titleTextWidth * 2 + titleGap : undefined,
+              },
+              titleAnimatedStyle,
+            ]}
+          >
+            <Text
+              maxFontSizeMultiplier={1.2}
+              numberOfLines={1}
+              ellipsizeMode={isOverflowing ? 'clip' : 'tail'}
+              style={{
                 fontFamily: 'Nunito_600SemiBold',
                 fontSize: 20,
                 color: '#354F52',
                 textAlign: 'left',
                 alignSelf: 'flex-start',
                 width: isOverflowing ? titleTextWidth : undefined,
-              },
-              titleAnimatedStyle,
-            ]}
-          >
-            {title}
-          </Animated.Text>
+              }}
+            >
+              {title}
+            </Text>
+            {isOverflowing ? (
+              <Text
+                maxFontSizeMultiplier={1.2}
+                numberOfLines={1}
+                ellipsizeMode="clip"
+                style={{
+                  marginLeft: titleGap,
+                  fontFamily: 'Nunito_600SemiBold',
+                  fontSize: 20,
+                  color: '#354F52',
+                  textAlign: 'left',
+                  alignSelf: 'flex-start',
+                  width: titleTextWidth,
+                }}
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
+              >
+                {title}
+              </Text>
+            ) : null}
+          </Animated.View>
         </View>
         <Text
           maxFontSizeMultiplier={1.2}
