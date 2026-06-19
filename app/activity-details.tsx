@@ -77,12 +77,14 @@ type ContentRow = {
   title: string;
   type: string;
   category: string;
+  genre?: string | null;
   description: string;
   duration: string;
   image?: string | null;
   instructions?: unknown;
   ingredients?: unknown;
   video_url?: string | null;
+  media_url?: string | null;
   author?: string | null;
 };
 
@@ -117,6 +119,19 @@ const toInstructionText = (value: unknown): string => {
     return String((value as { text?: unknown }).text ?? '');
   }
   return '';
+};
+
+const getInstructionLink = (value: unknown): string | undefined => {
+  if (
+    value &&
+    typeof value === 'object' &&
+    'url' in value &&
+    typeof (value as { url?: unknown }).url === 'string'
+  ) {
+    const url = String((value as { url?: unknown }).url ?? '').trim();
+    return url || undefined;
+  }
+  return undefined;
 };
 
 const normalizeIngredients = (value: unknown): Content['ingredients'] => {
@@ -381,6 +396,7 @@ export default function ActivityDetails() {
                   title: contentData.title,
                   type: contentData.type,
                   category: contentData.category,
+                  genre: contentData.genre || localContent?.genre,
                   description: contentData.description,
                   duration: contentData.duration,
                   image: resolveCatalogImage(
@@ -391,6 +407,7 @@ export default function ActivityDetails() {
                   ingredients:
                     contentData.ingredients || localContent?.ingredients,
                   videoUrl: localContent?.videoUrl || contentData.video_url,
+                  mediaUrl: localContent?.mediaUrl || contentData.media_url || contentData.video_url,
                   author: contentData.author || localContent?.author,
                 } as Content;
               }
@@ -799,6 +816,21 @@ export default function ActivityDetails() {
     relatedContent?.type === 'recipe'
       ? normalizeIngredients(relatedContent.ingredients)
       : [];
+  const isAudiobookContent =
+    relatedContent?.type === 'audiobooks' ||
+    relatedContent?.category?.toLowerCase() === 'audiobook';
+  const instructionMediaUrl = parseUnknownArray(relatedContent?.instructions)
+    .map(getInstructionLink)
+    .find((value): value is string => Boolean(value));
+  const resolvedMediaUrl =
+    relatedContent?.mediaUrl || relatedContent?.videoUrl || instructionMediaUrl;
+  const audiobookGenre =
+    relatedContent?.genre ||
+    (isAudiobookContent &&
+    relatedContent?.category &&
+    relatedContent.category.toLowerCase() !== 'audiobook'
+      ? relatedContent.category
+      : undefined);
 
   const displayTime = isActivity ? relatedContent?.duration || null : null;
 
@@ -881,8 +913,15 @@ export default function ActivityDetails() {
           <ContentSection
             ingredients={ingredients}
             instructions={instructions}
-            mediaUrl={relatedContent?.videoUrl}
-            mediaLabel={relatedContent?.type === 'audiobooks' ? 'Open audiobook' : undefined}
+            mediaUrl={resolvedMediaUrl}
+            mediaLabel={isAudiobookContent ? 'Open audiobook' : undefined}
+            metaLabel={isAudiobookContent ? 'Genre' : undefined}
+            metaValue={isAudiobookContent ? audiobookGenre : undefined}
+            emptyMediaMessage={
+              isAudiobookContent && !resolvedMediaUrl
+                ? 'This audiobook does not have audio available yet.'
+                : undefined
+            }
           />
         </View>
       </ScrollView>

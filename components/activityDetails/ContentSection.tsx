@@ -14,6 +14,9 @@ interface ContentSectionProps {
   instructions: (string | InstructionStep)[];
   mediaUrl?: string;
   mediaLabel?: string;
+  metaLabel?: string;
+  metaValue?: string;
+  emptyMediaMessage?: string;
 }
 
 export const ContentSection = ({
@@ -21,9 +24,35 @@ export const ContentSection = ({
   instructions,
   mediaUrl,
   mediaLabel,
+  metaLabel,
+  metaValue,
+  emptyMediaMessage,
 }: ContentSectionProps) => {
   return (
     <>
+      {metaLabel && metaValue ? (
+        <View className="mb-8">
+          <Text
+            maxFontSizeMultiplier={1.2}
+            className="text-[#354F52] text-xl mb-3"
+            style={{ fontFamily: 'Nunito_700Bold' }}
+            accessible
+            accessibilityRole="header"
+          >
+            {metaLabel}
+          </Text>
+          <View className="rounded-2xl p-4 border border-[#548f537f] bg-[#F6FBF6]">
+            <Text
+              maxFontSizeMultiplier={1.2}
+              className="text-[#354F52]"
+              style={{ fontFamily: 'Nunito_600SemiBold' }}
+            >
+              {metaValue}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
       {ingredients && ingredients.length > 0 && (
         <View className="mb-8">
           <Text
@@ -178,6 +207,16 @@ export const ContentSection = ({
               {mediaLabel || 'Open audiobook'}
             </Text>
           </TouchableOpacity>
+        </View>
+      ) : emptyMediaMessage ? (
+        <View className="mb-6 rounded-2xl border border-[#D7E6D2] px-4 py-3 bg-[#EEF5E8]">
+          <Text
+            maxFontSizeMultiplier={1.2}
+            className="text-[#4B6158]"
+            style={{ fontFamily: 'Nunito_600SemiBold' }}
+          >
+            {emptyMediaMessage}
+          </Text>
         </View>
       ) : null}
     </>

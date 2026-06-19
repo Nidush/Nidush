@@ -92,9 +92,15 @@ export const Step2_Content = ({
       if (isRecipe || isMeditation || isAudiobook || isWorkout) {
         let rawCat = content.category;
 
-        // Se for um audiobook mas o campo category estiver vazio ou apenas disser "audiobooks"
-        if (isAudiobook && (!rawCat || rawCat.toLowerCase() === 'audiobooks')) {
-          rawCat = 'Audiobooks';
+        // Audiobooks devem ser agrupados por género, não por uma secção genérica.
+        if (
+          isAudiobook &&
+          (
+            !rawCat ||
+            ['audiobook', 'audiobooks', 'audio'].includes(rawCat.toLowerCase())
+          )
+        ) {
+          rawCat = content.genre || 'Other Audiobooks';
         } else if (isRecipe && rawCat?.toLowerCase() === 'cooking') {
           rawCat = 'Recipes';
         } else if (isMeditation && rawCat?.toLowerCase() === 'meditation') {
@@ -127,8 +133,6 @@ export const Step2_Content = ({
       activityType !== 'workout' &&
       (c.type === 'video' || c.type === 'workout' || c.type === 'exercise'),
   );
-
-  const audios = filteredContent.filter((c) => c.type === 'audio');
 
   const renderCarousel = (title: string, data: typeof filteredContent) => {
     if (data.length === 0) return null;
@@ -193,8 +197,9 @@ export const Step2_Content = ({
             renderCarousel(category, items),
           )}
 
-          {renderCarousel('Video sessions', videos)}
-          {renderCarousel('Audio sessions', audios)}
+          {activityType !== 'audiobooks'
+            ? renderCarousel('Video sessions', videos)
+            : null}
         </>
       )}
     </StepWrapper>

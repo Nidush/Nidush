@@ -55,6 +55,11 @@ type LibrivoxAuthor = {
   dod?: string | null
 }
 
+type LibrivoxGenre = {
+  id?: string | number | null
+  name?: string | null
+}
+
 type LibrivoxBook = {
   id?: string | number | null
   title?: string | null
@@ -69,6 +74,8 @@ type LibrivoxBook = {
   coverart_jpg?: string | null
   coverart_thumbnail?: string | null
   authors?: LibrivoxAuthor[] | null
+  genre?: string | null
+  genres?: LibrivoxGenre[] | string[] | null
 }
 
 type LibrivoxTrack = {
@@ -229,6 +236,20 @@ const formatLibrivoxAuthors = (authors: LibrivoxAuthor[] | null | undefined) => 
   return names.length > 0 ? names.join(', ') : 'LibriVox'
 }
 
+const formatLibrivoxGenre = (book: LibrivoxBook) => {
+  const directGenre = String(book.genre ?? '').trim()
+  if (directGenre) return directGenre
+
+  const genreNames = (book.genres ?? [])
+    .map((genre) => {
+      if (typeof genre === 'string') return genre.trim()
+      return String(genre?.name ?? '').trim()
+    })
+    .filter(Boolean)
+
+  return genreNames[0] || 'Audiobooks'
+}
+
 const isEnglishLibrivoxBook = (book: LibrivoxBook) =>
   String(book.language ?? '').trim().toLowerCase() === 'english'
 
@@ -306,6 +327,8 @@ const fetchLibrivoxAudiobooks = async (
     params.append('fields[]', 'coverart_jpg')
     params.append('fields[]', 'coverart_thumbnail')
     params.append('fields[]', 'authors')
+    params.append('fields[]', 'genre')
+    params.append('fields[]', 'genres')
 
     const payload = await fetchJson<{ books?: LibrivoxBook[] | null }>(
       `${LIBRIVOX_AUDIOBOOKS_URL}/?${params.toString()}`,
@@ -336,6 +359,7 @@ const fetchLibrivoxAudiobooks = async (
   return await Promise.all(selectedBooks.map(async (book) => {
     const bookId = normalizeLibrivoxBookId(book)
     const author = formatLibrivoxAuthors(book.authors)
+    const genre = formatLibrivoxGenre(book)
     const tracks = await fetchLibrivoxTracks(bookId)
 
     return {
@@ -343,7 +367,7 @@ const fetchLibrivoxAudiobooks = async (
       title: String(book.title ?? '').trim(),
       description: buildLibrivoxDescription(book, author, tracks.length),
       type: 'audiobooks',
-      category: 'audio',
+      category: genre,
       duration: String(book.totaltime ?? '').trim() || null,
       image: String(book.coverart_thumbnail ?? book.coverart_jpg ?? '').trim() || null,
       instructions: tracks,

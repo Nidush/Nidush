@@ -16,12 +16,14 @@ export interface Content {
   title: string;
   type: 'video' | 'recipe' | 'audio' | 'workout' | 'exercise' | string;
   category: 'meditation' | 'audiobook' | 'cooking' | 'workout' | string;
+  genre?: string;
   description: string;
   duration: string;
   image: ImageSourcePropType;
   instructions?: (string | InstructionStep)[];
   ingredients?: Ingredient[];
   videoUrl?: string;
+  mediaUrl?: string;
   author?: string;
 }
 
