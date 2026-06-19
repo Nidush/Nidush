@@ -10,7 +10,13 @@ import {
 } from 'react-native';
 import Animated, {
   SharedValue,
+  cancelAnimation,
+  Easing,
   useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
 } from 'react-native-reanimated';
 
 interface SessionControlsProps {
@@ -27,6 +33,9 @@ interface SessionControlsProps {
   progress: SharedValue<number>;
   onToggleSession: () => void;
   onToggleMusic: () => void;
+  onNextTrack: () => void;
+  onPreviousTrack: () => void;
+  onOpenSpotify: () => void;
   onNextStep: () => void;
   currentTrack?: { title: string; artist: string } | null;
   showPauseButton?: boolean;
@@ -50,6 +59,9 @@ export const SessionControls = ({
   onPrevStep,
   onToggleSession,
   onToggleMusic,
+  onNextTrack,
+  onPreviousTrack,
+  onOpenSpotify,
   onNextStep,
   currentTrack,
   showPauseButton = true,
@@ -67,10 +79,48 @@ export const SessionControls = ({
     width: `${progress.value}%`,
   }));
 
+  const titleAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: titleTranslateX.value }],
+  }));
+
   const imageSource =
-    typeof image === 'string'
-      ? { uri: image }
-      : image || { uri: 'https://picsum.photos/seed/meditate/100/100' };
+    currentTrack?.imageUrl
+      ? { uri: currentTrack.imageUrl }
+      : typeof image === 'string'
+        ? { uri: image }
+        : image || { uri: 'https://picsum.photos/seed/meditate/100/100' };
+
+  const minutesLeft = Math.floor(secondsLeft / 60);
+  const remainingSeconds = (secondsLeft % 60).toString().padStart(2, '0');
+  const currentTitle = currentTrack?.title || 'Music';
+
+  useEffect(() => {
+    const overflow = titleTextWidth - titleContainerWidth;
+
+    cancelAnimation(titleTranslateX);
+    titleTranslateX.value = 0;
+
+    if (overflow <= 12) return;
+
+    titleTranslateX.value = withRepeat(
+      withSequence(
+        withTiming(0, { duration: 1200 }),
+        withTiming(-overflow, {
+          duration: Math.max(overflow * 45, 3500),
+          easing: Easing.linear,
+        }),
+        withTiming(-overflow, { duration: 1000 }),
+        withTiming(0, { duration: 900, easing: Easing.out(Easing.ease) }),
+      ),
+      -1,
+      false,
+    );
+
+    return () => {
+      cancelAnimation(titleTranslateX);
+      titleTranslateX.value = 0;
+    };
+  }, [currentTitle, titleContainerWidth, titleTextWidth, titleTranslateX]);
 
   // === 1. EFEITO DE SINCRONIZAÇÃO (Pausa/Play) ===
   useEffect(() => {
@@ -218,7 +268,94 @@ export const SessionControls = ({
             size={44}
             color="#548F53"
           />
-        </TouchableOpacity>
+
+          <View className="flex-1 ml-4 pr-3">
+            <View
+              accessible={true}
+              accessibilityRole="text"
+              accessibilityLabel={`Background music: ${currentTrack?.title || 'Music'} by ${currentTrack?.artist || 'Artist'}`}
+            >
+              <View
+                className="overflow-hidden"
+                onLayout={(event) =>
+                  setTitleContainerWidth(event.nativeEvent.layout.width)
+                }
+              >
+                <Animated.Text
+                  maxFontSizeMultiplier={1.2}
+                  className="text-[#354F52] text-[17px]"
+                  style={[{ fontFamily: 'Nunito_700Bold' }, titleAnimatedStyle]}
+                  importantForAccessibility="no-hide-descendants"
+                  numberOfLines={1}
+                  onLayout={(event) =>
+                    setTitleTextWidth(event.nativeEvent.layout.width)
+                  }
+                >
+                  {currentTitle}
+                </Animated.Text>
+              </View>
+              <Text
+                maxFontSizeMultiplier={1.2}
+                className="text-[#354F52]/70 text-sm"
+                style={{ fontFamily: 'Nunito_600SemiBold' }}
+                importantForAccessibility="no-hide-descendants"
+                numberOfLines={1}
+              >
+                {currentTrack?.artist || 'Artist'}
+              </Text>
+            </View>
+          </View>
+
+          <View className="flex-row items-center shrink-0">
+            <TouchableOpacity
+              onPress={onPreviousTrack}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Play previous Spotify track"
+              className="px-1 py-1"
+            >
+              <Ionicons
+                name="play-skip-back-sharp"
+                size={26}
+                color="#5A9A57"
+                importantForAccessibility="no"
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={onToggleMusic}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel={
+                isMusicPlaying ? 'Pause background music' : 'Play background music'
+              }
+              className="mx-2"
+            >
+              <View className="w-12 h-12 rounded-full border-[2.5px] border-[#5A9A57] items-center justify-center">
+                <MaterialIcons
+                  name={isMusicPlaying ? 'pause' : 'play-arrow'}
+                  size={28}
+                  color="#5A9A57"
+                  importantForAccessibility="no"
+                />
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={onNextTrack}
+              accessible={true}
+              accessibilityRole="button"
+              accessibilityLabel="Play next Spotify track"
+              className="px-1 py-1"
+            >
+              <Ionicons
+                name="play-skip-forward-sharp"
+                size={26}
+                color="#5A9A57"
+                importantForAccessibility="no"
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
       </View>
 
       {/* ÁREA CENTRAL INFERIOR: Botão Play/Pause E Botão de Voz */}

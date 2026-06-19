@@ -5,14 +5,13 @@ import {
 } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { BlurView } from 'expo-blur';
+import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  Image,
   ImageSourcePropType,
   Modal,
-  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -97,11 +96,11 @@ export const ActivityHeader = ({
         importantForAccessibility="no"
         accessibilityElementsHidden={true}
       >
-        <Image
+        <ExpoImage
           source={imageSource}
           style={{ width: '100%', height: '100%' }}
-          resizeMode="cover"
-          blurRadius={Platform.OS === 'ios' ? 70 : 50}
+          contentFit="cover"
+          cachePolicy="memory-disk"
         />
         <View className="absolute inset-0" />
       </View>
@@ -118,10 +117,12 @@ export const ActivityHeader = ({
           />
         }
       >
-        <Image
+        <ExpoImage
           source={imageSource}
           style={{ width: '100%', height: '100%' }}
-          resizeMode="cover"
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={200}
         />
       </MaskedView>
 
@@ -168,7 +169,7 @@ export const ActivityHeader = ({
           onRequestClose={() => setMenuVisible(false)}
         >
           <BlurView
-            intensity={Platform.OS === 'android' ? 10 : 10}
+            intensity={10}
             tint="dark"
             experimentalBlurMethod="dimezisBlurView"
             style={StyleSheet.absoluteFill}

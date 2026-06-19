@@ -1,17 +1,25 @@
 import React from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 
-import Profile from '../app/Profile';
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
+);
 
 const mockReplace = jest.fn();
 const mockPickImage = jest.fn();
 const mockUploadImage = jest.fn();
 const mockGetUser = jest.fn();
+const mockGetSessionUser = jest.fn();
 const mockUpdateUser = jest.fn();
+const mockUpdatePublicProfile = jest.fn();
 const mockInvoke = jest.fn();
+const mockSignOut = jest.fn();
 const mockRemoveChannel = jest.fn();
+const mockRequestGoogleHomeAccess = jest.fn();
+const mockSyncGoogleHomeSnapshot = jest.fn();
+const mockSetGoogleHomeDevicePower = jest.fn();
 const mockDeviceRows = { current: [] };
-const mockDiscoveryRequestRow = { current: { data: null, error: null } };
+const mockRoomRows = { current: [] };
 
 jest.mock('@expo-google-fonts/nunito', () => ({
   useFonts: () => [true],
@@ -69,6 +77,11 @@ jest.mock('../components/legal/LegalContent', () => ({
   LegalContent: () => null,
 }));
 
+jest.mock('../utils/legal', () => ({
+  LEGAL_POLICY_VERSION: '2026-05-29',
+  setHealthConnectEnabled: jest.fn(async () => {}),
+}));
+
 jest.mock('../utils/healthConnectSync', () => ({
   hasHeartRateReadPermission: jest.fn(() => false),
 }));
@@ -77,6 +90,13 @@ jest.mock('../utils/devices', () => ({
   isRealHomeDevice: jest.fn(() => true),
   sortDevicesByFreshness: jest.fn((devices) => devices),
   subscribeToHomeDeviceChanges: jest.fn(() => ({ id: 'channel-1' })),
+  getDeviceSourceLabel: jest.fn((source) => source || 'Network'),
+}));
+
+jest.mock('../utils/googleHome', () => ({
+  requestGoogleHomeAccess: (...args) => mockRequestGoogleHomeAccess(...args),
+  syncGoogleHomeSnapshot: (...args) => mockSyncGoogleHomeSnapshot(...args),
+  setGoogleHomeDevicePower: (...args) => mockSetGoogleHomeDevicePower(...args),
 }));
 
 jest.mock('react-native-health-connect', () => ({
@@ -92,13 +112,26 @@ jest.mock('react-native-health-connect', () => ({
 
 jest.mock('../utils/supabase', () => ({
   uploadImage: (...args) => mockUploadImage(...args),
+  getSessionUser: (...args) => mockGetSessionUser(...args),
   supabase: {
     auth: {
       getUser: (...args) => mockGetUser(...args),
       updateUser: (...args) => mockUpdateUser(...args),
-      signOut: jest.fn(),
+      signOut: (...args) => mockSignOut(...args),
     },
     from: jest.fn((table) => {
+      const createEqChain = (result) => {
+        const chain = {
+          eq: jest.fn(() => chain),
+          order: jest.fn(() => chain),
+          limit: jest.fn(() => chain),
+          maybeSingle: jest.fn(async () => result),
+          single: jest.fn(async () => result),
+          select: jest.fn(() => chain),
+        };
+        return chain;
+      };
+
       if (table === 'users') {
         return {
           select: jest.fn(() => ({
@@ -110,7 +143,7 @@ jest.mock('../utils/supabase', () => ({
             })),
           })),
           update: jest.fn(() => ({
-            eq: jest.fn(async () => ({ error: null })),
+            eq: (...args) => mockUpdatePublicProfile(...args),
           })),
           upsert: jest.fn(),
         };
@@ -146,6 +179,40 @@ jest.mock('../utils/supabase', () => ({
         };
       }
 
+      if (table === 'rooms') {
+        const roomListResult = {
+          data: mockRoomRows.current,
+          error: null,
+        };
+        const roomListChain = {
+          eq: jest.fn(() => roomListChain),
+          order: jest.fn(() => roomListChain),
+          maybeSingle: jest.fn(async () => ({ data: mockRoomRows.current[0] ?? null, error: null })),
+          then: (resolve) => resolve(roomListResult),
+        };
+
+        return {
+          select: jest.fn(() => roomListChain),
+          insert: jest.fn((payload) => {
+            const nextId = mockRoomRows.current.length + 1;
+            const createdRoom = {
+              id: nextId,
+              name: Array.isArray(payload) ? payload[0]?.name : payload?.name,
+            };
+            mockRoomRows.current = [...mockRoomRows.current, createdRoom];
+
+            return {
+              select: jest.fn(() => ({
+                single: jest.fn(async () => ({
+                  data: createdRoom,
+                  error: null,
+                })),
+              })),
+            };
+          }),
+        };
+      }
+
       if (table === 'activities') {
         return {
           select: jest.fn(() => ({
@@ -163,26 +230,43 @@ jest.mock('../utils/supabase', () => ({
       }
 
       if (table === 'devices') {
-        return {
-          select: jest.fn(() => ({
-            order: jest.fn(() => ({
-              eq: jest.fn(async () => ({
-                data: mockDeviceRows.current,
-                error: null,
-              })),
-            })),
-          })),
+        const existingDeviceLookup = createEqChain({ data: null, error: null });
+        const deviceListResult = {
+          data: mockDeviceRows.current,
+          error: null,
         };
-      }
-
-      if (table === 'device_discovery_requests') {
+        const deviceListChain = {
+          eq: jest.fn(() => deviceListChain),
+          order: jest.fn(() => deviceListChain),
+          limit: jest.fn(() => deviceListChain),
+          maybeSingle: jest.fn(async () => ({ data: null, error: null })),
+          then: (resolve) => resolve(deviceListResult),
+        };
         return {
-          select: jest.fn(() => ({
-            eq: jest.fn(() => ({
-              eq: jest.fn(() => ({
-                maybeSingle: jest.fn(async () => mockDiscoveryRequestRow.current),
-              })),
+          select: jest.fn((columns) => {
+            if (columns === 'id') {
+              return existingDeviceLookup;
+            }
+
+            return deviceListChain;
+          }),
+          update: jest.fn(() => ({
+            eq: jest.fn(async () => ({
+              data: mockDeviceRows.current[0] ?? null,
+              error: null,
             })),
+            then: (resolve) =>
+              resolve({
+                data: mockDeviceRows.current[0] ?? null,
+                error: null,
+              }),
+          })),
+          insert: jest.fn(() => ({
+            then: (resolve) =>
+              resolve({
+                data: mockDeviceRows.current[0] ?? null,
+                error: null,
+              }),
           })),
         };
       }
@@ -196,6 +280,8 @@ jest.mock('../utils/supabase', () => ({
   },
 }));
 
+const Profile = require('../app/Profile').default;
+
 describe('Profile Screen', () => {
   let consoleErrorSpy;
   let consoleLogSpy;
@@ -207,19 +293,22 @@ describe('Profile Screen', () => {
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockRoomRows.current = [
+      { id: 1, name: 'Bedroom' },
+      { id: 2, name: 'Living Room' },
+    ];
     mockDeviceRows.current = [
       {
         id: 10,
         name: 'Living Room Speaker',
         type: 'speaker',
-        source: 'network',
+        source: 'google_home',
         status: 'connected',
-        external_id: 'network:living-room-speaker',
+        external_id: 'google_home:living-room-speaker',
         last_seen: '2026-05-25T10:00:00Z',
         home_id: 7,
       },
     ];
-    mockDiscoveryRequestRow.current = { data: null, error: null };
     mockGetUser.mockResolvedValue({
       data: {
         user: {
@@ -234,9 +323,24 @@ describe('Profile Screen', () => {
         },
       },
     });
+    mockGetSessionUser.mockResolvedValue({
+      id: 'user-123',
+      email: 'laura@example.com',
+      created_at: '2026-01-01T12:00:00Z',
+      user_metadata: {
+        first_name: 'Laura',
+        last_name: 'Rossi',
+        avatar_url: null,
+      },
+    });
     mockUpdateUser.mockResolvedValue({ error: null });
+    mockUpdatePublicProfile.mockResolvedValue({ error: null });
     mockUploadImage.mockResolvedValue('https://example.com/avatar.jpg');
     mockInvoke.mockResolvedValue({ data: {}, error: null });
+    mockSignOut.mockResolvedValue({ error: null });
+    mockRequestGoogleHomeAccess.mockResolvedValue({ granted: true, reason: null });
+    mockSyncGoogleHomeSnapshot.mockResolvedValue({ devices: [], diagnostics: undefined });
+    mockSetGoogleHomeDevicePower.mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -250,8 +354,7 @@ describe('Profile Screen', () => {
 
     const { getByTestId, findByText } = render(<Profile />);
 
-    expect(await findByText('Laura Rossi')).toBeTruthy();
-
+    await findByText('Laura Rossi');
     fireEvent.press(getByTestId('avatar-picker-button'));
 
     await waitFor(() => {
@@ -266,9 +369,7 @@ describe('Profile Screen', () => {
       data: { avatar_url: 'https://example.com/avatar.jpg' },
     });
 
-    expect(mockUpdateUser).toHaveBeenCalledWith({
-      data: { avatar_url: 'https://example.com/avatar.jpg' },
-    });
+    expect(mockUpdatePublicProfile).toHaveBeenCalledWith('auth_uid', 'user-123');
     expect(global.alert).not.toHaveBeenCalled();
   });
 
@@ -289,45 +390,27 @@ describe('Profile Screen', () => {
     expect(global.alert).not.toHaveBeenCalled();
   });
 
-  it('shows a hardware error when smart-device scan is requested without a session', async () => {
-    mockGetUser
-      .mockResolvedValueOnce({
-        data: {
-          user: {
-            id: 'user-123',
-            email: 'laura@example.com',
-            created_at: '2026-01-01T12:00:00Z',
-            user_metadata: {
-              first_name: 'Laura',
-              last_name: 'Rossi',
-              avatar_url: null,
-            },
-          },
-        },
-      })
-      .mockResolvedValueOnce({ data: { user: null } });
+  it('shows a hardware error when Google Home sync is requested without a session', async () => {
+    mockGetSessionUser.mockResolvedValue(null);
 
     const { getByTestId, findByText } = render(<Profile />);
 
-    await findByText('Laura Rossi');
+    await findByText('Visitante');
     fireEvent.press(getByTestId('scan-smart-devices-button'));
 
     expect(await findByText('Session not found.')).toBeTruthy();
   });
 
-  it('shows a no-devices-found modal after a completed scan with zero discoveries', async () => {
-    mockInvoke.mockResolvedValueOnce({
-      data: { request: { id: 15, status: 'pending' } },
-      error: null,
-    });
-    mockDiscoveryRequestRow.current = {
-      data: {
-        status: 'completed',
-        error_message: null,
-        result: { discovered: 0 },
+  it('shows a no-devices-found modal after a Google Home sync with zero devices', async () => {
+    mockSyncGoogleHomeSnapshot.mockResolvedValueOnce({
+      devices: [],
+      diagnostics: {
+        structureCount: 1,
+        roomCount: 0,
+        structures: [{ id: 'structure-1', name: 'Casa Google' }],
+        rooms: [],
       },
-      error: null,
-    };
+    });
 
     const { getByTestId, findByText } = render(<Profile />);
 
@@ -337,8 +420,33 @@ describe('Profile Screen', () => {
     expect(await findByText('No devices found')).toBeTruthy();
     expect(
       await findByText(
-        'We scanned your home network but did not find any compatible smart devices this time. Make sure the devices are turned on and connected to the same Wi-Fi, then try again.',
+        'We connected to your Google Home household, but this Google Home API build did not receive any rooms or compatible devices for this account. This usually means the home was found, but your current devices are not exposed by this SDK layer yet, often because they are cloud-linked or not Matter-compatible. Your existing Nidush internet-connected devices can still keep working normally.',
       ),
     ).toBeTruthy();
+    expect(await findByText('Google Home SDK Debug')).toBeTruthy();
+    expect(await findByText('Structures found: 1')).toBeTruthy();
+    expect(await findByText('Casa Google (structure-1)')).toBeTruthy();
+  });
+
+  it('deletes the account after explicit confirmation', async () => {
+    mockInvoke.mockResolvedValueOnce({
+      data: { success: true },
+      error: null,
+    });
+
+    const { getByTestId, findByText } = render(<Profile />);
+
+    await findByText('Laura Rossi');
+    fireEvent.press(getByTestId('menu-privacy'));
+    fireEvent.press(getByTestId('open-delete-account-button'));
+    fireEvent.changeText(getByTestId('delete-account-confirm-input'), 'DELETE');
+    fireEvent.press(getByTestId('confirm-delete-account-button'));
+
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith('delete-account', { body: {} });
+    });
+
+    expect(mockSignOut).toHaveBeenCalledWith({ scope: 'local' });
+    expect(mockReplace).toHaveBeenCalledWith('/login');
   });
 });

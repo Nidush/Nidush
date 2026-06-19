@@ -8,6 +8,7 @@ export type InstructionStep = {
   text: string;
   duration?: number;
   description?: string;
+  url?: string;
 };
 
 export interface Content {
@@ -29,6 +30,11 @@ export interface ScenarioDeviceState {
   state: 'on' | 'off';
   value?: number | string;
   brightness?: string;
+  color?: string;
+  temperature?: number;
+  mode?: string;
+  deviceName?: string;
+  deviceType?: string;
 }
 
 export interface Scenario {

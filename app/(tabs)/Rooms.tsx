@@ -1,10 +1,12 @@
 import { MaterialCommunityIcons, MaterialIcons, Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   FlatList,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StatusBar,
   Text,
@@ -29,6 +31,7 @@ import AddRoomDevice from '../../components/rooms/AddRoomDevice';
 import CategoryPill from '../../components/rooms/CategoryPill';
 import DeviceCard from '../../components/rooms/device-card';
 import { FeedbackState } from '../../components/UI/FeedbackState';
+import { SearchAutocomplete } from '../../components/UI/SearchAutocomplete';
 import {
   AppDevice,
   DeviceRecord,
@@ -36,6 +39,14 @@ import {
   mapDeviceRecordToAppDevice,
   subscribeToHomeDeviceChanges,
 } from '../../utils/devices';
+import {
+  setGoogleHomeDeviceColor,
+  setGoogleHomeDeviceBrightness,
+  setGoogleHomeDevicePower,
+} from '../../utils/googleHome';
+import { updateDeviceStateRecord } from '../../utils/deviceExecution';
+import { createHomeRoom } from '../../utils/homeSetup';
+import { MAX_SEARCH_LENGTH, normalizeSearchInput } from '../../utils/searchSecurity';
 
 interface Room {
   id: number;
@@ -53,6 +64,49 @@ interface ActivityItem {
   room_id?: number | null;
 }
 
+const LIGHT_COLOR_OPTIONS = [
+  '#FFD65A',
+  '#F4A261',
+  '#F28482',
+  '#84A59D',
+  '#86B3EB',
+  '#CDB4DB',
+] as const;
+
+const normalizeRoomName = (value: string) => value.trim().toLowerCase();
+
+const extractDeviceRoomName = (device: DeviceRecord) => {
+  const metadata = device.metadata && typeof device.metadata === 'object'
+    ? device.metadata
+    : null;
+
+  const candidates = [
+    device.room_hint,
+    typeof metadata?.roomName === 'string' ? metadata.roomName : null,
+    typeof metadata?.roomHint === 'string' ? metadata.roomHint : null,
+  ];
+
+  return candidates.find((value) => typeof value === 'string' && value.trim())?.trim() ?? null;
+};
+
+const roomsScreenCache: {
+  rooms: Room[];
+  activeRoomId: number | null;
+  allDevices: Device[];
+  allActivities: ActivityItem[];
+  hasLoadedOnce: boolean;
+  loadError: string | null;
+  userHomeId: number | null;
+} = {
+  rooms: [],
+  activeRoomId: null,
+  allDevices: [],
+  allActivities: [],
+  hasLoadedOnce: false,
+  loadError: null,
+  userHomeId: null,
+};
+
 export default function Rooms() {
   // --- Fonts ---
   const [fontsLoaded] = useFonts({
@@ -62,31 +116,37 @@ export default function Rooms() {
   });
 
   // --- States ---
-  const [rooms, setRooms] = useState<Room[]>([]);
-  const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
-  const [allDevices, setAllDevices] = useState<Device[]>([]);
-  const [allActivities, setAllActivities] = useState<ActivityItem[]>([]);
-  const [, setJunctions] = useState<{ activity_id: number; device_id: number }[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [rooms, setRooms] = useState<Room[]>(roomsScreenCache.rooms);
+  const [activeRoomId, setActiveRoomId] = useState<number | null>(roomsScreenCache.activeRoomId);
+  const [allDevices, setAllDevices] = useState<Device[]>(roomsScreenCache.allDevices);
+  const [allActivities, setAllActivities] = useState<ActivityItem[]>(roomsScreenCache.allActivities);
+  const [junctions, setJunctions] = useState<{ activity_id: number; device_id: number }[]>([]);
+  const [loading, setLoading] = useState(!roomsScreenCache.hasLoadedOnce);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(roomsScreenCache.hasLoadedOnce);
+  const [loadError, setLoadError] = useState<string | null>(roomsScreenCache.loadError);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [feedbackTone, setFeedbackTone] = useState<'error' | 'success' | 'info'>('info');
   const [searchQuery, setSearchQuery] = useState('');
-  const [userHomeId, setUserHomeId] = useState<number | null>(null);
+  const [userHomeId, setUserHomeId] = useState<number | null>(roomsScreenCache.userHomeId);
   const [isAdjustingLight, setIsAdjustingLight] = useState(false);
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const createPanelTranslateX = useRef(new Animated.Value(900)).current;
 
-  // --- Add Device Modal State ---
-  const [isAddDeviceModalVisible, setIsAddDeviceModalVisible] = useState(false);
+  // --- Add Device / Room Panel State ---
+  const [createPanelMode, setCreatePanelMode] = useState<'room' | 'device' | null>(null);
+  const [newRoomName, setNewRoomName] = useState('');
   const [newDeviceName, setNewDeviceName] = useState('');
   const [newDeviceType, setNewDeviceType] = useState<'light' | 'speaker' | 'difuser' | 'purifier'>('light');
   const [newDeviceRoomId, setNewDeviceRoomId] = useState<number | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [isDeletingRoom, setIsDeletingRoom] = useState(false);
+  const [roomPendingDeletion, setRoomPendingDeletion] = useState<number | null>(null);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [deviceDraftName, setDeviceDraftName] = useState('');
   const [deviceDraftRoomId, setDeviceDraftRoomId] = useState<number | null>(null);
   const [isSavingDeviceDetails, setIsSavingDeviceDetails] = useState(false);
+  const [selectedLightColor, setSelectedLightColor] = useState<string>(LIGHT_COLOR_OPTIONS[0]);
+  const [isUpdatingLightColor, setIsUpdatingLightColor] = useState(false);
 
   // --- Manage Linked Devices Modal State ---
   const [isManageModalVisible, setIsManageModalVisible] = useState(false);
@@ -130,6 +190,7 @@ export default function Rooms() {
       
       const homeId = homeAssoc.home_id;
       setUserHomeId(homeId);
+      roomsScreenCache.userHomeId = homeId;
 
       const [
         { data: roomsData, error: roomsErr },
@@ -157,15 +218,58 @@ export default function Rooms() {
 
       const loadedRooms = roomsData || [];
       const loadedActivities = activitiesData || [];
+      const roomIdByName = new Map(
+        loadedRooms.map((room) => [normalizeRoomName(room.name), room.id] as const),
+      );
+      const virtualRooms: Room[] = [];
+      let nextVirtualRoomId = -1;
+
       const mappedDevices: Device[] = (devicesData || [])
         .filter((device: DeviceRecord) => isRealHomeDevice(device))
-        .map((device: DeviceRecord) => mapDeviceRecordToAppDevice(device));
+        .filter((device: DeviceRecord) => device.source?.toLowerCase() !== 'health_connect')
+        .map((device: DeviceRecord) => {
+          const mappedDevice = mapDeviceRecordToAppDevice(device);
 
-      setRooms(loadedRooms);
+          if (mappedDevice.room_id != null) {
+            return mappedDevice;
+          }
+
+          const googleRoomName = extractDeviceRoomName(device);
+          if (!googleRoomName) {
+            return mappedDevice;
+          }
+
+          const normalizedRoomName = normalizeRoomName(googleRoomName);
+          let resolvedRoomId = roomIdByName.get(normalizedRoomName) ?? null;
+
+          if (resolvedRoomId == null) {
+            resolvedRoomId = nextVirtualRoomId;
+            nextVirtualRoomId -= 1;
+            roomIdByName.set(normalizedRoomName, resolvedRoomId);
+            virtualRooms.push({
+              id: resolvedRoomId,
+              name: googleRoomName,
+            });
+          }
+
+          return {
+            ...mappedDevice,
+            room_id: resolvedRoomId,
+          };
+        });
+
+      const effectiveRooms = [...loadedRooms, ...virtualRooms];
+
+      setRooms(effectiveRooms);
       setAllDevices(mappedDevices);
       setAllActivities(loadedActivities);
       setLoadError(null);
-      setActiveRoomId((currentRoomId) => currentRoomId ?? loadedRooms[0]?.id ?? null);
+      setActiveRoomId(null);
+      roomsScreenCache.activeRoomId = null;
+      roomsScreenCache.rooms = effectiveRooms;
+      roomsScreenCache.allDevices = mappedDevices;
+      roomsScreenCache.allActivities = loadedActivities;
+      roomsScreenCache.loadError = null;
 
       // Only fetch links for activities that actually belong to this home.
       const activityIds = loadedActivities.map((activity) => activity.id).filter(Boolean);
@@ -205,7 +309,9 @@ export default function Rooms() {
     } catch (error) {
       console.error('Error fetching room/device details:', error);
       setLoadError('We could not load your smart home right now. Pull to refresh or try again in a moment.');
+      roomsScreenCache.loadError = 'We could not load your smart home right now. Pull to refresh or try again in a moment.';
     } finally {
+      roomsScreenCache.hasLoadedOnce = true;
       setHasLoadedOnce(true);
       setLoading(false);
     }
@@ -247,18 +353,36 @@ export default function Rooms() {
     if (!device) return;
 
     const nextStatus = device.status === 'On' ? 'Off' : 'On';
+    const fallbackLevel =
+      typeof device.level === 'number' && Number.isFinite(device.level)
+        ? Math.round(device.level)
+        : device.type === 'light'
+          ? 100
+          : 50;
+    const nextLevel = nextStatus === 'On'
+      ? Math.max(1, fallbackLevel)
+      : 0;
     
     setAllDevices(prev => prev.map(d => 
-      d.id === deviceId ? { ...d, status: nextStatus } : d
+      d.id === deviceId
+        ? {
+            ...d,
+            status: nextStatus,
+            level: d.type === 'light' ? nextLevel : d.level,
+            status_level: d.type === 'light' ? nextLevel : d.status_level,
+          }
+        : d
     ));
 
     try {
-      const { error } = await supabase
-        .from('devices')
-        .update({ status: nextStatus })
-        .eq('id', deviceId);
+      if (device.source === 'google_home' && device.external_id) {
+        await setGoogleHomeDevicePower(device.external_id, nextStatus === 'On');
+      }
 
-      if (error) throw error;
+      await updateDeviceStateRecord(deviceId, {
+        powerOn: nextStatus === 'On',
+        level: device.type === 'light' ? nextLevel : null,
+      });
     } catch (err: unknown) {
       console.error('Failed to toggle device status:', err);
       // Revert status on failure
@@ -271,18 +395,24 @@ export default function Rooms() {
 
   const updateDeviceLevel = async (deviceId: number, newLevel: number) => {
     const roundedLevel = Math.round(newLevel);
+    const nextStatus = roundedLevel > 0 ? 'On' : 'Off';
+    const device = allDevices.find((entry) => entry.id === deviceId);
     
     setAllDevices(prev => prev.map(d => 
-      d.id === deviceId ? { ...d, level: roundedLevel, status_level: roundedLevel } : d
+      d.id === deviceId
+        ? { ...d, level: roundedLevel, status_level: roundedLevel, status: nextStatus }
+        : d
     ));
 
     try {
-      const { error } = await supabase
-        .from('devices')
-        .update({ status_level: roundedLevel })
-        .eq('id', deviceId);
+      if (device?.source === 'google_home' && device.external_id) {
+        await setGoogleHomeDeviceBrightness(device.external_id, roundedLevel);
+      }
 
-      if (error) throw error;
+      await updateDeviceStateRecord(deviceId, {
+        powerOn: roundedLevel > 0,
+        level: roundedLevel,
+      });
     } catch (err) {
       console.error('Failed to update device level:', err);
     }
@@ -292,6 +422,7 @@ export default function Rooms() {
     setSelectedDevice(device);
     setDeviceDraftName(device.name);
     setDeviceDraftRoomId(device.room_id ?? rooms[0]?.id ?? null);
+    setSelectedLightColor(LIGHT_COLOR_OPTIONS[0]);
   };
 
   const closeDeviceDetails = () => {
@@ -299,6 +430,39 @@ export default function Rooms() {
     setDeviceDraftName('');
     setDeviceDraftRoomId(null);
     setIsSavingDeviceDetails(false);
+    setIsUpdatingLightColor(false);
+  };
+
+  const handleSetDeviceColor = async (colorHex: string) => {
+    if (!selectedDevice) return;
+
+    if (selectedDevice.type !== 'light') {
+      showFeedback('Only lights support color changes here.', 'info');
+      return;
+    }
+
+    setSelectedLightColor(colorHex);
+
+    if (selectedDevice.source !== 'google_home' || !selectedDevice.external_id) {
+      showFeedback('This light does not expose Google Home color control yet.', 'info');
+      return;
+    }
+
+    setIsUpdatingLightColor(true);
+    try {
+      await setGoogleHomeDeviceColor(selectedDevice.external_id, colorHex);
+      showFeedback(`Updated ${selectedDevice.name} to ${colorHex}.`, 'success');
+    } catch (err) {
+      console.error('Failed to update device color:', err);
+      showFeedback(
+        err instanceof Error
+          ? err.message
+          : 'Could not change this light color right now.',
+        'error',
+      );
+    } finally {
+      setIsUpdatingLightColor(false);
+    }
   };
 
   const handleSaveDeviceDetails = async () => {
@@ -431,8 +595,8 @@ export default function Rooms() {
         setAllDevices(prev => [...prev, {
           ...mapDeviceRecordToAppDevice(data as DeviceRecord),
         }]);
-        
-        setIsAddDeviceModalVisible(false);
+
+        closeCreatePanel();
         setNewDeviceName('');
         setNewDeviceRoomId(activeRoomId ?? rooms[0]?.id ?? null);
         showFeedback(`"${data.name}" was added to the selected room.`, 'success');
@@ -529,6 +693,25 @@ export default function Rooms() {
     [activeRoomId, allActivities],
   );
 
+  const openManageActivityDevices = useCallback((activity: ActivityItem) => {
+    const currentLinkedDeviceIds = junctions
+      .filter((link) => link.activity_id === activity.id)
+      .map((link) => link.device_id);
+
+    setSelectedActivity(activity);
+    setTempLinkedDeviceIds(currentLinkedDeviceIds);
+    setIsManageModalVisible(true);
+  }, [junctions]);
+
+  const handleStartRoomActivity = useCallback((activity: ActivityItem) => {
+    router.push({
+      pathname: '/activity-details',
+      params: {
+        id: String(activity.id),
+      },
+    });
+  }, []);
+
   const filteredDevices = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
 
@@ -539,12 +722,171 @@ export default function Rooms() {
     });
   }, [roomDevices, searchQuery]);
 
+  const searchSuggestions = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    if (normalizedQuery.length < 2) return [];
+
+    const seen = new Set<string>();
+    const suggestions: string[] = [];
+
+    for (const device of roomDevices) {
+      const name = device.name.trim();
+      if (!name.toLowerCase().includes(normalizedQuery)) continue;
+      if (seen.has(name.toLowerCase())) continue;
+      seen.add(name.toLowerCase());
+      suggestions.push(name);
+      if (suggestions.length >= 5) break;
+    }
+
+    return suggestions;
+  }, [roomDevices, searchQuery]);
+
   const openAddDeviceModal = () => {
+    if (rooms.length === 0) {
+      showFeedback('Create a room first, then assign your device to it.', 'info');
+      return;
+    }
+
     setNewDeviceRoomId(activeRoomId ?? rooms[0]?.id ?? null);
-    setIsAddDeviceModalVisible(true);
+    setCreatePanelMode('device');
+    createPanelTranslateX.setValue(900);
+    Animated.timing(createPanelTranslateX, {
+      toValue: 0,
+      duration: 260,
+      useNativeDriver: true,
+    }).start();
   };
 
-  const menuActions = [{ label: 'Device', onPress: openAddDeviceModal }];
+  const openAddRoomModal = () => {
+    setNewRoomName('');
+    setCreatePanelMode('room');
+    createPanelTranslateX.setValue(900);
+    Animated.timing(createPanelTranslateX, {
+      toValue: 0,
+      duration: 260,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const closeCreatePanel = () => {
+    Animated.timing(createPanelTranslateX, {
+      toValue: 900,
+      duration: 240,
+      useNativeDriver: true,
+    }).start(() => {
+      setCreatePanelMode(null);
+      setIsAdding(false);
+    });
+  };
+
+  const handleAddRoom = async () => {
+    if (!newRoomName.trim()) {
+      showFeedback('Please enter a room name.', 'error');
+      return;
+    }
+
+    if (!userHomeId) {
+      showFeedback('We could not find your home right now.', 'error');
+      return;
+    }
+
+    try {
+      const createdRoom = await createHomeRoom(userHomeId, newRoomName);
+      setRooms((prev) => [...prev, createdRoom]);
+      setActiveRoomId(createdRoom.id);
+      setNewDeviceRoomId(createdRoom.id);
+      closeCreatePanel();
+      setNewRoomName('');
+      showFeedback(`"${createdRoom.name}" was added to your home.`, 'success');
+    } catch (err: unknown) {
+      console.error('Failed to add room:', err);
+      showFeedback(
+        'Could not create new room: ' +
+          (err instanceof Error ? err.message : 'Unknown error'),
+        'error',
+      );
+    }
+  };
+
+  const handleDeleteRoom = useCallback(async (room: Room) => {
+    if (isDeletingRoom) return;
+
+    setIsDeletingRoom(true);
+    try {
+      const { error: devicesError } = await supabase
+        .from('devices')
+        .update({ room_id: null })
+        .eq('room_id', room.id);
+
+      if (devicesError) throw devicesError;
+
+      const { error: activitiesError } = await supabase
+        .from('activities')
+        .update({ room_id: null })
+        .eq('room_id', room.id);
+
+      if (activitiesError) throw activitiesError;
+
+      const { error: scenariosError } = await supabase
+        .from('scenarios')
+        .delete()
+        .eq('room_id', room.id);
+
+      if (scenariosError) throw scenariosError;
+
+      const { error } = await supabase
+        .from('rooms')
+        .delete()
+        .eq('id', room.id);
+
+      if (error) throw error;
+
+      setRooms((current) => {
+        const nextRooms = current.filter((item) => item.id !== room.id);
+        roomsScreenCache.rooms = nextRooms;
+        return nextRooms;
+      });
+      setAllDevices((current) => {
+        const nextDevices = current.map((device) =>
+          device.room_id === room.id
+            ? { ...device, room_id: null }
+            : device,
+        );
+        roomsScreenCache.allDevices = nextDevices;
+        return nextDevices;
+      });
+      setAllActivities((current) => {
+        const nextActivities = current.map((activity) =>
+          activity.room_id === room.id
+            ? { ...activity, room_id: null }
+            : activity,
+        );
+        roomsScreenCache.allActivities = nextActivities;
+        return nextActivities;
+      });
+      setActiveRoomId((current) => {
+        if (current !== room.id) return current;
+        roomsScreenCache.activeRoomId = null;
+        return null;
+      });
+      setRoomPendingDeletion((current) => (current === room.id ? null : current));
+      showFeedback(`"${room.name}" was removed from your home.`, 'success');
+    } catch (err: unknown) {
+      console.error('Failed to delete room:', err);
+      showFeedback(
+        'Could not delete this room: ' +
+          (err instanceof Error ? err.message : 'Unknown error'),
+        'error',
+      );
+    } finally {
+      setIsDeletingRoom(false);
+    }
+  }, [isDeletingRoom, showFeedback]);
+
+  const menuActions = [
+    { label: 'Room', onPress: openAddRoomModal },
+    { label: 'Device', onPress: openAddDeviceModal },
+  ];
 
   if (!fontsLoaded || loading) {
     return (
@@ -628,7 +970,7 @@ export default function Rooms() {
             accessibilityHint="Type to filter devices by name."
             placeholderTextColor="#7A8C85"
             value={searchQuery}
-            onChangeText={setSearchQuery}
+            onChangeText={(value) => setSearchQuery(normalizeSearchInput(value))}
             className="flex-1 h-full text-base text-[#2C3A35]"
             style={{
               fontFamily: 'Nunito_600SemiBold',
@@ -636,6 +978,13 @@ export default function Rooms() {
             }}
             textAlignVertical="center"
             autoCorrect={false}
+            autoCapitalize="none"
+            maxLength={MAX_SEARCH_LENGTH}
+          />
+          <SearchAutocomplete
+            suggestions={searchSuggestions}
+            query={searchQuery}
+            onSelect={setSearchQuery}
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity
@@ -657,7 +1006,7 @@ export default function Rooms() {
       </View>
 
       {/* Categories (Original style: h-10 mb-9) */}
-      <View className="h-10 mb-9 flex justify-center items-center">
+      <View className="h-10 mb-9 justify-center">
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -706,10 +1055,21 @@ export default function Rooms() {
         // Render devices section title in ListHeaderComponent
         ListHeaderComponent={
           activeRoom || activeRoomId === null ? (
-            <View className="mb-6">
-              <Text className="text-xl font-bold text-[#354F52] mb-1" style={{ fontFamily: 'Nunito_700Bold' }}>
+            <View className="mb-4 flex-row items-center">
+              <Text
+                maxFontSizeMultiplier={1.2}
+                className="text-2xl text-[#354F52]"
+                style={{ fontFamily: 'Nunito_600SemiBold' }}
+                accessibilityRole="header"
+              >
                 Smart Home Devices ({filteredDevices.length})
               </Text>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color="#548F53"
+                importantForAccessibility="no"
+              />
             </View>
           ) : null
         }
@@ -730,170 +1090,364 @@ export default function Rooms() {
         }
         ListFooterComponent={
           activeRoom ? (
-            <View className="mt-4 mb-6 rounded-3xl border border-[#D8DFD5] bg-white/70 p-5">
-              <View className="flex-row items-center justify-between mb-2">
+            <View className="mt-4 mb-6">
+              {roomActivities.length > 0 ? (
+                <View className="mb-4 rounded-3xl border border-[#D8DFD5] bg-[#F8FBF6] p-5">
+                  <View className="flex-row items-center justify-between mb-3">
+                    <Text
+                      className="text-lg text-[#354F52] font-bold"
+                      style={{ fontFamily: 'Nunito_700Bold' }}
+                    >
+                      Start from this room
+                    </Text>
+                    <MaterialCommunityIcons
+                      name="play-circle-outline"
+                      size={24}
+                      color="#548F53"
+                      accessible={false}
+                    />
+                  </View>
+                  <Text
+                    className="text-[#6C7A74] text-sm mb-4"
+                    style={{ fontFamily: 'Nunito_400Regular' }}
+                  >
+                    Start an activity from {activeRoom.name} and Nidush will prepare the linked devices for that session.
+                  </Text>
+                  <View className="gap-y-3">
+                    {roomActivities.map((activity) => {
+                      const linkedCount = junctions.filter((link) => link.activity_id === activity.id).length;
+
+                      return (
+                        <View
+                          key={`room-activity-${activity.id}`}
+                          className="rounded-[26px] border border-[#E1E8DE] bg-white px-4 py-4"
+                        >
+                          <View className="flex-row items-start justify-between mb-2">
+                            <View className="flex-1 pr-3">
+                              <Text
+                                className="text-[#354F52] text-base"
+                                style={{ fontFamily: 'Nunito_700Bold' }}
+                              >
+                                {activity.title}
+                              </Text>
+                              <Text
+                                className="text-[#6C7A74] text-sm mt-1"
+                                style={{ fontFamily: 'Nunito_400Regular' }}
+                                numberOfLines={2}
+                              >
+                                {activity.description || 'Ready to launch from this room.'}
+                              </Text>
+                            </View>
+                            <View className="rounded-full bg-[#EEF6EC] px-3 py-2">
+                              <Text
+                                className="text-[#548F53] text-xs"
+                                style={{ fontFamily: 'Nunito_700Bold' }}
+                              >
+                                {linkedCount} linked
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View className="flex-row gap-3 mt-2">
+                            <TouchableOpacity
+                              onPress={() => openManageActivityDevices(activity)}
+                              className="flex-1 rounded-full bg-[#F1F5EE] px-4 py-3 items-center"
+                              accessibilityRole="button"
+                              accessibilityLabel={`Manage linked devices for ${activity.title}`}
+                            >
+                              <Text
+                                className="text-[#354F52] text-sm"
+                                style={{ fontFamily: 'Nunito_700Bold' }}
+                              >
+                                Devices
+                              </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              onPress={() => handleStartRoomActivity(activity)}
+                              className="flex-1 rounded-full bg-[#548F53] px-4 py-3 items-center"
+                              accessibilityRole="button"
+                              accessibilityLabel={`Start activity ${activity.title}`}
+                            >
+                              <Text
+                                className="text-white text-sm"
+                                style={{ fontFamily: 'Nunito_700Bold' }}
+                              >
+                                Start
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              ) : null}
+
+              <View className="rounded-3xl border border-[#D8DFD5] bg-white/70 p-5">
+                <View className="flex-row items-center justify-between mb-2">
+                  <Text
+                    className="text-lg text-[#354F52] font-bold"
+                    style={{ fontFamily: 'Nunito_700Bold' }}
+                  >
+                    {activeRoom.name} Summary
+                  </Text>
+                  <MaterialCommunityIcons
+                    name="sofa-single"
+                    size={22}
+                    color="#548F53"
+                    accessible={false}
+                  />
+                </View>
                 <Text
-                  className="text-lg text-[#354F52] font-bold"
-                  style={{ fontFamily: 'Nunito_700Bold' }}
+                  className="text-[#6C7A74] text-sm mb-3"
+                  style={{ fontFamily: 'Nunito_400Regular' }}
                 >
-                  {activeRoom.name} Summary
+                  {filteredDevices.length} device{filteredDevices.length === 1 ? '' : 's'}, with {roomActivities.length} activity
+                  {roomActivities.length === 1 ? '' : 'ies'} linked to this room.
                 </Text>
-                <MaterialCommunityIcons
-                  name="sofa-single"
-                  size={22}
-                  color="#548F53"
-                  accessible={false}
-                />
+                {roomPendingDeletion === activeRoom.id ? (
+                  <View className="mt-3 rounded-[22px] border border-[#F2C9C4] bg-[#FFF2EF] p-4">
+                    <Text
+                      className="text-[#8E473F] text-sm mb-3"
+                      style={{ fontFamily: 'Nunito_600SemiBold' }}
+                    >
+                      Delete "{activeRoom.name}"? Devices in this room will become unassigned.
+                    </Text>
+                    <View className="flex-row gap-3">
+                      <TouchableOpacity
+                        onPress={() => setRoomPendingDeletion(null)}
+                        disabled={isDeletingRoom}
+                        className="px-4 py-3 rounded-full bg-white border border-[#E7D7D3]"
+                        accessibilityRole="button"
+                        accessibilityLabel={`Cancel deleting room ${activeRoom.name}`}
+                      >
+                        <Text
+                          className="text-[#6C7A74] text-sm"
+                          style={{ fontFamily: 'Nunito_700Bold' }}
+                        >
+                          Cancel
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => {
+                          void handleDeleteRoom(activeRoom);
+                        }}
+                        disabled={isDeletingRoom}
+                        className="px-4 py-3 rounded-full bg-[#B5564D]"
+                        accessibilityRole="button"
+                        accessibilityLabel={`Confirm deleting room ${activeRoom.name}`}
+                      >
+                        {isDeletingRoom ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <Text
+                            className="text-white text-sm"
+                            style={{ fontFamily: 'Nunito_700Bold' }}
+                          >
+                            Confirm delete
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    onPress={() => setRoomPendingDeletion(activeRoom.id)}
+                    disabled={isDeletingRoom}
+                    className="self-start mt-2 px-4 py-3 rounded-full bg-[#FBE8E6]"
+                    accessibilityRole="button"
+                    accessibilityLabel={`Delete room ${activeRoom.name}`}
+                  >
+                    {isDeletingRoom ? (
+                      <ActivityIndicator size="small" color="#B5564D" />
+                  ) : (
+                      <Text
+                        className="text-[#B5564D] text-sm"
+                        style={{ fontFamily: 'Nunito_700Bold' }}
+                      >
+                        Delete room
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                )}
               </View>
-              <Text
-                className="text-[#6C7A74] text-sm mb-3"
-                style={{ fontFamily: 'Nunito_400Regular' }}
-              >
-                {filteredDevices.length} device{filteredDevices.length === 1 ? '' : 's'}, with {roomActivities.length} activity
-                {roomActivities.length === 1 ? '' : 'ies'} linked to this room.
-              </Text>
             </View>
           ) : null
         }
       />
 
-      {/* Floating menu FAB with Add room / device actions */}
+      {/* Floating menu FAB with add device action */}
       <AddRoomDevice actions={menuActions} />
 
-      {/* --- ADD NEW SMART DEVICE DIALOG MODAL --- */}
-      <Modal
-        visible={isAddDeviceModalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setIsAddDeviceModalVisible(false)}
-      >
-        <KeyboardAvoidingView
-          className="flex-1 justify-end bg-black/40"
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 120 : 170}
-        >
-          <View className="bg-white rounded-t-[36px] p-6 pb-10">
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 12 }}
+      {createPanelMode ? (
+        <View className="absolute inset-0 z-20 bg-black/35">
+          <Pressable className="absolute inset-0" onPress={closeCreatePanel} />
+          <Animated.View
+            className="absolute inset-0 bg-[#F6F8F2] shadow-2xl"
+            style={{ transform: [{ translateX: createPanelTranslateX }] }}
+          >
+            <KeyboardAvoidingView
+              className="flex-1"
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
             >
-              <View className="flex-row justify-between items-center mb-6">
-                <Text className="text-2xl font-bold text-[#354F52]" style={{ fontFamily: 'Nunito_700Bold' }}>
-                  Add new smart device
-                </Text>
-                <TouchableOpacity onPress={() => setIsAddDeviceModalVisible(false)} hitSlop={15}>
-                  <Ionicons name="close" size={24} color="#7A8C85" />
-                </TouchableOpacity>
-              </View>
-
-              <Text className="text-[#354F52] text-sm mb-2" style={{ fontFamily: 'Nunito_600SemiBold' }}>
-                Device Name
-              </Text>
-              <TextInput
-                placeholder="e.g. Atmosphere Diffuser"
-                placeholderTextColor="#6B7C76"
-                value={newDeviceName}
-                onChangeText={setNewDeviceName}
-                className="bg-[#F1F3EA] border border-[#BDC7C2] rounded-2xl px-4 py-3 text-base text-[#2C3A35] mb-5"
-                style={{ fontFamily: 'Nunito_600SemiBold', color: '#1F2A24' }}
-                selectionColor="#548F53"
-              />
-
-              <Text className="text-[#354F52] text-sm mb-3" style={{ fontFamily: 'Nunito_600SemiBold' }}>
-                Device Category Type
-              </Text>
-              <View className="flex-row justify-between mb-8 gap-x-2">
-                {(['light', 'speaker', 'difuser', 'purifier'] as const).map(type => {
-                  const isSelected = newDeviceType === type;
-                  const label = type.charAt(0).toUpperCase() + type.slice(1);
-
-                  return (
-                    <TouchableOpacity
-                      key={type}
-                      onPress={() => setNewDeviceType(type)}
-                      className={`w-[23%] py-3 rounded-2xl border items-center justify-center ${
-                        isSelected 
-                          ? 'bg-[#BBE6BA] border-transparent' 
-                          : 'bg-transparent border-[#BDC7C2]'
-                      }`}
-                    >
-                      {type === 'difuser' ? (
-                        <MaterialCommunityIcons name="air-purifier" size={22} color={isSelected ? '#354F52' : '#7A8C85'} />
-                      ) : type === 'light' ? (
-                        <MaterialIcons name="lightbulb" size={22} color={isSelected ? '#354F52' : '#7A8C85'} />
-                      ) : type === 'speaker' ? (
-                        <MaterialIcons name="speaker" size={22} color={isSelected ? '#354F52' : '#7A8C85'} />
-                      ) : (
-                        <MaterialIcons name="air" size={22} color={isSelected ? '#354F52' : '#7A8C85'} />
-                      )}
-                      <Text className="text-[10px] mt-1 text-[#354F52] font-bold" style={{ fontFamily: 'Nunito_700Bold' }}>
-                        {label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <Text className="text-[#354F52] text-sm mb-3" style={{ fontFamily: 'Nunito_600SemiBold' }}>
-                Save in Room
-              </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 20 }}
-                keyboardShouldPersistTaps="handled"
-              >
-                {rooms.map((room) => {
-                  const isSelected = newDeviceRoomId === room.id;
-
-                  return (
-                    <TouchableOpacity
-                      key={room.id}
-                      onPress={() => setNewDeviceRoomId(room.id)}
-                      className={`mr-3 px-4 py-3 rounded-2xl border ${
-                        isSelected ? 'bg-[#BBE6BA] border-transparent' : 'bg-transparent border-[#BDC7C2]'
-                      }`}
-                    >
-                      <Text
-                        className="text-[#354F52] font-bold"
-                        style={{ fontFamily: 'Nunito_700Bold' }}
-                      >
-                        {room.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </ScrollView>
-
-            <View className="flex-row justify-between mt-4 pb-8">
-              <TouchableOpacity
-                onPress={() => setIsAddDeviceModalVisible(false)}
-                className="w-[48%] py-4 bg-[#F1F3EA] rounded-full items-center"
-              >
-                <Text className="text-[#354F52] text-lg font-bold" style={{ fontFamily: 'Nunito_700Bold' }}>
-                  Cancel
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={handleAddDevice}
-                disabled={isAdding}
-                className="w-[48%] py-4 bg-[#548F53] rounded-full items-center flex-row justify-center"
-              >
-                {isAdding ? (
-                  <ActivityIndicator size="small" color="white" />
-                ) : (
-                  <Text className="text-white text-lg font-bold" style={{ fontFamily: 'Nunito_700Bold' }}>
-                    Save Device
+              <View className="flex-1">
+                <View className="px-5 pt-14 pb-5 bg-[#EDF2E9] border-b border-[#DCE4D7]">
+                  <TouchableOpacity onPress={closeCreatePanel} className="mb-5 self-start" hitSlop={8}>
+                    <Ionicons name="chevron-back" size={28} color="#354F52" />
+                  </TouchableOpacity>
+                  <Text className="text-[#354F52] text-[30px]" style={{ fontFamily: 'Nunito_700Bold' }}>
+                    {createPanelMode === 'room' ? 'Add Room' : 'Add Device'}
                   </Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+                  <Text className="text-[#6B7C76] text-sm mt-2" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                    {createPanelMode === 'room'
+                      ? 'Create a new space in your home before linking activities and devices.'
+                      : 'Add a device and place it directly inside one of your home rooms.'}
+                  </Text>
+                </View>
+
+                <ScrollView
+                  className="flex-1"
+                  contentContainerStyle={{ padding: 24, paddingBottom: 36 }}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                >
+                  {createPanelMode === 'room' ? (
+                    <>
+                      <Text className="text-[#354F52] text-sm mb-2" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                        Room Name
+                      </Text>
+                      <TextInput
+                        placeholder="e.g. Office"
+                        placeholderTextColor="#6B7C76"
+                        value={newRoomName}
+                        onChangeText={setNewRoomName}
+                        className="bg-white border border-[#D4DDD2] rounded-2xl px-4 py-4 text-base text-[#2C3A35] mb-6"
+                        style={{ fontFamily: 'Nunito_600SemiBold', color: '#1F2A24' }}
+                        selectionColor="#548F53"
+                      />
+
+                      <View className="rounded-[28px] bg-white border border-[#E0E7DD] p-5">
+                        <Text className="text-[#354F52] text-lg mb-2" style={{ fontFamily: 'Nunito_700Bold' }}>
+                          What happens next
+                        </Text>
+                        <Text className="text-[#6B7C76] text-sm" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                          After saving the room, you can add devices to it and then use it in new activities and scenarios.
+                        </Text>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <Text className="text-[#354F52] text-sm mb-2" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                        Device Name
+                      </Text>
+                      <TextInput
+                        placeholder="e.g. Atmosphere Diffuser"
+                        placeholderTextColor="#6B7C76"
+                        value={newDeviceName}
+                        onChangeText={setNewDeviceName}
+                        className="bg-white border border-[#D4DDD2] rounded-2xl px-4 py-4 text-base text-[#2C3A35] mb-5"
+                        style={{ fontFamily: 'Nunito_600SemiBold', color: '#1F2A24' }}
+                        selectionColor="#548F53"
+                      />
+
+                      <Text className="text-[#354F52] text-sm mb-3" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                        Device Category Type
+                      </Text>
+                      <View className="flex-row justify-between mb-8 gap-x-2">
+                        {(['light', 'speaker', 'difuser', 'purifier'] as const).map(type => {
+                          const isSelected = newDeviceType === type;
+                          const label = type.charAt(0).toUpperCase() + type.slice(1);
+
+                          return (
+                            <TouchableOpacity
+                              key={type}
+                              onPress={() => setNewDeviceType(type)}
+                              className={`w-[23%] py-3 rounded-2xl border items-center justify-center ${
+                                isSelected ? 'bg-[#BBE6BA] border-transparent' : 'bg-white border-[#D4DDD2]'
+                              }`}
+                            >
+                              {type === 'difuser' ? (
+                                <MaterialCommunityIcons name="air-purifier" size={22} color={isSelected ? '#354F52' : '#7A8C85'} />
+                              ) : type === 'light' ? (
+                                <MaterialIcons name="lightbulb" size={22} color={isSelected ? '#354F52' : '#7A8C85'} />
+                              ) : type === 'speaker' ? (
+                                <MaterialIcons name="speaker" size={22} color={isSelected ? '#354F52' : '#7A8C85'} />
+                              ) : (
+                                <MaterialIcons name="air" size={22} color={isSelected ? '#354F52' : '#7A8C85'} />
+                              )}
+                              <Text className="text-[10px] mt-1 text-[#354F52] font-bold" style={{ fontFamily: 'Nunito_700Bold' }}>
+                                {label}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+
+                      <Text className="text-[#354F52] text-sm mb-3" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                        Save in Room
+                      </Text>
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{ paddingBottom: 20 }}
+                        keyboardShouldPersistTaps="handled"
+                      >
+                        {rooms.map((room) => {
+                          const isSelected = newDeviceRoomId === room.id;
+
+                          return (
+                            <TouchableOpacity
+                              key={room.id}
+                              onPress={() => setNewDeviceRoomId(room.id)}
+                              className={`mr-3 px-4 py-3 rounded-2xl border ${
+                                isSelected ? 'bg-[#BBE6BA] border-transparent' : 'bg-white border-[#D4DDD2]'
+                              }`}
+                            >
+                              <Text
+                                className="text-[#354F52] font-bold"
+                                style={{ fontFamily: 'Nunito_700Bold' }}
+                              >
+                                {room.name}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    </>
+                  )}
+                </ScrollView>
+
+                <View className="px-6 pt-4 pb-8 border-t border-[#DCE4D7] bg-[#F6F8F2] flex-row justify-between">
+                  <TouchableOpacity
+                    onPress={closeCreatePanel}
+                    className="w-[48%] py-4 bg-[#E9EFE7] rounded-full items-center"
+                  >
+                    <Text className="text-[#354F52] text-base font-bold" style={{ fontFamily: 'Nunito_700Bold' }}>
+                      Cancel
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={createPanelMode === 'room' ? handleAddRoom : handleAddDevice}
+                    disabled={createPanelMode === 'device' ? isAdding : false}
+                    className="w-[48%] py-4 bg-[#548F53] rounded-full items-center flex-row justify-center"
+                  >
+                    {createPanelMode === 'device' && isAdding ? (
+                      <ActivityIndicator size="small" color="white" />
+                    ) : (
+                      <Text className="text-white text-base font-bold" style={{ fontFamily: 'Nunito_700Bold' }}>
+                        {createPanelMode === 'room' ? 'Save Room' : 'Save Device'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </KeyboardAvoidingView>
+          </Animated.View>
+        </View>
+      ) : null}
 
       <Modal
         visible={selectedDevice !== null}
@@ -1004,6 +1558,55 @@ export default function Rooms() {
                   );
                 })}
               </ScrollView>
+
+              {selectedDevice?.type === 'light' ? (
+                <View className="mb-2">
+                  <View className="flex-row items-center justify-between mb-3">
+                    <Text className="text-[#354F52] text-sm" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                      Light Color
+                    </Text>
+                    {isUpdatingLightColor ? (
+                      <ActivityIndicator size="small" color="#548F53" />
+                    ) : (
+                      <Text className="text-[#6B7C76] text-xs" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                        Applies instantly
+                      </Text>
+                    )}
+                  </View>
+
+                  <View className="flex-row flex-wrap gap-y-3">
+                    {LIGHT_COLOR_OPTIONS.map((color) => {
+                      const selected = selectedLightColor === color;
+
+                      return (
+                        <TouchableOpacity
+                          key={color}
+                          onPress={() => {
+                            void handleSetDeviceColor(color);
+                          }}
+                          disabled={isUpdatingLightColor}
+                          className="mr-3"
+                          style={{
+                            width: 44,
+                            height: 44,
+                            borderRadius: 22,
+                            backgroundColor: color,
+                            borderWidth: selected ? 3 : 1,
+                            borderColor: selected ? '#354F52' : '#D7DED6',
+                            opacity: isUpdatingLightColor ? 0.7 : 1,
+                          }}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Set light color ${color}`}
+                        />
+                      );
+                    })}
+                  </View>
+
+                  <Text className="text-[#6B7C76] text-xs mt-3" style={{ fontFamily: 'Nunito_600SemiBold' }}>
+                    Works for Google Home lights that support RGB color control. White-only bulbs may reject this command.
+                  </Text>
+                </View>
+              ) : null}
             </ScrollView>
 
             <View className="flex-row justify-between mt-2 pt-2">

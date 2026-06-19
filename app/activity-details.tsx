@@ -34,8 +34,13 @@ import { SMART_HOME_DEVICES } from '@/constants/devices';
 import {
   fetchActivityTemplateById,
   fetchScenarioTemplateById,
+  isUserScenarioRouteId,
   mapUserActivity,
+  parseUserScenarioDbId,
+  resolvePossibleUserScenarioDbIds,
 } from '@/utils/catalogTemplates';
+import { getScenarioDeviceMeta, mapLinkedDeviceToScenarioState } from '@/utils/activityDeviceConfigs';
+import { applyScenarioDeviceStates } from '@/utils/deviceExecution';
 
 type AlertConfigState = {
   visible: boolean;
@@ -59,8 +64,12 @@ type ScenarioRow = {
   id: number | string;
   name: string;
   description: string | null;
+  image?: string | null;
   playlist_id: string | null;
   playlist_name?: string | null;
+  focus_mode_enabled?: boolean | null;
+  devices?: ScenarioDeviceState[] | null;
+  rooms?: { name?: string | null } | null;
 };
 
 type ContentRow = {
@@ -94,6 +103,13 @@ const parseUnknownArray = (value: unknown): unknown[] => {
   }
   return Array.isArray(value) ? value : [];
 };
+
+const splitInstructionText = (value: string) =>
+  value
+    .replace(/\s+/g, ' ')
+    .split(/(?:\r?\n)+|;\s+|[.!?],\s*|(?<=[.!?])\s+(?=[A-Z0-9])|(?<=\d\.)\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
 
 const toInstructionText = (value: unknown): string => {
   if (typeof value === 'string') return value;
@@ -135,8 +151,47 @@ const getItemDevices = (item: Activity | Scenario) =>
     ? item.devices
     : []) as ScenarioDeviceState[];
 
+const resolveConfiguredDevices = (
+  activityDevices: ScenarioDeviceState[],
+  scenarioDevices: ScenarioDeviceState[],
+) => (scenarioDevices.length > 0 ? scenarioDevices : activityDevices);
+
+const normalizeLinkedDevice = (value: unknown) => {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value;
+};
+
+const fetchScenarioFromDbCandidates = async (rawScenarioId: string) => {
+  const candidateIds = resolvePossibleUserScenarioDbIds(rawScenarioId);
+
+  for (const candidateId of candidateIds) {
+    const { data: scenData } = await supabase
+      .from('scenarios')
+      .select('*')
+      .eq('id', candidateId)
+      .maybeSingle<ScenarioRow>();
+
+    if (scenData) {
+      return {
+        id: `scenario:${scenData.id}`,
+        title: scenData.name,
+        description: scenData.description || '',
+        playlist: scenData.playlist_id ? 'Spotify Music' : (scenData.playlist_name || 'No music'),
+        playlist_id: scenData.playlist_id,
+        focusMode: scenData.focus_mode_enabled === true,
+        shortcuts: false,
+        devices: Array.isArray(scenData.devices) ? scenData.devices : [],
+        room: scenData.rooms?.name || undefined,
+        image: resolveCatalogImage(scenData.image || 'Scenarios/moonlight_bay.png'),
+      } as Scenario;
+    }
+  }
+
+  return null;
+};
+
 export default function ActivityDetails() {
-  const { id, isNew } = useLocalSearchParams<{ id: string; isNew?: string }>();
+  const { id, isNew, itemType } = useLocalSearchParams<{ id: string; isNew?: string; itemType?: string }>();
 
   const [mainItem, setMainItem] = useState<Activity | Scenario | null>(null);
   const [relatedScenario, setRelatedScenario] = useState<Scenario | null>(null);
@@ -163,15 +218,13 @@ export default function ActivityDetails() {
     if (isNew === 'true') {
       setToastMessage('Activity created successfully!');
       setShowToast(true);
-      AccessibilityInfo.announceForAccessibility(
-        'Atividade criada com sucesso!',
-      );
+      AccessibilityInfo.announceForAccessibility(creationMessage);
       const timer = setTimeout(() => {
         setShowToast(false);
       }, 5000);
       return () => clearTimeout(timer);
     }
-  }, [isNew]);
+  }, [isNew, itemType]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -182,7 +235,7 @@ export default function ActivityDetails() {
         apiLog('SELECT', 'activities', { id });
         const { data, error } = await supabase
           .from('activities')
-          .select('*')
+          .select('*, rooms(name)')
           .eq('id', id)
           .single();
 
@@ -192,6 +245,31 @@ export default function ActivityDetails() {
       }
 
       if (foundActivity) {
+        const linkedDevicesPromise = (async () => {
+          const activityId = Number(foundActivity.id);
+          if (!Number.isFinite(activityId)) return [];
+
+          const { data: linkedRows, error: linkedError } = await supabase
+            .from('activity_devices')
+            .select('device_id, devices(id, name, type, status, status_level)')
+            .eq('activity_id', activityId);
+
+          if (linkedError || !linkedRows) return [];
+
+          return linkedRows
+            .map((row) => normalizeLinkedDevice(row.devices))
+            .filter(Boolean)
+            .map((device) =>
+              mapLinkedDeviceToScenarioState(device as {
+                id: number;
+                name: string;
+                type: string | null;
+                status?: string | null;
+                status_level?: number | null;
+              }),
+            );
+        })();
+
         const shortcutPromise = (async () => {
           if (String(foundActivity.id).startsWith('template:')) {
             return foundActivity.shortcuts;
@@ -291,10 +369,11 @@ export default function ActivityDetails() {
             })()
           : Promise.resolve(null);
 
-        const [shortcutValue, scen, content] = await Promise.all([
+        const [shortcutValue, scen, content, linkedDevices] = await Promise.all([
           shortcutPromise,
           scenarioPromise,
           contentPromise,
+          linkedDevicesPromise,
         ]);
         const activityWithShortcut = {
           ...foundActivity,
@@ -311,6 +390,38 @@ export default function ActivityDetails() {
           setMainItem(foundScenario);
           setRelatedScenario(foundScenario);
           setFocusEnabled(foundScenario.focusMode);
+        } else if (isUserScenarioRouteId(id)) {
+          const { data: scenData } = await supabase
+            .from('scenarios')
+            .select('id, name, description, image, playlist_id, playlist_name, focus_mode_enabled, devices, rooms(name)')
+            .eq('id', id.replace(/^scenario:/, ''))
+            .maybeSingle<ScenarioRow>();
+
+          if (scenData) {
+            const dbScenario: Scenario = {
+              id,
+              title: scenData.name,
+              description: scenData.description || '',
+              playlist: scenData.playlist_name || (scenData.playlist_id ? 'Spotify Music' : undefined),
+              playlist_id: scenData.playlist_id || undefined,
+              focusMode: scenData.focus_mode_enabled === true,
+              shortcuts: false,
+              devices: Array.isArray(scenData.devices) ? scenData.devices : [],
+              room: scenData.rooms?.name || undefined,
+              image: resolveCatalogImage(scenData.image || 'Scenarios/moonlight_bay.png'),
+            };
+
+            setMainItem(dbScenario);
+            setRelatedScenario(dbScenario);
+            setFocusEnabled(dbScenario.focusMode);
+          }
+        } else {
+          const dbScenario = await fetchScenarioFromDbCandidates(id);
+          if (dbScenario) {
+            setMainItem(dbScenario);
+            setRelatedScenario(dbScenario);
+            setFocusEnabled(dbScenario.focusMode);
+          }
         }
       }
       setLoading(false);
@@ -629,16 +740,19 @@ export default function ActivityDetails() {
       ? { uri: imgObj }
       : imgObj || { uri: 'https://picsum.photos/400/600' };
 
-  const devicesToShow: ScenarioDeviceState[] =
-    relatedScenario?.devices || getItemDevices(mainItem);
+  const devicesToShow: ScenarioDeviceState[] = resolveConfiguredDevices(
+    getItemDevices(mainItem),
+    Array.isArray(relatedScenario?.devices) ? relatedScenario.devices : [],
+  );
 
   const activeSpeakerConfig = devicesToShow.find((config) => {
     const device = SMART_HOME_DEVICES[config.deviceId];
-    return device?.type === 'speaker';
+    const fallbackMeta = getScenarioDeviceMeta(config);
+    return device?.type === 'speaker' || fallbackMeta.type === 'speaker';
   });
 
   const audioStatusText = activeSpeakerConfig
-    ? `Playlist will be played on ${SMART_HOME_DEVICES[activeSpeakerConfig.deviceId].name}`
+    ? `Playlist will be played on ${SMART_HOME_DEVICES[activeSpeakerConfig.deviceId]?.name || getScenarioDeviceMeta(activeSpeakerConfig).name}`
     : 'Playlist will be played';
 
   // Helper: parse JSON safely (handles strings, arrays, objects)
@@ -739,6 +853,8 @@ export default function ActivityDetails() {
           <ContentSection
             ingredients={ingredients}
             instructions={instructions}
+            mediaUrl={relatedContent?.videoUrl}
+            mediaLabel={relatedContent?.type === 'audiobooks' ? 'Open audiobook' : undefined}
           />
         </View>
       </ScrollView>

@@ -11,12 +11,14 @@ import {
   HealthConnectSyncResult,
   syncLatestHealthConnectReading,
 } from '@/utils/healthConnectSync';
+import { hasHealthConnectEnabled } from '@/utils/legal';
 import { supabase } from '@/utils/supabase';
 import { useSegments } from 'expo-router';
 import React, {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -86,6 +88,7 @@ export const BiometricsProvider = ({
   const lastStateRef = useRef<UserState>('RELAXED');
   const lastHealthConnectSyncRef = useRef(0);
   const segments = useSegments();
+  const routeKey = useMemo(() => segments.join('/'), [segments]);
 
   const persistBaselineSnapshot = async () => {
     try {
@@ -114,8 +117,8 @@ export const BiometricsProvider = ({
   const notifyStateChange = (newState: UserState) => {
     if (newState !== lastStateRef.current) {
       addNotification(
-        'Mood Update',
-        `You're now feeling ${newState.toLowerCase()}`,
+        'Activity recommendation',
+        `You're feeling ${newState.toLowerCase()}. Check Nidush for an activity that fits this moment.`,
         'state_change'
       );
       lastStateRef.current = newState;
@@ -174,9 +177,8 @@ export const BiometricsProvider = ({
   };
 
   useEffect(() => {
-    const isOnboarding = segments.some(
-      (segment) => segment === 'onboarding' || segment === 'profile-selection',
-    );
+    const isOnboarding =
+      routeKey.includes('onboarding') || routeKey.includes('profile-selection');
 
     if (isOnboarding) return;
 
@@ -236,6 +238,12 @@ export const BiometricsProvider = ({
       await restoreBaselineSnapshot();
       if (!isMounted) return;
 
+      const isHealthConnectEnabled = await hasHealthConnectEnabled();
+      if (!isMounted || !isHealthConnectEnabled) {
+        startFallbackSimulation();
+        return;
+      }
+
       await syncHealthConnectHeartRate();
       if (!isMounted) return;
 
@@ -263,7 +271,7 @@ export const BiometricsProvider = ({
       if (healthConnectInterval) clearInterval(healthConnectInterval);
       appStateSubscription?.remove();
     };
-  }, [segments, addNotification]);
+  }, [routeKey, addNotification]);
 
   return (
     <BiometricsContext.Provider

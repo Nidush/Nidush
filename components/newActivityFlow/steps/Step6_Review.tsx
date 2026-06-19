@@ -4,9 +4,11 @@ import {
   MaterialIcons,
 } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
+import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
-import { Image, ImageSourcePropType, Platform, StyleSheet, Text, View } from 'react-native';
+import { ImageSourcePropType, StyleSheet, Text, View } from 'react-native';
+import { getRoomIconName } from '@/utils/roomIcons';
 import { ReviewCard } from '../ReviewCard';
 import { ScenarioReviewCard } from '../ScenarioReviewCard';
 import { StepWrapper } from '../StepWrapper';
@@ -78,29 +80,8 @@ const getActivityIcon = (type: string) => {
 };
 
 const getRoomIcon = (room: string) => {
-  const lowerRoom = room ? room.toLowerCase() : '';
   const props = { size: 24, color: '#354F52' };
-
-  if (lowerRoom.includes('kitchen') || lowerRoom.includes('dining')) {
-    return <MaterialIcons name="restaurant" {...props} />;
-  }
-
-  let iconName: keyof typeof MaterialIcons.glyphMap = 'room';
-  if (lowerRoom.includes('bed')) iconName = 'bed';
-  else if (lowerRoom.includes('living') || lowerRoom.includes('lounge'))
-    iconName = 'weekend';
-  else if (
-    lowerRoom.includes('office') ||
-    lowerRoom.includes('desk') ||
-    lowerRoom.includes('study')
-  )
-    iconName = 'computer';
-  else if (lowerRoom.includes('bath') || lowerRoom.includes('toilet'))
-    iconName = 'bathtub';
-  else if (lowerRoom.includes('garden') || lowerRoom.includes('out'))
-    iconName = 'deck';
-
-  return <MaterialIcons name={iconName} {...props} />;
+  return <MaterialIcons name={getRoomIconName(room)} {...props} />;
 };
 
 export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
@@ -151,11 +132,11 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
               importantForAccessibility="no-hide-descendants"
               accessibilityElementsHidden={true}
             >
-              <Image
+              <ExpoImage
                 source={content.image}
                 className="w-full h-full"
-                resizeMode="cover"
-                blurRadius={Platform.OS === 'ios' ? 70 : 50}
+                contentFit="cover"
+                cachePolicy="memory-disk"
               />
               <View className="absolute inset-0" />
             </View>
@@ -174,10 +155,12 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
                 />
               }
             >
-              <Image
+              <ExpoImage
                 source={content.image}
                 className="w-full h-full"
-                resizeMode="cover"
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={200}
               />
             </MaskedView>
 
@@ -278,10 +261,12 @@ export const Step6_Review = ({ data, onJumpToStep }: Step6Props) => {
             accessibilityElementsHidden={true}
           >
             {activityImageSource ? (
-              <Image
+              <ExpoImage
                 source={activityImageSource}
                 className="w-20 h-20 rounded-xl"
-                resizeMode="cover"
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={200}
               />
             ) : (
               <View className="w-20 h-24 rounded-xl bg-[#C8E2C8] justify-center items-center">

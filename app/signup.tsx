@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
@@ -24,6 +25,7 @@ import {
   useFonts,
 } from '@expo-google-fonts/nunito';
 import { apiLog, invokeFunction, supabase } from '../utils/supabase';
+import { LEGAL_CONSENT_KEY } from '../components/legal/LegalContent';
 
 import { getFriendlyErrorMessage } from '../utils/errorHandlers';
 import { getNextPasswordRequirement, validatePassword } from '../utils/passwordPolicy';
@@ -57,6 +59,28 @@ export default function SignUp() {
     return () => sub.remove();
   }, []);
 
+  useEffect(() => {
+    const ensureLegalConsent = async () => {
+      try {
+        const storedConsent = await AsyncStorage.getItem(LEGAL_CONSENT_KEY);
+        if (storedConsent !== 'accepted') {
+          router.replace('/pre-signup-consent');
+        }
+      } catch (e) {
+        console.log('Erro ao ler consentimento legal:', e);
+      }
+    };
+
+    ensureLegalConsent();
+  }, [router]);
+
+  const getEmailRedirectUrl = () => {
+    const configuredRedirect = process.env.EXPO_PUBLIC_AUTH_REDIRECT_URL?.trim();
+    if (configuredRedirect) return configuredRedirect;
+
+    return 'nidush://login';
+  };
+
   const handleSignUp = async () => {
     if (!email || !password || !firstName || !lastName) {
       setErrorMsg('Por favor preenche todos os campos.');
@@ -73,11 +97,12 @@ export default function SignUp() {
     setErrorMsg('');
 
     apiLog('POST', 'auth/signUp', { email });
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
 
       email,
       password,
       options: {
+        emailRedirectTo: getEmailRedirectUrl(),
         data: {
           first_name: firstName,
           last_name: lastName,
@@ -91,23 +116,19 @@ export default function SignUp() {
       setErrorMsg(getFriendlyErrorMessage(error));
       return;
     }
-
-
-    try {
-      await invokeFunction('welcome-user', { 
-        name: firstName, 
-        email: email 
-      });
-    } catch (fnError) {
-      console.log('Erro ao enviar email de boas-vindas:', fnError);
-    }
-
-    // Signup bem sucedido, limpar progresso anterior se existir e redirecionar para o login
+    // Signup bem sucedido, limpar progresso anterior e qualquer flag antiga de onboarding
     try {
       await AsyncStorage.removeItem('@onboarding_progress');
+      await AsyncStorage.removeItem('@viewedOnboarding');
     } catch (e) {
       console.log('Erro ao limpar progresso:', e);
     }
+
+    if (data.session) {
+      router.replace('/setup-profile');
+      return;
+    }
+
     router.replace({ pathname: '/login', params: { registeredEmail: email } });
 
   };
@@ -175,138 +196,136 @@ export default function SignUp() {
                 </View>
 
                 <View className={isWebPC ? 'mt-[10px]' : 'mt-[14px]'}>
-                  <Text
-                    style={{ fontFamily: 'Nunito_700Bold' }}
-                    className="text-[40px] text-[#3E545C]"
-                    accessibilityRole="header"
-                    maxFontSizeMultiplier={1}
-                  >
-                    Welcome Home
-                  </Text>
+                  <>
+                    <Text
+                      style={{ fontFamily: 'Nunito_700Bold' }}
+                      className="text-[40px] text-[#3E545C]"
+                      accessibilityRole="header"
+                      maxFontSizeMultiplier={1}
+                    >
+                      Welcome Home
+                    </Text>
 
-                  <Text
-                    style={{ fontFamily: 'Nunito_400Regular' }}
-                    className="text-[16px] text-[#3E545C] mt-[8px] mb-[20px]"
-                    accessibilityLabel="Join Nidush and let your home be your safe space"
-                    maxFontSizeMultiplier={1.2}
-                  >
-                    Join Nidush and let your home be your safe space.
-                  </Text>
-
-                  <View className="flex-row justify-between mb-[15px]">
-                    <View className="w-[48%]">
-                      <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">First Name</Text>
-                      <TextInput
-                        style={{ fontFamily: 'Nunito_400Regular' }}
-                        className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]"
-                        testID="first-name-input"
-                        value={firstName}
-                        onChangeText={setFirstName}
-                      />
-                    </View>
-                    <View className="w-[48%]">
-                      <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">Last Name</Text>
-                      <TextInput
-                        style={{ fontFamily: 'Nunito_400Regular' }}
-                        className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]"
-                        testID="last-name-input"
-                        value={lastName}
-                        onChangeText={setLastName}
-                      />
-                    </View>
-                  </View>
-
-                  <View className="w-full mb-[15px]">
-                    <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">Email</Text>
-                    <TextInput
+                    <Text
                       style={{ fontFamily: 'Nunito_400Regular' }}
-                      className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]"
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                      autoComplete="email"
-                      textContentType="emailAddress"
-                      testID="email-input"
-                      value={email}
-                      onChangeText={setEmail}
-                    />
-                  </View>
+                      className="text-[16px] text-[#3E545C] mt-[8px] mb-[20px]"
+                      accessibilityLabel="Join Nidush and let your home be your safe space"
+                      maxFontSizeMultiplier={1.2}
+                    >
+                      Join Nidush and let your home be your safe space.
+                    </Text>
 
-                  <View className="w-full mb-[15px]">
-                    <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">Password</Text>
-                    <View className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] bg-[#FBFDFB] flex-row items-center">
-                      <TextInput
-                        style={{ fontFamily: 'Nunito_400Regular', color: '#1F2D2F' }}
-                        className="flex-1 h-full px-[15px] pr-2"
-                        secureTextEntry={!showPassword}
-                        testID="password-input"
-                        value={password}
-                        onChangeText={setPassword}
-                        autoCapitalize="none"
-                        autoComplete="new-password"
-                        textContentType="newPassword"
-                        autoCorrect={false}
-                        selectionColor="#5C8D58"
-                        placeholderTextColor="#7B8A7B"
-                      />
-                      <TouchableOpacity
-                        onPress={() => setShowPassword((current) => !current)}
-                        className="h-full w-12 items-center justify-center"
-                        testID="toggle-password-visibility"
-                        accessible
-                        accessibilityRole="button"
-                        accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
-                        accessibilityHint="Toggles password visibility"
-                      >
-                        <MaterialIcons
-                          name={showPassword ? 'visibility-off' : 'visibility'}
-                          size={22}
-                          color="#5C8D58"
-                        />
-                      </TouchableOpacity>
-                    </View>
-                    {password ? (
-                      <View className="flex-row items-center mt-2">
-                        <MaterialIcons
-                          name={nextPasswordRequirement ? 'info-outline' : 'check-circle'}
-                          size={15}
-                          color={nextPasswordRequirement ? '#8A9A8A' : '#5C8D58'}
-                        />
-                        <Text
+                    <View className="flex-row justify-between mb-[15px]">
+                      <View className="w-[48%]">
+                        <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">First Name</Text>
+                        <TextInput
                           style={{ fontFamily: 'Nunito_400Regular' }}
-                          className={`ml-2 text-[12px] ${nextPasswordRequirement ? 'text-[#6A7D6A]' : 'text-[#5C8D58]'}`}
+                          className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]"
+                          testID="first-name-input"
+                          value={firstName}
+                          onChangeText={setFirstName}
+                        />
+                      </View>
+                      <View className="w-[48%]">
+                        <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">Last Name</Text>
+                        <TextInput
+                          style={{ fontFamily: 'Nunito_400Regular' }}
+                          className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]"
+                          testID="last-name-input"
+                          value={lastName}
+                          onChangeText={setLastName}
+                        />
+                      </View>
+                    </View>
+
+                    <View className="w-full mb-[15px]">
+                      <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">Email</Text>
+                      <TextInput
+                        style={{ fontFamily: 'Nunito_400Regular' }}
+                        className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] px-[15px] bg-[#FBFDFB]"
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        autoComplete="email"
+                        textContentType="emailAddress"
+                        testID="email-input"
+                        value={email}
+                        onChangeText={setEmail}
+                      />
+                    </View>
+
+                    <View className="w-full mb-[15px]">
+                      <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-[14px] text-[#3E545C] mb-[6px]">Password</Text>
+                      <View className="h-[44px] border-[1.2px] border-[#C8D2C8] rounded-[15px] bg-[#FBFDFB] flex-row items-center">
+                        <TextInput
+                          style={{ fontFamily: 'Nunito_400Regular', color: '#1F2D2F' }}
+                          className="flex-1 h-full px-[15px] pr-2"
+                          secureTextEntry={!showPassword}
+                          testID="password-input"
+                          value={password}
+                          onChangeText={setPassword}
+                          autoCapitalize="none"
+                          autoComplete="new-password"
+                          textContentType="newPassword"
+                          autoCorrect={false}
+                          selectionColor="#5C8D58"
+                          placeholderTextColor="#7B8A7B"
+                        />
+                        <TouchableOpacity
+                          onPress={() => setShowPassword((current) => !current)}
+                          className="h-full w-12 items-center justify-center"
+                          testID="toggle-password-visibility"
+                          accessible
+                          accessibilityRole="button"
+                          accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                          accessibilityHint="Toggles password visibility"
                         >
-                          {nextPasswordRequirement
-                            ? `Missing: ${nextPasswordRequirement.toLowerCase()}`
-                            : 'Strong password'}
+                          <MaterialIcons
+                            name={showPassword ? 'visibility-off' : 'visibility'}
+                            size={22}
+                            color="#5C8D58"
+                          />
+                        </TouchableOpacity>
+                      </View>
+                      {password ? (
+                        <View className="flex-row items-center mt-2">
+                          <MaterialIcons
+                            name={nextPasswordRequirement ? 'info-outline' : 'check-circle'}
+                            size={15}
+                            color={nextPasswordRequirement ? '#8A9A8A' : '#5C8D58'}
+                          />
+                          <Text
+                            style={{ fontFamily: 'Nunito_400Regular' }}
+                            className={`ml-2 text-[12px] ${nextPasswordRequirement ? 'text-[#6A7D6A]' : 'text-[#5C8D58]'}`}
+                          >
+                            {nextPasswordRequirement
+                              ? `Missing: ${nextPasswordRequirement.toLowerCase()}`
+                              : 'Strong password'}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+
+                    {errorMsg ? (
+                      <View className="bg-red-50 border border-red-200 p-3 rounded-xl mb-4">
+                        <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-red-600 text-[14px] text-center">
+                          {errorMsg}
                         </Text>
                       </View>
                     ) : null}
-                  </View>
 
-                   {errorMsg ? (
-                    <View className="bg-red-50 border border-red-200 p-3 rounded-xl mb-4">
-                      <Text style={{ fontFamily: 'Nunito_600SemiBold' }} className="text-red-600 text-[14px] text-center">
-                        {errorMsg}
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      className="bg-[#5C8D58] w-[230px] h-[54px] rounded-full justify-center items-center self-center mt-[15px] shadow-sm"
+                      onPress={handleSignUp}
+                      disabled={loading}
+                      style={{ opacity: loading ? 0.7 : 1 }}
+                    >
+                      <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-white text-[20px]">
+                        {loading ? 'Joining...' : 'Join Nidush'}
                       </Text>
-                    </View>
-                  ) : null}
+                    </TouchableOpacity>
+                  </>
 
-
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    className="bg-[#5C8D58] w-[230px] h-[54px] rounded-full justify-center items-center self-center mt-[15px] shadow-sm"
-                    onPress={handleSignUp}
-                    disabled={loading}
-                    style={{ opacity: loading ? 0.7 : 1 }}
-                  >
-                    <Text style={{ fontFamily: 'Nunito_700Bold' }} className="text-white text-[20px]">
-                      {loading ? 'Joining...' : 'Join Nidush'}
-                    </Text>
-                  </TouchableOpacity>
-
-
-
-                  {/* Footer Login */}
                   <View className="flex-row justify-center mt-[20px] mb-20">
                     <Text style={{ fontFamily: 'Nunito_400Regular' }} className="text-[#3E545C] text-[15px]">Already have an account? </Text>
                     <TouchableOpacity onPress={() => router.push('/login')}>

@@ -10,7 +10,12 @@ import {
 import { apiLog, supabase, uploadImage } from '../utils/supabase';
 
 import { useNotifications } from '@/context/NotificationsContext';
-import { fetchScenarioTemplates } from '@/utils/catalogTemplates';
+import {
+  fetchScenarioTemplates,
+  fetchUserScenarios,
+  parseUserScenarioDbId,
+  resolvePossibleUserScenarioDbIds,
+} from '@/utils/catalogTemplates';
 import { captureException, trackEvent } from '@/utils/observability';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -65,7 +70,19 @@ const dbTypeToActivityType = (
 const scenarioIdToTemplateId = (value: unknown) => {
   if (value === null || value === undefined || value === '') return '';
   const raw = String(value);
+  if (raw.startsWith('scenario:')) return raw;
   return raw.startsWith('s') ? raw : `s${raw}`;
+};
+
+type ActivityDraftPayload = {
+  step: number;
+  activityType: Activity['type'];
+  selectedContentId: string;
+  room_id: string;
+  selectedScenarioId: string;
+  activityName: string;
+  description: string;
+  activityImageUri: string | null;
 };
 
 type ContentRow = {
@@ -103,6 +120,15 @@ const getImageUri = (value: ImageSourcePropType | string | null) =>
       ? value.uri
       : undefined;
 
+const resolveScenarioDbId = (value: string) => {
+  if (typeof parseUserScenarioDbId === 'function') {
+    return parseUserScenarioDbId(value);
+  }
+
+  const raw = String(value ?? '');
+  return raw.startsWith('scenario:') ? raw.replace(/^scenario:/, '') : raw;
+};
+
 export default function NewActivityFlow() {
   let [fontsLoaded] = useFonts({
     Nunito_700Bold,
@@ -112,13 +138,19 @@ export default function NewActivityFlow() {
 
   const { editId } = useLocalSearchParams<{ editId?: string }>();
   const isEditMode = Boolean(editId);
+  const draftKey = useMemo(
+    () => `@new_activity_draft:${editId ?? 'create'}`,
+    [editId],
+  );
   const [step, setStep] = useState(1);
   const { addNotification } = useNotifications();
   const totalSteps = 6;
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const [didRestoreDraft, setDidRestoreDraft] = useState(false);
 
   const insets = useSafeAreaInsets();
   const scrollViewRef = useRef<ScrollView>(null);
+  const hasHydratedDraftRef = useRef(false);
 
   const [activityType, setActivityType] = useState<Activity['type']>('other');
   const [selectedContentId, setSelectedContentId] = useState('');
@@ -131,6 +163,9 @@ export default function NewActivityFlow() {
   >(null);
   const [dbContent, setDbContent] = useState<Content[]>([]);
   const [scenarioTemplates, setScenarioTemplates] = useState<Scenario[]>([]);
+  const [homeRooms, setHomeRooms] = useState<HomeRoomRow[]>([]);
+  const [roomDeviceTypes, setRoomDeviceTypes] = useState<string[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const linkRoomTvDevices = async (
@@ -141,15 +176,14 @@ export default function NewActivityFlow() {
     if (!roomId) return;
 
     try {
-      const { data: tvDevices, error: devicesError } = await supabase
+      const { data: roomDevices, error: devicesError } = await supabase
         .from('devices')
         .select('id')
         .eq('home_id', homeId)
-        .eq('room_id', roomId)
-        .in('type', ['tv', 'display']);
+        .eq('room_id', roomId);
 
       if (devicesError) throw devicesError;
-      if (!tvDevices?.length) return;
+      if (!roomDevices?.length) return;
 
       const { data: existingLinks, error: existingError } = await supabase
         .from('activity_devices')
@@ -176,9 +210,37 @@ export default function NewActivityFlow() {
 
       if (insertError) throw insertError;
     } catch (error) {
-      console.warn('Could not auto-link room TV devices to activity:', error);
+      console.warn('Could not auto-link room devices to activity:', error);
     }
   };
+
+  useEffect(() => {
+    const loadDraft = async () => {
+      try {
+        const raw = await AsyncStorage.getItem(draftKey);
+        if (!raw) return;
+
+        const draft = JSON.parse(raw) as ActivityDraftPayload;
+        setStep(typeof draft.step === 'number' ? draft.step : 1);
+        setActivityType(draft.activityType ?? 'other');
+        setSelectedContentId(draft.selectedContentId ?? '');
+        setRoomId(draft.room_id ?? '');
+        setSelectedScenarioId(draft.selectedScenarioId ?? '');
+        setActivityName(draft.activityName ?? '');
+        setDescription(draft.description ?? '');
+        if (draft.activityImageUri) {
+          setActivityImage(draft.activityImageUri);
+        }
+        setDidRestoreDraft(true);
+      } catch (error) {
+        console.error('Failed to restore activity draft:', error);
+      } finally {
+        hasHydratedDraftRef.current = true;
+      }
+    };
+
+    void loadDraft();
+  }, [draftKey]);
 
   useEffect(() => {
     if (!editId) return;
@@ -243,9 +305,79 @@ export default function NewActivityFlow() {
   }, []);
 
   useEffect(() => {
+    const fetchHomeSetup = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setLoadError('You need to be logged in to create an activity.');
+          return;
+        }
+
+        const { data: userHome, error: userHomeError } = await supabase
+          .from('user_homes')
+          .select('home_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (userHomeError) throw userHomeError;
+
+        if (!userHome?.home_id) {
+          setLoadError('Connect this profile to a home before creating activities.');
+          return;
+        }
+
+        const { data: roomRows, error: roomsError } = await supabase
+          .from('rooms')
+          .select('id, name')
+          .eq('home_id', userHome.home_id)
+          .order('id', { ascending: true });
+
+        if (roomsError) throw roomsError;
+
+        const safeRooms = roomRows ?? [];
+        setHomeRooms(safeRooms);
+        if (safeRooms.length === 0) {
+          setLoadError('Create at least one room before creating an activity.');
+          return;
+        }
+
+        const { count: assignedDevicesCount, error: devicesError } = await supabase
+          .from('devices')
+          .select('id', { count: 'exact', head: true })
+          .eq('home_id', userHome.home_id)
+          .not('room_id', 'is', null);
+
+        if (devicesError) throw devicesError;
+        if (!assignedDevicesCount) {
+          setLoadError('Assign at least one device to a room before creating an activity.');
+          return;
+        }
+
+        setLoadError(null);
+      } catch (error) {
+        console.error('Failed to load home setup for activity creation:', error);
+        setLoadError('We could not load your home setup right now.');
+      }
+    };
+
+    fetchHomeSetup();
+  }, []);
+
+  useEffect(() => {
     const fetchScenarios = async () => {
       try {
-        setScenarioTemplates(await fetchScenarioTemplates());
+        const [templateScenarios, userScenarios] = await Promise.all([
+          fetchScenarioTemplates(),
+          fetchUserScenarios().catch(() => []),
+        ]);
+
+        const mergedScenarios = [...userScenarios, ...templateScenarios];
+        const uniqueScenarios = mergedScenarios.filter(
+          (scenario, index, list) =>
+            list.findIndex((item) => item.id === scenario.id) === index,
+        );
+
+        setScenarioTemplates(uniqueScenarios);
       } catch (error) {
         console.error('Failed to load scenario templates:', error);
         setScenarioTemplates([]);
@@ -273,6 +405,54 @@ export default function NewActivityFlow() {
     }
   }, [isEditMode, room_id, selectedScenarioId, scenarioTemplates]);
 
+  useEffect(() => {
+    if (!homeRooms.length) return;
+
+    const rawRoomValue = String(room_id ?? '');
+    if (!/^\d+$/.test(rawRoomValue)) return;
+
+    const matchedRoom = homeRooms.find((room) => String(room.id) === rawRoomValue);
+    if (matchedRoom) {
+      setRoomId(matchedRoom.name);
+    }
+  }, [homeRooms, room_id]);
+
+  useEffect(() => {
+    const fetchRoomDevices = async () => {
+      if (!room_id || homeRooms.length === 0) {
+        setRoomDeviceTypes([]);
+        return;
+      }
+      
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        
+        const { data: homeAssoc } = await supabase.from('user_homes').select('home_id').eq('user_id', user.id).maybeSingle();
+        if (!homeAssoc?.home_id) return;
+
+        const matchedRoom = homeRooms.find((r) => r.name === room_id || String(r.id) === room_id);
+        if (!matchedRoom) return;
+
+        const { data: devices } = await supabase
+          .from('devices')
+          .select('type')
+          .eq('home_id', homeAssoc.home_id)
+          .eq('room_id', matchedRoom.id);
+
+        if (devices) {
+          const types = Array.from(new Set(devices.map(d => String(d.type).toLowerCase())));
+          setRoomDeviceTypes(types);
+        } else {
+          setRoomDeviceTypes([]);
+        }
+      } catch (e) {
+        console.error('Error fetching room devices:', e);
+      }
+    };
+    fetchRoomDevices();
+  }, [room_id, homeRooms]);
+
   const allContent = useMemo(() => {
     const combined = [...dbContent];
     Object.values(CONTENTS).forEach((local: Content) => {
@@ -286,6 +466,45 @@ export default function NewActivityFlow() {
   useEffect(() => {
     AccessibilityInfo.announceForAccessibility(`Step ${step} of ${totalSteps}`);
   }, [step]);
+
+  useEffect(() => {
+    if (!hasHydratedDraftRef.current) return;
+
+    const shouldPersist =
+      step > 1 ||
+      !!selectedContentId ||
+      !!room_id ||
+      !!selectedScenarioId ||
+      !!activityName.trim() ||
+      !!description.trim() ||
+      !!activityImage;
+
+    const persistDraft = async () => {
+      try {
+        if (!shouldPersist) {
+          await AsyncStorage.removeItem(draftKey);
+          return;
+        }
+
+        await saveActivityDraft();
+      } catch (error) {
+        console.error('Failed to persist activity draft:', error);
+      }
+    };
+
+    void persistDraft();
+  }, [
+    activityImage,
+    activityName,
+    activityType,
+    description,
+    draftKey,
+    room_id,
+    saveActivityDraft,
+    selectedContentId,
+    selectedScenarioId,
+    step,
+  ]);
 
   useEffect(() => {
     const keyboardShowListener = Keyboard.addListener(
@@ -323,10 +542,18 @@ export default function NewActivityFlow() {
   const nextStep = () => {
     if (step < totalSteps) setStep(step + 1);
   };
-  const prevStep = () => {
+  const prevStep = async () => {
     if (step > 1) setStep(step - 1);
-    else router.back();
+    else {
+      await discardActivityDraft();
+      router.back();
+    }
   };
+
+  const handleCancel = useCallback(async () => {
+    await discardActivityDraft();
+    router.back();
+  }, [discardActivityDraft]);
 
   const isNextDisabled = () => {
     if (step === 1 && !activityType) return true;
@@ -349,7 +576,7 @@ export default function NewActivityFlow() {
   };
 
   const handleSave = async () => {
-    if (isSaving) return;
+    if (isSaving || loadError) return;
 
     const contentObj = allContent.find((c) => c.id === selectedContentId);
 
@@ -478,6 +705,8 @@ export default function NewActivityFlow() {
         await linkRoomTvDevices(Number(data.id), currentHomeId, dbRoomId);
       }
 
+      await AsyncStorage.removeItem(draftKey);
+
       // 3. Trigger Notification
       addNotification(
         isEditMode ? 'Activity Updated' : 'New Activity Created',
@@ -544,6 +773,7 @@ export default function NewActivityFlow() {
             step={step}
             totalSteps={totalSteps}
             onBack={prevStep}
+            onCancel={handleCancel}
           />
         </View>
         <KeyboardAvoidingView
@@ -625,12 +855,12 @@ export default function NewActivityFlow() {
                 <TouchableOpacity
                   // Se estiver desativado, fica cinzento/translúcido e sem sombra
                   className={`h-14 w-[210px] rounded-full justify-center items-center transition-all ${
-                    isNextDisabled()
+                    isNextDisabled() || Boolean(loadError)
                       ? 'bg-gray-400 opacity-60 shadow-none'
                       : 'bg-[#548F53] shadow-lg'
                   }`}
                   onPress={step === 6 ? handleSave : nextStep}
-                  disabled={isNextDisabled() || isSaving} // Impede o clique físico
+                  disabled={isNextDisabled() || isSaving || Boolean(loadError)} // Impede o clique físico
                   accessible={true}
                   accessibilityRole="button"
                   // Informa o leitor de ecrã (VoiceOver/TalkBack) que o botão está inativo

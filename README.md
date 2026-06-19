@@ -42,7 +42,7 @@ The app is focused on people dealing with stress or anxiety in urban contexts. I
 Recent development work includes:
 
 - **Supabase integration:** Auth, database migrations, RLS policies, Storage support, Edge Functions and production-ready data flows.
-- **Weekly API automation:** A scheduled Supabase cron job refreshes external content from TheMealDB and API Ninjas without creating duplicated records.
+- **Weekly API automation:** A scheduled Supabase cron job refreshes external content from TheMealDB and WorkoutX, caching workout GIFs in Supabase Storage to avoid repeated client/API requests.
 - **Activities catalog split:** App-provided activities now live in `activity_templates`, while user-created activities remain in `activities`.
 - **Recommendations fixes:** Recommended activities now correctly include app-provided catalog items in **Activities** and **Activities for you**.
 - **Profile and avatars:** Profile data, account summary, avatar storage and resident/home associations were improved.
@@ -100,7 +100,7 @@ The weekly API sync was deployed and manually tested successfully:
 ### APIs & Integrations
 
 - **TheMealDB API:** Imports recipe content.
-- **API Ninjas Exercises API:** Imports workout/exercise content.
+- **WorkoutX API:** Imports workout/exercise content and weekly cached GIFs.
 - **Spotify API:** Authentication, playlists and music-related session support.
 - **Resend API:** Welcome email Edge Function.
 - **Google Gemini API:** Personalized activity idea generation in the `generate-activity-ideas` Edge Function.
@@ -178,7 +178,8 @@ EXPO_PUBLIC_SUPABASE_URL=
 EXPO_PUBLIC_SUPABASE_ANON_KEY=
 EXPO_PUBLIC_SPOTIFY_CLIENT_ID=
 EXPO_PUBLIC_SPOTIFY_SCHEME=
-API_NINJAS_KEY=
+EXPO_PUBLIC_ENABLE_AI_AUTO_CALLS=true
+WORKOUTX_API_KEY=
 PORT=3000
 ```
 
@@ -187,6 +188,7 @@ Important:
 - Do not commit `.env`.
 - Public Expo variables must start with `EXPO_PUBLIC_`.
 - Secret API keys used by Edge Functions must also be stored in Supabase secrets.
+- `EXPO_PUBLIC_ENABLE_AI_AUTO_CALLS=false` disables the automatic AI recommendation calls on screen load/focus. In development it defaults to `true`; in production builds it now defaults to `false` unless you explicitly enable it.
 
 ### 4. Start The App
 
@@ -284,10 +286,28 @@ supabase functions deploy weekly-api-content-sync
 Set required secrets:
 
 ```bash
-supabase secrets set API_NINJAS_KEY="your-api-ninjas-key"
+supabase secrets set WORKOUTX_API_KEY="your-workoutx-api-key"
 supabase secrets set GEMINI_API_KEY="your-gemini-api-key"
+supabase secrets set ENABLE_GEMINI_API="true"
+supabase secrets set ENABLE_AI_RATE_LIMIT="true"
+supabase secrets set AI_IDEAS_MAX_REQUESTS_PER_HOUR="10"
+supabase secrets set AI_IDEAS_MIN_SECONDS_BETWEEN_REQUESTS="30"
 supabase secrets set RESEND_API_KEY="your-resend-key"
 ```
+
+If you want production to avoid calling Gemini altogether while keeping the local fallback ideas, set:
+
+```bash
+supabase secrets set ENABLE_GEMINI_API="false"
+```
+
+The AI idea generator now also supports server-side rate limiting:
+
+- `ENABLE_AI_RATE_LIMIT=true`: turns the limiter on.
+- `AI_IDEAS_MAX_REQUESTS_PER_HOUR=10`: maximum generations per user in a rolling 1-hour window.
+- `AI_IDEAS_MIN_SECONDS_BETWEEN_REQUESTS=30`: cooldown between consecutive generations from the same user.
+
+When the limit is exceeded, the function returns HTTP `429` and tells the app how long to wait.
 
 Optional cron protection:
 
@@ -317,13 +337,31 @@ The project includes a scheduled content refresh:
 The function fetches:
 
 - Recipes from **TheMealDB**
-- Exercises from **API Ninjas**
+- 10 exercises from **WorkoutX**
+- 10 **English audiobooks** from **LibriVox**
+- Workout GIFs are uploaded once per exercise to the public Supabase Storage bucket `api-content-media`
+
+LibriVox notes:
+
+- The API does not support a direct `language` query parameter on the `audiobooks` endpoint, so the function fetches extended audiobook records and filters them locally to `English`
+- Audiobooks are stored in `public.contents` with `type = 'audiobooks'` and `category = 'audio'`
+- The weekly sync prefers audiobooks that are not already in the database, so each week tends to bring different titles until the available pool is exhausted
+- Audiobook metadata comes from `https://librivox.org/api/feed/audiobooks`
+- Audiotracks are fetched separately from `https://librivox.org/api/feed/audiotracks`
+- We store title, cleaned description, year, language, total duration, track list, cover art, and author
 
 It avoids duplicates by:
 
-- Using stable API-based IDs, such as `api_mealdb_<mealId>` and `api_ninjas_exercise_<slug>`
+- Using stable API-based IDs, such as `api_mealdb_<mealId>` and `workoutx_exercise_<id>`
 - Checking existing records by `title + author`
+- Reusing previously uploaded Supabase Storage GIF URLs when the exercise already exists
 - Using Supabase `upsert` on `contents.id`
+
+Optional content-volume overrides:
+
+- `API_CONTENT_SYNC_MEALS`
+- `API_CONTENT_SYNC_EXERCISES`
+- `API_CONTENT_SYNC_AUDIOBOOKS`
 
 Manual test:
 

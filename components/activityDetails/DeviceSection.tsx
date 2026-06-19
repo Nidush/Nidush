@@ -1,5 +1,6 @@
 import { ScenarioDeviceState } from '@/constants/data';
 import { DeviceType, SMART_HOME_DEVICES } from '@/constants/devices';
+import { getScenarioDeviceMeta } from '@/utils/activityDeviceConfigs';
 import {
   Feather,
   MaterialCommunityIcons,
@@ -54,20 +55,36 @@ export const DeviceSection = ({ devices }: DeviceSectionProps) => {
       </Text>
       <View className="flex-row flex-wrap gap-3">
         {devices.map((config, i) => {
-          const realDevice = SMART_HOME_DEVICES[config.deviceId];
+          const fallbackMeta = getScenarioDeviceMeta(config);
+          const realDevice = SMART_HOME_DEVICES[config.deviceId] ?? (
+            fallbackMeta.type
+              ? {
+                  id: config.deviceId,
+                  name: fallbackMeta.name,
+                  type: fallbackMeta.type,
+                  room: '',
+                }
+              : null
+          );
           if (!realDevice) return null;
 
           const isLight = realDevice.type === 'light';
           const isColorValue =
-            typeof config.value === 'string' &&
-            config.value.trim().startsWith('#');
+            (typeof config.color === 'string' && config.color.trim().startsWith('#')) ||
+            (typeof config.value === 'string' && config.value.trim().startsWith('#'));
+          const lightColor =
+            typeof config.color === 'string' && config.color.trim().startsWith('#')
+              ? config.color
+              : typeof config.value === 'string' && config.value.trim().startsWith('#')
+                ? config.value
+                : null;
           const hasDetails = !!config.value;
 
           // Cria label de acessibilidade detalhada
           const accessibilityText = `${realDevice.name}${
             hasDetails
               ? isLight && isColorValue
-                ? `, color ${config.value}, brightness ${config.brightness || '100%'}`
+                ? `, color ${lightColor}, brightness ${config.brightness || '100%'}`
                 : `, value ${config.value}${realDevice.type === 'thermostat' ? ' degrees Celsius' : ''}`
               : ''
           }`;
@@ -106,7 +123,7 @@ export const DeviceSection = ({ devices }: DeviceSectionProps) => {
                             width: 14,
                             height: 14,
                             borderRadius: 7,
-                            backgroundColor: config.value as string,
+                            backgroundColor: lightColor as string,
                             borderWidth: 1,
                             borderColor: '#E5E5E5',
                             marginRight: 6,

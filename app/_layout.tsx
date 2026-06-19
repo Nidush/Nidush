@@ -5,20 +5,22 @@ import { ConsentModal } from '@/components/legal/ConsentModal';
 import { LEGAL_CONSENT_KEY } from '@/components/legal/LegalContent';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAudioPlayer } from 'expo-audio';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, usePathname, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, StyleSheet, View, Platform } from 'react-native';
-import { supabase } from '../utils/supabase';
+import { Animated, AppState, Easing, StyleSheet, View, Platform } from 'react-native';
+import { getSessionUser, supabase, touchUserAppPresence } from '../utils/supabase';
 import { registerHealthConnectBackgroundSync } from '../utils/healthConnectBackgroundTask';
 import * as WebBrowser from 'expo-web-browser';
 import { logger } from '../utils/logger';
 import {
   installGlobalErrorHandlers,
   setObservabilityContext,
+  setObservabilityConsent,
   setObservabilityUser,
   trackEvent,
 } from '../utils/observability';
+import { hasHealthConnectEnabled, recordLegalPolicyConsents } from '../utils/legal';
 import './../global.css';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -28,6 +30,7 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
 
   const player = useAudioPlayer(require('../assets/audio/intro.mp3'));
 
@@ -48,18 +51,50 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const pingPresence = async (force = false) => {
+      try {
+        await touchUserAppPresence(force);
+      } catch (error) {
+        logger.warn('Could not refresh app presence heartbeat.', error);
+      }
+    };
+
+    void pingPresence(true);
+
+    intervalId = setInterval(() => {
+      void pingPresence(false);
+    }, 5 * 60 * 1000);
+
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        void pingPresence(true);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isReady) return;
 
     const checkOnboarding = async () => {
-      // 0. Inicializar Health Connect IMEDIATAMENTE (Nativo)
+      // 0. Inicializar Health Connect apenas quando a integracao ja tiver sido ativada pelo utilizador
       if (Platform.OS === 'android') {
         try {
-          const { initialize, getSdkStatus, SdkAvailabilityStatus } = await import('react-native-health-connect');
-          const status = await getSdkStatus();
-          if (status === SdkAvailabilityStatus.SDK_AVAILABLE) {
-            await initialize();
-            await registerHealthConnectBackgroundSync();
-            logger.debug('Health Connect pre-initialized.');
+          const isHealthConnectEnabled = await hasHealthConnectEnabled();
+          if (isHealthConnectEnabled) {
+            const { initialize, getSdkStatus, SdkAvailabilityStatus } = await import('react-native-health-connect');
+            const status = await getSdkStatus();
+            if (status === SdkAvailabilityStatus.SDK_AVAILABLE) {
+              await initialize();
+              await registerHealthConnectBackgroundSync();
+              logger.debug('Health Connect initialized after explicit user activation.');
+            }
           }
         } catch (error) {
           logger.warn('Health Connect pre-init failed.', error);
@@ -70,8 +105,9 @@ export default function RootLayout() {
         const viewed = await AsyncStorage.getItem('@viewedOnboarding');
         const legalConsent = await AsyncStorage.getItem(LEGAL_CONSENT_KEY);
         setIsConsentVisible(legalConsent !== 'accepted');
+        setObservabilityConsent(legalConsent === 'accepted');
 
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = await getSessionUser();
         setObservabilityUser(user?.id);
         
         if (user) {
@@ -139,6 +175,15 @@ export default function RootLayout() {
 
   const handleAcceptLegalConsent = async () => {
     await AsyncStorage.setItem(LEGAL_CONSENT_KEY, 'accepted');
+    setObservabilityConsent(true);
+    try {
+      const user = await getSessionUser();
+      if (user) {
+        await recordLegalPolicyConsents('legal_modal');
+      }
+    } catch (error) {
+      logger.warn('Could not sync legal consent to backend.', error);
+    }
     setIsConsentVisible(false);
   };
 
@@ -182,6 +227,10 @@ export default function RootLayout() {
   }, [isRoutingReady, isImageLoaded, opacityAnim, player, scaleAnim]);
 
   const splashBackgroundColor = '#F0F2EB';
+  const shouldUseInlineLegalFlow =
+    pathname === '/pre-signup-consent' ||
+    pathname === '/signup' ||
+    pathname === '/setup-profile';
 
   return (
     <NotificationsProvider>
@@ -194,7 +243,7 @@ export default function RootLayout() {
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="profile-selection" />
               <Stack.Screen name="activity-details" />
-              <Stack.Screen name="notifications" options={{ presentation: 'modal' }} />
+              <Stack.Screen name="notifications" options={{ presentation: 'fullScreenModal' }} />
             </Stack>
 
             {!isAnimationComplete && (
@@ -228,7 +277,7 @@ export default function RootLayout() {
             )}
 
             <ConsentModal
-              visible={isAnimationComplete && isConsentVisible}
+              visible={isAnimationComplete && isConsentVisible && !shouldUseInlineLegalFlow}
               onAccept={handleAcceptLegalConsent}
             />
           </View>

@@ -10,6 +10,7 @@ jobs:
   build-test:
     name: Build & Test
     runs-on: ubuntu-latest
+    
     env:
       EXPO_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
       EXPO_PUBLIC_SUPABASE_ANON_KEY: placeholder-key

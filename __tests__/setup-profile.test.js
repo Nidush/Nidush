@@ -35,8 +35,24 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock('../components/Onboarding/WelcomeUser', () => (props) => {
-  const { Text } = require('react-native');
-  return <Text>{`welcome-step:${props.userName}`}</Text>;
+  const { Text, TouchableOpacity } = require('react-native');
+  return (
+    <TouchableOpacity testID="welcome-step-button" onPress={props.onFinish}>
+      <Text>{`welcome-step:${props.userName}`}</Text>
+    </TouchableOpacity>
+  );
+});
+
+jest.mock('../components/Onboarding/ProfileAvatarStep', () => (props) => {
+  const { Text, TouchableOpacity, View } = require('react-native');
+  return (
+    <View>
+      <Text>{`avatar-step:${props.userName}|${props.avatarValue}`}</Text>
+      <TouchableOpacity testID="avatar-continue-button" onPress={props.onNext}>
+        <Text>avatar-continue</Text>
+      </TouchableOpacity>
+    </View>
+  );
 });
 
 jest.mock('../components/Onboarding/HouseName', () => (props) => {
@@ -64,6 +80,29 @@ jest.mock('../components/Onboarding/WearableSync', () => (props) => {
     <TouchableOpacity testID="wearable-step-button" onPress={props.onNext}>
       <Text>wearable-step</Text>
     </TouchableOpacity>
+  );
+});
+
+jest.mock('../components/Onboarding/ConsentStep', () => (props) => {
+  const { Text, TouchableOpacity, View } = require('react-native');
+  return (
+    <View>
+      <Text>{`consent-step:${props.badgeText}`}</Text>
+      <TouchableOpacity
+        testID={`consent-primary-${props.badgeText}`}
+        onPress={props.onPrimary}
+      >
+        <Text>{props.primaryLabel}</Text>
+      </TouchableOpacity>
+      {props.onSecondary ? (
+        <TouchableOpacity
+          testID={`consent-secondary-${props.badgeText}`}
+          onPress={props.onSecondary}
+        >
+          <Text>{props.secondaryLabel}</Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
   );
 });
 
@@ -172,7 +211,7 @@ describe('SetupProfile Screen', () => {
     mockUsersUpsert.mockResolvedValue({ error: null });
     mockUserHomesUpsert.mockResolvedValue({ error: null });
     animatedTimingSpy = jest.spyOn(Animated, 'timing').mockImplementation(() => ({
-      start: (callback) => callback?.(),
+      start: (callback) => callback?.({ finished: true }),
     }));
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation((...args) => {
       if (
@@ -230,6 +269,64 @@ describe('SetupProfile Screen', () => {
     const { findByText } = renderScreen();
 
     expect(await findByText('house-step:Casa Serena|ABC123|join')).toBeTruthy();
+  });
+
+  it('restores the health consent step from saved onboarding progress', async () => {
+    await AsyncStorage.setItem(
+      '@onboarding_progress',
+      JSON.stringify({
+        step: 'health-consent',
+        data: { homeMode: 'create' },
+      }),
+    );
+    const { findByText } = renderScreen();
+    expect(await findByText('consent-step:Health consent')).toBeTruthy();
+  });
+
+  it('restores the spotify consent step from saved onboarding progress', async () => {
+    await AsyncStorage.setItem(
+      '@onboarding_progress',
+      JSON.stringify({
+        step: 'spotify-consent',
+        data: { homeMode: 'create' },
+      }),
+    );
+    const { findByText } = renderScreen();
+    expect(await findByText('consent-step:Spotify consent')).toBeTruthy();
+  });
+
+  it('restores the app consent step from saved onboarding progress', async () => {
+    await AsyncStorage.setItem(
+      '@onboarding_progress',
+      JSON.stringify({
+        step: 'app-consent',
+        data: { homeMode: 'create', selectedActivities: ['meditation'] },
+      }),
+    );
+    const { findByText } = renderScreen();
+    expect(await findByText('consent-step:Privacy and app consent')).toBeTruthy();
+  });
+
+  it('shows health consent before wearable sync in the main flow', async () => {
+    const { getByTestId, findByText } = renderScreen();
+
+    fireEvent.press(await findByText('welcome-step:Laura'));
+    fireEvent.press(getByTestId('avatar-continue-button'));
+    fireEvent.press(getByTestId('house-continue-button'));
+
+    expect(await findByText('consent-step:Health consent')).toBeTruthy();
+  });
+
+  it('shows spotify consent before spotify connect in the main flow', async () => {
+    const { getByTestId, findByText, findByTestId } = renderScreen();
+
+    fireEvent.press(await findByText('welcome-step:Laura'));
+    fireEvent.press(getByTestId('avatar-continue-button'));
+    fireEvent.press(getByTestId('house-continue-button'));
+    fireEvent.press(getByTestId('consent-primary-Health consent'));
+    fireEvent.press(await findByTestId('wearable-step-button'));
+
+    expect(await findByText('consent-step:Spotify consent')).toBeTruthy();
   });
 
 });

@@ -1,12 +1,15 @@
 import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Image, Modal, ScrollView, Switch, Text, TouchableOpacity, View, AppState } from 'react-native';
+import { AppState, Image, Modal, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { pickImage } from '../utils/imagePicker';
-import { supabase, uploadImage } from '../utils/supabase';
+import { getSessionUser, supabase, uploadImage } from '../utils/supabase';
+import { getAvatarSource } from '../utils/avatarSource';
 import {
   DeviceRecord,
+  getDeviceSourceLabel,
   isRealHomeDevice,
   SmartDeviceStatus,
   sortDevicesByFreshness,
@@ -27,7 +30,17 @@ import { LegalContent } from '../components/legal/LegalContent';
 import {
   hasHeartRateReadPermission,
 } from '../utils/healthConnectSync';
+import { LEGAL_POLICY_VERSION, setHealthConnectEnabled } from '../utils/legal';
 import { captureException, trackEvent } from '../utils/observability';
+import {
+  GoogleHomeDiagnostics,
+  GoogleHomeSyncedDevice,
+  requestGoogleHomeAccess,
+  setGoogleHomeDevicePower,
+  syncGoogleHomeSnapshot,
+} from '../utils/googleHome';
+
+const SPOTIFY_RETURN_ROUTE_KEY = '@spotify_return_route';
 
 export default function Profile() {
   const router = useRouter();
@@ -44,6 +57,7 @@ export default function Profile() {
   } = useNotifications();
   const [userName, setUserName] = useState('A carregar...');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isProfileHeaderLoading, setIsProfileHeaderLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedHobbies, setSelectedHobbies] = useState<string[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -51,6 +65,12 @@ export default function Profile() {
   const [isAccountModalVisible, setIsAccountModalVisible] = useState(false);
   const [isNotificationsModalVisible, setIsNotificationsModalVisible] = useState(false);
   const [isDeviceScanModalVisible, setIsDeviceScanModalVisible] = useState(false);
+  const [isDeleteAccountModalVisible, setIsDeleteAccountModalVisible] = useState(false);
+  const [isExportingData, setIsExportingData] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [dataExportJson, setDataExportJson] = useState('');
+  const [deleteAccountConfirmation, setDeleteAccountConfirmation] = useState('');
+  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
   const [deviceScanModalTitle, setDeviceScanModalTitle] = useState('Smart device scan');
   const [deviceScanModalMessage, setDeviceScanModalMessage] = useState('');
   const [userEmail, setUserEmail] = useState('');
@@ -65,6 +85,11 @@ export default function Profile() {
     shortcutsCount: 0,
   });
   const [healthConnectStatus, setHealthConnectStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
+
+  const handleSpotifyConnectFromProfile = useCallback(async () => {
+    await AsyncStorage.setItem(SPOTIFY_RETURN_ROUTE_KEY, '/Profile');
+    await login();
+  }, [login]);
 
 const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
@@ -110,23 +135,71 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     status?: string | null;
     external_id?: string | null;
     last_seen?: string | null;
-    home_id?: number | string | null;
+    home_id?: number | null;
   };
 
-  type DeviceDiscoveryResult = {
-    discovered?: number;
+  type ProfileCacheSnapshot = {
+    userName?: string;
+    avatarUrl?: string | null;
+    userEmail?: string;
+    selectedHobbies?: string[];
+    userHomeId?: number | string | null;
+    joinCode?: string | null;
+    accountDetails?: typeof accountDetails;
+    discoveredDevices?: ConnectedDevice[];
+    cachedAt?: string;
   };
 
-  type DeviceDiscoveryRequestRow = {
-    status?: string | null;
-    error_message?: string | null;
-    result?: DeviceDiscoveryResult | null;
-  };
+  const getProfileCacheKey = (userId: string) => `@profile_cache:v1:${userId}`;
+
+  const applyProfileCache = useCallback((snapshot: ProfileCacheSnapshot) => {
+    if (snapshot.userName) setUserName(snapshot.userName);
+    if (snapshot.avatarUrl !== undefined) setAvatarUrl(snapshot.avatarUrl);
+    if (snapshot.userEmail) setUserEmail(snapshot.userEmail);
+    if (snapshot.selectedHobbies) setSelectedHobbies(snapshot.selectedHobbies);
+    if (snapshot.userHomeId !== undefined) setUserHomeId(snapshot.userHomeId);
+    if (snapshot.joinCode !== undefined) setJoinCode(snapshot.joinCode);
+    if (snapshot.accountDetails) setAccountDetails(snapshot.accountDetails);
+    if (snapshot.discoveredDevices) setDiscoveredDevices(snapshot.discoveredDevices);
+    setIsProfileHeaderLoading(false);
+    setIsLoading(false);
+  }, []);
+
+  const writeProfileCache = useCallback(async (userId: string, snapshot: ProfileCacheSnapshot) => {
+    try {
+      await AsyncStorage.setItem(
+        getProfileCacheKey(userId),
+        JSON.stringify({
+          ...snapshot,
+          cachedAt: new Date().toISOString(),
+        }),
+      );
+    } catch (error) {
+      console.warn('Could not persist profile cache:', error);
+    }
+  }, []);
+
+  const mergeProfileCache = useCallback(async (userId: string, patch: Partial<ProfileCacheSnapshot>) => {
+    try {
+      const cacheKey = getProfileCacheKey(userId);
+      const current = await AsyncStorage.getItem(cacheKey);
+      const parsed = current ? (JSON.parse(current) as ProfileCacheSnapshot) : {};
+      await writeProfileCache(userId, {
+        ...parsed,
+        ...patch,
+      });
+    } catch (error) {
+      console.warn('Could not update profile cache:', error);
+    }
+  }, [writeProfileCache]);
 
   const [discoveredDevices, setDiscoveredDevices] = useState<ConnectedDevice[]>([]);
   const [isRefreshingDevices, setIsRefreshingDevices] = useState(false);
   const [isRequestingDiscovery, setIsRequestingDiscovery] = useState(false);
+  const [togglingDeviceId, setTogglingDeviceId] = useState<number | null>(null);
   const [hardwareError, setHardwareError] = useState<string | null>(null);
+  const [googleHomeDiagnostics, setGoogleHomeDiagnostics] = useState<GoogleHomeDiagnostics | null>(null);
+  const [lastGoogleHomeDevices, setLastGoogleHomeDevices] = useState<GoogleHomeSyncedDevice[]>([]);
   const openDeviceScanModal = (title: string, message: string) => {
     setDeviceScanModalTitle(title);
     setDeviceScanModalMessage(message);
@@ -172,6 +245,8 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
     return `${source}:${slug || 'device'}`;
   };
+
+  const normalizeRoomName = (value: string) => value.trim().toLowerCase();
 
   const loadConnectedDevices = useCallback(async (userId: string, homeId: number | string | null) => {
     const buildQuery = (selectClause: string) => {
@@ -228,145 +303,259 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     setIsRefreshingDevices(true);
     try {
       const resolvedHomeId = homeId ?? (await getCurrentUserHomeId(userId));
-      await loadConnectedDevices(userId, resolvedHomeId);
+      const refreshedDevices = await loadConnectedDevices(userId, resolvedHomeId);
+      await mergeProfileCache(userId, { discoveredDevices: refreshedDevices, userHomeId: resolvedHomeId });
     } finally {
       setIsRefreshingDevices(false);
     }
   };
 
+  const syncGoogleHomeDevicesToDb = useCallback(async (
+    userId: string,
+    homeId: number | string | null,
+    devices: GoogleHomeSyncedDevice[],
+  ) => {
+    const normalizedHomeId = homeId ? Number(homeId) : null;
+    const seenExternalIds = new Set<string>();
+    const now = new Date().toISOString();
+    const roomIdByName = new Map<string, number>();
+
+    if (normalizedHomeId) {
+      const { data: existingRooms, error: roomsError } = await supabase
+        .from('rooms')
+        .select('id, name')
+        .eq('home_id', normalizedHomeId)
+        .order('id', { ascending: true });
+
+      if (roomsError) throw roomsError;
+
+      for (const room of existingRooms ?? []) {
+        if (!room?.name) continue;
+        roomIdByName.set(normalizeRoomName(room.name), room.id);
+      }
+    }
+
+    for (const device of devices) {
+      const externalId = String(device.externalId ?? '').trim();
+      const name = String(device.name ?? '').trim();
+      if (!externalId || !name) continue;
+
+      seenExternalIds.add(externalId);
+
+      const googleRoomName =
+        String(device.roomName ?? device.roomHint ?? '')
+          .trim();
+
+      let roomId: number | null = null;
+
+      if (normalizedHomeId && googleRoomName) {
+        const normalizedRoomName = normalizeRoomName(googleRoomName);
+        roomId = roomIdByName.get(normalizedRoomName) ?? null;
+
+        if (roomId == null) {
+          const { data: createdRoom, error: createRoomError } = await supabase
+            .from('rooms')
+            .insert({
+              home_id: normalizedHomeId,
+              name: googleRoomName,
+            })
+            .select('id, name')
+            .single();
+
+          if (createRoomError) throw createRoomError;
+
+          roomId = createdRoom.id;
+          roomIdByName.set(normalizedRoomName, createdRoom.id);
+        }
+      }
+
+      const payload = {
+        name,
+        type: device.type || 'unknown',
+        source: 'google_home',
+        status: device.isOn ? 'On' : 'Off',
+        connectivity_status: device.isOnline === false ? 'offline' : 'online',
+        discovery_method: 'integration',
+        sync_source: 'google_home',
+        user_id: userId,
+        home_id: normalizedHomeId,
+        external_id: externalId,
+        last_seen: now,
+        manufacturer: device.manufacturer ?? null,
+        model: device.model ?? null,
+        room_id: roomId,
+        room_hint: googleRoomName || null,
+        metadata: {
+          roomName: device.roomName ?? null,
+          roomHint: device.roomHint ?? null,
+          traits: device.traits ?? [],
+          provider: 'google_home',
+          ...((device.metadata ?? {}) as Record<string, unknown>),
+        },
+      };
+
+      const legacyPayload = {
+        name,
+        type: device.type || 'unknown',
+        source: 'google_home',
+        status: device.isOn ? 'On' : 'Off',
+        user_id: userId,
+        home_id: normalizedHomeId,
+        external_id: externalId,
+        last_seen: now,
+        room_id: roomId,
+      };
+
+      const { data: existing, error: existingError } = await supabase
+        .from('devices')
+        .select('id')
+        .eq('home_id', normalizedHomeId)
+        .eq('source', 'google_home')
+        .eq('external_id', externalId)
+        .limit(1)
+        .maybeSingle();
+
+      if (existingError) throw existingError;
+
+      const request = existing
+        ? supabase.from('devices').update(payload).eq('id', existing.id)
+        : supabase.from('devices').insert(payload);
+
+      let { error } = await request;
+
+      if (error?.code === '42703') {
+        const fallbackRequest = existing
+          ? supabase.from('devices').update(legacyPayload).eq('id', existing.id)
+          : supabase.from('devices').insert(legacyPayload);
+
+        const fallbackResult = await fallbackRequest;
+        error = fallbackResult.error;
+      }
+
+      if (error) throw error;
+    }
+
+    if (!normalizedHomeId) return;
+
+    let { data: existingGoogleHomeDevices, error: loadExistingError } = await supabase
+      .from('devices')
+      .select('id, external_id')
+      .eq('home_id', normalizedHomeId)
+      .eq('source', 'google_home');
+
+    if (loadExistingError?.code === '42703') {
+      existingGoogleHomeDevices = [];
+      loadExistingError = null;
+    }
+
+    if (loadExistingError) throw loadExistingError;
+
+    for (const existing of existingGoogleHomeDevices ?? []) {
+      const existingExternalId = String(existing.external_id ?? '').trim();
+      if (!existingExternalId || seenExternalIds.has(existingExternalId)) continue;
+
+      await supabase
+        .from('devices')
+        .update({
+          status: 'Off',
+          connectivity_status: 'offline',
+        })
+        .eq('id', existing.id);
+    }
+  }, []);
+
   const requestAutomaticDiscovery = async () => {
     setIsRequestingDiscovery(true);
-    trackEvent('requested-device-discovery', {
+    trackEvent('requested-google-home-sync', {
       area: 'devices',
       screen: 'profile',
-      action: 'request-scan',
+      action: 'connect-google-home',
     });
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getSessionUser();
       if (!user) throw new Error('Session not found.');
 
       const resolvedHomeId = userHomeId ?? (await getCurrentUserHomeId(user.id));
       if (!resolvedHomeId) throw new Error('No home connected to this user.');
 
-      const { data, error } = await supabase.functions.invoke('request-device-discovery', {
-        body: {},
-      });
-
-      if (error) throw error;
-
-      console.log('[Profile][DeviceDiscovery] Request response:', data);
-
-      const requestId = Number(data?.request?.id);
-      if (!requestId) {
-        console.log('[Profile][DeviceDiscovery] No request id returned. Refreshing current devices.');
-        await refreshConnectedDevices(user.id, resolvedHomeId);
-        trackEvent('device-discovery-reused-existing-sync', {
+      const access = await requestGoogleHomeAccess();
+      console.log('[GoogleHome] access result', access);
+      if (!access.granted) {
+        const reason = access.reason || 'Google Home access was not granted.';
+        trackEvent('google-home-access-denied', {
           area: 'devices',
           screen: 'profile',
-          action: 'request-scan',
-          userId: user.id,
-          metadata: { homeId: resolvedHomeId },
-        });
+          action: 'connect-google-home',
+          metadata: { reason },
+        }, 'warn');
+        openDeviceScanModal('Google Home setup required', reason);
+        setHardwareError(reason);
         return;
       }
 
-      const startedAt = Date.now();
-      let latestStatus = String(data?.request?.status ?? 'pending').toLowerCase();
-      console.log(
-        `[Profile][DeviceDiscovery] Waiting for request ${requestId} on home ${resolvedHomeId}. Initial status: ${latestStatus}`,
-      );
+      const snapshot = await syncGoogleHomeSnapshot();
+      const devices = snapshot.devices;
+      setGoogleHomeDiagnostics(snapshot.diagnostics ?? null);
+      setLastGoogleHomeDevices(devices);
+      console.log('[GoogleHome] synced devices', devices.length, devices);
+      await syncGoogleHomeDevicesToDb(user.id, resolvedHomeId, devices);
+      const refreshedDevices = await loadConnectedDevices(user.id, resolvedHomeId);
 
-      while (Date.now() - startedAt < 45000) {
-        const { data: requestRow, error: requestError } = await supabase
-          .from('device_discovery_requests')
-          .select('status, error_message, result')
-          .eq('id', requestId)
-          .eq('home_id', Number(resolvedHomeId))
-          .maybeSingle();
-
-        if (requestError) throw requestError;
-
-        latestStatus = String(requestRow?.status ?? latestStatus).toLowerCase();
-        console.log(
-          `[Profile][DeviceDiscovery] Poll request ${requestId}: status=${latestStatus}`,
-          requestRow,
+      if (devices.length === 0 || refreshedDevices.length === 0) {
+        openDeviceScanModal(
+          'No devices found',
+          'We connected to your Google Home household, but this Google Home API build did not receive any rooms or compatible devices for this account. This usually means the home was found, but your current devices are not exposed by this SDK layer yet, often because they are cloud-linked or not Matter-compatible. Your existing Nidush internet-connected devices can still keep working normally.',
         );
-
-        if (latestStatus === 'completed') {
-          console.log(`[Profile][DeviceDiscovery] Request ${requestId} completed. Refreshing devices.`);
-          const refreshedDevices = await loadConnectedDevices(user.id, resolvedHomeId);
-          const typedRequestRow = requestRow as DeviceDiscoveryRequestRow | null;
-          const discoveredCount = Number(
-            typedRequestRow?.result?.discovered ?? refreshedDevices.length ?? 0,
-          );
-
-          if (discoveredCount === 0 || refreshedDevices.length === 0) {
-            trackEvent('device-discovery-completed-no-devices', {
-              area: 'devices',
-              screen: 'profile',
-              action: 'poll-scan',
-              userId: user.id,
-              metadata: { requestId, homeId: resolvedHomeId },
-            });
-            openDeviceScanModal(
-              'No devices found',
-              'We scanned your home network but did not find any compatible smart devices this time. Make sure the devices are turned on and connected to the same Wi-Fi, then try again.',
-            );
-          }
-          return;
-        }
-
-        if (latestStatus === 'failed') {
-          const failureMessage = requestRow?.error_message
-            ? String(requestRow.error_message)
-            : 'The smart device scan failed.';
-          captureException(new Error(failureMessage), {
-            area: 'devices',
-            screen: 'profile',
-            action: 'poll-scan',
-            userId: user.id,
-            metadata: { requestId, homeId: resolvedHomeId, status: latestStatus },
-          });
-          openDeviceScanModal(
-            'Scan failed',
-            `${failureMessage} Please wait a moment and try again.`,
-          );
-          throw new Error(failureMessage);
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, 2500));
       }
-
-      console.log(
-        `[Profile][DeviceDiscovery] Request ${requestId} is still running after 45s. Refreshing current devices.`,
-      );
-      await refreshConnectedDevices(user.id, resolvedHomeId);
-      setHardwareError('The scan is still running. Pull to refresh again in a few seconds.');
-      trackEvent('device-discovery-timeout-refresh', {
-        area: 'devices',
-        screen: 'profile',
-        action: 'poll-scan',
-        userId: user.id,
-        metadata: { requestId, homeId: resolvedHomeId },
-      });
-      openDeviceScanModal(
-        'Scan still running',
-        'We started the smart device scan, but it is taking longer than expected. Please wait a few seconds and tap refresh again.',
-      );
     } catch (error: unknown) {
-      console.error('Failed to request automatic discovery:', error);
+      console.error('Failed to sync Google Home devices:', error);
       const errorMessage =
-        error instanceof Error ? error.message : 'Could not scan smart devices.';
+        error instanceof Error ? error.message : 'Could not sync Google Home devices.';
       setHardwareError(errorMessage);
       captureException(error, {
         area: 'devices',
         screen: 'profile',
-        action: 'request-scan',
+        action: 'connect-google-home',
       });
     } finally {
       setIsRequestingDiscovery(false);
     }
   };
+
+  const toggleGoogleHomeDevice = useCallback(async (device: ConnectedDevice) => {
+    if (!device.id || device.source !== 'google_home') return;
+
+    const nextPowerState = !isDeviceCurrentlyConnected(device);
+    setTogglingDeviceId(device.id);
+    try {
+      await setGoogleHomeDevicePower(String(device.external_id ?? ''), nextPowerState);
+      await supabase
+        .from('devices')
+        .update({
+          status: nextPowerState ? 'On' : 'Off',
+          connectivity_status: nextPowerState ? 'online' : 'offline',
+          last_seen: new Date().toISOString(),
+        })
+        .eq('id', device.id);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await refreshConnectedDevices(user.id, userHomeId);
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Could not control this Google Home device.';
+      setHardwareError(errorMessage);
+      captureException(error, {
+        area: 'devices',
+        screen: 'profile',
+        action: 'toggle-google-home-device',
+        metadata: { deviceId: device.id, externalId: device.external_id },
+      });
+    } finally {
+      setTogglingDeviceId(null);
+    }
+  }, [isDeviceCurrentlyConnected, refreshConnectedDevices, userHomeId]);
 
   // Função para sincronizar dispositivos com o Supabase
   const syncDeviceToDB = useCallback(async (name: string, type: string, source: string, externalId?: string) => {
@@ -454,127 +643,167 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     let activeHomeChannel: ReturnType<typeof subscribeToHomeDeviceChanges> | null = null;
 
     const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setAvatarUrl(user.user_metadata?.avatar_url || null);
-        const first = user.user_metadata?.first_name || '';
-        const last = user.user_metadata?.last_name || '';
+      try {
+        const user = await getSessionUser();
+        if (user) {
+          try {
+            const cachedProfile = await AsyncStorage.getItem(getProfileCacheKey(user.id));
+            if (cachedProfile) {
+              applyProfileCache(JSON.parse(cachedProfile) as ProfileCacheSnapshot);
+            }
+          } catch (error) {
+            console.warn('Could not read profile cache:', error);
+          }
 
-        if (first || last) {
-          setUserName(`${first} ${last}`.trim());
-        } else if (user.email) {
-          setUserName(user.email.split('@')[0]);
-        } else {
-          setUserName('Utilizador');
-        }
+          setAvatarUrl(user.user_metadata?.avatar_url || null);
+          const first = user.user_metadata?.first_name || '';
+          const last = user.user_metadata?.last_name || '';
 
-        const userEmail = user.email || '';
-        setUserEmail(userEmail);
-        let [
-          userDataResult,
-          homeAssociationResult,
-        ] = await Promise.all([
-          supabase
-            .from('users')
-            .select('hobbies, created_at')
-            .eq('auth_uid', user.id)
-            .maybeSingle(),
-          supabase
-            .from('user_homes')
-            .select('home_id, role, created_at')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: true })
-            .limit(1)
-            .maybeSingle(),
-        ]);
+          if (first || last) {
+            setUserName(`${first} ${last}`.trim());
+          } else if (user.email) {
+            setUserName(user.email.split('@')[0]);
+          } else {
+            setUserName('Utilizador');
+          }
 
-        let userData = userDataResult.data;
-        let userDataError = userDataResult.error;
+          const userEmail = user.email || '';
+          setUserEmail(userEmail);
+          setIsProfileHeaderLoading(false);
 
-        if ((!userData || userDataError) && userEmail) {
-          const fallback = await supabase
-            .from('users')
-            .select('hobbies, created_at')
-            .eq('email', userEmail)
-            .maybeSingle();
+          let [
+            userDataResult,
+            homeAssociationResult,
+          ] = await Promise.all([
+            supabase
+              .from('users')
+              .select('hobbies, created_at')
+              .eq('auth_uid', user.id)
+              .maybeSingle(),
+            supabase
+              .from('user_homes')
+              .select('home_id, role, created_at')
+              .eq('user_id', user.id)
+              .order('created_at', { ascending: true })
+              .limit(1)
+              .maybeSingle(),
+          ]);
 
-          userData = fallback.data;
-          userDataError = fallback.error;
-        }
+          let userData = userDataResult.data;
+          let userDataError = userDataResult.error;
 
-        if (userDataError) {
-          console.error('Erro a carregar hobbies:', userDataError);
-        }
+          if ((!userData || userDataError) && userEmail) {
+            const fallback = await supabase
+              .from('users')
+              .select('hobbies, created_at')
+              .eq('email', userEmail)
+              .maybeSingle();
 
-        setSelectedHobbies(parseHobbies(userData?.hobbies));
+            userData = fallback.data;
+            userDataError = fallback.error;
+          }
 
-        let finalHomeId = null;
-        const homeAssociation = homeAssociationResult.data;
+          if (userDataError) {
+            console.error('Erro a carregar hobbies:', userDataError);
+          }
 
-        if (homeAssociation) {
-          finalHomeId = homeAssociation.home_id;
-          setUserHomeId(finalHomeId);
-        }
+          setSelectedHobbies(parseHobbies(userData?.hobbies));
 
-        const [
-          homeDataResult,
-          activitiesCountResult,
-          shortcutsCountResult,
-          connectedDevices,
-        ] = await Promise.all([
-          finalHomeId
-            ? supabase.from('homes').select('name, join_code').eq('id', finalHomeId).maybeSingle()
-            : Promise.resolve({ data: null }),
-          supabase
-            .from('activities')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', user.id),
-          supabase
-            .from('shortcuts')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', user.id),
-          loadConnectedDevices(user.id, finalHomeId),
-        ]);
+          let finalHomeId = null;
+          const homeAssociation = homeAssociationResult.data;
 
-        let homeData = homeDataResult.data;
-        if ('error' in homeDataResult && homeDataResult.error?.code === '42703' && finalHomeId) {
-          const legacyHomeResult = await supabase
-            .from('homes')
-            .select('name, join_code')
-            .eq('id', finalHomeId)
-            .maybeSingle();
-          homeData = legacyHomeResult.data as typeof homeData;
-        }
-        const homeName = homeData?.name || 'Not connected';
-        const resolvedJoinCode = homeData?.join_code || null;
-        if (resolvedJoinCode) {
-          setJoinCode(resolvedJoinCode);
-        }
+          if (homeAssociation) {
+            finalHomeId = homeAssociation.home_id;
+            setUserHomeId(finalHomeId);
+          }
 
-        setAccountDetails({
-          homeName,
-          role: homeAssociation?.role || 'Resident',
-          memberSince: formatProfileDate(user.created_at || userData?.created_at),
-          accountCode: user.id.slice(0, 8).toUpperCase(),
-          activitiesCount: activitiesCountResult.count ?? 0,
-          shortcutsCount: shortcutsCountResult.count ?? 0,
-        });
-        if (!resolvedJoinCode) {
-          setJoinCode(null);
-        }
+          const [
+            homeDataResult,
+            activitiesCountResult,
+            shortcutsCountResult,
+            connectedDevices,
+          ] = await Promise.all([
+            finalHomeId
+              ? supabase.from('homes').select('name, join_code').eq('id', finalHomeId).maybeSingle()
+              : Promise.resolve({ data: null }),
+            supabase
+              .from('activities')
+              .select('id', { count: 'exact', head: true })
+              .eq('user_id', user.id),
+            supabase
+              .from('shortcuts')
+              .select('id', { count: 'exact', head: true })
+              .eq('user_id', user.id),
+            loadConnectedDevices(user.id, finalHomeId),
+          ]);
 
-        setDiscoveredDevices(connectedDevices);
+          let homeData = homeDataResult.data;
+          if ('error' in homeDataResult && homeDataResult.error?.code === '42703' && finalHomeId) {
+            const legacyHomeResult = await supabase
+              .from('homes')
+              .select('name, join_code')
+              .eq('id', finalHomeId)
+              .maybeSingle();
+            homeData = legacyHomeResult.data as typeof homeData;
+          }
+          const homeName = homeData?.name || 'Not connected';
+          const resolvedJoinCode = homeData?.join_code || null;
+          if (resolvedJoinCode) {
+            setJoinCode(resolvedJoinCode);
+          }
 
-        if (finalHomeId) {
-          activeHomeChannel = subscribeToHomeDeviceChanges(Number(finalHomeId), async () => {
-            await loadConnectedDevices(user.id, finalHomeId);
+          const nextAccountDetails = {
+            homeName,
+            role: homeAssociation?.role || 'Resident',
+            memberSince: formatProfileDate(user.created_at || userData?.created_at),
+            accountCode: user.id.slice(0, 8).toUpperCase(),
+            activitiesCount: activitiesCountResult.count ?? 0,
+            shortcutsCount: shortcutsCountResult.count ?? 0,
+          };
+          setAccountDetails(nextAccountDetails);
+          if (!resolvedJoinCode) {
+            setJoinCode(null);
+          }
+
+          setDiscoveredDevices(connectedDevices);
+
+          await writeProfileCache(user.id, {
+            userName:
+              (first || last)
+                ? `${first} ${last}`.trim()
+                : user.email
+                  ? user.email.split('@')[0]
+                  : 'Utilizador',
+            avatarUrl: user.user_metadata?.avatar_url || null,
+            userEmail,
+            selectedHobbies: parseHobbies(userData?.hobbies),
+            userHomeId: finalHomeId,
+            joinCode: resolvedJoinCode,
+            accountDetails: nextAccountDetails,
+            discoveredDevices: connectedDevices,
           });
-        }
 
-      } else {
-        setUserName('Visitante');
+          if (activeHomeChannel) {
+            supabase.removeChannel(activeHomeChannel);
+            activeHomeChannel = null;
+          }
+          if (finalHomeId) {
+            activeHomeChannel = subscribeToHomeDeviceChanges(Number(finalHomeId), async () => {
+              const refreshedDevices = await loadConnectedDevices(user.id, finalHomeId);
+              await mergeProfileCache(user.id, { discoveredDevices: refreshedDevices });
+            });
+          }
+        } else {
+          setUserName('Visitante');
+          setIsProfileHeaderLoading(false);
+        }
+      } catch (error) {
+        console.error('Erro a carregar perfil:', error);
+        setUserName('Utilizador');
+        setIsProfileHeaderLoading(false);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
     const checkHealthConnect = async () => {
@@ -596,13 +825,16 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
         );
 
         if (!canReadHeartRate) {
+          await setHealthConnectEnabled(false);
           setHealthConnectStatus('disconnected');
           return;
         }
 
+        await setHealthConnectEnabled(true);
         setHealthConnectStatus('connected');
         await syncDeviceToDB('Health Connect', 'heart', 'health_connect', 'android_hc');
       } catch {
+        await setHealthConnectEnabled(false);
         setHealthConnectStatus('disconnected');
       }
     };
@@ -612,6 +844,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
     const subscription = AppState.addEventListener('change', (nextAppState) => {
       if (nextAppState === 'active') {
+        fetchUser();
         checkHealthConnect();
       }
     });
@@ -659,6 +892,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
       }
 
       setAvatarUrl(publicUrl);
+      await mergeProfileCache(user.id, { avatarUrl: publicUrl });
     } else {
       console.warn('Profile image upload did not complete.');
     }
@@ -693,10 +927,84 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
       if (error) {
         console.error("Erro ao guardar hobbies:", error);
       } else {
-        setSelectedHobbies(parseHobbies(data?.hobbies));
+        const nextHobbies = parseHobbies(data?.hobbies);
+        setSelectedHobbies(nextHobbies);
+        await mergeProfileCache(user.id, { selectedHobbies: nextHobbies });
         setIsModalVisible(false);
       }
 
+    }
+  };
+
+  const handleExportData = async () => {
+    setIsExportingData(true);
+    try {
+      const { data, error } = await supabase.rpc('export_my_data');
+
+      if (error) {
+        throw error;
+      }
+
+      setDataExportJson(JSON.stringify(data ?? {}, null, 2));
+    } catch (error) {
+      console.error('Erro ao exportar dados do utilizador:', error);
+      setDataExportJson(
+        JSON.stringify(
+          {
+            error: 'Could not generate your data export right now.',
+          },
+          null,
+          2,
+        ),
+      );
+    } finally {
+      setIsExportingData(false);
+    }
+  };
+
+  const openDeleteAccountModal = () => {
+    setDeleteAccountError(null);
+    setDeleteAccountConfirmation('');
+    setIsDeleteAccountModalVisible(true);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteAccountConfirmation.trim().toUpperCase() !== 'DELETE') {
+      setDeleteAccountError('Type DELETE to confirm account deletion.');
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    setDeleteAccountError(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('delete-account', {
+        body: {},
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.error) {
+        throw new Error(String(data.error));
+      }
+
+      await supabase.auth.signOut({ scope: 'local' });
+      setIsDeleteAccountModalVisible(false);
+      setIsPrivacyModalVisible(false);
+      router.replace('/login');
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Could not delete your account right now.';
+      setDeleteAccountError(message);
+      captureException(error, {
+        area: 'privacy',
+        screen: 'profile',
+        action: 'delete-account',
+      });
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
@@ -752,11 +1060,11 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
             style={{ position: 'relative' }}
             testID="avatar-picker-button"
           >
-            {isLoading ? (
+            {isProfileHeaderLoading ? (
               <View className="w-32 h-32 rounded-full bg-[#E8EDDF]" />
             ) : (
               <Image
-                source={avatarUrl ? { uri: avatarUrl } : require('@/assets/avatars/profile.png')}
+                source={getAvatarSource(avatarUrl)}
                 className="w-32 h-32 rounded-full"
                 accessible
                 accessibilityRole="image"
@@ -848,7 +1156,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
                 className="text-xs text-[#71806F] mt-1"
                 style={{ fontFamily: 'Nunito_400Regular' }}
               >
-                Real home devices synced from your local network agent.
+                Smart home devices synced from your Google Home household.
               </Text>
             </View>
             {isRefreshingDevices && (
@@ -888,10 +1196,30 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
                     <Text className="text-[#4A5D4E] font-bold">{device.name}</Text>
                     <Text className="text-gray-500 text-xs">
                       {device.status === 'connected' || device.status === 'On'
-                        ? 'Online on your home network'
+                        ? device.source === 'google_home'
+                          ? 'Online in Google Home'
+                          : 'Online on your home network'
                         : 'Offline or waiting for the next sync'}
                     </Text>
                   </View>
+                  {device.source === 'google_home' && (
+                    <TouchableOpacity
+                      onPress={() => toggleGoogleHomeDevice(device)}
+                      disabled={togglingDeviceId === device.id}
+                      testID={`toggle-google-home-device-${device.id ?? index}`}
+                      className={`mr-3 px-3 py-1.5 rounded-full border border-[#D1D9C5] ${
+                        togglingDeviceId === device.id ? 'opacity-50' : ''
+                      }`}
+                    >
+                      <Text className="text-[#4A5D4E] text-xs font-bold">
+                        {togglingDeviceId === device.id
+                          ? '...'
+                          : isDeviceCurrentlyConnected(device)
+                            ? 'Turn Off'
+                            : 'Turn On'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                   <View className="ml-auto items-end">
                     <View
                       className={`w-2.5 h-2.5 rounded-full ${
@@ -901,14 +1229,14 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
                       }`}
                     />
                     <Text className="text-[10px] text-gray-400 mt-1">
-                      {device.source || 'network'}
+                      {getDeviceSourceLabel(device.source)}
                     </Text>
                   </View>
                 </View>
               ))
             ) : (
               <Text className="text-gray-400 italic text-center">
-                No real smart home devices synced yet.
+                No Google Home devices synced yet.
               </Text>
             )}
           </View>
@@ -920,7 +1248,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
             className={`mt-4 py-3 items-center bg-[#5B8C51] rounded-full ${isRequestingDiscovery ? 'opacity-50' : ''}`}
           >
             <Text className="text-white font-bold">
-              {isRequestingDiscovery ? 'Requesting Scan...' : 'Scan Smart Devices'}
+              {isRequestingDiscovery ? 'Syncing Google Home...' : 'Connect Google Home & Sync Devices'}
             </Text>
           </TouchableOpacity>
 
@@ -938,6 +1266,75 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
               {isRefreshingDevices ? 'Refreshing Devices...' : 'Refresh Synced Devices'}
             </Text>
           </TouchableOpacity>
+
+          {(googleHomeDiagnostics || lastGoogleHomeDevices.length > 0) && (
+            <View className="mt-4 rounded-[20px] border border-[#D1D9C5] bg-white/60 p-4" testID="google-home-debug-card">
+              <Text
+                maxFontSizeMultiplier={1.2}
+                className="text-base text-[#4A5D4E]"
+                style={{ fontFamily: 'Nunito_600SemiBold' }}
+              >
+                Google Home SDK Debug
+              </Text>
+              <Text
+                className="text-xs text-[#71806F] mt-1"
+                style={{ fontFamily: 'Nunito_400Regular' }}
+              >
+                This shows the exact home data that the Google Home Android SDK returned to Nidush.
+              </Text>
+
+              <View className="mt-3 gap-y-2">
+                <Text className="text-xs text-[#4A5D4E]">
+                  Structures found: {googleHomeDiagnostics?.structureCount ?? 0}
+                </Text>
+                <Text className="text-xs text-[#4A5D4E]">
+                  Rooms found: {googleHomeDiagnostics?.roomCount ?? 0}
+                </Text>
+                <Text className="text-xs text-[#4A5D4E]">
+                  Devices returned by SDK: {lastGoogleHomeDevices.length}
+                </Text>
+              </View>
+
+              <View className="mt-3">
+                <Text className="text-xs font-bold text-[#4A5D4E]">Structures</Text>
+                {googleHomeDiagnostics?.structures?.length ? (
+                  googleHomeDiagnostics.structures.map((structure) => (
+                    <Text key={structure.id} className="text-xs text-[#71806F] mt-1">
+                      {structure.name} ({structure.id})
+                    </Text>
+                  ))
+                ) : (
+                  <Text className="text-xs text-[#A0AA9A] mt-1">No structures details returned.</Text>
+                )}
+              </View>
+
+              <View className="mt-3">
+                <Text className="text-xs font-bold text-[#4A5D4E]">Rooms</Text>
+                {googleHomeDiagnostics?.rooms?.length ? (
+                  googleHomeDiagnostics.rooms.map((room) => (
+                    <Text key={room.id} className="text-xs text-[#71806F] mt-1">
+                      {room.name} ({room.id})
+                    </Text>
+                  ))
+                ) : (
+                  <Text className="text-xs text-[#A0AA9A] mt-1">No rooms were returned by the SDK.</Text>
+                )}
+              </View>
+
+              <View className="mt-3">
+                <Text className="text-xs font-bold text-[#4A5D4E]">Devices</Text>
+                {lastGoogleHomeDevices.length ? (
+                  lastGoogleHomeDevices.map((device) => (
+                    <Text key={device.externalId} className="text-xs text-[#71806F] mt-1">
+                      {device.name} [{device.type}] {device.roomName ? `- room: ${device.roomName}` : ''}
+                    </Text>
+                  ))
+                ) : (
+                  <Text className="text-xs text-[#A0AA9A] mt-1">No devices were returned by the SDK.</Text>
+                )}
+              </View>
+            </View>
+          )}
         </View>
 
         {/* Wearables */}
@@ -1044,7 +1441,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
         <View className="bg-[#F5F7F0] rounded-[24px] px-2 mb-4 border border-[#D1D9C5]">
           <TouchableOpacity
             className="flex-row justify-between items-center py-5 px-4"
-            onPress={isAuthenticated ? logout : login}
+            onPress={isAuthenticated ? logout : handleSpotifyConnectFromProfile}
           >
             <View className="flex-row items-center">
               <MaterialCommunityIcons name="spotify" size={28} color={isAuthenticated ? "#1DB954" : "#4A5D4E"} />
@@ -1334,7 +1731,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
         onRequestClose={() => setIsPrivacyModalVisible(false)}
       >
         <View className="flex-1 justify-end bg-black/50">
-          <View className="bg-white w-full rounded-t-[40px] px-8 pt-8 pb-16 shadow-2xl h-[76%]">
+          <View className="bg-white w-full rounded-t-[40px] px-8 pt-8 pb-12 shadow-2xl h-[86%]">
             <View className="flex-row justify-between items-center mb-6">
               <Text
                 className="text-2xl text-[#3A4D3F]"
@@ -1347,7 +1744,87 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
               </TouchableOpacity>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} className="mb-4">
+            <ScrollView showsVerticalScrollIndicator={false} className="mb-3">
+              <View className="bg-[#F5F7F0] border border-[#D1D9C5] rounded-[24px] p-4 mb-5">
+                <Text
+                  className="text-lg text-[#3A4D3F]"
+                  style={{ fontFamily: 'Nunito_700Bold' }}
+                >
+                  Data Portability
+                </Text>
+                <Text
+                  className="text-[#71806F] mt-2 leading-6"
+                  style={{ fontFamily: 'Nunito_400Regular' }}
+                >
+                  Generate a structured JSON export of your profile, preferences, activities, devices, notifications, and consent history.
+                </Text>
+                <Text
+                  className="text-[#71806F] mt-2 text-xs"
+                  style={{ fontFamily: 'Nunito_600SemiBold' }}
+                >
+                  Policy version: {LEGAL_POLICY_VERSION}
+                </Text>
+
+                <TouchableOpacity
+                  onPress={handleExportData}
+                  disabled={isExportingData}
+                  className={`mt-4 py-3 rounded-full items-center ${isExportingData ? 'bg-[#A7B5A4]' : 'bg-[#5B8C51]'}`}
+                >
+                  <Text
+                    className="text-white text-base"
+                    style={{ fontFamily: 'Nunito_700Bold' }}
+                  >
+                    {isExportingData ? 'Generating export...' : 'Generate data export'}
+                  </Text>
+                </TouchableOpacity>
+
+                {dataExportJson ? (
+                  <View className="mt-4 bg-[#1F2D2F] rounded-[20px] p-4">
+                    <Text
+                      selectable
+                      className="text-[#E8F0E4] text-xs leading-5"
+                      style={{ fontFamily: 'Nunito_400Regular' }}
+                    >
+                      {dataExportJson}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
+              <View className="bg-[#FFF4F1] border border-[#E6B8AC] rounded-[24px] p-4 mb-5">
+                <Text
+                  className="text-lg text-[#8A3D2B]"
+                  style={{ fontFamily: 'Nunito_700Bold' }}
+                >
+                  Delete account
+                </Text>
+                <Text
+                  className="text-[#8A5B50] mt-2 leading-6"
+                  style={{ fontFamily: 'Nunito_400Regular' }}
+                >
+                  Permanently remove your profile, preferences, activities, routines, devices, notifications, consents, and active session from Nidush.
+                </Text>
+                <Text
+                  className="text-[#8A5B50] mt-2 text-xs"
+                  style={{ fontFamily: 'Nunito_600SemiBold' }}
+                >
+                  If you are the only admin in a shared home, Nidush will transfer admin access to the oldest remaining member when possible.
+                </Text>
+
+                <TouchableOpacity
+                  onPress={openDeleteAccountModal}
+                  className="mt-4 py-3 rounded-full items-center bg-[#C95F44]"
+                  testID="open-delete-account-button"
+                >
+                  <Text
+                    className="text-white text-base"
+                    style={{ fontFamily: 'Nunito_700Bold' }}
+                  >
+                    Delete my account
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
               <LegalContent />
             </ScrollView>
 
@@ -1361,6 +1838,80 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
               >
                 Close
               </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={isDeleteAccountModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsDeleteAccountModalVisible(false)}
+      >
+        <View className="flex-1 justify-center items-center bg-black/50 px-6">
+          <View className="bg-white w-full rounded-[32px] p-7 shadow-xl">
+            <View className="w-14 h-14 rounded-full bg-[#FFF4F1] items-center justify-center self-center mb-4">
+              <MaterialIcons name="delete-forever" size={28} color="#C95F44" />
+            </View>
+
+            <Text
+              className="text-2xl text-[#3A2E2A] mb-3 text-center"
+              style={{ fontFamily: 'Nunito_700Bold' }}
+            >
+              Confirm account deletion
+            </Text>
+
+            <Text
+              className="text-[#7A665E] text-base text-center leading-6"
+              style={{ fontFamily: 'Nunito_400Regular' }}
+            >
+              This action is permanent. Type DELETE to confirm that Nidush should erase your account and personal app data.
+            </Text>
+
+            <TextInput
+              value={deleteAccountConfirmation}
+              onChangeText={(value) => {
+                setDeleteAccountConfirmation(value);
+                if (deleteAccountError) setDeleteAccountError(null);
+              }}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              placeholder="Type DELETE"
+              placeholderTextColor="#A28F87"
+              className="mt-5 border border-[#E6B8AC] rounded-2xl px-4 py-3 text-[#3A2E2A]"
+              testID="delete-account-confirm-input"
+            />
+
+            {deleteAccountError ? (
+              <Text
+                className="text-[#C95F44] mt-3 text-sm"
+                style={{ fontFamily: 'Nunito_600SemiBold' }}
+              >
+                {deleteAccountError}
+              </Text>
+            ) : null}
+
+            <TouchableOpacity
+              onPress={handleDeleteAccount}
+              disabled={isDeletingAccount}
+              className={`mt-6 py-4 rounded-full items-center shadow-md ${isDeletingAccount ? 'bg-[#D9A79A]' : 'bg-[#C95F44]'}`}
+              testID="confirm-delete-account-button"
+            >
+              <Text
+                className="text-white text-lg"
+                style={{ fontFamily: 'Nunito_700Bold' }}
+              >
+                {isDeletingAccount ? 'Deleting account...' : 'Permanently delete'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setIsDeleteAccountModalVisible(false)}
+              disabled={isDeletingAccount}
+              className="mt-4 py-2 items-center"
+            >
+              <Text className="text-gray-400 text-lg">Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>

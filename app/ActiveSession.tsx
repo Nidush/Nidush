@@ -1,7 +1,7 @@
 import { supabase } from '@/utils/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -32,13 +32,17 @@ import {
   Scenario,
   ScenarioDeviceState,
 } from '@/constants/data';
+import { resolveCatalogImage } from '@/constants/data/catalogAssets';
 import { SMART_HOME_DEVICES } from '@/constants/devices';
 import {
   fetchActivityTemplateById,
   fetchScenarioTemplateById,
   mapUserActivity,
   normalizeScenarioTemplateId,
+  resolvePossibleUserScenarioDbIds,
 } from '@/utils/catalogTemplates';
+import { getScenarioDeviceMeta, mapLinkedDeviceToScenarioState } from '@/utils/activityDeviceConfigs';
+import { applyScenarioDeviceStates } from '@/utils/deviceExecution';
 
 type FormattedInstruction = {
   text: string;
@@ -85,6 +89,66 @@ type ContentRow = {
   video_url?: string | null;
   ingredients?: unknown;
   image?: string | null;
+};
+
+const DEVICE_ENFORCEMENT_INTERVAL_MS = 15000;
+
+const getJoinedRoomName = (value: unknown) => {
+  if (Array.isArray(value)) {
+    const first = value[0];
+    return first && typeof first === 'object' && 'name' in first
+      ? String((first as { name?: unknown }).name ?? '')
+      : '';
+  }
+
+  if (value && typeof value === 'object' && 'name' in value) {
+    return String((value as { name?: unknown }).name ?? '');
+  }
+
+  return '';
+};
+
+const getEnforcedLightDevices = (devices: ScenarioDeviceState[]) =>
+  devices.filter((config) => {
+    const device = SMART_HOME_DEVICES[config.deviceId];
+    const fallbackMeta = getScenarioDeviceMeta(config);
+    const isLight = device?.type === 'light' || fallbackMeta.type === 'light';
+    const hasConfiguredVisualState =
+      typeof config.color === 'string' ||
+      typeof config.brightness === 'string' ||
+      typeof config.value === 'string' ||
+      typeof config.value === 'number';
+
+    return isLight && hasConfiguredVisualState;
+  });
+
+const fetchScenarioFromDbCandidates = async (rawScenarioId: string) => {
+  const candidateIds = resolvePossibleUserScenarioDbIds(rawScenarioId);
+
+  for (const candidateId of candidateIds) {
+    const { data: scenData } = await supabase
+      .from('scenarios')
+      .select('id, name, description, image, playlist_id, playlist_name, focus_mode_enabled, devices, rooms(name)')
+      .eq('id', candidateId)
+      .maybeSingle();
+
+    if (scenData) {
+      return {
+        id: `scenario:${scenData.id}`,
+        title: scenData.name,
+        description: scenData.description || '',
+        playlist: scenData.playlist_name || (scenData.playlist_id ? 'Spotify Music' : undefined),
+        playlist_id: scenData.playlist_id || undefined,
+        focusMode: scenData.focus_mode_enabled === true,
+        shortcuts: false,
+        devices: Array.isArray(scenData.devices) ? scenData.devices : [],
+        room: getJoinedRoomName(scenData.rooms) || undefined,
+        image: resolveCatalogImage(scenData.image || 'Scenarios/moonlight_bay.png'),
+      } as Scenario;
+    }
+  }
+
+  return null;
 };
 
 const isStoredActivityLike = (value: unknown): value is StoredActivityLike =>
@@ -143,11 +207,21 @@ const getItemDevices = (item: StoredActivityLike | Activity | Scenario) =>
     ? item.devices
     : []) as ScenarioDeviceState[];
 
+const resolveConfiguredDevices = (
+  activityDevices: ScenarioDeviceState[],
+  scenarioDevices: ScenarioDeviceState[],
+) => (scenarioDevices.length > 0 ? scenarioDevices : activityDevices);
+
 const getNumericRoomId = (item: StoredActivityLike | Activity | Scenario) => {
   if (typeof item.room_id === 'number') return item.room_id;
 
   const parsed = Number(item.room_id);
   return Number.isFinite(parsed) ? parsed : null;
+};
+
+const normalizeLinkedDevice = (value: unknown) => {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value;
 };
 
 export default function ActiveSession() {
@@ -169,6 +243,8 @@ export default function ActiveSession() {
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [showExitModal, setShowExitModal] = useState(false);
+  const startedPlaybackForSessionRef = useRef<string | null>(null);
+  const cleanedUpSessionRef = useRef(false);
 
   const progress = useSharedValue(0);
   const contentOpacity = useSharedValue(1);
@@ -203,7 +279,27 @@ export default function ActiveSession() {
           .single();
 
         if (data && !error) {
-          foundItem = mapUserActivity(data);
+          const mappedActivity = mapUserActivity(data);
+          const { data: linkedRows } = await supabase
+            .from('activity_devices')
+            .select('device_id, devices(id, name, type, status, status_level)')
+            .eq('activity_id', id);
+
+          foundItem = {
+            ...mappedActivity,
+            devices: (linkedRows ?? [])
+              .map((row) => normalizeLinkedDevice(row.devices))
+              .filter(Boolean)
+              .map((device) =>
+                mapLinkedDeviceToScenarioState(device as {
+                  id: number;
+                  name: string;
+                  type: string | null;
+                  status?: string | null;
+                  status_level?: number | null;
+                }),
+              ),
+          };
         }
       }
 
@@ -253,7 +349,10 @@ export default function ActiveSession() {
       }
 
       const sId = getScenarioId(foundItem);
-      relatedScenario = sId ? await fetchScenarioTemplateById(sId) : null;
+      relatedScenario = sId ? await fetchScenarioTemplateById(String(sId)) : null;
+      if (!relatedScenario && sId) {
+        relatedScenario = await fetchScenarioFromDbCandidates(String(sId));
+      }
       if (contentType !== 'video' && relatedScenario?.playlist) {
         playlistName = relatedScenario.playlist;
       }
@@ -371,7 +470,7 @@ export default function ActiveSession() {
         instructions: formattedInstructions,
         type: contentType,
         videoUrl: videoUrl,
-        devices: relatedScenario?.devices || getItemDevices(foundItem),
+        devices: configuredDevices,
         tvDeviceName: connectedTvName,
         activityType: activityType,
         ingredients: parsedIngredients,
@@ -431,8 +530,12 @@ export default function ActiveSession() {
           ['meditation', 'yoga', 'general', 'other'].includes(
             getActivityType(foundItem),
           );
+        const basePlaybackOptions = {
+          suppressAppOpen: true,
+        };
         const tvPlaybackOptions = shouldPreferTv
           ? {
+              ...basePlaybackOptions,
               preferredDeviceTypes: ['TV'],
               preferredDeviceNameIncludes: [
                 connectedTvName || '',
@@ -443,7 +546,7 @@ export default function ActiveSession() {
                 'chromecast',
               ].filter(Boolean),
             }
-          : undefined;
+          : basePlaybackOptions;
 
         if (pId) {
           console.log(
@@ -459,7 +562,8 @@ export default function ActiveSession() {
             cooking: '37i9dQZF1DXdbChS9879u9',
             meditation: '37i9dQZF1DWZ0XmS6AnY9s',
           };
-          if (fallbacks[type]) {
+          if (fallbacks[type] && startedPlaybackForSessionRef.current !== String(id)) {
+            startedPlaybackForSessionRef.current = String(id);
             console.log('[Spotify] A usar fallback no Exercício:', type);
             playPlaylist(fallbacks[type], tvPlaybackOptions);
           }
@@ -478,8 +582,10 @@ export default function ActiveSession() {
   }, [id, isAuthenticated, playPlaylist]);
 
   useEffect(() => {
+    startedPlaybackForSessionRef.current = null;
+    cleanedUpSessionRef.current = false;
     loadData();
-  }, [loadData]);
+  }, [id, loadData]);
 
   useEffect(() => {
     if (isVideoSession) return;
@@ -496,6 +602,77 @@ export default function ActiveSession() {
       pulseScale.value = withTiming(1);
     }
   }, [isActive, isVideoSession, pulseScale]);
+
+  const handleToggleSession = () => {
+    const newState = !isActive;
+    setIsActive(newState);
+    setIsMusicPlaying(newState);
+  };
+
+  const handleToggleMusic = () => {
+    if (isMusicPlaying) {
+      pausePlayback();
+    } else {
+      resumePlayback();
+    }
+    setIsMusicPlaying((prev) => !prev);
+  };
+
+  const cleanupSessionDevices = useCallback(async () => {
+    if (cleanedUpSessionRef.current) return;
+    if (!sessionData?.devices?.length) {
+      cleanedUpSessionRef.current = true;
+      return;
+    }
+
+    try {
+      await applyScenarioDeviceStates(sessionData.devices, { forcePowerOn: false });
+    } catch (error) {
+      console.error('Failed to turn off session devices on exit:', error);
+    } finally {
+      cleanedUpSessionRef.current = true;
+    }
+  }, [sessionData]);
+
+  useEffect(() => {
+    if (!isActive || !sessionData?.devices?.length) return;
+
+    const devicesToEnforce = getEnforcedLightDevices(sessionData.devices).map((device) => ({
+      ...device,
+      state: 'on' as const,
+    }));
+
+    if (devicesToEnforce.length === 0) return;
+
+    let cancelled = false;
+
+    const enforceLightingState = async () => {
+      try {
+        await applyScenarioDeviceStates(devicesToEnforce, { forcePowerOn: true });
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Failed to reapply session lighting state:', error);
+        }
+      }
+    };
+
+    void enforceLightingState();
+    const interval = setInterval(() => {
+      void enforceLightingState();
+    }, DEVICE_ENFORCEMENT_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [isActive, sessionData]);
+
+  const exitSession = useCallback(async () => {
+    setIsActive(false);
+    setIsMusicPlaying(false);
+    await cleanupSessionDevices();
+    router.replace('/Activities');
+  }, [cleanupSessionDevices]);
 
   const handleNextStep = useCallback(() => {
     setIsMediaReady(false);
@@ -514,9 +691,9 @@ export default function ActiveSession() {
         setSecondsLeft(nextDuration || 0);
       }, 300);
     } else {
-      router.replace('/Activities');
+      void exitSession();
     }
-  }, [currentStepIndex, sessionData, contentOpacity]);
+  }, [currentStepIndex, sessionData, contentOpacity, exitSession]);
 
   const handlePreviousStep = useCallback(() => {
     setIsMediaReady(false);
@@ -692,12 +869,16 @@ export default function ActiveSession() {
       <ExitModal
         visible={showExitModal}
         onResume={handleResume}
-        onEnd={() => router.replace('/Activities')}
+        onEnd={() => {
+          void exitSession();
+        }}
       />
 
       <SessionHeader
         title={sessionData.title}
-        onBack={() => router.back()}
+        onBack={() => {
+          void exitSession();
+        }}
         onCancel={handleCancel}
       />
 
@@ -766,6 +947,9 @@ export default function ActiveSession() {
             progress={progress}
             onToggleSession={handleToggleSession}
             onToggleMusic={handleToggleMusic}
+            onNextTrack={nextTrack}
+            onPreviousTrack={previousTrack}
+            onOpenSpotify={openCurrentTrack}
             currentTrack={currentTrack}
             stepIndex={currentStepIndex}
             showPauseButton={

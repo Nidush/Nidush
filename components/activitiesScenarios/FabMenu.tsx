@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { router } from 'expo-router';
 import React from 'react';
 import {
   Platform,
@@ -11,6 +10,8 @@ import {
   View,
 } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+
+import { router } from 'expo-router';
 
 interface FabMenuProps {
   isOpen: boolean;
@@ -52,26 +53,6 @@ export const FabMenu = ({ isOpen, setIsOpen, onAiActivityPress }: FabMenuProps) 
           className="absolute bottom-[110px] right-[25px] items-end z-[11]"
           accessibilityViewIsModal={true}
         >
-          {onAiActivityPress && (
-            <TouchableOpacity
-              className="mb-4"
-              onPress={() => {
-                setIsOpen(false);
-                onAiActivityPress();
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Create activity with AI"
-            >
-              <Text
-                maxFontSizeMultiplier={1.2}
-                className="bg-[#3E545C] px-10 py-4 rounded-full text-xl text-white shadow-md overflow-hidden"
-                style={{ fontFamily: 'Nunito_600SemiBold' }}
-              >
-                AI idea
-              </Text>
-            </TouchableOpacity>
-          )}
-
           <TouchableOpacity
             className="mb-4"
             onPress={() => {
