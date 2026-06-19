@@ -1,5 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/utils/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -16,12 +16,14 @@ import {
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AudiobookVisuals } from '@/components/activeSession/AudiobookVisuals';
+import { CookingVisuals } from '@/components/activeSession/CookingVisuals';
 import { ExitModal } from '@/components/activeSession/ExitModal';
+import { MeditationVisuals } from '@/components/activeSession/MeditationVisuals';
 import { SessionControls } from '@/components/activeSession/SessionControls';
 import { SessionHeader } from '@/components/activeSession/SessionHeader';
 import { SessionVideo } from '@/components/activeSession/SessionVideo';
-import { SessionVisuals } from '@/components/activeSession/SessionVisuals';
-import { SessionWave } from '@/components/activeSession/SessionWave';
+import { WorkoutVisuals } from '@/components/activeSession/WorkoutVisuals';
 import { useSpotify } from '@/context/SpotifyContext';
 
 import {
@@ -46,6 +48,9 @@ type FormattedInstruction = {
   text: string;
   duration?: number;
   description?: string;
+  isIngredientsStep?: boolean;
+  audio_url?: string;
+  isChapterListStep?: boolean;
 };
 
 type SessionData = {
@@ -58,6 +63,9 @@ type SessionData = {
   videoUrl?: string;
   devices: ScenarioDeviceState[];
   tvDeviceName?: string;
+  activityType: string;
+  ingredients?: any[];
+  contentImageUrl?: string;
 };
 
 type StoredActivityLike = Partial<Activity> & {
@@ -79,6 +87,8 @@ type ContentRow = {
   type?: string | null;
   instructions?: unknown;
   video_url?: string | null;
+  ingredients?: unknown;
+  image?: string | null;
 };
 
 const DEVICE_ENFORCEMENT_INTERVAL_MS = 15000;
@@ -143,10 +153,7 @@ const fetchScenarioFromDbCandidates = async (rawScenarioId: string) => {
 
 const isStoredActivityLike = (value: unknown): value is StoredActivityLike =>
   Boolean(
-    value &&
-      typeof value === 'object' &&
-      'id' in value &&
-      'title' in value,
+    value && typeof value === 'object' && 'id' in value && 'title' in value,
   );
 
 const parseArrayValue = <T,>(value: unknown): T[] => {
@@ -164,53 +171,41 @@ const parseArrayValue = <T,>(value: unknown): T[] => {
   return Array.isArray(value) ? (value as T[]) : [value as T];
 };
 
-const splitInstructionText = (value: string) =>
-  value
-    .replace(/\s+/g, ' ')
-    .split(/(?:\r?\n)+|;\s+|[.!?],\s*|(?<=[.!?])\s+(?=[A-Z0-9])|(?<=\d\.)\s+/)
-    .map((part) => part.trim())
-    .filter(Boolean);
+const normalizeIngredients = (value: unknown): any[] => {
+  const parsed = parseArrayValue<any>(value);
 
-const normalizeInstructionSteps = (
-  rawInstructions: Array<FormattedInstruction | string>,
-): FormattedInstruction[] =>
-  rawInstructions.flatMap((step) => {
-    if (typeof step === 'string') {
-      return splitInstructionText(step).map((text) => ({
-        text,
-        duration: undefined,
-        description: undefined,
-      }));
+  return parsed.map((entry) => {
+    if (entry && typeof entry === 'object' && 'item' in entry) {
+      return {
+        item: String((entry as { item?: unknown }).item ?? ''),
+        amount: String((entry as { amount?: unknown }).amount ?? ''),
+      };
     }
 
-    const text = String(step.text ?? '').trim();
-    const splitText = splitInstructionText(text);
-    if (splitText.length <= 1) return [step];
+    const text = String(entry ?? '');
+    const spaceIdx = text.indexOf(' ');
 
-    return splitText.map((part, index) => ({
-      text: part,
-      duration: index === 0 ? step.duration : undefined,
-      description: step.description,
-    }));
+    if (spaceIdx === -1) return { item: text, amount: '' };
+
+    return { amount: text.slice(0, spaceIdx), item: text.slice(spaceIdx + 1) };
   });
+};
 
 const getActivityType = (item: Partial<Activity> | Partial<Scenario>) =>
   String(('type' in item ? item.type : '') ?? '').toLowerCase();
 
 const getActivityRoom = (item: StoredActivityLike | Activity | Scenario) =>
-  item.room ?? (typeof item.room_id === 'string' ? item.room_id : 'Living Room');
+  item.room ??
+  (typeof item.room_id === 'string' ? item.room_id : 'Living Room');
 
-const getScenarioId = (item: StoredActivityLike | Activity | Scenario) =>
-  'scenario_id' in item ? item.scenario_id : undefined;
-
-const getContentId = (item: StoredActivityLike | Activity | Scenario) =>
-  'content_id' in item ? item.content_id : undefined;
-
-const getPlaylistId = (item: StoredActivityLike | Activity | Scenario) =>
-  'playlist_id' in item ? item.playlist_id : undefined;
+const getScenarioId = (item: any) => item.scenario_id ?? item.scenarioId;
+const getContentId = (item: any) => item.content_id ?? item.contentId;
+const getPlaylistId = (item: any) => item.playlist_id ?? item.playlistId;
 
 const getItemDevices = (item: StoredActivityLike | Activity | Scenario) =>
-  ('devices' in item && Array.isArray(item.devices) ? item.devices : []) as ScenarioDeviceState[];
+  ('devices' in item && Array.isArray(item.devices)
+    ? item.devices
+    : []) as ScenarioDeviceState[];
 
 const resolveConfiguredDevices = (
   activityDevices: ScenarioDeviceState[],
@@ -235,9 +230,6 @@ export default function ActiveSession() {
     playPlaylist,
     pausePlayback,
     resumePlayback,
-    nextTrack,
-    previousTrack,
-    openCurrentTrack,
     currentTrack,
     isAuthenticated,
   } = useSpotify();
@@ -257,24 +249,28 @@ export default function ActiveSession() {
   const progress = useSharedValue(0);
   const contentOpacity = useSharedValue(1);
   const pulseScale = useSharedValue(1);
+  const [isMediaReady, setIsMediaReady] = useState(false);
 
   const isVideoSession = sessionData?.type === 'video';
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      let foundItem: Activity | Scenario | StoredActivityLike | null | undefined =
-        await fetchActivityTemplateById(id);
+      let foundItem:
+        | Activity
+        | Scenario
+        | StoredActivityLike
+        | null
+        | undefined = await fetchActivityTemplateById(id);
       if (!foundItem) {
         const stored = await AsyncStorage.getItem('@myActivities');
         if (stored) {
-          const parsedStored = parseArrayValue<unknown>(stored).filter(isStoredActivityLike);
+          const parsedStored =
+            parseArrayValue<unknown>(stored).filter(isStoredActivityLike);
           foundItem = parsedStored.find((activity) => activity.id === id);
         }
       }
       if (!foundItem) foundItem = await fetchScenarioTemplateById(id);
-
-       // Se não encontrou localmente, tentar no Supabase (atividades criadas pelo user)
       if (!foundItem) {
         const { data, error } = await supabase
           .from('activities')
@@ -324,23 +320,24 @@ export default function ActiveSession() {
       const localContent = contentId ? CONTENTS[String(contentId)] : null;
 
       if (foundItem && contentId) {
-        // Fetch content from Supabase
         const { data: contentRows } = await supabase
           .from('contents')
           .select('*')
           .eq('id', contentId)
           .limit(1);
 
-        contentData = contentRows && contentRows.length > 0 ? contentRows[0] : null;
+        contentData =
+          contentRows && contentRows.length > 0 ? contentRows[0] : null;
 
         if (contentData) {
-          playlistName = contentData.title || localContent?.title || playlistName;
+          playlistName =
+            contentData.title || localContent?.title || playlistName;
           if (contentData.type === 'video' || localContent?.type === 'video') {
             contentType = 'video';
-            videoUrl = localContent?.videoUrl || contentData.video_url || undefined;
+            videoUrl =
+              localContent?.videoUrl || contentData.video_url || undefined;
           }
         } else {
-          // Fallback to local CONTENTS
           if (localContent) {
             playlistName = localContent.title;
             if (localContent.type === 'video') {
@@ -360,7 +357,9 @@ export default function ActiveSession() {
         playlistName = relatedScenario.playlist;
       }
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (user) {
         const { data: homeAssoc } = await supabase
           .from('user_homes')
@@ -392,17 +391,40 @@ export default function ActiveSession() {
       }
 
       const rawInstructions = parseArrayValue<FormattedInstruction | string>(
-        contentData?.instructions ||
-        localContent?.instructions ||
-        []
+        contentData?.instructions || localContent?.instructions || [],
       );
 
-      const formattedInstructions = normalizeInstructionSteps(rawInstructions.map((step) => {
-        if (typeof step === 'string') {
-          return { text: step, duration: undefined, description: undefined };
-        }
-        return step;
-      }));
+      const formattedInstructions: FormattedInstruction[] = rawInstructions
+        .map((step: any) => {
+          if (typeof step === 'string') {
+            return { text: step, duration: undefined, description: undefined };
+          }
+          return {
+            text: String(step.text ?? ''),
+            duration: step.duration,
+            description: step.description,
+            audio_url: step.url || step.audio_url,
+          };
+        })
+        .flatMap((stepObj) => {
+          if (!stepObj.text) return [];
+
+          const sentences = stepObj.text
+            .split('.')
+            .map((sentence) => sentence.trim())
+            .filter((sentence) => sentence.length > 0);
+
+          if (sentences.length <= 1) {
+            return [stepObj];
+          }
+
+          return sentences.map((sentence, index) => ({
+            text: sentence + '.',
+            duration: index === 0 ? stepObj.duration : undefined,
+            description: stepObj.description,
+            audio_url: index === 0 ? stepObj.audio_url : undefined,
+          }));
+        });
 
       if (formattedInstructions.length === 0) {
         formattedInstructions.push({
@@ -412,10 +434,33 @@ export default function ActiveSession() {
         });
       }
 
-      const configuredDevices = resolveConfiguredDevices(
-        getItemDevices(foundItem),
-        Array.isArray(relatedScenario?.devices) ? relatedScenario.devices : [],
-      );
+      const robustIngredients =
+        contentData?.ingredients ??
+        (foundItem as any)?.content?.ingredients ??
+        (foundItem as any)?.contents?.ingredients ??
+        (foundItem as any)?.ingredients ??
+        localContent?.ingredients ??
+        [];
+
+      const parsedIngredients = normalizeIngredients(robustIngredients);
+      const activityType = getActivityType(foundItem);
+
+      if (activityType === 'cooking' && parsedIngredients.length > 0) {
+        formattedInstructions.unshift({
+          text: 'Check and prepare all the required ingredients before starting the preparation.',
+          duration: undefined,
+          description: undefined,
+          isIngredientsStep: true,
+        });
+      }
+      if (activityType === 'audiobooks' && formattedInstructions.length > 0) {
+        formattedInstructions.unshift({
+          text: 'Table of Contents',
+          duration: undefined,
+          description: undefined,
+          isChapterListStep: true,
+        });
+      }
 
       setSessionData({
         title: foundItem.title || 'Session',
@@ -427,27 +472,33 @@ export default function ActiveSession() {
         videoUrl: videoUrl,
         devices: configuredDevices,
         tvDeviceName: connectedTvName,
+        activityType: activityType,
+        ingredients: parsedIngredients,
+        contentImageUrl: contentData?.image || undefined,
       });
 
-      // Tocar música no Spotify só em sessões sem vídeo.
-      if (isAuthenticated && contentType !== 'video') {
-        let pId = getPlaylistId(foundItem) || relatedScenario?.playlist_id;
-        
+      if (
+        isAuthenticated &&
+        contentType !== 'video' &&
+        activityType !== 'audiobooks'
+      ) {
+        let pId = getPlaylistId(foundItem);
+
         if (!pId) {
           const type = getActivityType(foundItem);
           let sId = getScenarioId(foundItem);
-          
+
           if (!sId || sId === 'null') {
-             // Tentar mapear o tipo para um cenário padrão local
-             if (type === 'workout') sId = '1';
-             else if (type === 'cooking') sId = '2';
-             else if (type === 'meditation') sId = '3';
-             else sId = '1';
+            if (type === 'workout') sId = '1';
+            else if (type === 'cooking') sId = '2';
+            else if (type === 'meditation') sId = '3';
+            else sId = '1';
           }
 
-          console.log(`[Spotify] Traduzindo tipo "${type}" para cenário: ${sId}`);
-          
-          // 1. Tentar catálogo de cenários
+          console.log(
+            `[Spotify] Traduzindo tipo "${type}" para cenário: ${sId}`,
+          );
+
           const templateScenarioId = normalizeScenarioTemplateId(sId);
           const templateScenario = templateScenarioId
             ? await fetchScenarioTemplateById(templateScenarioId)
@@ -463,19 +514,17 @@ export default function ActiveSession() {
             .maybeSingle();
           if (!pId) pId = scenData?.playlist_id;
 
-          // 3. Fallback Final (Workout)
           if (!pId) pId = '37i9dQZF1DX76W9kuv1Z0g';
         }
-        
-        const sessionDevices = resolveConfiguredDevices(
-          getItemDevices(foundItem),
-          Array.isArray(relatedScenario?.devices) ? relatedScenario.devices : [],
+
+        const sessionDevices =
+          relatedScenario?.devices || getItemDevices(foundItem);
+        const hasScenarioTv = sessionDevices.some(
+          (config: ScenarioDeviceState) => {
+            const device = SMART_HOME_DEVICES[config.deviceId];
+            return device?.type === 'tv';
+          },
         );
-        const hasScenarioTv = sessionDevices.some((config: ScenarioDeviceState) => {
-          const device = SMART_HOME_DEVICES[config.deviceId];
-          const fallbackMeta = getScenarioDeviceMeta(config);
-          return device?.type === 'tv' || fallbackMeta.type === 'tv';
-        });
         const shouldPreferTv =
           hasScenarioTv &&
           ['meditation', 'yoga', 'general', 'other'].includes(
@@ -499,9 +548,11 @@ export default function ActiveSession() {
             }
           : basePlaybackOptions;
 
-        if (pId && startedPlaybackForSessionRef.current !== String(id)) {
-          startedPlaybackForSessionRef.current = String(id);
-          console.log('[Spotify] A iniciar música no momento do Exercício:', pId);
+        if (pId) {
+          console.log(
+            '[Spotify] A iniciar música no momento do Exercício:',
+            pId,
+          );
           playPlaylist(pId, tvPlaybackOptions);
         } else {
           // Fallback por tipo de atividade
@@ -509,7 +560,7 @@ export default function ActiveSession() {
           const fallbacks: Record<string, string> = {
             workout: '37i9dQZF1DX76W9kuv1Z0g',
             cooking: '37i9dQZF1DXdbChS9879u9',
-            meditation: '37i9dQZF1DWZ0XmS6AnY9s'
+            meditation: '37i9dQZF1DWZ0XmS6AnY9s',
           };
           if (fallbacks[type] && startedPlaybackForSessionRef.current !== String(id)) {
             startedPlaybackForSessionRef.current = String(id);
@@ -624,6 +675,7 @@ export default function ActiveSession() {
   }, [cleanupSessionDevices]);
 
   const handleNextStep = useCallback(() => {
+    setIsMediaReady(false);
     if (!sessionData) return;
     const totalSteps = sessionData.instructions.length;
 
@@ -643,6 +695,60 @@ export default function ActiveSession() {
     }
   }, [currentStepIndex, sessionData, contentOpacity, exitSession]);
 
+  const handlePreviousStep = useCallback(() => {
+    setIsMediaReady(false);
+    if (!sessionData || currentStepIndex === 0) return;
+
+    const prevIndex = currentStepIndex - 1;
+
+    contentOpacity.value = withSequence(
+      withTiming(0, { duration: 300 }),
+      withTiming(1, { duration: 300 }),
+    );
+
+    setTimeout(() => {
+      setCurrentStepIndex(prevIndex);
+      const prevDuration = sessionData.instructions[prevIndex].duration;
+      setSecondsLeft(prevDuration || 0);
+    }, 300);
+  }, [currentStepIndex, sessionData, contentOpacity]);
+  const handleJumpToStep = useCallback(
+    (index: number) => {
+      setIsMediaReady(false);
+      setIsActive(true);
+      setIsMusicPlaying(false);
+
+      if (!sessionData) return;
+
+      contentOpacity.value = withSequence(
+        withTiming(0, { duration: 300 }),
+        withTiming(1, { duration: 300 }),
+      );
+
+      setTimeout(() => {
+        setCurrentStepIndex(index);
+        const targetDuration = sessionData.instructions[index].duration;
+        setSecondsLeft(targetDuration || 0);
+      }, 300);
+    },
+    [sessionData, contentOpacity],
+  );
+  const handleShowChapters = useCallback(() => {
+    if (!sessionData) return;
+
+    setIsMediaReady(false);
+    setIsActive(false);
+
+    contentOpacity.value = withSequence(
+      withTiming(0, { duration: 300 }),
+      withTiming(1, { duration: 300 }),
+    );
+
+    setTimeout(() => {
+      setCurrentStepIndex(0);
+      setSecondsLeft(0);
+    }, 300);
+  }, [sessionData, contentOpacity]);
   useEffect(() => {
     if (sessionData && currentStepIndex > 0 && !isVideoSession) {
       const currentInstruction =
@@ -655,25 +761,40 @@ export default function ActiveSession() {
 
   useEffect(() => {
     if (isVideoSession) return;
-    let interval: ReturnType<typeof setInterval> | null = null;
     const currentStep = sessionData?.instructions[currentStepIndex];
     const isTimedStep = currentStep?.duration !== undefined;
 
-    if (isActive && isTimedStep && secondsLeft > 0) {
-      interval = setInterval(() => setSecondsLeft((prev) => prev - 1), 1000);
-    } else if (isActive && isTimedStep && secondsLeft === 0) {
-      handleNextStep();
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    if (isActive && isTimedStep && isMediaReady) {
+      if (secondsLeft > 0) {
+        interval = setInterval(() => {
+          setSecondsLeft((prev) => {
+            if (prev <= 1) {
+              if (interval) clearInterval(interval);
+              setTimeout(() => handleNextStep(), 0);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      } else {
+        // Se já for zero
+        handleNextStep();
+      }
     }
+
     return () => {
       if (interval) clearInterval(interval);
     };
   }, [
     isActive,
-    secondsLeft,
-    sessionData,
-    currentStepIndex,
-    handleNextStep,
+    isMediaReady,
     isVideoSession,
+    currentStepIndex,
+    sessionData,
+    handleNextStep,
+    secondsLeft,
   ]);
 
   useEffect(() => {
@@ -684,6 +805,24 @@ export default function ActiveSession() {
       progress.value = withTiming(percent, { duration: 500 });
     }
   }, [currentStepIndex, sessionData, isVideoSession, progress]);
+
+  const handleToggleSession = () => {
+    const newState = !isActive;
+    setIsActive(newState);
+    setIsMusicPlaying(newState);
+  };
+  const handleAudioReady = useCallback(() => {
+    setIsMediaReady(true);
+  }, []);
+
+  const handleToggleMusic = () => {
+    if (isMusicPlaying) {
+      pausePlayback();
+    } else {
+      resumePlayback();
+    }
+    setIsMusicPlaying((prev) => !prev);
+  };
 
   const handleCancel = () => {
     setIsActive(false);
@@ -710,10 +849,14 @@ export default function ActiveSession() {
   }
 
   const currentStep = sessionData.instructions[currentStepIndex];
-
   if (!currentStep && !isVideoSession) return null;
-
   const isLastStep = currentStepIndex === sessionData.instructions.length - 1;
+
+  // Variáveis auxiliares para legibilidade do fluxo condicional
+  const isCooking = sessionData.activityType === 'cooking';
+  const isWorkout = sessionData.activityType === 'workout';
+  const isAudiobook = sessionData.activityType === 'audiobooks';
+  const isMeditation = sessionData.activityType === 'meditation';
 
   return (
     <SafeAreaView className="flex-1 bg-[#F1F4EE]" accessibilityLanguage="en-US">
@@ -746,14 +889,48 @@ export default function ActiveSession() {
         />
       ) : (
         <>
-          <SessionVisuals
-            text={currentStep.text}
-            stepIndex={currentStepIndex}
-            pulseScale={pulseScale}
-            contentOpacity={contentOpacity}
-          />
-
-          <SessionWave />
+          {isCooking ? (
+            <CookingVisuals
+              step={currentStep}
+              ingredients={sessionData.ingredients ?? []}
+              stepIndex={currentStepIndex}
+              contentOpacity={contentOpacity}
+            />
+          ) : isAudiobook ? (
+            <AudiobookVisuals
+              step={currentStep}
+              instructions={sessionData.instructions}
+              stepIndex={currentStepIndex}
+              contentOpacity={contentOpacity}
+              isActive={isActive}
+              imageUrl={
+                sessionData.contentImageUrl ||
+                (typeof sessionData.image === 'string'
+                  ? sessionData.image
+                  : undefined)
+              }
+              onSelectChapter={handleJumpToStep}
+            />
+          ) : isWorkout ? (
+            <WorkoutVisuals
+              step={currentStep}
+              stepIndex={currentStepIndex}
+              contentOpacity={contentOpacity}
+              imageUrl={
+                sessionData.contentImageUrl ||
+                (typeof sessionData.image === 'string'
+                  ? sessionData.image
+                  : undefined)
+              }
+            />
+          ) : (
+            <MeditationVisuals
+              step={currentStep}
+              stepIndex={currentStepIndex}
+              pulseScale={pulseScale}
+              contentOpacity={contentOpacity}
+            />
+          )}
 
           <SessionControls
             isActive={isActive}
@@ -762,6 +939,8 @@ export default function ActiveSession() {
             isManualStep={currentStep.duration === undefined}
             isLastStep={isLastStep}
             onNextStep={handleNextStep}
+            isFirstStep={currentStepIndex === 0}
+            onPrevStep={handlePreviousStep}
             playlistName={sessionData.playlistName}
             room={sessionData.room}
             image={sessionData.image}
@@ -772,6 +951,15 @@ export default function ActiveSession() {
             onPreviousTrack={previousTrack}
             onOpenSpotify={openCurrentTrack}
             currentTrack={currentTrack}
+            stepIndex={currentStepIndex}
+            showPauseButton={
+              !isCooking && !isWorkout && !currentStep.isChapterListStep
+            }
+            guideText={isMeditation ? currentStep.text : undefined}
+            guideAudioUrl={currentStep.audio_url}
+            onAudioReady={handleAudioReady}
+            showChaptersButton={isAudiobook && !currentStep.isChapterListStep}
+            onShowChapters={handleShowChapters}
           />
         </>
       )}
