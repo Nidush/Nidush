@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import {
   DimensionValue,
+  Image,
   ImageSourcePropType,
   StyleSheet,
   Text,
@@ -35,11 +36,11 @@ export const BaseCard = ({
       style={{ width, aspectRatio: 1 }}
     >
       <View style={StyleSheet.absoluteFill}>
-        <ExpoImage
+        <Image
           source={image}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          cachePolicy="memory-disk"
+          style={[StyleSheet.absoluteFill, { transform: [{ scale: 1.45 }] }]}
+          resizeMode="cover"
+          blurRadius={85}
           accessible={false}
         />
         <View className="absolute inset-0 " />

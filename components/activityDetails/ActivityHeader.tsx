@@ -10,6 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
+  Image,
   ImageSourcePropType,
   Modal,
   StyleSheet,
@@ -89,18 +90,19 @@ export const ActivityHeader = ({
   );
 
   return (
-    <View className="w-full h-[450px] relative">
+    <View className="w-full h-[450px] relative overflow-hidden">
       {/* Background blur + masked image */}
       <View
         style={StyleSheet.absoluteFill}
         importantForAccessibility="no"
         accessibilityElementsHidden={true}
       >
-        <ExpoImage
+        <Image
           source={imageSource}
-          style={{ width: '100%', height: '100%' }}
-          contentFit="cover"
-          cachePolicy="memory-disk"
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+          blurRadius={70}
+          accessible={false}
         />
         <View className="absolute inset-0" />
       </View>
