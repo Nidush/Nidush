@@ -507,6 +507,10 @@ export default function SetupProfile() {
                     homeError && 'status' in homeError
                       ? Number((homeError as { status?: number }).status)
                       : undefined;
+                  const joinCodeNotFound = homeError && (
+                    homeError.code === 'P0002' ||
+                    String(homeError.message).toLowerCase().includes('join code not found')
+                  );
                   const rpcMissing = homeError && (
                     homeError.code === 'PGRST202' ||
                     homeErrorStatus === 404 ||
@@ -541,7 +545,9 @@ export default function SetupProfile() {
                   }
 
                   if (homeError || !joinedHomeId) {
-                    if (homeError) logger.error('Error finding existing home:', homeError);
+                    if (homeError && !joinCodeNotFound) {
+                      logger.error('Error finding existing home:', homeError);
+                    }
                     if (rpcMissing) {
                       openAlert(
                         'Home join unavailable',

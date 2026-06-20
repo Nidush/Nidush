@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     const authHeader = req.headers.get('Authorization')
 
-    if (!authHeader) throw new Error('Sessão não encontrada.')
+    if (!authHeader) throw new Error('Session not found.')
 
     const authClient = createClient(
       supabaseUrl,
@@ -26,19 +26,19 @@ Deno.serve(async (req) => {
     )
 
     const { data: { user }, error: authError } = await authClient.auth.getUser()
-    if (authError || !user) throw new Error('Sessão inválida.')
+    if (authError || !user) throw new Error('Invalid session.')
 
     const { action, joinCode } = await req.json()
 
     if (action === 'join-home') {
       const normalizedJoinCode = String(joinCode ?? '').trim().toUpperCase()
-      if (!normalizedJoinCode) throw new Error('Código de casa obrigatório.')
+      if (!normalizedJoinCode) throw new Error('Join code is required.')
 
       const { data: joinedHomeId, error: joinError } = await authClient
         .rpc('join_home_by_code', { p_join_code: normalizedJoinCode })
 
       if (joinError || !joinedHomeId) {
-        throw joinError ?? new Error('Código de casa inválido.')
+        throw joinError ?? new Error('Join code not found')
       }
 
       const { data: home, error: homeError } = await authClient
@@ -47,17 +47,17 @@ Deno.serve(async (req) => {
         .eq('id', joinedHomeId)
         .maybeSingle()
 
-      if (homeError || !home) throw new Error('Casa não encontrada após o join.')
+      if (homeError || !home) throw new Error('Home not found after joining.')
 
       log.info('User joined home successfully.', {
         userId: user.id,
         homeId: home.id,
         action,
       })
-      return jsonResponse({ message: "Sucesso!", home, requestId: log.requestId }, 200, corsHeaders)
+      return jsonResponse({ message: 'Success!', home, requestId: log.requestId }, 200, corsHeaders)
     }
 
-    throw new Error('Ação inválida.')
+    throw new Error('Invalid action.')
 
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
