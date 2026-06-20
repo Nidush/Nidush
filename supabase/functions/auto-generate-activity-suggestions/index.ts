@@ -90,6 +90,13 @@ const getRecentPresenceWindowMinutes = () => {
   return Math.min(raw, 180)
 }
 
+const getScheduledSlotIso = (date: Date) => {
+  const slot = new Date(date)
+  slot.setUTCSeconds(0, 0)
+  slot.setUTCMinutes(Math.floor(slot.getUTCMinutes() / 15) * 15)
+  return slot.toISOString()
+}
+
 const isUserRecentlyActive = (value: string | null | undefined, now: Date, windowMinutes: number) => {
   if (!value) return false
   const timestamp = new Date(value).getTime()
@@ -227,7 +234,7 @@ const chooseAnchorRoutine = (routines: RoutineRow[], bucket: string, date: Date)
 }
 
 const shouldProcessUser = (candidate: CandidateUser, bucket: string, now: Date) => {
-  if (candidate.routines.length === 0) return bucket === 'evening'
+  if (candidate.routines.length === 0) return true
   return Boolean(chooseAnchorRoutine(candidate.routines, bucket, now))
 }
 
@@ -545,6 +552,7 @@ Deno.serve(async (req) => {
   const now = new Date()
   const bucket = getTimeBucket(now)
   const scheduledDate = now.toISOString().slice(0, 10)
+  const scheduledSlot = getScheduledSlotIso(now)
   const body = await req.json().catch(() => ({}))
   const source = clampText(body?.source, 'pg_cron', 40)
 
@@ -557,6 +565,7 @@ Deno.serve(async (req) => {
     source,
     bucket,
     scheduledDate,
+    scheduledSlot,
     created: [] as Array<Record<string, unknown>>,
     skipped: [] as Array<Record<string, unknown>>,
     errors: [] as string[],
@@ -565,7 +574,7 @@ Deno.serve(async (req) => {
   try {
     const { data: run } = await supabase
       .from('ai_auto_generation_runs')
-      .insert({ status: 'running', started_at: now.toISOString(), details: { source, bucket, scheduledDate } })
+      .insert({ status: 'running', started_at: now.toISOString(), details: { source, bucket, scheduledDate, scheduledSlot } })
       .select('id')
       .maybeSingle()
     runId = run?.id ?? null
@@ -613,8 +622,7 @@ Deno.serve(async (req) => {
         .from('ai_auto_generated_activities')
         .select('id')
         .eq('user_id', candidate.userId)
-        .eq('scheduled_for_date', scheduledDate)
-        .eq('time_bucket', bucket)
+        .eq('scheduled_for_slot', scheduledSlot)
         .maybeSingle()
 
       if (existingError) throw existingError
@@ -622,7 +630,7 @@ Deno.serve(async (req) => {
         skippedCount += 1
         ;(details.skipped as Array<Record<string, unknown>>).push({
           userId: candidate.userId,
-          reason: 'already_generated_for_bucket',
+          reason: 'already_generated_for_slot',
         })
         continue
       }
@@ -748,6 +756,7 @@ Deno.serve(async (req) => {
         activity_id: saved.activityId,
         content_id: saved.contentId,
         scheduled_for_date: scheduledDate,
+        scheduled_for_slot: scheduledSlot,
         time_bucket: bucket,
         metadata: {
           source,
@@ -794,6 +803,7 @@ Deno.serve(async (req) => {
       status: 'success',
       bucket,
       scheduledDate,
+      scheduledSlot,
       usersProcessed,
       generatedCount,
       skippedCount,
