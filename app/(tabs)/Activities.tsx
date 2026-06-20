@@ -51,6 +51,7 @@ import {
   getNidushAiErrorMessage,
   saveAiActivityIdea,
 } from '@/utils/aiActivities';
+import { isAiAutoInvocationEnabled } from '@/utils/aiConfig';
 import { logger } from '@/utils/logger';
 import { getDynamicRecommendations } from '@/utils/recommendationEngine';
 
@@ -90,6 +91,7 @@ const UnifiedActivitiesScreen = () => {
   });
 
   const isLoadingRef = useRef(false);
+  const lastAutoRecommendationRequestKeyRef = useRef<string | null>(null);
   const PAGE_SIZE = 10;
 
   // Debounce search query
@@ -180,10 +182,83 @@ const UnifiedActivitiesScreen = () => {
     }, [loadActivities, loadTemplates])
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        lastAutoRecommendationRequestKeyRef.current = null;
+      };
+    }, []),
+  );
+
   useEffect(() => {
-    setAiRecommendedIdeas([]);
-    setIsLoadingAiRecommendations(false);
-  }, [activeFilter, currentState, searchQuery, viewMode]);
+    if (!isAiAutoInvocationEnabled || viewMode !== 'activities') {
+      setAiRecommendedIdeas([]);
+      setIsLoadingAiRecommendations(false);
+      return;
+    }
+
+    const requestKey = JSON.stringify({
+      viewMode,
+      activeFilter,
+      mood: currentState,
+      prompt: debouncedSearchQuery,
+      spotify: isAuthenticated,
+    });
+
+    if (lastAutoRecommendationRequestKeyRef.current === requestKey) {
+      return;
+    }
+
+    let isActive = true;
+    lastAutoRecommendationRequestKeyRef.current = requestKey;
+
+    const loadAiRecommendations = async () => {
+      setIsLoadingAiRecommendations(true);
+
+      try {
+        const spotifyPlaylists = isAuthenticated
+          ? (await getUserPlaylists())
+              .slice(0, 15)
+              .map((playlist) => ({
+                id: playlist.id,
+                name: playlist.name,
+              }))
+          : [];
+
+        const ideas = await fetchAiActivityIdeas({
+          mood: currentState,
+          activeFilter,
+          prompt: debouncedSearchQuery,
+          source: 'activities-auto',
+          spotifyPlaylists,
+        });
+
+        if (!isActive) return;
+        setAiRecommendedIdeas(ideas.slice(0, 5));
+      } catch (error) {
+        if (!isActive) return;
+        logger.warn('Failed to auto-load AI recommendations:', error);
+        setAiRecommendedIdeas([]);
+      } finally {
+        if (isActive) {
+          setIsLoadingAiRecommendations(false);
+        }
+      }
+    };
+
+    void loadAiRecommendations();
+
+    return () => {
+      isActive = false;
+    };
+  }, [
+    activeFilter,
+    currentState,
+    debouncedSearchQuery,
+    getUserPlaylists,
+    isAuthenticated,
+    viewMode,
+  ]);
 
   let [fontsLoaded] = useFonts({
     Nunito_700Bold,

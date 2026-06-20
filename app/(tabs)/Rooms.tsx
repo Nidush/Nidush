@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons, MaterialIcons, Ionicons } from '@expo/vector-icons';
-import { router, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -40,6 +40,8 @@ import {
   subscribeToHomeDeviceChanges,
 } from '../../utils/devices';
 import {
+  GoogleHomeSyncedDevice,
+  syncGoogleHomeSnapshot,
   setGoogleHomeDeviceColor,
   setGoogleHomeDeviceBrightness,
   setGoogleHomeDevicePower,
@@ -107,6 +109,8 @@ const roomsScreenCache: {
   userHomeId: null,
 };
 
+const LIVE_DEVICE_REFRESH_INTERVAL_MS = 12000;
+
 export default function Rooms() {
   // --- Fonts ---
   const [fontsLoaded] = useFonts({
@@ -130,6 +134,7 @@ export default function Rooms() {
   const [userHomeId, setUserHomeId] = useState<number | null>(roomsScreenCache.userHomeId);
   const [isAdjustingLight, setIsAdjustingLight] = useState(false);
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isRefreshingDevicesRef = useRef(false);
   const createPanelTranslateX = useRef(new Animated.Value(900)).current;
 
   // --- Add Device / Room Panel State ---
@@ -154,70 +159,141 @@ export default function Rooms() {
   const [tempLinkedDeviceIds, setTempLinkedDeviceIds] = useState<number[]>([]);
   const [isSavingLinks, setIsSavingLinks] = useState(false);
 
-  const showFeedback = useCallback((message: string, tone: 'error' | 'success' | 'info' = 'info') => {
-    setFeedbackMessage(message);
-    setFeedbackTone(tone);
-  }, []);
+  const syncGoogleHomeDevicesToDb = useCallback(
+    async (userId: string, homeId: number, devices: GoogleHomeSyncedDevice[]) => {
+      const seenExternalIds = new Set<string>();
+      const now = new Date().toISOString();
+      const roomIdByName = new Map<string, number>();
 
-  // --- Load Data from Database ---
-  const loadDatabaseData = useCallback(async (options?: { showLoader?: boolean }) => {
-    const showLoader = options?.showLoader ?? !hasLoadedOnce;
+      const { data: existingRooms, error: roomsError } = await supabase
+        .from('rooms')
+        .select('id, name')
+        .eq('home_id', homeId)
+        .order('id', { ascending: true });
 
-    if (showLoader) {
-      setLoading(true);
-    }
+      if (roomsError) throw roomsError;
 
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setLoadError('Sign in again to load your rooms and devices.');
-        setLoading(false);
-        return;
+      for (const room of existingRooms ?? []) {
+        if (!room?.name) continue;
+        roomIdByName.set(normalizeRoomName(room.name), room.id);
       }
 
-      // 1. Get current user's home ID
-      const { data: homeAssoc } = await supabase
-        .from('user_homes')
-        .select('home_id')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      for (const device of devices) {
+        const externalId = String(device.externalId ?? '').trim();
+        const name = String(device.name ?? '').trim();
+        if (!externalId || !name) continue;
 
-      if (!homeAssoc?.home_id) {
-        setLoadError('Connect this profile to a home to start organizing rooms and devices.');
-        setLoading(false);
-        return;
-      }
-      
-      const homeId = homeAssoc.home_id;
-      setUserHomeId(homeId);
-      roomsScreenCache.userHomeId = homeId;
+        seenExternalIds.add(externalId);
 
-      const [
-        { data: roomsData, error: roomsErr },
-        { data: devicesData, error: devicesErr },
-        { data: activitiesData, error: activitiesErr },
-      ] = await Promise.all([
-        supabase
-          .from('rooms')
-          .select('id, name')
-          .eq('home_id', homeId)
-          .order('id', { ascending: true }),
-        supabase
+        const googleRoomName = String(device.roomName ?? device.roomHint ?? '').trim();
+        let roomId: number | null = null;
+
+        if (googleRoomName) {
+          const normalizedRoomName = normalizeRoomName(googleRoomName);
+          roomId = roomIdByName.get(normalizedRoomName) ?? null;
+
+          if (roomId == null) {
+            const { data: createdRoom, error: createRoomError } = await supabase
+              .from('rooms')
+              .insert({
+                home_id: homeId,
+                name: googleRoomName,
+              })
+              .select('id, name')
+              .single();
+
+            if (createRoomError) throw createRoomError;
+
+            roomId = createdRoom.id;
+            roomIdByName.set(normalizedRoomName, createdRoom.id);
+          }
+        }
+
+        const payload = {
+          name,
+          type: device.type || 'unknown',
+          source: 'google_home',
+          status: device.isOn ? 'On' : 'Off',
+          connectivity_status: device.isOnline === false ? 'offline' : 'online',
+          discovery_method: 'integration',
+          sync_source: 'google_home',
+          user_id: userId,
+          home_id: homeId,
+          external_id: externalId,
+          last_seen: now,
+          manufacturer: device.manufacturer ?? null,
+          model: device.model ?? null,
+          room_id: roomId,
+          room_hint: googleRoomName || null,
+          metadata: {
+            roomName: device.roomName ?? null,
+            roomHint: device.roomHint ?? null,
+            traits: device.traits ?? [],
+            provider: 'google_home',
+            ...((device.metadata ?? {}) as Record<string, unknown>),
+          },
+        };
+
+        const legacyPayload = {
+          name,
+          type: device.type || 'unknown',
+          source: 'google_home',
+          status: device.isOn ? 'On' : 'Off',
+          user_id: userId,
+          home_id: homeId,
+          external_id: externalId,
+          last_seen: now,
+          room_id: roomId,
+        };
+
+        const { data: existing, error: existingError } = await supabase
           .from('devices')
-          .select('*')
-          .eq('home_id', homeId),
-        supabase
-          .from('activities')
-          .select('*')
-          .eq('home_id', homeId),
-      ]);
+          .select('id')
+          .eq('home_id', homeId)
+          .eq('source', 'google_home')
+          .eq('external_id', externalId)
+          .limit(1)
+          .maybeSingle();
 
-      if (roomsErr) throw roomsErr;
-      if (devicesErr) throw devicesErr;
-      if (activitiesErr) throw activitiesErr;
+        if (existingError) throw existingError;
 
-      const loadedRooms = roomsData || [];
-      const loadedActivities = activitiesData || [];
+        const request = existing
+          ? supabase.from('devices').update(payload).eq('id', existing.id)
+          : supabase.from('devices').insert(payload);
+
+        let { error } = await request;
+
+        if (error?.code === '42703') {
+          const fallbackRequest = existing
+            ? supabase.from('devices').update(legacyPayload).eq('id', existing.id)
+            : supabase.from('devices').insert(legacyPayload);
+
+          const fallbackResult = await fallbackRequest;
+          error = fallbackResult.error;
+        }
+
+        if (error) throw error;
+      }
+
+      if (seenExternalIds.size > 0) {
+        await supabase
+          .from('devices')
+          .update({
+            status: 'Off',
+            connectivity_status: 'offline',
+          })
+          .eq('home_id', homeId)
+          .eq('source', 'google_home')
+          .not('external_id', 'in', `(${Array.from(seenExternalIds)
+            .map((value) => `"${value.replace(/"/g, '\\"')}"`)
+            .join(',')})`);
+      }
+    },
+    [],
+  );
+
+  const mapVisibleDevices = useCallback(
+    (devicesData: DeviceRecord[], loadedRooms: Room[]) => {
       const roomIdByName = new Map(
         loadedRooms.map((room) => [normalizeRoomName(room.name), room.id] as const),
       );
@@ -258,14 +334,109 @@ export default function Rooms() {
           };
         });
 
+      return {
+        mappedDevices,
+        virtualRooms,
+      };
+    },
+    [],
+  );
+
+  const showFeedback = useCallback((message: string, tone: 'error' | 'success' | 'info' = 'info') => {
+    setFeedbackMessage(message);
+    setFeedbackTone(tone);
+  }, []);
+
+  // --- Load Data from Database ---
+  const loadDatabaseData = useCallback(async (options?: { showLoader?: boolean }) => {
+    if (isRefreshingDevicesRef.current) return;
+    isRefreshingDevicesRef.current = true;
+
+    const showLoader = options?.showLoader ?? !hasLoadedOnce;
+
+    if (showLoader) {
+      setLoading(true);
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLoadError('Sign in again to load your rooms and devices.');
+        setLoading(false);
+        return;
+      }
+
+      // 1. Get current user's home ID
+      const { data: homeAssoc } = await supabase
+        .from('user_homes')
+        .select('home_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!homeAssoc?.home_id) {
+        setLoadError('Connect this profile to a home to start organizing rooms and devices.');
+        setLoading(false);
+        return;
+      }
+      
+      const homeId = homeAssoc.home_id;
+      setUserHomeId(homeId);
+      roomsScreenCache.userHomeId = homeId;
+
+      try {
+        const snapshot = await syncGoogleHomeSnapshot();
+        if (snapshot.devices.length > 0) {
+          await syncGoogleHomeDevicesToDb(user.id, homeId, snapshot.devices);
+        }
+      } catch (error) {
+        console.warn('Rooms screen could not refresh Google Home live state:', error);
+      }
+
+      const [
+        { data: roomsData, error: roomsErr },
+        { data: devicesData, error: devicesErr },
+        { data: activitiesData, error: activitiesErr },
+      ] = await Promise.all([
+        supabase
+          .from('rooms')
+          .select('id, name')
+          .eq('home_id', homeId)
+          .order('id', { ascending: true }),
+        supabase
+          .from('devices')
+          .select('*')
+          .eq('home_id', homeId),
+        supabase
+          .from('activities')
+          .select('*')
+          .eq('home_id', homeId),
+      ]);
+
+      if (roomsErr) throw roomsErr;
+      if (devicesErr) throw devicesErr;
+      if (activitiesErr) throw activitiesErr;
+
+      const loadedRooms = roomsData || [];
+      const loadedActivities = activitiesData || [];
+      const { mappedDevices, virtualRooms } = mapVisibleDevices(
+        devicesData || [],
+        loadedRooms,
+      );
       const effectiveRooms = [...loadedRooms, ...virtualRooms];
 
       setRooms(effectiveRooms);
       setAllDevices(mappedDevices);
       setAllActivities(loadedActivities);
       setLoadError(null);
-      setActiveRoomId(null);
-      roomsScreenCache.activeRoomId = null;
+      setActiveRoomId((prev) => {
+        if (prev === null) return null;
+        return effectiveRooms.some((room) => room.id === prev) ? prev : null;
+      });
+      roomsScreenCache.activeRoomId =
+        roomsScreenCache.activeRoomId !== null &&
+        effectiveRooms.some((room) => room.id === roomsScreenCache.activeRoomId)
+          ? roomsScreenCache.activeRoomId
+          : null;
       roomsScreenCache.rooms = effectiveRooms;
       roomsScreenCache.allDevices = mappedDevices;
       roomsScreenCache.allActivities = loadedActivities;
@@ -311,11 +482,76 @@ export default function Rooms() {
       setLoadError('We could not load your smart home right now. Pull to refresh or try again in a moment.');
       roomsScreenCache.loadError = 'We could not load your smart home right now. Pull to refresh or try again in a moment.';
     } finally {
+      isRefreshingDevicesRef.current = false;
       roomsScreenCache.hasLoadedOnce = true;
       setHasLoadedOnce(true);
       setLoading(false);
     }
-  }, [hasLoadedOnce]);
+  }, [hasLoadedOnce, mapVisibleDevices, syncGoogleHomeDevicesToDb]);
+
+  const refreshDevicesOnly = useCallback(async () => {
+    if (isRefreshingDevicesRef.current) return;
+    isRefreshingDevicesRef.current = true;
+
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: homeAssoc } = await supabase
+        .from('user_homes')
+        .select('home_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      const homeId = homeAssoc?.home_id;
+      if (!homeId) return;
+
+      try {
+        const snapshot = await syncGoogleHomeSnapshot();
+        if (snapshot.devices.length > 0) {
+          await syncGoogleHomeDevicesToDb(user.id, homeId, snapshot.devices);
+        }
+      } catch (error) {
+        console.warn('Rooms screen could not refresh Google Home live state:', error);
+      }
+
+      const { data: devicesData, error: devicesErr } = await supabase
+        .from('devices')
+        .select('*')
+        .eq('home_id', homeId);
+
+      if (devicesErr) throw devicesErr;
+
+      const baseRooms = roomsScreenCache.rooms.filter((room) => room.id > 0);
+      const { mappedDevices, virtualRooms } = mapVisibleDevices(
+        devicesData || [],
+        baseRooms,
+      );
+      const effectiveRooms = [...baseRooms, ...virtualRooms];
+
+      setAllDevices(mappedDevices);
+      roomsScreenCache.allDevices = mappedDevices;
+
+      setRooms(effectiveRooms);
+      roomsScreenCache.rooms = effectiveRooms;
+
+      setActiveRoomId((prev) => {
+        if (prev === null) return null;
+        return effectiveRooms.some((room) => room.id === prev) ? prev : null;
+      });
+      roomsScreenCache.activeRoomId =
+        roomsScreenCache.activeRoomId !== null &&
+        effectiveRooms.some((room) => room.id === roomsScreenCache.activeRoomId)
+          ? roomsScreenCache.activeRoomId
+          : null;
+    } catch (error) {
+      console.error('Error refreshing room devices:', error);
+    } finally {
+      isRefreshingDevicesRef.current = false;
+    }
+  }, [mapVisibleDevices, syncGoogleHomeDevicesToDb]);
 
   // Reload data when page gets focused
   useFocusEffect(
@@ -333,7 +569,7 @@ export default function Rooms() {
       }
 
       refreshTimeoutRef.current = setTimeout(() => {
-        loadDatabaseData({ showLoader: false });
+        refreshDevicesOnly();
       }, 250);
     });
 
@@ -344,7 +580,19 @@ export default function Rooms() {
       }
       supabase.removeChannel(channel);
     };
-  }, [loadDatabaseData, userHomeId]);
+  }, [refreshDevicesOnly, userHomeId]);
+
+  useEffect(() => {
+    if (!userHomeId) return;
+
+    const interval = setInterval(() => {
+      refreshDevicesOnly();
+    }, LIVE_DEVICE_REFRESH_INTERVAL_MS);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [refreshDevicesOnly, userHomeId]);
 
   // --- Real-time Updates ---
   const toggleDevice = async (deviceId: number) => {
@@ -684,33 +932,6 @@ export default function Rooms() {
         : allDevices.filter((device) => device.room_id === activeRoomId),
     [activeRoomId, allDevices],
   );
-
-  const roomActivities = useMemo(
-    () =>
-      activeRoomId === null
-        ? allActivities
-        : allActivities.filter((activity) => activity.room_id === activeRoomId),
-    [activeRoomId, allActivities],
-  );
-
-  const openManageActivityDevices = useCallback((activity: ActivityItem) => {
-    const currentLinkedDeviceIds = junctions
-      .filter((link) => link.activity_id === activity.id)
-      .map((link) => link.device_id);
-
-    setSelectedActivity(activity);
-    setTempLinkedDeviceIds(currentLinkedDeviceIds);
-    setIsManageModalVisible(true);
-  }, [junctions]);
-
-  const handleStartRoomActivity = useCallback((activity: ActivityItem) => {
-    router.push({
-      pathname: '/activity-details',
-      params: {
-        id: String(activity.id),
-      },
-    });
-  }, []);
 
   const filteredDevices = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -1091,99 +1312,6 @@ export default function Rooms() {
         ListFooterComponent={
           activeRoom ? (
             <View className="mt-4 mb-6">
-              {roomActivities.length > 0 ? (
-                <View className="mb-4 rounded-3xl border border-[#D8DFD5] bg-[#F8FBF6] p-5">
-                  <View className="flex-row items-center justify-between mb-3">
-                    <Text
-                      className="text-lg text-[#354F52] font-bold"
-                      style={{ fontFamily: 'Nunito_700Bold' }}
-                    >
-                      Start from this room
-                    </Text>
-                    <MaterialCommunityIcons
-                      name="play-circle-outline"
-                      size={24}
-                      color="#548F53"
-                      accessible={false}
-                    />
-                  </View>
-                  <Text
-                    className="text-[#6C7A74] text-sm mb-4"
-                    style={{ fontFamily: 'Nunito_400Regular' }}
-                  >
-                    Start an activity from {activeRoom.name} and Nidush will prepare the linked devices for that session.
-                  </Text>
-                  <View className="gap-y-3">
-                    {roomActivities.map((activity) => {
-                      const linkedCount = junctions.filter((link) => link.activity_id === activity.id).length;
-
-                      return (
-                        <View
-                          key={`room-activity-${activity.id}`}
-                          className="rounded-[26px] border border-[#E1E8DE] bg-white px-4 py-4"
-                        >
-                          <View className="flex-row items-start justify-between mb-2">
-                            <View className="flex-1 pr-3">
-                              <Text
-                                className="text-[#354F52] text-base"
-                                style={{ fontFamily: 'Nunito_700Bold' }}
-                              >
-                                {activity.title}
-                              </Text>
-                              <Text
-                                className="text-[#6C7A74] text-sm mt-1"
-                                style={{ fontFamily: 'Nunito_400Regular' }}
-                                numberOfLines={2}
-                              >
-                                {activity.description || 'Ready to launch from this room.'}
-                              </Text>
-                            </View>
-                            <View className="rounded-full bg-[#EEF6EC] px-3 py-2">
-                              <Text
-                                className="text-[#548F53] text-xs"
-                                style={{ fontFamily: 'Nunito_700Bold' }}
-                              >
-                                {linkedCount} linked
-                              </Text>
-                            </View>
-                          </View>
-
-                          <View className="flex-row gap-3 mt-2">
-                            <TouchableOpacity
-                              onPress={() => openManageActivityDevices(activity)}
-                              className="flex-1 rounded-full bg-[#F1F5EE] px-4 py-3 items-center"
-                              accessibilityRole="button"
-                              accessibilityLabel={`Manage linked devices for ${activity.title}`}
-                            >
-                              <Text
-                                className="text-[#354F52] text-sm"
-                                style={{ fontFamily: 'Nunito_700Bold' }}
-                              >
-                                Devices
-                              </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              onPress={() => handleStartRoomActivity(activity)}
-                              className="flex-1 rounded-full bg-[#548F53] px-4 py-3 items-center"
-                              accessibilityRole="button"
-                              accessibilityLabel={`Start activity ${activity.title}`}
-                            >
-                              <Text
-                                className="text-white text-sm"
-                                style={{ fontFamily: 'Nunito_700Bold' }}
-                              >
-                                Start
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      );
-                    })}
-                  </View>
-                </View>
-              ) : null}
-
               <View className="rounded-3xl border border-[#D8DFD5] bg-white/70 p-5">
                 <View className="flex-row items-center justify-between mb-2">
                   <Text
@@ -1203,8 +1331,7 @@ export default function Rooms() {
                   className="text-[#6C7A74] text-sm mb-3"
                   style={{ fontFamily: 'Nunito_400Regular' }}
                 >
-                  {filteredDevices.length} device{filteredDevices.length === 1 ? '' : 's'}, with {roomActivities.length} activity
-                  {roomActivities.length === 1 ? '' : 'ies'} linked to this room.
+                  {filteredDevices.length} device{filteredDevices.length === 1 ? '' : 's'} in this room.
                 </Text>
                 {roomPendingDeletion === activeRoom.id ? (
                   <View className="mt-3 rounded-[22px] border border-[#F2C9C4] bg-[#FFF2EF] p-4">

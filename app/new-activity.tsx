@@ -1,28 +1,27 @@
 import { Content, CONTENTS } from '@/constants/data';
-import { Activity, Scenario } from '@/constants/data/types';
 import { resolveCatalogImage } from '@/constants/data/catalogAssets';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Activity, Scenario } from '@/constants/data/types';
 import {
   Nunito_400Regular,
   Nunito_600SemiBold,
   Nunito_700Bold,
   useFonts,
 } from '@expo-google-fonts/nunito';
-import { supabase, uploadImage, apiLog } from '../utils/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiLog, supabase, uploadImage } from '../utils/supabase';
 
-import { router, Stack, useLocalSearchParams } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNotifications } from '@/context/NotificationsContext';
 import {
   fetchScenarioTemplates,
   fetchUserScenarios,
   parseUserScenarioDbId,
-  resolvePossibleUserScenarioDbIds,
 } from '@/utils/catalogTemplates';
 import { captureException, trackEvent } from '@/utils/observability';
-import { getRoomIconName } from '@/utils/roomIcons';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
+  ImageSourcePropType,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -30,7 +29,6 @@ import {
   Text,
   TouchableOpacity,
   View,
-  ImageSourcePropType,
 } from 'react-native';
 import {
   SafeAreaProvider,
@@ -46,8 +44,11 @@ import {
   Step5_Details,
   Step6_Review,
 } from '@/components/newActivityFlow';
+import { parseScenarioDeviceDbId } from '@/utils/deviceExecution';
 
-const dbTypeToActivityType = (type: string | null | undefined): Activity['type'] => {
+const dbTypeToActivityType = (
+  type: string | null | undefined,
+): Activity['type'] => {
   const normalized = String(type ?? 'other').toLowerCase();
   if (normalized === 'audiobook') return 'audiobooks';
   if (
@@ -85,6 +86,12 @@ type ActivityDraftPayload = {
   activityImageUri: string | null;
 };
 
+const ACTIVITY_DESCRIPTION_MAX_LENGTH = 1000;
+const ACTIVITY_TITLE_MAX_LENGTH = 255;
+const ACTIVITY_IMAGE_MAX_LENGTH = 1000;
+const ACTIVITY_CATEGORY_MAX_LENGTH = 255;
+const ACTIVITY_TYPE_MAX_LENGTH = 255;
+
 type ContentRow = {
   id: string;
   title: string;
@@ -100,16 +107,20 @@ type ContentRow = {
 };
 
 type HomeRoomRow = {
-  id: number;
+  id: number | string;
   name: string;
 };
 
-const normalizeContentInstructions = (value: unknown): Content['instructions'] => {
+const normalizeContentInstructions = (
+  value: unknown,
+): Content['instructions'] => {
   if (!Array.isArray(value)) return undefined;
   return value as Content['instructions'];
 };
 
-const normalizeContentIngredients = (value: unknown): Content['ingredients'] => {
+const normalizeContentIngredients = (
+  value: unknown,
+): Content['ingredients'] => {
   if (!Array.isArray(value)) return undefined;
   return value as Content['ingredients'];
 };
@@ -120,6 +131,18 @@ const getImageUri = (value: ImageSourcePropType | string | null) =>
     : value && typeof value === 'object' && 'uri' in value
       ? value.uri
       : undefined;
+
+const normalizeActivityDescription = (value: string) =>
+  value.replace(/\s+/g, ' ').trim().slice(0, ACTIVITY_DESCRIPTION_MAX_LENGTH);
+
+const normalizeActivityTitle = (value: string) =>
+  value.replace(/\s+/g, ' ').trim().slice(0, ACTIVITY_TITLE_MAX_LENGTH);
+
+const normalizeActivityImage = (value: string | ImageSourcePropType | null) =>
+  (typeof value === 'string' ? value : getImageUri(value))?.trim().slice(0, ACTIVITY_IMAGE_MAX_LENGTH) || null;
+
+const normalizeShortText = (value: string, maxLength = ACTIVITY_CATEGORY_MAX_LENGTH) =>
+  value.replace(/\s+/g, ' ').trim().slice(0, maxLength);
 
 const resolveScenarioDbId = (value: string) => {
   if (typeof parseUserScenarioDbId === 'function') {
@@ -159,7 +182,9 @@ export default function NewActivityFlow() {
   const [selectedScenarioId, setSelectedScenarioId] = useState('');
   const [activityName, setActivityName] = useState('');
   const [description, setDescription] = useState('');
-  const [activityImage, setActivityImage] = useState<ImageSourcePropType | string | null>(null);
+  const [activityImage, setActivityImage] = useState<
+    ImageSourcePropType | string | null
+  >(null);
   const [dbContent, setDbContent] = useState<Content[]>([]);
   const [scenarioTemplates, setScenarioTemplates] = useState<Scenario[]>([]);
   const [homeRooms, setHomeRooms] = useState<HomeRoomRow[]>([]);
@@ -167,51 +192,17 @@ export default function NewActivityFlow() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const serializeActivityImage = (value: ImageSourcePropType | string | null) =>
-    typeof value === 'string'
-      ? value
-      : value && typeof value === 'object' && 'uri' in value
-        ? String(value.uri ?? '') || null
-        : null;
-
-  const buildDraftPayload = useCallback(
-    (): ActivityDraftPayload => ({
-      step,
-      activityType,
-      selectedContentId,
-      room_id,
-      selectedScenarioId,
-      activityName,
-      description,
-      activityImageUri: serializeActivityImage(activityImage),
-    }),
-    [
-      activityImage,
-      activityName,
-      activityType,
-      description,
-      room_id,
-      selectedContentId,
-      selectedScenarioId,
-      step,
-    ],
-  );
-
-  const saveActivityDraft = useCallback(async () => {
-    await AsyncStorage.setItem(draftKey, JSON.stringify(buildDraftPayload()));
-  }, [buildDraftPayload, draftKey]);
-
-  const discardActivityDraft = useCallback(async () => {
-    await AsyncStorage.removeItem(draftKey);
-  }, [draftKey]);
-
-  const linkRoomTvDevices = async (activityId: number, homeId: number, roomId: number | null) => {
+  const linkRoomTvDevices = async (
+    activityId: number,
+    homeId: number,
+    roomId: number | null,
+  ) => {
     if (!roomId) return;
 
     try {
       const { data: roomDevices, error: devicesError } = await supabase
         .from('devices')
-        .select('id')
+        .select('id, type')
         .eq('home_id', homeId)
         .eq('room_id', roomId);
 
@@ -225,8 +216,13 @@ export default function NewActivityFlow() {
 
       if (existingError) throw existingError;
 
-      const linkedDeviceIds = new Set((existingLinks || []).map((link) => link.device_id));
-      const linksToInsert = roomDevices
+      const linkedDeviceIds = new Set(
+        (existingLinks || []).map((link) => link.device_id),
+      );
+      const tvDevices = roomDevices.filter((device) =>
+        ['tv', 'display'].includes(String(device.type).toLowerCase()),
+      );
+      const linksToInsert = tvDevices
         .filter((device) => !linkedDeviceIds.has(device.id))
         .map((device) => ({
           activity_id: activityId,
@@ -242,6 +238,51 @@ export default function NewActivityFlow() {
       if (insertError) throw insertError;
     } catch (error) {
       console.warn('Could not auto-link room devices to activity:', error);
+    }
+  };
+
+  const syncScenarioDevicesToActivity = async (
+    activityId: number,
+    scenarioDevices: Scenario['devices'] | undefined,
+  ) => {
+    const resolvedDeviceIds = Array.from(
+      new Set(
+        (scenarioDevices ?? [])
+          .map((device) => parseScenarioDeviceDbId(device.deviceId))
+          .filter((deviceId): deviceId is number => Number.isFinite(deviceId)),
+      ),
+    );
+
+    if (resolvedDeviceIds.length === 0) return;
+
+    try {
+      const { data: existingLinks, error: existingError } = await supabase
+        .from('activity_devices')
+        .select('device_id')
+        .eq('activity_id', activityId);
+
+      if (existingError) throw existingError;
+
+      const linkedDeviceIds = new Set(
+        (existingLinks ?? []).map((link) => Number(link.device_id)),
+      );
+
+      const linksToInsert = resolvedDeviceIds
+        .filter((deviceId) => !linkedDeviceIds.has(deviceId))
+        .map((deviceId) => ({
+          activity_id: activityId,
+          device_id: deviceId,
+        }));
+
+      if (linksToInsert.length === 0) return;
+
+      const { error: insertError } = await supabase
+        .from('activity_devices')
+        .insert(linksToInsert);
+
+      if (insertError) throw insertError;
+    } catch (error) {
+      console.warn('Could not sync scenario devices to activity:', error);
     }
   };
 
@@ -304,28 +345,32 @@ export default function NewActivityFlow() {
 
   useEffect(() => {
     const fetchContent = async () => {
-      const { data, error } = await supabase
-        .from('contents')
-        .select('*');
-      
-      if (data && !error) {
-        setDbContent((data as ContentRow[]).map((c) => {
-          const localContent = CONTENTS[c.id as keyof typeof CONTENTS];
+      const { data, error } = await supabase.from('contents').select('*');
 
-          return {
-            id: c.id,
-            title: c.title || localContent?.title,
-            type: c.type || localContent?.type,
-            category: c.category || localContent?.category,
-            description: c.description || localContent?.description,
-            duration: c.duration || localContent?.duration,
-            image: resolveCatalogImage(c.image || localContent?.image),
-            instructions: normalizeContentInstructions(c.instructions) || localContent?.instructions,
-            ingredients: normalizeContentIngredients(c.ingredients) || localContent?.ingredients,
-            videoUrl: localContent?.videoUrl || c.video_url || undefined,
-            author: c.author || localContent?.author,
-          };
-        }));
+      if (data && !error) {
+        setDbContent(
+          (data as ContentRow[]).map((c) => {
+            const localContent = CONTENTS[c.id as keyof typeof CONTENTS];
+
+            return {
+              id: c.id,
+              title: c.title || localContent?.title,
+              type: c.type || localContent?.type,
+              category: c.category || localContent?.category,
+              description: c.description || localContent?.description,
+              duration: c.duration || localContent?.duration,
+              image: resolveCatalogImage(c.image || localContent?.image),
+              instructions:
+                normalizeContentInstructions(c.instructions) ||
+                localContent?.instructions,
+              ingredients:
+                normalizeContentIngredients(c.ingredients) ||
+                localContent?.ingredients,
+              videoUrl: localContent?.videoUrl || c.video_url || undefined,
+              author: c.author || localContent?.author,
+            };
+          }),
+        );
       }
     };
     fetchContent();
@@ -415,25 +460,18 @@ export default function NewActivityFlow() {
   }, []);
 
   useEffect(() => {
-    if (!selectedScenarioId || scenarioTemplates.length === 0) return;
-    if (scenarioTemplates.some((scenario) => scenario.id === selectedScenarioId)) return;
-
-    const candidateIds = resolvePossibleUserScenarioDbIds(selectedScenarioId);
-    const matchingUserScenario = scenarioTemplates.find((scenario) =>
-      candidateIds.some((candidateId) => scenario.id === `scenario:${candidateId}`),
-    );
-
-    if (matchingUserScenario) {
-      setSelectedScenarioId(matchingUserScenario.id);
-    }
-  }, [scenarioTemplates, selectedScenarioId]);
-
-  useEffect(() => {
-    if (!isEditMode || room_id || !selectedScenarioId || scenarioTemplates.length === 0) {
+    if (
+      !isEditMode ||
+      room_id ||
+      !selectedScenarioId ||
+      scenarioTemplates.length === 0
+    ) {
       return;
     }
 
-    const selectedScenario = scenarioTemplates.find((scenario) => scenario.id === selectedScenarioId);
+    const selectedScenario = scenarioTemplates.find(
+      (scenario) => scenario.id === selectedScenarioId,
+    );
     if (selectedScenario?.room || selectedScenario?.room_id) {
       setRoomId(selectedScenario.room || selectedScenario.room_id || '');
     }
@@ -500,6 +538,38 @@ export default function NewActivityFlow() {
   useEffect(() => {
     AccessibilityInfo.announceForAccessibility(`Step ${step} of ${totalSteps}`);
   }, [step]);
+
+  const saveActivityDraft = useCallback(async () => {
+    const payload: ActivityDraftPayload = {
+      step,
+      activityType,
+      selectedContentId,
+      room_id,
+      selectedScenarioId,
+      activityName,
+      description,
+      activityImageUri:
+        typeof activityImage === 'string'
+          ? activityImage
+          : getImageUri(activityImage) ?? null,
+    };
+
+    await AsyncStorage.setItem(draftKey, JSON.stringify(payload));
+  }, [
+    activityImage,
+    activityName,
+    activityType,
+    description,
+    draftKey,
+    room_id,
+    selectedContentId,
+    selectedScenarioId,
+    step,
+  ]);
+
+  const discardActivityDraft = useCallback(async () => {
+    await AsyncStorage.removeItem(draftKey);
+  }, [draftKey]);
 
   useEffect(() => {
     if (!hasHydratedDraftRef.current) return;
@@ -612,9 +682,9 @@ export default function NewActivityFlow() {
   const handleSave = async () => {
     if (isSaving || loadError) return;
 
-    const contentObj = allContent.find(
-      (c) => c.id === selectedContentId,
-    );
+    const contentObj = allContent.find((c) => c.id === selectedContentId);
+    const selectedScenario =
+      scenarioTemplates.find((scenario) => scenario.id === selectedScenarioId) ?? null;
 
     let finalImage;
 
@@ -631,12 +701,19 @@ export default function NewActivityFlow() {
 
     try {
       setIsSaving(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Utilizador não autenticado!");
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated.');
 
       // 1. Upload da imagem para o Storage (se for uma nova imagem local)
       let imageUrl = getImageUri(finalImage) || finalImage;
-      if (typeof imageUrl === 'string' && (imageUrl.startsWith('data:') || imageUrl.startsWith('file:') || imageUrl.startsWith('blob:'))) {
+      if (
+        typeof imageUrl === 'string' &&
+        (imageUrl.startsWith('data:') ||
+          imageUrl.startsWith('file:') ||
+          imageUrl.startsWith('blob:'))
+      ) {
         const uploadedUrl = await uploadImage(imageUrl);
         if (uploadedUrl) imageUrl = uploadedUrl;
       }
@@ -650,9 +727,14 @@ export default function NewActivityFlow() {
         reading: 'Reading',
         yoga: 'Yoga',
         other: 'other',
-        general: 'other'
+        general: 'other',
       };
       const formattedType = typeMapping[activityType] || 'other';
+      const safeTitle = normalizeActivityTitle(activityName || 'Untitled Activity');
+      const safeDescription = normalizeActivityDescription(description);
+      const safeImageUrl = normalizeActivityImage(imageUrl);
+      const safeCategory = normalizeShortText('My creations');
+      const safeType = normalizeShortText(formattedType, ACTIVITY_TYPE_MAX_LENGTH);
 
       // 2. Resolve room_id string to database room integer ID
       let dbRoomId = null;
@@ -687,41 +769,78 @@ export default function NewActivityFlow() {
 
       // 3. Tentar inserir/atualizar na DB
       const saveData = {
-        title: activityName || 'Untitled Activity',
-        description,
-        image: imageUrl,
-        category: 'My creations',
-        type: formattedType,
+        title: safeTitle,
+        description: safeDescription,
+        image: safeImageUrl,
+        category: safeCategory,
+        type: safeType,
         content_id: selectedContentId || null,
         scenario_id: selectedScenarioId
-          ? parseInt(resolveScenarioDbId(selectedScenarioId).toString().replace(/\D/g, ''), 10)
+          ? parseInt(selectedScenarioId.toString().replace(/\D/g, ''))
+          : 1,
+        playlist_id: selectedScenario?.playlist_id ?? null,
+        room_id: dbRoomId,
+        home_id: currentHomeId,
+      };
+      const legacySaveData = {
+        title: safeTitle,
+        description: safeDescription,
+        image: safeImageUrl,
+        category: safeCategory,
+        type: safeType,
+        content_id: selectedContentId || null,
+        scenario_id: selectedScenarioId
+          ? parseInt(selectedScenarioId.toString().replace(/\D/g, ''))
           : 1,
         room_id: dbRoomId,
         home_id: currentHomeId,
       };
 
-      const { data, error } = isEditMode && editId
-        ? await supabase
-            .from('activities')
-            .update(saveData)
-            .eq('id', editId)
-            .eq('user_id', user.id)
-            .select('*, id')
-            .single()
-        : await supabase
-            .from('activities')
-            .insert({ ...saveData, user_id: user.id })
-            .select('*, id')
-            .single();
+      let saveResult =
+        isEditMode && editId
+          ? await supabase
+              .from('activities')
+              .update(saveData)
+              .eq('id', editId)
+              .eq('user_id', user.id)
+              .select('*, id')
+              .single()
+          : await supabase
+              .from('activities')
+              .insert({ ...saveData, user_id: user.id })
+              .select('*, id')
+              .single();
+
+      if (
+        saveResult.error?.code === 'PGRST204' ||
+        saveResult.error?.code === '42703' ||
+        /playlist_id/i.test(String(saveResult.error?.message ?? ''))
+      ) {
+        saveResult =
+          isEditMode && editId
+            ? await supabase
+                .from('activities')
+                .update(legacySaveData)
+                .eq('id', editId)
+                .eq('user_id', user.id)
+                .select('*, id')
+                .single()
+            : await supabase
+                .from('activities')
+                .insert({ ...legacySaveData, user_id: user.id })
+                .select('*, id')
+                .single();
+      }
+
+      const { data, error } = saveResult;
 
       apiLog(isEditMode ? 'UPDATE' : 'INSERT', 'activities', {
         id: editId,
         ...saveData,
       });
 
-
       if (error) {
-        console.error('Erro no Supabase:', error);
+        console.error('Supabase error:', error);
         captureException(error, {
           area: 'activities',
           screen: 'new-activity',
@@ -731,6 +850,7 @@ export default function NewActivityFlow() {
       }
 
       if (data?.id && currentHomeId) {
+        await syncScenarioDevicesToActivity(Number(data.id), selectedScenario?.devices);
         await linkRoomTvDevices(Number(data.id), currentHomeId, dbRoomId);
       }
 
@@ -742,14 +862,18 @@ export default function NewActivityFlow() {
         isEditMode
           ? `"${activityName || 'Untitled Activity'}" has been updated.`
           : `Great job! "${activityName || 'Untitled Activity'}" has been added to your creations.`,
-        'creation'
+        'creation',
       );
       trackEvent(isEditMode ? 'activity-updated' : 'activity-created', {
         area: 'activities',
         screen: 'new-activity',
         action: isEditMode ? 'update-activity' : 'create-activity',
         userId: user.id,
-        metadata: { activityId: data.id, roomId: dbRoomId, homeId: currentHomeId },
+        metadata: {
+          activityId: data.id,
+          roomId: dbRoomId,
+          homeId: currentHomeId,
+        },
       });
 
       // Se tudo correu bem, avançar para os detalhes usando o ID gerado pelo Supabase
@@ -761,7 +885,7 @@ export default function NewActivityFlow() {
         },
       });
     } catch (e) {
-      console.error('Erro ao salvar:', e);
+      console.error('Error saving activity:', e);
       captureException(e, {
         area: 'activities',
         screen: 'new-activity',
@@ -774,18 +898,10 @@ export default function NewActivityFlow() {
 
   if (!fontsLoaded) return null;
 
-  const roomOptions = homeRooms.map((room) => {
-    return {
-      id: room.name,
-      name: room.name,
-      icon: getRoomIconName(room.name),
-    };
-  });
-
-  const reviewContent = allContent.find(
-    (c) => c.id === selectedContentId,
+  const reviewContent = allContent.find((c) => c.id === selectedContentId);
+  const reviewScenario = scenarioTemplates.find(
+    (s) => s.id === selectedScenarioId,
   );
-  const reviewScenario = scenarioTemplates.find((s) => s.id === selectedScenarioId);
 
   return (
     <SafeAreaProvider>
@@ -824,97 +940,82 @@ export default function NewActivityFlow() {
               }}
               keyboardShouldPersistTaps="handled"
             >
-              {loadError ? (
-                <View className="bg-white rounded-3xl border border-[#DDE5D7] p-5 mt-4">
-                  <Text
-                    className="text-[#354F52] text-lg mb-2"
-                    style={{ fontFamily: 'Nunito_700Bold' }}
-                  >
-                    Activity creation is not ready yet
-                  </Text>
-                  <Text
-                    className="text-[#6C7A74] text-base"
-                    style={{ fontFamily: 'Nunito_400Regular' }}
-                  >
-                    {loadError}
-                  </Text>
-                </View>
-              ) : (
-                <>
-                  {didRestoreDraft && (
-                    <View className="bg-[#EEF6EC] rounded-3xl border border-[#D7E7D2] p-4 mt-4 mb-2">
-                      <Text
-                        className="text-[#354F52] text-base"
-                        style={{ fontFamily: 'Nunito_700Bold' }}
-                      >
-                        Restored your activity draft
-                      </Text>
-                      <Text
-                        className="text-[#6C7A74] text-sm mt-1"
-                        style={{ fontFamily: 'Nunito_400Regular' }}
-                      >
-                        We brought back what you had already filled in so you can continue from where you stopped.
-                      </Text>
-                    </View>
-                  )}
-                  {step === 1 && (
-                    <Step1_Type
-                      selected={activityType}
-                      onSelect={setActivityType}
-                    />
-                  )}
-                  {step === 2 && (
-                    <Step2_Content
-                      activityType={activityType}
-                      selectedContentId={selectedContentId}
-                      onSelect={handleContentSelect}
-                      contentList={allContent}
-                    />
-                  )}
-                  {step === 3 && (
-                    <Step3_Room
-                      selected={room_id}
-                      onSelect={setRoomId}
-                      options={roomOptions}
-                    />
-                  )}
-                  {step === 4 && (
-                    <Step4_Environment
-                      roomName={room_id}
-                      selected={selectedScenarioId}
-                      onSelect={setSelectedScenarioId}
-                      scenarios={scenarioTemplates}
-                      availableDeviceTypes={roomDeviceTypes}
-                    />
-                  )}
-                  {step === 5 && (
-                    <Step5_Details
-                      name={activityName}
-                      setName={setActivityName}
-                      desc={description}
-                      setDesc={setDescription}
-                      image={activityImage}
-                      setImage={setActivityImage}
-                      defaultImage={reviewContent?.image || null}
-                    />
-                  )}
-                  {step === 6 && (
-                    <Step6_Review
-                      data={{
-                        activityType,
-                        content: reviewContent || null,
-                        room: room_id,
-                        environment: reviewScenario || null,
-                        activityName,
-                        description,
-                        activityImage,
-                      }}
-                      onJumpToStep={setStep}
-                    />
-                  )}
-                </>
+              {step === 1 && (
+                <Step1_Type
+                  selected={activityType}
+                  onSelect={setActivityType}
+                />
+              )}
+              {step === 2 && (
+                <Step2_Content
+                  activityType={activityType}
+                  selectedContentId={selectedContentId}
+                  onSelect={handleContentSelect}
+                />
+              )}
+              {step === 3 && (
+                <Step3_Room
+                  selected={room_id}
+                  onSelect={setRoomId}
+                  options={homeRooms.map((room) => ({
+                    id: room.name,
+                    name: room.name,
+                  }))}
+                />
+              )}
+              {step === 4 && (
+                <Step4_Environment
+                  roomName={room_id}
+                  selected={selectedScenarioId}
+                  onSelect={setSelectedScenarioId}
+                  scenarios={scenarioTemplates}
+                />
+              )}
+              {step === 5 && (
+                <Step5_Details
+                  name={activityName}
+                  setName={setActivityName}
+                  desc={description}
+                  setDesc={setDescription}
+                  image={activityImage}
+                  setImage={setActivityImage}
+                  defaultImage={reviewContent?.image || null}
+                />
+              )}
+              {step === 6 && (
+                <Step6_Review
+                  data={{
+                    activityType,
+                    content: reviewContent || null,
+                    room: room_id,
+                    environment: reviewScenario || null,
+                    activityName,
+                    description,
+                    activityImage,
+                  }}
+                  onJumpToStep={setStep}
+                />
               )}
             </ScrollView>
+
+            {loadError && (
+              <View className="px-8 pb-4 items-center">
+                <Text
+                  maxFontSizeMultiplier={1.2}
+                  className="text-[#354F52] text-lg text-center"
+                  style={{ fontFamily: 'Nunito_700Bold' }}
+                >
+                  Activity creation is not ready yet
+                </Text>
+                <Text
+                  maxFontSizeMultiplier={1.2}
+                  className="text-[#354F52]/75 text-sm text-center mt-2"
+                  style={{ fontFamily: 'Nunito_400Regular' }}
+                >
+                  {loadError}
+                </Text>
+              </View>
+            )}
 
             {/* Mantemos apenas a verificação do teclado para não o esconder */}
             {!isKeyboardVisible && (
@@ -938,7 +1039,9 @@ export default function NewActivityFlow() {
                   accessible={true}
                   accessibilityRole="button"
                   // Informa o leitor de ecrã (VoiceOver/TalkBack) que o botão está inativo
-                  accessibilityState={{ disabled: isNextDisabled() || isSaving || Boolean(loadError) }}
+                  accessibilityState={{
+                    disabled: isNextDisabled() || isSaving,
+                  }}
                   accessibilityLabel={
                     step === 6
                       ? isEditMode
@@ -958,7 +1061,13 @@ export default function NewActivityFlow() {
                     className="text-white text-2xl"
                     style={{ fontFamily: 'Nunito_700Bold' }}
                   >
-                    {step === 6 ? (isSaving ? 'Saving...' : isEditMode ? 'Update' : 'Save') : 'Continue'}
+                    {step === 6
+                      ? isSaving
+                        ? 'Saving...'
+                        : isEditMode
+                          ? 'Update'
+                          : 'Save'
+                      : 'Continue'}
                   </Text>
                 </TouchableOpacity>
               </View>

@@ -114,9 +114,9 @@ const normalizeGoogleHomeMessage = (message: string) => {
     lower.includes('package name and sha-1 certificate fingerprint')
   ) {
     return [
-      'O cliente OAuth Android ainda não está registado corretamente para esta app.',
-      'No Google Cloud, cria ou corrige um OAuth Client do tipo Android com package name `com.nidush.app` e o SHA-1 da build instalada no telemóvel.',
-      'Depois reinstala a app com `npx expo run:android` e testa novamente.',
+      'The Android OAuth client is not registered correctly for this app yet.',
+      'In Google Cloud, create or fix an Android OAuth Client with package name `com.nidush.app` and the SHA-1 of the build installed on your phone.',
+      'Then reinstall the app with `npx expo run:android` and try again.',
     ].join(' ');
   }
 
@@ -131,25 +131,25 @@ const normalizeGoogleHomeMessage = (message: string) => {
     }
 
     return [
-      'A ligação ao Google Home foi cancelada antes de terminares o pedido de permissões.',
-      'Verifica se aceitaste o ecrã da Google até ao fim, se o teu email Google foi adicionado como test user no OAuth consent screen, e se essa conta Google é a mesma que tens na app Google Home.',
-      'Se eu tiver feito alterações nativas agora, precisas também de reinstalar a app com `npx expo run:android` antes de testar de novo.',
+      'The Google Home connection was cancelled before the permissions request was completed.',
+      'Make sure you finished the Google consent flow, added your Google email as a test user in the OAuth consent screen, and are using the same Google account as in the Google Home app.',
+      'If native changes were made recently, reinstall the app with `npx expo run:android` before testing again.',
     ].join(' ');
   }
 
   if (lower.includes('test user') || lower.includes('oauth')) {
     return [
-      'A conta Google usada neste telemóvel ainda não parece autorizada para o OAuth do Google Home.',
-      'Adiciona esse email como test user no OAuth consent screen do Google Cloud e tenta novamente.',
+      'The Google account on this phone does not appear to be authorized for Google Home OAuth yet.',
+      'Add that email as a test user in the Google Cloud OAuth consent screen and try again.',
     ].join(' ');
   }
 
   if (lower.includes('no activity')) {
-    return 'Abre o ecrã Profile e tenta novamente com a app visível no telemóvel.';
+    return 'Open the Profile screen and try again with the app visible on your phone.';
   }
 
   if (lower.includes('permissions have not been granted yet')) {
-    return 'A permissão Google Home foi aceite, mas ainda estava a ser aplicada. A app vai tentar sincronizar novamente automaticamente.';
+    return 'Google Home permission was accepted, but it was still being applied. The app will try to sync again automatically.';
   }
 
   if (
@@ -158,9 +158,9 @@ const normalizeGoogleHomeMessage = (message: string) => {
     lower.includes('primary error: code=19')
   ) {
     return [
-      'O acesso ao Google Home foi concedido, mas a Google não devolveu uma lista válida de dispositivos para esta conta/casa.',
-      'Confirma que estás na mesma conta Google dentro da app Google Home, que já tens pelo menos um dispositivo compatível adicionado a essa casa, e volta a sincronizar.',
-      'Se continuar, envia o novo erro completo porque agora a app vai mostrar também os sub-erros reais do SDK.',
+      'Google Home access was granted, but Google did not return a valid device list for this account and home.',
+      'Confirm that you are using the same Google account in the Google Home app, that at least one compatible device is already added to that home, and then sync again.',
+      'If it still fails, send the full new error because the app will now also show the real SDK sub-errors.',
     ].join(' ');
   }
 
@@ -169,6 +169,25 @@ const normalizeGoogleHomeMessage = (message: string) => {
   }
 
   return normalized;
+};
+
+export const isGoogleHomeUnavailableDeviceListError = (error: unknown) => {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : '';
+
+  const lower = message.toLowerCase();
+
+  return (
+    lower.includes('google home access was granted, but google did not return a valid device list') ||
+    lower.includes('google did not return a valid device list') ||
+    lower.includes('command errors encountered') ||
+    lower.includes('sub-errors:') ||
+    lower.includes('primary error: code=19')
+  );
 };
 
 const toFriendlyError = (error: unknown, fallbackMessage: string) => {

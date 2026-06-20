@@ -20,9 +20,13 @@ import { resolveCatalogImage } from '@/constants/data/catalogAssets';
 import { useBiometrics } from '@/context/BiometricsContext';
 import {
   AiActivityIdea,
+  fetchAiActivityIdeas,
+  getNidushAiErrorMessage,
   isAiRateLimitError,
   saveAiActivityIdea,
 } from '@/utils/aiActivities';
+import { isAiAutoInvocationEnabled } from '@/utils/aiConfig';
+import { logger } from '@/utils/logger';
 import { getDynamicRecommendations } from '@/utils/recommendationEngine';
 import { getSessionUser, supabase } from '@/utils/supabase';
 import {
@@ -88,12 +92,14 @@ export default function Index() {
   const [shortcutRows, setShortcutRows] = useState<ShortcutRow[]>([]);
   const [userHobbies, setUserHobbies] = useState<string[]>([]);
   const [aiHomeIdeas, setAiHomeIdeas] = useState<AiActivityIdea[]>([]);
+  const [isLoadingAiHomeIdeas, setIsLoadingAiHomeIdeas] = useState(false);
   const [isSavingAiHomeIdeaId, setIsSavingAiHomeIdeaId] = useState<string | null>(null);
   const [isEditingShortcuts, setIsEditingShortcuts] = useState(false);
   const [isSavingShortcutOrder, setIsSavingShortcutOrder] = useState(false);
   const [draggingShortcutId, setDraggingShortcutId] = useState<number | null>(null);
   const shortcutDragOffsets = useRef(new Map<number, Animated.ValueXY>()).current;
   const shortcutLayoutsRef = useRef<Record<number, ShortcutLayout>>({});
+  const lastAiHomeIdeasRequestKeyRef = useRef<string | null>(null);
 
 
   // O userName deve ser atualizado quando ganhamos foco também
@@ -103,7 +109,7 @@ export default function Index() {
       
       if (user) {
         setAvatarUrl(user.user_metadata?.avatar_url || null);
-        setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'Utilizador');
+        setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'User');
 
         // Buscar hobbies da tabela users
         const { data: dbUser } = await supabase
@@ -134,7 +140,7 @@ export default function Index() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setAvatarUrl(session.user.user_metadata?.avatar_url || null);
-        setUserName(session.user.user_metadata?.first_name || session.user.email?.split('@')[0] || 'Utilizador');
+        setUserName(session.user.user_metadata?.first_name || session.user.email?.split('@')[0] || 'User');
       } else {
         setAvatarUrl(null);
         setUserName('Visitante');
@@ -162,7 +168,7 @@ export default function Index() {
 
         // Atualizar o nome também por precaução
         setAvatarUrl(user.user_metadata?.avatar_url || null);
-        setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'Utilizador');
+        setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'User');
         
         let [
           homeAssocResult,
@@ -239,6 +245,62 @@ export default function Index() {
       loadTemplates();
       loadActivities();
     }, [])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        lastAiHomeIdeasRequestKeyRef.current = null;
+      };
+    }, []),
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isAiAutoInvocationEnabled) {
+        setAiHomeIdeas([]);
+        setIsLoadingAiHomeIdeas(false);
+        return;
+      }
+
+      const requestKey = `home:${currentState}`;
+      if (lastAiHomeIdeasRequestKeyRef.current === requestKey) {
+        return;
+      }
+
+      let isActive = true;
+      lastAiHomeIdeasRequestKeyRef.current = requestKey;
+
+      const loadAiHomeIdeas = async () => {
+        setIsLoadingAiHomeIdeas(true);
+
+        try {
+          const ideas = await fetchAiActivityIdeas({
+            mood: currentState,
+            source: 'home-auto',
+          });
+
+          if (!isActive) return;
+          setAiHomeIdeas(ideas.slice(0, 5));
+        } catch (error) {
+          if (!isActive) return;
+          logger.warn('Failed to auto-load AI home ideas:', error);
+          const message = await getNidushAiErrorMessage(error);
+          logger.warn(message);
+          setAiHomeIdeas([]);
+        } finally {
+          if (isActive) {
+            setIsLoadingAiHomeIdeas(false);
+          }
+        }
+      };
+
+      void loadAiHomeIdeas();
+
+      return () => {
+        isActive = false;
+      };
+    }, [currentState]),
   );
 
   const saveHomeAiIdea = useCallback(async (idea: AiActivityIdea) => {
@@ -320,10 +382,10 @@ export default function Index() {
   }, [activityTemplates, aiHomeIdeas, currentState, isSavingAiHomeIdeaId, myActivities, saveHomeAiIdea, userHobbies]);
 
 
-  const dynamicTitle = useMemo(
-    () => (aiHomeIdeas.length > 0 ? 'AI activities for you' : 'Activities for you'),
-    [aiHomeIdeas.length],
-  );
+  const dynamicTitle = useMemo(() => {
+    if (isLoadingAiHomeIdeas || aiHomeIdeas.length > 0) return 'AI activities for you';
+    return 'Activities for you';
+  }, [aiHomeIdeas.length, isLoadingAiHomeIdeas]);
 
   // --- NOVA LÓGICA DOS SHORTCUTS (USANDO 'shortcuts' NO PLURAL) ---
   const shortcuts = useMemo(() => {
@@ -532,6 +594,7 @@ export default function Index() {
             title={dynamicTitle}
             data={dynamicActivities}
             showTime={true}
+            isLoadingMore={isLoadingAiHomeIdeas}
           />
         </View>
 

@@ -225,7 +225,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
       .maybeSingle();
 
     if (error) {
-      console.error('Erro a obter casa do utilizador para devices:', error);
+      console.error('Error getting user home for devices:', error);
       captureException(error, {
         area: 'devices',
         screen: 'profile',
@@ -277,7 +277,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
     }
 
     if (error) {
-      console.error('Erro a carregar devices da BD:', error);
+      console.error('Error loading devices from DB:', error);
       setHardwareError('Could not load smart home devices.');
       captureException(error, {
         area: 'devices',
@@ -560,7 +560,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
   // Função para sincronizar dispositivos com o Supabase
   const syncDeviceToDB = useCallback(async (name: string, type: string, source: string, externalId?: string) => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('Sessão não encontrada.');
+    if (!user) throw new Error('Session not found.');
 
     const now = new Date().toISOString();
     const normalizedExternalId = externalId || buildExternalId(name, source);
@@ -664,7 +664,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
           } else if (user.email) {
             setUserName(user.email.split('@')[0]);
           } else {
-            setUserName('Utilizador');
+            setUserName('User');
           }
 
           const userEmail = user.email || '';
@@ -704,7 +704,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
           }
 
           if (userDataError) {
-            console.error('Erro a carregar hobbies:', userDataError);
+            console.error('Error loading hobbies:', userDataError);
           }
 
           setSelectedHobbies(parseHobbies(userData?.hobbies));
@@ -773,7 +773,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
                 ? `${first} ${last}`.trim()
                 : user.email
                   ? user.email.split('@')[0]
-                  : 'Utilizador',
+                  : 'User',
             avatarUrl: user.user_metadata?.avatar_url || null,
             userEmail,
             selectedHobbies: parseHobbies(userData?.hobbies),
@@ -798,8 +798,8 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
           setIsProfileHeaderLoading(false);
         }
       } catch (error) {
-        console.error('Erro a carregar perfil:', error);
-        setUserName('Utilizador');
+        console.error('Error loading profile:', error);
+        setUserName('User');
         setIsProfileHeaderLoading(false);
       } finally {
         setIsLoading(false);
@@ -888,7 +888,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
         .eq('auth_uid', user.id);
 
       if (dbError) {
-        console.error("Erro a atualizar tabela users:", dbError);
+        console.error('Error updating users table:', dbError);
       }
 
       setAvatarUrl(publicUrl);
@@ -925,7 +925,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
         .single();
 
       if (error) {
-        console.error("Erro ao guardar hobbies:", error);
+        console.error('Error saving hobbies:', error);
       } else {
         const nextHobbies = parseHobbies(data?.hobbies);
         setSelectedHobbies(nextHobbies);
@@ -947,7 +947,7 @@ const HOBBIES_OPTIONS = ['Cooking', 'Workout', 'Meditation', 'Audiobooks'];
 
       setDataExportJson(JSON.stringify(data ?? {}, null, 2));
     } catch (error) {
-      console.error('Erro ao exportar dados do utilizador:', error);
+      console.error('Error exporting user data:', error);
       setDataExportJson(
         JSON.stringify(
           {

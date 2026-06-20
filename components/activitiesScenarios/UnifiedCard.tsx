@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import {
   DimensionValue,
+  Image,
   ImageSourcePropType,
   StyleSheet,
   Text,
@@ -51,11 +52,12 @@ export const UnifiedCard = ({
       accessibilityHint={`Press to go to the details of ${title}`}
     >
       <View style={StyleSheet.absoluteFill}>
-        <ExpoImage
+        <Image
           source={imageSource}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          cachePolicy="memory-disk"
+          style={[StyleSheet.absoluteFill, { transform: [{ scale: 1.45 }] }]}
+          resizeMode="cover"
+          blurRadius={85}
+          accessible={false}
         />
         <View className="absolute inset-0 " />
       </View>

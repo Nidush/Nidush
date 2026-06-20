@@ -18,6 +18,7 @@ interface CustomAlertProps {
   type?: 'success' | 'error' | 'warning' | 'info';
   onClose: () => void;
   onConfirm?: () => void;
+  onCancel?: () => void;
   confirmText?: string;
   cancelText?: string;
   isDestructive?: boolean;
@@ -35,6 +36,7 @@ export const CustomAlert = ({
   type = 'info',
   onClose,
   onConfirm,
+  onCancel,
   confirmText = 'OK',
   cancelText = 'Cancel',
   isDestructive = false,
@@ -118,9 +120,12 @@ export const CustomAlert = ({
           </Text>
 
           <View className="flex-row w-full space-x-3 gap-3">
-            {onConfirm && (
+            {onConfirm && Boolean(cancelText) && (
               <TouchableOpacity
-                onPress={onClose}
+                onPress={() => {
+                  if (onCancel) onCancel();
+                  onClose();
+                }}
                 accessible
                 accessibilityRole="button"
                 className="flex-1 py-3 items-center"

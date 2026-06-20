@@ -52,7 +52,7 @@ describe('SignUp Screen', () => {
 
     fireEvent.press(getByText('Join Nidush'));
 
-    expect(await findByText('Por favor preenche todos os campos.')).toBeTruthy();
+    expect(await findByText('Please fill in all fields.')).toBeTruthy();
     expect(mockSignUp).not.toHaveBeenCalled();
   });
 

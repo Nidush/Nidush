@@ -9,7 +9,7 @@ import {
 import React from 'react';
 import { Text, View } from 'react-native';
 
-const getDeviceIcon = (type: DeviceType, color: string) => {
+const getDeviceIcon = (type: DeviceType | undefined, color: string) => {
   switch (type) {
     case 'light':
       return <MaterialIcons name="lightbulb-outline" size={20} color={color} />;
@@ -56,17 +56,12 @@ export const DeviceSection = ({ devices }: DeviceSectionProps) => {
       <View className="flex-row flex-wrap gap-3">
         {devices.map((config, i) => {
           const fallbackMeta = getScenarioDeviceMeta(config);
-          const realDevice = SMART_HOME_DEVICES[config.deviceId] ?? (
-            fallbackMeta.type
-              ? {
-                  id: config.deviceId,
-                  name: fallbackMeta.name,
-                  type: fallbackMeta.type,
-                  room: '',
-                }
-              : null
-          );
-          if (!realDevice) return null;
+          const realDevice = SMART_HOME_DEVICES[config.deviceId] ?? {
+            id: config.deviceId,
+            name: fallbackMeta.name,
+            type: fallbackMeta.type,
+            room: '',
+          };
 
           const isLight = realDevice.type === 'light';
           const isColorValue =
@@ -78,14 +73,33 @@ export const DeviceSection = ({ devices }: DeviceSectionProps) => {
               : typeof config.value === 'string' && config.value.trim().startsWith('#')
                 ? config.value
                 : null;
-          const hasDetails = !!config.value;
+          const hasDetails = Boolean(
+            config.value ||
+            config.mode ||
+            config.brightness ||
+            config.temperature,
+          );
+          const detailText =
+            typeof config.value === 'string' && config.value.trim()
+              ? config.value
+              : typeof config.value === 'number'
+                ? String(config.value)
+                : typeof config.mode === 'string' && config.mode.trim()
+                  ? config.mode
+                  : typeof config.temperature === 'number'
+                    ? String(config.temperature)
+                    : typeof config.brightness === 'string' && config.brightness.trim()
+                      ? config.brightness
+                      : config.state === 'on'
+                        ? 'On'
+                        : 'Off';
 
           // Cria label de acessibilidade detalhada
           const accessibilityText = `${realDevice.name}${
             hasDetails
               ? isLight && isColorValue
                 ? `, color ${lightColor}, brightness ${config.brightness || '100%'}`
-                : `, value ${config.value}${realDevice.type === 'thermostat' ? ' degrees Celsius' : ''}`
+                : `, value ${detailText}${realDevice.type === 'thermostat' ? ' degrees Celsius' : ''}`
               : ''
           }`;
 
@@ -143,7 +157,7 @@ export const DeviceSection = ({ devices }: DeviceSectionProps) => {
                         className="text-[#548F53] text-sm"
                         style={{ fontFamily: 'Nunito_600SemiBold' }}
                       >
-                        {config.value}
+                        {detailText}
                         {realDevice.type === 'thermostat' ? 'ºC' : ''}
                       </Text>
                     )}

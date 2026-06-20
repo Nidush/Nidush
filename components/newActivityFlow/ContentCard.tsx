@@ -6,6 +6,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import {
+  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -66,11 +67,12 @@ export const ContentCard = ({
         style={StyleSheet.absoluteFill}
         importantForAccessibility="no-hide-descendants"
       >
-        <ExpoImage
+        <Image
           source={imageSource}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          cachePolicy="memory-disk"
+          style={[StyleSheet.absoluteFill, { transform: [{ scale: 1.45 }] }]}
+          resizeMode="cover"
+          blurRadius={85}
+          accessible={false}
         />
         <View className="absolute inset-0 bg-black/20" />
       </View>

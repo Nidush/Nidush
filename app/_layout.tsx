@@ -218,7 +218,7 @@ export default function RootLayout() {
             setAnimationComplete(true);
           });
         } catch (error) {
-          logger.error('Erro na animação de splash:', error);
+          logger.error('Error in splash animation:', error);
           setAnimationComplete(true);
         }
       };
