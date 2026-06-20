@@ -128,14 +128,11 @@ export const NotificationsProvider = ({ children }: { children: React.ReactNode 
   }, []);
 
   const syncPushTokenForUser = useCallback(async (uid: string, token: string) => {
-    const { error } = await supabase
-      .from('user_push_tokens')
-      .upsert({
-        user_id: uid,
-        expo_push_token: token,
-        platform: Platform.OS,
-        last_seen_at: new Date().toISOString(),
-      }, { onConflict: 'expo_push_token' });
+    const { error } = await supabase.rpc('register_user_push_token', {
+      p_expo_push_token: token,
+      p_platform: Platform.OS,
+      p_last_seen_at: new Date().toISOString(),
+    });
 
     if (error) {
       console.error('Error saving push token:', error);
