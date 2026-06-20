@@ -89,6 +89,36 @@ type ContentRow = {
 
 type DisplayInstruction = string | { text: string; duration?: number };
 
+const getSupabaseErrorText = (error: unknown) => {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim();
+  }
+
+  if (error && typeof error === 'object') {
+    const typedError = error as {
+      message?: unknown;
+      details?: unknown;
+      hint?: unknown;
+      code?: unknown;
+    };
+
+    const parts = [
+      typedError.message,
+      typedError.details,
+      typedError.hint,
+      typedError.code ? `Code: ${String(typedError.code)}` : '',
+    ]
+      .map((part) => String(part ?? '').trim())
+      .filter(Boolean);
+
+    if (parts.length > 0) {
+      return parts.join('\n');
+    }
+  }
+
+  return 'Please try again in a moment.';
+};
+
 const isActivityItem = (item: Activity | Scenario): item is Activity =>
   'type' in item;
 
@@ -751,10 +781,7 @@ export default function ActivityDetails() {
           setAlertConfig({
             visible: true,
             title: deletingScenario ? 'Could not delete scenario' : 'Could not delete activity',
-            message:
-              e instanceof Error && e.message
-                ? e.message
-                : 'Please try again in a moment.',
+            message: getSupabaseErrorText(e),
             confirmText: 'OK',
             cancelText: '',
             isDestructive: false,
