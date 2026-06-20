@@ -24,7 +24,6 @@ import { CustomAlert } from '@/components/CustomAlert';
 import {
   Activity,
   Content,
-  CONTENTS,
   Scenario,
   ScenarioDeviceState,
 } from '@/constants/data';
@@ -89,6 +88,61 @@ type ContentRow = {
 };
 
 type DisplayInstruction = string | { text: string; duration?: number };
+
+const getSupabaseErrorText = (error: unknown) => {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim();
+  }
+
+  if (error && typeof error === 'object') {
+    const typedError = error as {
+      message?: unknown;
+      details?: unknown;
+      hint?: unknown;
+      code?: unknown;
+    };
+
+    const parts = [
+      typedError.message,
+      typedError.details,
+      typedError.hint,
+      typedError.code ? `Code: ${String(typedError.code)}` : '',
+    ]
+      .map((part) => String(part ?? '').trim())
+      .filter(Boolean);
+
+    if (parts.length > 0) {
+      return parts.join('\n');
+    }
+  }
+
+  return 'Please try again in a moment.';
+};
+
+const hasMissingColumnError = (error: unknown, columnName: string) => {
+  if (!error || typeof error !== 'object') return false;
+
+  const typedError = error as {
+    code?: unknown;
+    message?: unknown;
+    details?: unknown;
+    hint?: unknown;
+  };
+
+  const joinedText = [
+    typedError.message,
+    typedError.details,
+    typedError.hint,
+  ]
+    .map((part) => String(part ?? '').toLowerCase())
+    .join(' ');
+
+  return (
+    String(typedError.code ?? '') === '42703' ||
+    String(typedError.code ?? '') === 'PGRST204' ||
+    joinedText.includes(columnName.toLowerCase())
+  );
+};
 
 const isActivityItem = (item: Activity | Scenario): item is Activity =>
   'type' in item;
@@ -166,6 +220,11 @@ const getItemDevices = (item: Activity | Scenario) =>
     ? item.devices
     : []) as ScenarioDeviceState[];
 
+const getReadableDeviceName = (config: ScenarioDeviceState) =>
+  config.deviceName ||
+  SMART_HOME_DEVICES[config.deviceId]?.name ||
+  getScenarioDeviceMeta(config).name;
+
 const resolveConfiguredDevices = (
   activityDevices: ScenarioDeviceState[],
   scenarioDevices: ScenarioDeviceState[],
@@ -209,6 +268,29 @@ const resolveScenarioForDisplay = async (rawScenarioId: string) => {
   const dbScenario = await fetchScenarioFromDbCandidates(rawScenarioId);
   if (dbScenario) return dbScenario;
   return fetchScenarioTemplateById(rawScenarioId);
+};
+
+const countLinkedRoutinesForScenario = async (scenarioDbId: number) => {
+  const primaryQuery = await supabase
+    .from('routines')
+    .select('id', { count: 'exact', head: true })
+    .eq('scenario_id', scenarioDbId);
+
+  if (
+    primaryQuery.error &&
+    hasMissingColumnError(primaryQuery.error, 'scenario_id')
+  ) {
+    const legacyQuery = await supabase
+      .from('routines')
+      .select('id', { count: 'exact', head: true })
+      .eq('scenario_idscenario', scenarioDbId);
+
+    if (legacyQuery.error) throw legacyQuery.error;
+    return legacyQuery.count ?? 0;
+  }
+
+  if (primaryQuery.error) throw primaryQuery.error;
+  return primaryQuery.count ?? 0;
 };
 
 export default function ActivityDetails() {
@@ -330,7 +412,6 @@ export default function ActivityDetails() {
 
         const contentPromise = foundActivity.content_id
           ? (async () => {
-              const localContent = CONTENTS[String(foundActivity.content_id)];
               const { data: contentRows, error: contentError } = await supabase
                 .from('contents')
                 .select('*')
@@ -345,23 +426,19 @@ export default function ActivityDetails() {
                   title: contentData.title,
                   type: contentData.type,
                   category: contentData.category,
-                  genre: contentData.genre || localContent?.genre,
+                  genre: contentData.genre || undefined,
                   description: contentData.description,
                   duration: contentData.duration,
-                  image: resolveCatalogImage(
-                    contentData.image || localContent?.image,
-                  ),
-                  instructions:
-                    contentData.instructions || localContent?.instructions,
-                  ingredients:
-                    contentData.ingredients || localContent?.ingredients,
-                  videoUrl: localContent?.videoUrl || contentData.video_url,
-                  mediaUrl: localContent?.mediaUrl || contentData.media_url || contentData.video_url,
-                  author: contentData.author || localContent?.author,
+                  image: resolveCatalogImage(contentData.image),
+                  instructions: contentData.instructions,
+                  ingredients: contentData.ingredients,
+                  videoUrl: contentData.video_url || undefined,
+                  mediaUrl: contentData.media_url || contentData.video_url || undefined,
+                  author: contentData.author || undefined,
                 } as Content;
               }
 
-              return localContent || null;
+              return null;
             })()
           : Promise.resolve(null);
 
@@ -424,11 +501,6 @@ export default function ActivityDetails() {
     };
     loadData();
   }, [id]);
-
-  const displayDescription =
-    !isActivity && relatedScenario?.description
-      ? relatedScenario.description
-      : mainItem?.description;
 
   const handleCustomBack = () => {
     if (isNew === 'true') {
@@ -662,11 +734,33 @@ export default function ActivityDetails() {
   };
 
   const handleEditActivity = () => {
-    if (!isActivity || String(id).startsWith('template:')) {
+    if (isActivity) {
+      if (String(id).startsWith('template:')) {
+        setAlertConfig({
+          visible: true,
+          title: 'Edit',
+          message: 'Only your own created activities can be edited.',
+          confirmText: 'OK',
+          cancelText: '',
+          isDestructive: false,
+          onConfirm: undefined,
+          onCancel: undefined,
+        });
+        return;
+      }
+
+      router.push({
+        pathname: '/new-activity',
+        params: { editId: id },
+      });
+      return;
+    }
+
+    if (!isUserScenarioRouteId(id)) {
       setAlertConfig({
         visible: true,
         title: 'Edit',
-        message: 'Only your own created activities can be edited.',
+        message: 'Only your own created scenarios can be edited.',
         confirmText: 'OK',
         cancelText: '',
         isDestructive: false,
@@ -677,34 +771,89 @@ export default function ActivityDetails() {
     }
 
     router.push({
-      pathname: '/new-activity',
-      params: { editId: id },
+      pathname: '/new-scenario',
+      params: { editId: parseUserScenarioDbId(id) },
     });
   };
 
   const handleDeleteActivity = () => {
+    const deletingScenario = !isActivity;
     setAlertConfig({
       visible: true,
-      title: 'Delete Activity',
+      title: deletingScenario ? 'Delete Scenario' : 'Delete Activity',
       message:
-        'Are you sure you want to delete this activity? This action cannot be undone.',
+        deletingScenario
+          ? 'Are you sure you want to delete this scenario? This action cannot be undone.'
+          : 'Are you sure you want to delete this activity? This action cannot be undone.',
       confirmText: 'Delete',
       cancelText: 'Cancel',
       isDestructive: true,
       onConfirm: async () => {
         try {
-          // Deletar a atividade na nuvem do Supabase
-          apiLog('DELETE', 'activities', { id });
-          const { error } = await supabase
-            .from('activities')
-            .delete()
-            .eq('id', id);
+          if (deletingScenario) {
+            const rawScenarioDbId = parseUserScenarioDbId(id);
+            const scenarioDbId = Number(rawScenarioDbId);
 
-          if (error) throw error;
+            if (!Number.isFinite(scenarioDbId)) {
+              throw new Error('Invalid scenario id.');
+            }
+
+            const [{ count: linkedActivitiesCount, error: linkedActivitiesError }, linkedRoutinesCount] = await Promise.all([
+              supabase
+                .from('activities')
+                .select('id', { count: 'exact', head: true })
+                .eq('scenario_id', scenarioDbId),
+              countLinkedRoutinesForScenario(scenarioDbId),
+            ]);
+
+            if (linkedActivitiesError) throw linkedActivitiesError;
+
+            const blockingRefs = (linkedActivitiesCount ?? 0) + (linkedRoutinesCount ?? 0);
+            if (blockingRefs > 0) {
+              setAlertConfig({
+                visible: true,
+                title: 'Scenario in use',
+                message:
+                  'This scenario is linked to existing activities or routines. Remove those links first, then try deleting the scenario again.',
+                confirmText: 'OK',
+                cancelText: '',
+                isDestructive: false,
+                onConfirm: undefined,
+                onCancel: undefined,
+              });
+              return;
+            }
+
+            apiLog('DELETE', 'scenarios', { id: scenarioDbId });
+            const { error } = await supabase
+              .from('scenarios')
+              .delete()
+              .eq('id', scenarioDbId);
+
+            if (error) throw error;
+          } else {
+            apiLog('DELETE', 'activities', { id });
+            const { error } = await supabase
+              .from('activities')
+              .delete()
+              .eq('id', id);
+
+            if (error) throw error;
+          }
 
           router.navigate('/Activities');
         } catch (e) {
           console.log('Error while trying to delete', e);
+          setAlertConfig({
+            visible: true,
+            title: deletingScenario ? 'Could not delete scenario' : 'Could not delete activity',
+            message: getSupabaseErrorText(e),
+            confirmText: 'OK',
+            cancelText: '',
+            isDestructive: false,
+            onConfirm: undefined,
+            onCancel: undefined,
+          });
         }
       },
       onCancel: undefined,
@@ -743,6 +892,47 @@ export default function ActivityDetails() {
     getItemDevices(mainItem),
     Array.isArray(relatedScenario?.devices) ? relatedScenario.devices : [],
   );
+
+  const deviceNames = Array.from(
+    new Set(
+      devicesToShow
+        .map((config) => getReadableDeviceName(config).trim())
+        .filter(Boolean),
+    ),
+  );
+
+  const scenarioDescription =
+    relatedScenario?.description?.trim() || '';
+  const baseDescription =
+    (!isActivity && scenarioDescription) ||
+    mainItem?.description?.trim() ||
+    scenarioDescription;
+  const mergedDescription = (() => {
+    const descriptionParts = [baseDescription];
+
+    if (
+      isActivity &&
+      scenarioDescription &&
+      scenarioDescription !== baseDescription &&
+      !scenarioDescription.startsWith(baseDescription)
+    ) {
+      descriptionParts.push(scenarioDescription);
+    } else if (
+      isActivity &&
+      scenarioDescription.startsWith(baseDescription) &&
+      scenarioDescription.length > baseDescription.length
+    ) {
+      descriptionParts[0] = scenarioDescription;
+    }
+
+    if (deviceNames.length > 0) {
+      descriptionParts.push(
+        `Devices involved: ${deviceNames.join(', ')}.`,
+      );
+    }
+
+    return descriptionParts.filter(Boolean).join('\n\n');
+  })();
 
   const activeSpeakerConfig = devicesToShow.find((config) => {
     const device = SMART_HOME_DEVICES[config.deviceId];
@@ -836,7 +1026,7 @@ export default function ActivityDetails() {
               className="text-[#586963] text-[16px] leading-6"
               style={{ fontFamily: 'Nunito_400Regular' }}
             >
-              {displayDescription}
+              {mergedDescription}
             </Text>
           </View>
 

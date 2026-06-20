@@ -65,6 +65,22 @@ type DeviceControlDraft = {
   deviceType: string;
 };
 
+type PersistedScenarioDevice = DeviceControlDraft & {
+  deviceId?: string;
+};
+
+type ScenarioEditRow = {
+  id: number;
+  name: string;
+  description?: string | null;
+  room_id?: number | null;
+  image?: string | null;
+  playlist_id?: string | null;
+  playlist_name?: string | null;
+  focus_mode_enabled?: boolean | null;
+  devices?: PersistedScenarioDevice[] | null;
+};
+
 type PlaylistItem = {
   id: string;
   name: string;
@@ -403,7 +419,9 @@ function NewScenarioContent() {
   const hasAppliedRestoredDevicesRef = useRef(false);
 
   const { addNotification } = useNotifications();
-  const { roomName: roomNameParam } = useLocalSearchParams<{ roomName?: string }>();
+  const { roomName: roomNameParam, editId } = useLocalSearchParams<{ roomName?: string; editId?: string }>();
+  const isEditMode = Boolean(editId);
+  const draftStorageKey = `${NEW_SCENARIO_DRAFT_KEY}:${editId ?? 'create'}`;
 
   const [step, setStep] = useState(1);
   const [isRoomStepSkipped, setIsRoomStepSkipped] = useState(false);
@@ -472,11 +490,12 @@ function NewScenarioContent() {
 
   const saveScenarioDraft = useCallback(async () => {
     await AsyncStorage.setItem(
-      NEW_SCENARIO_DRAFT_KEY,
+      draftStorageKey,
       JSON.stringify(buildDraftPayload()),
     );
   }, [
     description,
+    draftStorageKey,
     deviceDrafts,
     focusMode,
     isRoomStepSkipped,
@@ -495,14 +514,14 @@ function NewScenarioContent() {
   }, [saveScenarioDraft]);
 
   const discardScenarioDraft = useCallback(async () => {
-    await AsyncStorage.removeItem(NEW_SCENARIO_DRAFT_KEY);
+    await AsyncStorage.removeItem(draftStorageKey);
     await AsyncStorage.removeItem(SPOTIFY_RETURN_ROUTE_KEY);
-  }, []);
+  }, [draftStorageKey]);
 
   useEffect(() => {
     const loadDraft = async () => {
       try {
-        const raw = await AsyncStorage.getItem(NEW_SCENARIO_DRAFT_KEY);
+        const raw = await AsyncStorage.getItem(draftStorageKey);
         if (!raw) return;
 
         const draft = JSON.parse(raw) as ScenarioDraftPayload;
@@ -530,7 +549,73 @@ function NewScenarioContent() {
     };
 
     loadDraft();
-  }, []);
+  }, [draftStorageKey]);
+
+  useEffect(() => {
+    if (!isEditMode || !editId) return;
+
+    const loadScenarioForEdit = async () => {
+      try {
+        const numericScenarioId = Number(editId);
+        if (!Number.isFinite(numericScenarioId)) {
+          throw new Error('Invalid scenario id.');
+        }
+
+        const { data, error } = await supabase
+          .from('scenarios')
+          .select('id, name, description, room_id, image, playlist_id, playlist_name, focus_mode_enabled, devices')
+          .eq('id', numericScenarioId)
+          .single<ScenarioEditRow>();
+
+        if (error) throw error;
+
+        setSelectedRoomId(data.room_id ?? null);
+        setSelectedPlaylistId(data.playlist_id ?? '');
+        setSelectedPlaylistName(data.playlist_name ?? '');
+        setScenarioName(data.name ?? '');
+        setDescription(data.description ?? '');
+        setScenarioImage(data.image ?? null);
+        setFocusMode(data.focus_mode_enabled === true);
+        setStep(1);
+        setIsRoomStepSkipped(false);
+
+        const scenarioDevices = Array.isArray(data.devices) ? data.devices : [];
+        const parsedIds = scenarioDevices
+          .map((device) => {
+            const rawId = String(device.deviceId ?? '').replace(/^db-/, '');
+            const parsedId = Number(rawId);
+            return Number.isFinite(parsedId) ? parsedId : null;
+          })
+          .filter((value): value is number => value !== null);
+
+        setSelectedDeviceIds(new Set(parsedIds));
+
+        const parsedDrafts = scenarioDevices.reduce<Record<number, DeviceControlDraft>>((acc, device) => {
+          const rawId = String(device.deviceId ?? '').replace(/^db-/, '');
+          const parsedId = Number(rawId);
+          if (!Number.isFinite(parsedId)) return acc;
+          acc[parsedId] = {
+            state: device.state === 'off' ? 'off' : 'on',
+            value: device.value,
+            brightness: device.brightness,
+            color: device.color,
+            temperature: device.temperature,
+            mode: device.mode,
+            deviceName: device.deviceName ?? '',
+            deviceType: device.deviceType ?? '',
+          };
+          return acc;
+        }, {});
+
+        setDeviceDrafts(parsedDrafts);
+      } catch (error) {
+        console.error('Failed to load scenario for edit:', error);
+        setLoadError(error instanceof Error ? error.message : 'Could not load the scenario.');
+      }
+    };
+
+    void loadScenarioForEdit();
+  }, [editId, isEditMode]);
 
   useEffect(() => {
     if (!isDraftHydrated) return;
@@ -977,12 +1062,22 @@ function NewScenarioContent() {
         shortcuts: false,
       };
 
-      let payloadToInsert: Record<string, unknown> = fullPayload;
-      let insertResult = await supabase
-        .from('scenarios')
-        .insert(payloadToInsert)
-        .select('id')
-        .single();
+      let payloadToWrite: Record<string, unknown> = fullPayload;
+      const runScenarioWrite = async () =>
+        isEditMode && editId
+          ? supabase
+              .from('scenarios')
+              .update(payloadToWrite)
+              .eq('id', Number(editId))
+              .select('id')
+              .single()
+          : supabase
+              .from('scenarios')
+              .insert(payloadToWrite)
+              .select('id')
+              .single();
+
+      let writeResult = await runScenarioWrite();
 
       const unsupportedColumnErrorCodes = new Set(['42703', 'PGRST204']);
       const fallbackColumnOrder = [
@@ -994,46 +1089,44 @@ function NewScenarioContent() {
         'shortcuts',
       ];
 
-      while (insertResult.error && unsupportedColumnErrorCodes.has(insertResult.error.code ?? '')) {
-        const missingColumn = getMissingColumnName(insertResult.error);
+      while (writeResult.error && unsupportedColumnErrorCodes.has(writeResult.error.code ?? '')) {
+        const missingColumn = getMissingColumnName(writeResult.error);
         const columnsToRemove = missingColumn
           ? [missingColumn]
-          : fallbackColumnOrder.filter(column => column in payloadToInsert);
+          : fallbackColumnOrder.filter(column => column in payloadToWrite);
 
         if (columnsToRemove.length === 0) break;
 
-        payloadToInsert = omitKeys(payloadToInsert, columnsToRemove);
+        payloadToWrite = omitKeys(payloadToWrite, columnsToRemove);
 
-        insertResult = await supabase
-          .from('scenarios')
-          .insert(payloadToInsert)
-          .select('id')
-          .single();
+        writeResult = await runScenarioWrite();
       }
 
-      if (insertResult.error?.code === '42501') {
+      if (writeResult.error?.code === '42501') {
         throw new Error('The database still needs the scenarios permission update. Run `supabase db push` and try again.');
       }
 
-      if (insertResult.error || !insertResult.data?.id) {
-        throw insertResult.error || new Error('Could not create the scenario.');
+      if (writeResult.error || !writeResult.data?.id) {
+        throw writeResult.error || new Error(isEditMode ? 'Could not update the scenario.' : 'Could not create the scenario.');
       }
 
-      await AsyncStorage.removeItem(NEW_SCENARIO_DRAFT_KEY);
+      await AsyncStorage.removeItem(draftStorageKey);
 
       addNotification(
-        'New Scenario Created',
-        `"${scenarioName.trim()}" is ready to use in ${selectedRoom.name}.`,
+        isEditMode ? 'Scenario Updated' : 'New Scenario Created',
+        isEditMode
+          ? `"${scenarioName.trim()}" was updated in ${selectedRoom.name}.`
+          : `"${scenarioName.trim()}" is ready to use in ${selectedRoom.name}.`,
         'creation',
       );
 
-      trackEvent('scenario-created', {
+      trackEvent(isEditMode ? 'scenario-updated' : 'scenario-created', {
         area: 'scenarios',
         screen: 'new-scenario',
-        action: 'create-scenario',
+        action: isEditMode ? 'update-scenario' : 'create-scenario',
         userId: user.id,
         metadata: {
-          scenarioId: insertResult.data.id,
+          scenarioId: writeResult.data.id,
           roomId: selectedRoomId,
           playlistId: selectedPlaylistId || null,
           focusMode,
@@ -1043,7 +1136,7 @@ function NewScenarioContent() {
       router.push({
         pathname: '/activity-details',
         params: {
-          id: `scenario:${insertResult.data.id}`,
+          id: `scenario:${writeResult.data.id}`,
           isNew: 'true',
           itemType: 'scenario',
         },

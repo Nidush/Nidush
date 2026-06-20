@@ -31,7 +31,6 @@ import { useSpotify } from '@/context/SpotifyContext';
 
 import {
   Activity,
-  CONTENTS,
   Scenario,
   ScenarioDeviceState,
 } from '@/constants/data';
@@ -426,7 +425,6 @@ export default function ActiveSession() {
       let connectedTvName: string | undefined = undefined;
 
       const contentId = getContentId(foundItem);
-      const localContent = contentId ? CONTENTS[String(contentId)] : null;
 
       if (foundItem && contentId) {
         const { data: contentRows } = await supabase
@@ -439,20 +437,10 @@ export default function ActiveSession() {
           contentRows && contentRows.length > 0 ? contentRows[0] : null;
 
         if (contentData) {
-          playlistName =
-            contentData.title || localContent?.title || playlistName;
-          if (contentData.type === 'video' || localContent?.type === 'video') {
+          playlistName = contentData.title || playlistName;
+          if (contentData.type === 'video') {
             contentType = 'video';
-            videoUrl =
-              localContent?.videoUrl || contentData.video_url || undefined;
-          }
-        } else {
-          if (localContent) {
-            playlistName = localContent.title;
-            if (localContent.type === 'video') {
-              contentType = 'video';
-              videoUrl = localContent.videoUrl;
-            }
+            videoUrl = contentData.video_url || undefined;
           }
         }
       }
@@ -502,7 +490,7 @@ export default function ActiveSession() {
       }
 
       const rawInstructions = parseArrayValue<FormattedInstruction | string>(
-        contentData?.instructions || localContent?.instructions || [],
+        contentData?.instructions || [],
       );
 
       const formattedInstructions: FormattedInstruction[] = rawInstructions
@@ -550,15 +538,14 @@ export default function ActiveSession() {
         (foundItem as any)?.content?.ingredients ??
         (foundItem as any)?.contents?.ingredients ??
         (foundItem as any)?.ingredients ??
-        localContent?.ingredients ??
         [];
 
       const parsedIngredients = normalizeIngredients(robustIngredients);
       const activityType = inferSessionActivityType({
         foundItem,
         relatedScenario,
-        contentCategory: contentData?.category ?? localContent?.category,
-        contentType: contentData?.type ?? localContent?.type,
+        contentCategory: contentData?.category,
+        contentType: contentData?.type,
       });
       const configuredDevices = resolveConfiguredDevices(
         getItemDevices(foundItem),
