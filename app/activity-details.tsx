@@ -677,24 +677,75 @@ export default function ActivityDetails() {
   };
 
   const handleDeleteActivity = () => {
+    const deletingScenario = !isActivity;
     setAlertConfig({
       visible: true,
-      title: 'Delete Activity',
+      title: deletingScenario ? 'Delete Scenario' : 'Delete Activity',
       message:
-        'Are you sure you want to delete this activity? This action cannot be undone.',
+        deletingScenario
+          ? 'Are you sure you want to delete this scenario? This action cannot be undone.'
+          : 'Are you sure you want to delete this activity? This action cannot be undone.',
       confirmText: 'Delete',
       cancelText: 'Cancel',
       isDestructive: true,
       onConfirm: async () => {
         try {
-          // Deletar a atividade na nuvem do Supabase
-          apiLog('DELETE', 'activities', { id });
-          const { error } = await supabase
-            .from('activities')
-            .delete()
-            .eq('id', id);
+          if (deletingScenario) {
+            const scenarioDbId = parseUserScenarioDbId(id);
 
-          if (error) throw error;
+            const [{ count: linkedActivitiesCount, error: linkedActivitiesError }, { count: linkedRoutinesCount, error: linkedRoutinesError }] = await Promise.all([
+              supabase
+                .from('activities')
+                .select('id', { count: 'exact', head: true })
+                .eq('scenario_id', scenarioDbId),
+              supabase
+                .from('routines')
+                .select('id', { count: 'exact', head: true })
+                .eq('scenario_id', scenarioDbId),
+            ]);
+
+            if (linkedActivitiesError) throw linkedActivitiesError;
+            if (linkedRoutinesError) throw linkedRoutinesError;
+
+            const blockingRefs = (linkedActivitiesCount ?? 0) + (linkedRoutinesCount ?? 0);
+            if (blockingRefs > 0) {
+              setAlertConfig({
+                visible: true,
+                title: 'Scenario in use',
+                message:
+                  'This scenario is linked to existing activities or routines. Remove those links first, then try deleting the scenario again.',
+                confirmText: 'OK',
+                cancelText: '',
+                isDestructive: false,
+                onConfirm: undefined,
+                onCancel: undefined,
+              });
+              return;
+            }
+
+            apiLog('DELETE', 'scenarios', { id: scenarioDbId });
+            const { error: shortcutDeleteError } = await supabase
+              .from('shortcuts')
+              .delete()
+              .eq('scenario_idscenario', scenarioDbId);
+
+            if (shortcutDeleteError) throw shortcutDeleteError;
+
+            const { error } = await supabase
+              .from('scenarios')
+              .delete()
+              .eq('id', scenarioDbId);
+
+            if (error) throw error;
+          } else {
+            apiLog('DELETE', 'activities', { id });
+            const { error } = await supabase
+              .from('activities')
+              .delete()
+              .eq('id', id);
+
+            if (error) throw error;
+          }
 
           router.navigate('/Activities');
         } catch (e) {
