@@ -734,11 +734,33 @@ export default function ActivityDetails() {
   };
 
   const handleEditActivity = () => {
-    if (!isActivity || String(id).startsWith('template:')) {
+    if (isActivity) {
+      if (String(id).startsWith('template:')) {
+        setAlertConfig({
+          visible: true,
+          title: 'Edit',
+          message: 'Only your own created activities can be edited.',
+          confirmText: 'OK',
+          cancelText: '',
+          isDestructive: false,
+          onConfirm: undefined,
+          onCancel: undefined,
+        });
+        return;
+      }
+
+      router.push({
+        pathname: '/new-activity',
+        params: { editId: id },
+      });
+      return;
+    }
+
+    if (!isUserScenarioRouteId(id)) {
       setAlertConfig({
         visible: true,
         title: 'Edit',
-        message: 'Only your own created activities can be edited.',
+        message: 'Only your own created scenarios can be edited.',
         confirmText: 'OK',
         cancelText: '',
         isDestructive: false,
@@ -749,8 +771,8 @@ export default function ActivityDetails() {
     }
 
     router.push({
-      pathname: '/new-activity',
-      params: { editId: id },
+      pathname: '/new-scenario',
+      params: { editId: parseUserScenarioDbId(id) },
     });
   };
 
