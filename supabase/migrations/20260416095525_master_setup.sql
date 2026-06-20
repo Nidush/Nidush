@@ -47,12 +47,6 @@ CREATE TABLE IF NOT EXISTS public.rooms (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS public.categories (
-    id SERIAL PRIMARY KEY,
-    name character varying NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
 CREATE TABLE IF NOT EXISTS public.contents (
     id text PRIMARY KEY,
     title text NOT NULL,
@@ -169,4 +163,3 @@ BEGIN
         EXECUTE format('CREATE TRIGGER tr_updated_at BEFORE UPDATE ON public.%I FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at()', t);
     END LOOP;
 END $$;
-

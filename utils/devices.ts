@@ -133,12 +133,53 @@ const TYPE_ALIASES: Record<string, SmartDeviceType> = {
   heart: 'heart',
 };
 
+const inferDeviceTypeFromText = (value: string): SmartDeviceType => {
+  const normalized = value.toLowerCase();
+
+  if (/(speaker|soundbar|nest mini|nest audio|home mini|homepod|echo)/.test(normalized)) return 'speaker';
+  if (/(tv|television|chromecast|google tv)/.test(normalized)) return 'tv';
+  if (/(display|nest hub|smart display|monitor|screen)/.test(normalized)) return 'display';
+  if (/(plug|outlet|socket)/.test(normalized)) return 'outlet';
+  if (/(lamp|light|bulb|lighting)/.test(normalized)) return 'light';
+  if (/(router|wifi|wi-fi|mesh)/.test(normalized)) return 'router';
+  if (/(assistant|google home|google nest|alexa)/.test(normalized)) return 'assistant';
+  if (/(air purifier|purifier)/.test(normalized)) return 'purifier';
+  if (/(diffuser|difuser|humidifier|aroma)/.test(normalized)) return 'difuser';
+  if (/(coffee|espresso|nespresso)/.test(normalized)) return 'coffee';
+  if (/(^|\\W)ac(\\W|$)|air conditioner|climate/.test(normalized)) return 'ac';
+  if (/(heater|heating|radiator|boiler)/.test(normalized)) return 'heater';
+  if (/(sensor|motion|temperature|humidity|contact)/.test(normalized)) return 'sensor';
+  if (/(computer|laptop|desktop|pc|macbook)/.test(normalized)) return 'computer';
+  if (/(fridge|washer|dryer|oven|dishwasher|appliance)/.test(normalized)) return 'appliance';
+
+  return 'unknown';
+};
+
+export const resolveDeviceType = (device: Partial<DeviceRecord>): SmartDeviceType => {
+  const direct = normalizeDeviceType(device.type);
+  if (direct !== 'unknown') return direct;
+
+  return inferDeviceTypeFromText(
+    [
+      device.name,
+      device.model,
+      device.external_id,
+      device.source,
+      typeof device.metadata === 'object' && device.metadata
+        ? JSON.stringify(device.metadata)
+        : '',
+    ]
+      .filter(Boolean)
+      .join(' '),
+  );
+};
+
 export const isRealHomeDevice = (device: Partial<DeviceRecord>) => {
   const discoveryMethod = device.discovery_method?.toLowerCase();
   const source = device.source?.toLowerCase();
   const name = device.name?.trim();
   const externalId = device.external_id?.trim();
-  const normalizedType = normalizeDeviceType(device.type);
+  const normalizedType = resolveDeviceType(device);
   const searchable = [
     device.name,
     device.type,
@@ -201,7 +242,7 @@ export const normalizeDeviceStatus = (device: Partial<DeviceRecord>): SmartDevic
 export const mapDeviceRecordToAppDevice = (device: DeviceRecord): AppDevice => ({
   id: device.id,
   name: device.name,
-  type: normalizeDeviceType(device.type),
+  type: resolveDeviceType(device),
   status: normalizeDeviceStatus(device),
   level: device.status_level ?? 100,
   room_id: device.room_id ?? null,
@@ -223,6 +264,21 @@ export const sortDevicesByFreshness = <T extends Partial<DeviceRecord>>(devices:
     const rightTime = right.last_seen ? new Date(right.last_seen).getTime() : 0;
     return rightTime - leftTime;
   });
+
+export const getDeviceSourceLabel = (source?: string | null) => {
+  const normalized = String(source ?? '').trim().toLowerCase();
+
+  if (!normalized || normalized === 'network') return 'Network';
+  if (normalized === 'google_home') return 'Google Home';
+  if (normalized === 'health_connect') return 'Health Connect';
+  if (normalized === 'spotify') return 'Spotify';
+
+  return normalized
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+};
 
 export const subscribeToHomeDeviceChanges = (
   homeId: number,

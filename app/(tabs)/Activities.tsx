@@ -30,22 +30,25 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   Activity,
-  CONTENTS,
   Scenario,
 } from '@/constants/data';
 import { resolveCatalogImage } from '@/constants/data/catalogAssets';
 import {
-  fetchActivityTemplates,
-  fetchScenarioTemplates,
   fetchUserScenarios,
   mapUserActivity,
 } from '@/utils/catalogTemplates';
+import {
+  buildSafeContainsPattern,
+  MAX_SEARCH_LENGTH,
+  normalizeSearchInput,
+} from '@/utils/searchSecurity';
 import {
   AiActivityIdea,
   fetchAiActivityIdeas,
   getNidushAiErrorMessage,
   saveAiActivityIdea,
 } from '@/utils/aiActivities';
+import { isAiAutoInvocationEnabled } from '@/utils/aiConfig';
 import { logger } from '@/utils/logger';
 import { getDynamicRecommendations } from '@/utils/recommendationEngine';
 
@@ -63,6 +66,7 @@ const UnifiedActivitiesScreen = () => {
   const [myActivities, setMyActivities] = useState<Activity[]>([]);
   const [activityTemplates, setActivityTemplates] = useState<Activity[]>([]);
   const [scenarioTemplates, setScenarioTemplates] = useState<Scenario[]>([]);
+  const [contentDurations, setContentDurations] = useState<Record<string, string>>({});
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [isAiModalVisible, setIsAiModalVisible] = useState(false);
@@ -85,29 +89,40 @@ const UnifiedActivitiesScreen = () => {
   });
 
   const isLoadingRef = useRef(false);
+  const lastAutoRecommendationRequestKeyRef = useRef<string | null>(null);
   const PAGE_SIZE = 10;
-
   // Debounce search query
   useEffect(() => {
     const handler = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
+      setDebouncedSearchQuery(normalizeSearchInput(searchQuery));
     }, 500);
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
   const loadTemplates = useCallback(async () => {
     try {
-      const [activities, scenarios, userScenarios] = await Promise.all([
-        fetchActivityTemplates(),
-        fetchScenarioTemplates(),
-        fetchUserScenarios().catch(() => []),
-      ]);
-      setActivityTemplates(activities);
-      setScenarioTemplates([...userScenarios, ...scenarios]);
+      const userScenarios = await fetchUserScenarios().catch(() => []);
+      setActivityTemplates([]);
+      setScenarioTemplates(userScenarios);
     } catch (error) {
       logger.error('Failed to load activity/scenario templates:', error);
       setActivityTemplates([]);
       setScenarioTemplates([]);
+    }
+  }, []);
+
+  const loadContentDurations = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.from('contents').select('id, duration');
+      if (error) throw error;
+
+      const nextDurations = Object.fromEntries(
+        (data ?? []).map((item) => [String(item.id), String(item.duration ?? '')]),
+      );
+      setContentDurations(nextDurations);
+    } catch (error) {
+      logger.warn('Failed to load content durations:', error);
+      setContentDurations({});
     }
   }, []);
 
@@ -134,7 +149,7 @@ const UnifiedActivitiesScreen = () => {
 
     let query = supabase
       .from('activities')
-      .select('*', { count: 'exact' })
+      .select('*, rooms(name)', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(start, end);
 
@@ -143,10 +158,8 @@ const UnifiedActivitiesScreen = () => {
     } else {
       query = query.eq('user_id', user.id);
     }
-
-
     if (debouncedSearchQuery) {
-      query = query.ilike('title', `%${debouncedSearchQuery}%`);
+      query = query.ilike('title', buildSafeContainsPattern(debouncedSearchQuery));
     }
 
     const { data, error, count } = await query;
@@ -173,14 +186,89 @@ const UnifiedActivitiesScreen = () => {
   useFocusEffect(
     useCallback(() => {
       loadTemplates();
+      loadContentDurations();
       loadActivities();
-    }, [loadActivities, loadTemplates])
+    }, [loadActivities, loadContentDurations, loadTemplates])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        lastAutoRecommendationRequestKeyRef.current = null;
+      };
+    }, []),
   );
 
   useEffect(() => {
-    setAiRecommendedIdeas([]);
-    setIsLoadingAiRecommendations(false);
-  }, [activeFilter, currentState, searchQuery, viewMode]);
+    if (!isAiAutoInvocationEnabled || viewMode !== 'activities') {
+      setAiRecommendedIdeas([]);
+      setIsLoadingAiRecommendations(false);
+      lastAutoRecommendationRequestKeyRef.current = null;
+      return;
+    }
+
+    const requestKey = JSON.stringify({
+      viewMode,
+      activeFilter,
+      mood: currentState,
+      prompt: debouncedSearchQuery,
+      spotify: isAuthenticated,
+    });
+
+    if (lastAutoRecommendationRequestKeyRef.current === requestKey) {
+      return;
+    }
+
+    let isActive = true;
+    lastAutoRecommendationRequestKeyRef.current = requestKey;
+
+    const loadAiRecommendations = async () => {
+      setIsLoadingAiRecommendations(true);
+
+      try {
+        const spotifyPlaylists = isAuthenticated
+          ? (await getUserPlaylists())
+              .slice(0, 15)
+              .map((playlist) => ({
+                id: playlist.id,
+                name: playlist.name,
+              }))
+          : [];
+
+        const ideas = await fetchAiActivityIdeas({
+          mood: currentState,
+          activeFilter,
+          prompt: debouncedSearchQuery,
+          source: 'activities-auto',
+          spotifyPlaylists,
+        });
+
+        if (!isActive) return;
+        setAiRecommendedIdeas(ideas.slice(0, 5));
+      } catch (error) {
+        if (!isActive) return;
+        logger.warn('Failed to auto-load AI recommendations:', error);
+        lastAutoRecommendationRequestKeyRef.current = null;
+      } finally {
+        if (isActive) {
+          setIsLoadingAiRecommendations(false);
+        }
+      }
+    };
+
+    void loadAiRecommendations();
+
+    return () => {
+      isActive = false;
+    };
+  }, [
+    activeFilter,
+    currentState,
+    debouncedSearchQuery,
+    getUserPlaylists,
+    isAuthenticated,
+    viewMode,
+  ]);
 
   let [fontsLoaded] = useFonts({
     Nunito_700Bold,
@@ -199,8 +287,8 @@ const UnifiedActivitiesScreen = () => {
 
   const getActivityTime = (activity: Activity) => {
     const cId = activity.content_id || activity.contentId;
-    if (cId && CONTENTS[cId]) {
-      return CONTENTS[cId].duration;
+    if (cId) {
+      return contentDurations[String(cId)];
     }
     return undefined;
   };
@@ -266,6 +354,31 @@ const UnifiedActivitiesScreen = () => {
       isEmpty: filteredUserActivities.length + filteredCatalog.length === 0,
     };
   }, [viewMode, activeFilter, searchQuery, myActivities, activityTemplates, scenarioTemplates, currentState]);
+
+  const searchSuggestions = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    if (normalizedQuery.length < 2) return [];
+
+    const sourceItems =
+      viewMode === 'activities'
+        ? [...myActivities, ...activityTemplates]
+        : scenarioTemplates;
+
+    const seen = new Set<string>();
+    const suggestions: string[] = [];
+
+    for (const item of sourceItems) {
+      const title = item.title?.trim();
+      if (!title) continue;
+      if (!title.toLowerCase().includes(normalizedQuery)) continue;
+      if (seen.has(title.toLowerCase())) continue;
+      seen.add(title.toLowerCase());
+      suggestions.push(title);
+      if (suggestions.length >= 5) break;
+    }
+
+    return suggestions;
+  }, [activityTemplates, myActivities, scenarioTemplates, searchQuery, viewMode]);
 
   const handleViewModeChange = (mode: 'activities' | 'scenarios') => {
     setViewMode(mode);
@@ -406,6 +519,8 @@ const UnifiedActivitiesScreen = () => {
           setViewMode={handleViewModeChange}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
+          suggestions={searchSuggestions}
+          onSelectSuggestion={setSearchQuery}
         />
 
         <FilterBar
@@ -447,7 +562,7 @@ const UnifiedActivitiesScreen = () => {
 
             {(recommendedData.length > 0 || isLoadingAiRecommendations) && (
               <CarouselSection
-                title={viewMode === 'activities' ? 'AI recommended' : 'Recommended'}
+                title="Recommended"
                 data={recommendedData}
                 showTime={viewMode === 'activities'}
                 isLoadingMore={isLoadingAiRecommendations}

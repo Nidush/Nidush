@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
@@ -66,16 +67,23 @@ export default function SignUp() {
           router.replace('/pre-signup-consent');
         }
       } catch (e) {
-        console.log('Erro ao ler consentimento legal:', e);
+        console.log('Error reading legal consent:', e);
       }
     };
 
     ensureLegalConsent();
   }, [router]);
 
+  const getEmailRedirectUrl = () => {
+    const configuredRedirect = process.env.EXPO_PUBLIC_AUTH_REDIRECT_URL?.trim();
+    if (configuredRedirect) return configuredRedirect;
+
+    return 'nidush://login';
+  };
+
   const handleSignUp = async () => {
     if (!email || !password || !firstName || !lastName) {
-      setErrorMsg('Por favor preenche todos os campos.');
+      setErrorMsg('Please fill in all fields.');
       return;
     }
 
@@ -94,6 +102,7 @@ export default function SignUp() {
       email,
       password,
       options: {
+        emailRedirectTo: getEmailRedirectUrl(),
         data: {
           first_name: firstName,
           last_name: lastName,
@@ -107,12 +116,12 @@ export default function SignUp() {
       setErrorMsg(getFriendlyErrorMessage(error));
       return;
     }
-    // Signup bem sucedido, limpar progresso anterior e qualquer flag antiga de onboarding
+    // Successful signup: clear old onboarding progress.
     try {
       await AsyncStorage.removeItem('@onboarding_progress');
       await AsyncStorage.removeItem('@viewedOnboarding');
     } catch (e) {
-      console.log('Erro ao limpar progresso:', e);
+      console.log('Error clearing progress:', e);
     }
 
     if (data.session) {

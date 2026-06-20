@@ -8,6 +8,7 @@ export type InstructionStep = {
   text: string;
   duration?: number;
   description?: string;
+  url?: string;
 };
 
 export interface Content {
@@ -15,12 +16,14 @@ export interface Content {
   title: string;
   type: 'video' | 'recipe' | 'audio' | 'workout' | 'exercise' | string;
   category: 'meditation' | 'audiobook' | 'cooking' | 'workout' | string;
+  genre?: string;
   description: string;
   duration: string;
   image: ImageSourcePropType;
   instructions?: (string | InstructionStep)[];
   ingredients?: Ingredient[];
   videoUrl?: string;
+  mediaUrl?: string;
   author?: string;
 }
 
@@ -29,6 +32,9 @@ export interface ScenarioDeviceState {
   state: 'on' | 'off';
   value?: number | string;
   brightness?: string;
+  color?: string;
+  temperature?: number;
+  mode?: string;
   deviceName?: string;
   deviceType?: string;
 }
@@ -60,6 +66,8 @@ export interface Activity {
   type: 'cooking' | 'meditation' | 'workout' | 'audiobooks' | 'general' | 'reading' | 'yoga' | 'other';
   scenario_id?: string;
   scenarioId?: string; 
+  playlist_id?: string;
+  playlistId?: string;
   content_id?: string;
   contentId?: string;  
   shortcuts: boolean;

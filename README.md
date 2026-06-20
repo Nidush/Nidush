@@ -6,9 +6,9 @@
 
 > **University Project - MVP | Master's in Communication and Web Technologies (MCTW)**
 
-**Nidush** is a smart home and wellbeing application created for the **Altice Labs** challenge. The project explores how a home can become a calmer, more adaptive space by combining guided activities, ambient scenarios, digital content and smart device interactions.
+**Nidush** is a smart home and wellbeing application created for the **Altice Labs** challenge. It explores how a home can become a calmer, more adaptive space through guided activities, ambient scenarios, digital content and smart device interactions.
 
-The app is focused on people dealing with stress or anxiety in urban contexts. Instead of treating smart home devices as isolated controls, Nidush groups them into emotional routines: cooking, meditation, workouts, audiobooks, focus mode and room atmospheres.
+Designed for people dealing with stress or anxiety in urban contexts, Nidush turns smart home interactions into emotional routines such as cooking, meditation, workouts, audiobooks, focus sessions and room atmospheres.
 
 [![Android Download](https://img.shields.io/badge/Download-Android_APK-34A853?style=for-the-badge&logo=android&logoColor=white)](https://drive.google.com/drive/folders/1574BepiHOLFtc2zvkSyJQmq_g9qTiNVV)
 [![React Native](https://img.shields.io/badge/React_Native-Expo-61DAFB?style=for-the-badge&logo=react)](https://reactnative.dev/)
@@ -21,52 +21,21 @@ The app is focused on people dealing with stress or anxiety in urban contexts. I
 
 ## Features
 
-- **Guided Activities:** Meditation, cooking, workout and audiobook experiences connected to content, room ambience and optional focus mode.
-- **Recommended Activities:** Dynamic recommendations based on app catalog templates, user preferences and biometric state.
-- **AI Activity Ideas:** Gemini-powered activity suggestions adapt to the user's current emotional/biometric state, available rooms, connected devices and hobbies.
-- **Activity Creator:** Step-by-step flow to create personal activities with type, content, room, environment, image and review.
-- **Atmospheric Scenarios:** Room presets that combine devices, playlists and ambience.
-- **Smart Home Device Layer:** Device cards and room views for connected or simulated devices.
-- **Focus Mode:** Activity sessions can reduce distractions while the user is doing an activity.
-- **Multi-user Homes:** Users can create or join a home with resident/admin roles.
-- **Profile & Onboarding:** User setup, hobbies/preferences, home selection and resident profile flow.
-- **Spotify Integration:** Spotify authentication and playlist support for immersive sessions.
-- **Biometric State Engine:** Personalized `RELAXED` / `FOCUSED` / `STRESSED` / `ANXIOUS` detection based on heart rate, HRV and EDA deviations from the user's own baseline.
-- **Weekly API Sync:** A Supabase cron job refreshes external API content every week without creating duplicates.
-- **Policies & Legal Pages:** Privacy Policy and Terms of Service documents are included.
+- Guided activities with music, ambience and optional focus mode
+- Personalized recommendations and AI-assisted activity ideas
+- Smart home scenarios, room presets and device-aware experiences
+- Multi-user homes, onboarding and profile management
+- Spotify integration with background playback support
+- Biometric state detection for more adaptive wellbeing routines
 
 ---
 
 ## Development Highlights
 
-Recent development work includes:
-
-- **Supabase integration:** Auth, database migrations, RLS policies, Storage support, Edge Functions and production-ready data flows.
-- **Weekly API automation:** A scheduled Supabase cron job refreshes external content from TheMealDB and API Ninjas without creating duplicated records.
-- **Activities catalog split:** App-provided activities now live in `activity_templates`, while user-created activities remain in `activities`.
-- **Recommendations fixes:** Recommended activities now correctly include app-provided catalog items in **Activities** and **Activities for you**.
-- **Profile and avatars:** Profile data, account summary, avatar storage and resident/home associations were improved.
-- **Home management:** Create/join home flows, join codes, resident roles and related Supabase functions were added or refined.
-- **Shortcuts and notifications:** Shortcut persistence, ordering, notification access and activity entry points were improved.
-- **Spotify and media sessions:** Spotify flows, playlist support, background playback behavior and media session handling were integrated.
-- **TV/casting support:** TV video activity support and Google Cast-related session behavior were added.
-- **Biometrics and recommendations:** Biometric testing, state-based recommendations and home activity suggestions were improved.
-- **Personalized state classification:** Biometrics now use a baseline-driven scoring model with local persistence, instead of only fixed thresholds.
-- **AI home suggestions:** `generate-activity-ideas` now adapts generated ideas to the user's detected state and falls back to mood-aware local suggestions if Gemini is unavailable.
-- **Security updates:** Password validation, signup security and auth-related flows were strengthened.
-- **CI/CD:** Supabase and app workflow checks were added/refined to run across branches.
-- **Documentation:** Privacy Policy, Terms of Service, Spotify submission notes and Supabase setup documentation were added.
-
-The weekly API sync was deployed and manually tested successfully:
-
-```json
-{
-  "status": "success",
-  "insertedCount": 8,
-  "updatedCount": 2,
-  "skippedCount": 0
-}
-```
+- End-to-end Supabase integration covering auth, database, RLS, storage and Edge Functions
+- Automated weekly content sync for external activity sources
+- Refined recommendation, biometrics, Spotify and home-management flows
+- Improved CI/CD, security hardening and project documentation
 
 ---
 
@@ -100,7 +69,7 @@ The weekly API sync was deployed and manually tested successfully:
 ### APIs & Integrations
 
 - **TheMealDB API:** Imports recipe content.
-- **API Ninjas Exercises API:** Imports workout/exercise content.
+- **WorkoutX API:** Imports workout/exercise content and weekly cached GIFs.
 - **Spotify API:** Authentication, playlists and music-related session support.
 - **Resend API:** Welcome email Edge Function.
 - **Google Gemini API:** Personalized activity idea generation in the `generate-activity-ideas` Edge Function.
@@ -141,7 +110,8 @@ selenium/                    E2E test specs
 - **Node.js LTS**
 - **npm**
 - **Git**
-- **Expo Go** for mobile testing, or Android Studio/iOS Simulator
+- **Android Studio** and/or **Xcode** if you build native clients
+- **Expo development build (`expo-dev-client`)** for day-to-day mobile testing
 - **Supabase CLI** for database/functions work
 
 Install Supabase CLI if needed:
@@ -178,8 +148,12 @@ EXPO_PUBLIC_SUPABASE_URL=
 EXPO_PUBLIC_SUPABASE_ANON_KEY=
 EXPO_PUBLIC_SPOTIFY_CLIENT_ID=
 EXPO_PUBLIC_SPOTIFY_SCHEME=
+EXPO_PUBLIC_AUTH_REDIRECT_URL=
 EXPO_PUBLIC_ENABLE_AI_AUTO_CALLS=true
+EXPO_PUBLIC_APP_ENV=development
 API_NINJAS_KEY=
+HOME_DEVICE_SYNC_TOKEN=
+DEVICE_SYNC_SHARED_SECRET=
 PORT=3000
 ```
 
@@ -189,16 +163,64 @@ Important:
 - Public Expo variables must start with `EXPO_PUBLIC_`.
 - Secret API keys used by Edge Functions must also be stored in Supabase secrets.
 - `EXPO_PUBLIC_ENABLE_AI_AUTO_CALLS=false` disables the automatic AI recommendation calls on screen load/focus. In development it defaults to `true`; in production builds it now defaults to `false` unless you explicitly enable it.
+- `EXPO_PUBLIC_AUTH_REDIRECT_URL` is optional; if omitted, the app falls back to `nidush://login`.
+- `DEVICE_SYNC_SHARED_SECRET` is required for non-JWT local discovery/sync calls.
 
 ### 4. Start The App
+
+Recommended flow for this repository:
+
+```bash
+npx expo start --dev-client
+```
+
+This project is primarily developed with a **development build**, not plain Expo Go.
+
+Useful variants:
+
+```bash
+npx expo start --dev-client --lan
+```
+
+```bash
+npx expo start --dev-client --localhost
+```
+
+```bash
+npx expo start --dev-client --tunnel
+```
+
+```bash
+npx expo start --dev-client -c
+```
+
+Flags:
+
+- `--lan`: best when your phone/emulator is on the same Wi-Fi network as your computer.
+- `--localhost`: best when everything runs on the same machine.
+- `--tunnel`: fallback when LAN access is blocked or unstable.
+- `-c`: clears the Metro cache.
+
+If you still want the standard Expo entry point, it is available too:
 
 ```bash
 npm start
 ```
 
-Then:
+Native build helpers:
 
-- Scan the QR code with **Expo Go**.
+```bash
+npm run android
+```
+
+```bash
+npm run ios
+```
+
+Expo server shortcuts:
+
+- Open the installed **development build** on the device/emulator.
+- Scan the QR code from the dev server when needed.
 - Press `a` for Android emulator.
 - Press `i` for iOS simulator.
 - Press `w` for web.
@@ -209,25 +231,15 @@ If cache causes strange behavior:
 npx expo start -c
 ```
 
-If you are using a development build (`expo-dev-client`), these startup modes are useful:
+If the native client is missing after dependency changes, rebuild it:
 
 ```bash
-npx expo start --dev-client --localhost -c
+npm run android
 ```
-
-- `--localhost`: best for local-only development on your own machine; it is not suitable for sharing across the network.
 
 ```bash
-npx expo start --dev-client --lan -c
+npm run ios
 ```
-
-- `--lan`: use this when your phone/emulator is on the same Wi-Fi network as your computer.
-
-```bash
-npx expo start --dev-client --tunnel -c
-```
-
-- `--tunnel`: best fallback when local network restrictions break device access or when you need a more reliable remote connection path.
 
 ---
 
@@ -235,6 +247,7 @@ npx expo start --dev-client --tunnel -c
 
 ```bash
 npm start              # Start Expo
+npx expo start --dev-client  # Start Metro for the development build
 npm run android        # Run native Android build
 npm run ios            # Run native iOS build
 npm run web            # Start web version
@@ -249,6 +262,18 @@ TypeScript check:
 
 ```bash
 npx tsc --noEmit
+```
+
+If `npx expo` fails locally with `expo: not found` or similar module errors, rebuild the local install:
+
+```bash
+npm install
+```
+
+Then retry:
+
+```bash
+npx expo start --dev-client
 ```
 
 Biometric state behavior:
@@ -286,7 +311,7 @@ supabase functions deploy weekly-api-content-sync
 Set required secrets:
 
 ```bash
-supabase secrets set API_NINJAS_KEY="your-api-ninjas-key"
+supabase secrets set WORKOUTX_API_KEY="your-workoutx-api-key"
 supabase secrets set GEMINI_API_KEY="your-gemini-api-key"
 supabase secrets set ENABLE_GEMINI_API="true"
 supabase secrets set ENABLE_AI_RATE_LIMIT="true"
@@ -337,13 +362,31 @@ The project includes a scheduled content refresh:
 The function fetches:
 
 - Recipes from **TheMealDB**
-- Exercises from **API Ninjas**
+- 10 exercises from **WorkoutX**
+- 10 **English audiobooks** from **LibriVox**
+- Workout GIFs are uploaded once per exercise to the public Supabase Storage bucket `api-content-media`
+
+LibriVox notes:
+
+- The API does not support a direct `language` query parameter on the `audiobooks` endpoint, so the function fetches extended audiobook records and filters them locally to `English`
+- Audiobooks are stored in `public.contents` with `type = 'audiobooks'` and `category = 'audio'`
+- The weekly sync prefers audiobooks that are not already in the database, so each week tends to bring different titles until the available pool is exhausted
+- Audiobook metadata comes from `https://librivox.org/api/feed/audiobooks`
+- Audiotracks are fetched separately from `https://librivox.org/api/feed/audiotracks`
+- We store title, cleaned description, year, language, total duration, track list, cover art, and author
 
 It avoids duplicates by:
 
-- Using stable API-based IDs, such as `api_mealdb_<mealId>` and `api_ninjas_exercise_<slug>`
+- Using stable API-based IDs, such as `api_mealdb_<mealId>` and `workoutx_exercise_<id>`
 - Checking existing records by `title + author`
+- Reusing previously uploaded Supabase Storage GIF URLs when the exercise already exists
 - Using Supabase `upsert` on `contents.id`
+
+Optional content-volume overrides:
+
+- `API_CONTENT_SYNC_MEALS`
+- `API_CONTENT_SYNC_EXERCISES`
+- `API_CONTENT_SYNC_AUDIOBOOKS`
 
 Manual test:
 
@@ -364,7 +407,7 @@ limit 10;
 
 ## Mobile Access APK
 
-Since Nidush is mobile-first, testing the Android build gives the best experience:
+Nidush is mobile-first, so testing the Android build gives the best experience:
 
 [**Nidush Android Build - Google Drive**](https://drive.google.com/drive/folders/1574BepiHOLFtc2zvkSyJQmq_g9qTiNVV)
 

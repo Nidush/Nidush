@@ -35,8 +35,8 @@ SELECT ok(
   'scenario_templates has RLS enabled'
 );
 
-SELECT is((SELECT count(*)::int FROM public.activity_templates), 14, 'activity templates are seeded');
-SELECT is((SELECT count(*)::int FROM public.scenario_templates), 13, 'scenario templates are seeded');
+SELECT is((SELECT count(*)::int FROM public.activity_templates), 0, 'activity templates are empty after static catalog cleanup');
+SELECT is((SELECT count(*)::int FROM public.scenario_templates), 0, 'scenario templates are empty after static catalog cleanup');
 SELECT ok(
   EXISTS (
     SELECT 1

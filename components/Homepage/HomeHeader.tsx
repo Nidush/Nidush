@@ -3,6 +3,7 @@ import { Link } from 'expo-router';
 import React from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 import { useNotifications } from '@/context/NotificationsContext';
+import { getAvatarSource } from '@/utils/avatarSource';
 
 interface HomeHeaderProps {
   userName: string;
@@ -105,7 +106,7 @@ export const HomeHeader = ({ userName, avatarUrl }: HomeHeaderProps) => {
             accessibilityHint="Navigates to the user's profile page"
           >
             <Image
-              source={avatarUrl ? { uri: avatarUrl } : require('@/assets/avatars/profile.png')}
+              source={getAvatarSource(avatarUrl)}
               className="rounded-full"
               style={{
                 width: 60,

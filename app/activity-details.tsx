@@ -1,12 +1,13 @@
+import { apiLog, supabase } from '@/utils/supabase';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase, apiLog } from '@/utils/supabase';
-
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
   ImageSourcePropType,
+  Linking,
+  Platform,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -23,7 +24,6 @@ import { CustomAlert } from '@/components/CustomAlert';
 import {
   Activity,
   Content,
-  CONTENTS,
   Scenario,
   ScenarioDeviceState,
 } from '@/constants/data';
@@ -35,8 +35,10 @@ import {
   isUserScenarioRouteId,
   mapUserActivity,
   parseUserScenarioDbId,
+  resolvePossibleUserScenarioDbIds,
 } from '@/utils/catalogTemplates';
 import { getScenarioDeviceMeta, mapLinkedDeviceToScenarioState } from '@/utils/activityDeviceConfigs';
+import { applyScenarioDeviceStates } from '@/utils/deviceExecution';
 
 type AlertConfigState = {
   visible: boolean;
@@ -46,6 +48,7 @@ type AlertConfigState = {
   cancelText: string;
   isDestructive: boolean;
   onConfirm?: () => void;
+  onCancel?: () => void;
 };
 
 type ShortcutRow = {
@@ -64,6 +67,7 @@ type ScenarioRow = {
   playlist_id: string | null;
   playlist_name?: string | null;
   focus_mode_enabled?: boolean | null;
+  devices?: ScenarioDeviceState[] | null;
   rooms?: { name?: string | null } | null;
 };
 
@@ -72,18 +76,51 @@ type ContentRow = {
   title: string;
   type: string;
   category: string;
+  genre?: string | null;
   description: string;
   duration: string;
   image?: string | null;
   instructions?: unknown;
   ingredients?: unknown;
   video_url?: string | null;
+  media_url?: string | null;
   author?: string | null;
 };
 
 type DisplayInstruction = string | { text: string; duration?: number };
 
-const isActivityItem = (item: Activity | Scenario): item is Activity => 'type' in item;
+const getSupabaseErrorText = (error: unknown) => {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim();
+  }
+
+  if (error && typeof error === 'object') {
+    const typedError = error as {
+      message?: unknown;
+      details?: unknown;
+      hint?: unknown;
+      code?: unknown;
+    };
+
+    const parts = [
+      typedError.message,
+      typedError.details,
+      typedError.hint,
+      typedError.code ? `Code: ${String(typedError.code)}` : '',
+    ]
+      .map((part) => String(part ?? '').trim())
+      .filter(Boolean);
+
+    if (parts.length > 0) {
+      return parts.join('\n');
+    }
+  }
+
+  return 'Please try again in a moment.';
+};
+
+const isActivityItem = (item: Activity | Scenario): item is Activity =>
+  'type' in item;
 
 const parseUnknownArray = (value: unknown): unknown[] => {
   if (!value) return [];
@@ -92,11 +129,18 @@ const parseUnknownArray = (value: unknown): unknown[] => {
       const parsed = JSON.parse(value);
       return Array.isArray(parsed) ? parsed : [];
     } catch {
-      return [];
+      return [value];
     }
   }
   return Array.isArray(value) ? value : [];
 };
+
+const splitInstructionText = (value: string) =>
+  value
+    .replace(/\s+/g, ' ')
+    .split(/(?:\r?\n)+|;\s+|[.!?],\s*|(?<=[.!?])\s+(?=[A-Z0-9])|(?<=\d\.)\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
 
 const toInstructionText = (value: unknown): string => {
   if (typeof value === 'string') return value;
@@ -104,6 +148,19 @@ const toInstructionText = (value: unknown): string => {
     return String((value as { text?: unknown }).text ?? '');
   }
   return '';
+};
+
+const getInstructionLink = (value: unknown): string | undefined => {
+  if (
+    value &&
+    typeof value === 'object' &&
+    'url' in value &&
+    typeof (value as { url?: unknown }).url === 'string'
+  ) {
+    const url = String((value as { url?: unknown }).url ?? '').trim();
+    return url || undefined;
+  }
+  return undefined;
 };
 
 const normalizeIngredients = (value: unknown): Content['ingredients'] => {
@@ -134,11 +191,58 @@ const getItemTypeKey = (item: Activity | Scenario) =>
   (isActivityItem(item) ? item.type : '').toLowerCase();
 
 const getItemDevices = (item: Activity | Scenario) =>
-  ('devices' in item && Array.isArray(item.devices) ? item.devices : []) as ScenarioDeviceState[];
+  ('devices' in item && Array.isArray(item.devices)
+    ? item.devices
+    : []) as ScenarioDeviceState[];
+
+const getReadableDeviceName = (config: ScenarioDeviceState) =>
+  config.deviceName ||
+  SMART_HOME_DEVICES[config.deviceId]?.name ||
+  getScenarioDeviceMeta(config).name;
+
+const resolveConfiguredDevices = (
+  activityDevices: ScenarioDeviceState[],
+  scenarioDevices: ScenarioDeviceState[],
+) => (scenarioDevices.length > 0 ? scenarioDevices : activityDevices);
 
 const normalizeLinkedDevice = (value: unknown) => {
   if (Array.isArray(value)) return value[0] ?? null;
   return value;
+};
+
+const fetchScenarioFromDbCandidates = async (rawScenarioId: string) => {
+  const candidateIds = resolvePossibleUserScenarioDbIds(rawScenarioId);
+
+  for (const candidateId of candidateIds) {
+    const { data: scenData } = await supabase
+      .from('scenarios')
+      .select('*')
+      .eq('id', candidateId)
+      .maybeSingle<ScenarioRow>();
+
+    if (scenData) {
+      return {
+        id: `scenario:${scenData.id}`,
+        title: scenData.name,
+        description: scenData.description || '',
+        playlist: scenData.playlist_name || (scenData.playlist_id ? 'Spotify Music' : 'No music'),
+        playlist_id: scenData.playlist_id,
+        focusMode: scenData.focus_mode_enabled === true,
+        shortcuts: false,
+        devices: Array.isArray(scenData.devices) ? scenData.devices : [],
+        room: scenData.rooms?.name || undefined,
+        image: resolveCatalogImage(scenData.image || 'Scenarios/moonlight_bay.png'),
+      } as Scenario;
+    }
+  }
+
+  return null;
+};
+
+const resolveScenarioForDisplay = async (rawScenarioId: string) => {
+  const dbScenario = await fetchScenarioFromDbCandidates(rawScenarioId);
+  if (dbScenario) return dbScenario;
+  return fetchScenarioTemplateById(rawScenarioId);
 };
 
 export default function ActivityDetails() {
@@ -154,6 +258,10 @@ export default function ActivityDetails() {
   const [isUpdatingShortcut, setIsUpdatingShortcut] = useState(false);
 
   const isActivity = mainItem ? isActivityItem(mainItem) : false;
+  const creationMessage =
+    itemType === 'scenario'
+      ? 'Scenario created successfully!'
+      : 'Activity created successfully!';
 
   const [alertConfig, setAlertConfig] = useState<AlertConfigState>({
     visible: false,
@@ -163,13 +271,11 @@ export default function ActivityDetails() {
     cancelText: 'Cancel',
     isDestructive: false,
     onConfirm: undefined,
+    onCancel: undefined,
   });
 
   useEffect(() => {
     if (isNew === 'true') {
-      const creationMessage = itemType === 'scenario'
-        ? 'Scenario created successfully!'
-        : 'Atividade criada com sucesso!';
       setToastMessage(creationMessage);
       setShowToast(true);
       AccessibilityInfo.announceForAccessibility(creationMessage);
@@ -178,7 +284,7 @@ export default function ActivityDetails() {
       }, 5000);
       return () => clearTimeout(timer);
     }
-  }, [isNew, itemType]);
+  }, [creationMessage, isNew]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -189,11 +295,10 @@ export default function ActivityDetails() {
         apiLog('SELECT', 'activities', { id });
         const { data, error } = await supabase
           .from('activities')
-          .select('*')
+          .select('*, rooms(name)')
           .eq('id', id)
           .single();
 
-          
         if (data && !error) {
           foundActivity = mapUserActivity(data);
         }
@@ -230,7 +335,9 @@ export default function ActivityDetails() {
             return foundActivity.shortcuts;
           }
 
-          const { data: { user } } = await supabase.auth.getUser();
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
           const activityId = Number(foundActivity.id);
 
           if (user && Number.isFinite(activityId)) {
@@ -251,40 +358,12 @@ export default function ActivityDetails() {
 
         const scenarioPromise = foundActivity.scenario_id
           ? (async () => {
-              let scen = await fetchScenarioTemplateById(foundActivity.scenario_id!);
-
-              if (!scen) {
-                console.log('[ActivityDetails] Fetching scenario from DB:', foundActivity.scenario_id);
-                const scenarioDbId = parseUserScenarioDbId(foundActivity.scenario_id);
-                const { data: scenData } = await supabase
-                  .from('scenarios')
-                  .select('*')
-                  .eq('id', scenarioDbId)
-                  .maybeSingle<ScenarioRow>();
-
-                if (scenData) {
-                  scen = {
-                    id: `scenario:${scenData.id}`,
-                    title: scenData.name,
-                    description: scenData.description || '',
-                    playlist: scenData.playlist_id ? 'Spotify Music' : (scenData.playlist_name || 'No music'),
-                    playlist_id: scenData.playlist_id,
-                    focusMode: scenData.focus_mode_enabled === true,
-                    shortcuts: false,
-                    devices: [],
-                    room: scenData.rooms?.name || undefined,
-                    image: resolveCatalogImage(scenData.image || 'Scenarios/moonlight_bay.png'),
-                  } as Scenario;
-                }
-              }
-
-              return scen || null;
+              return resolveScenarioForDisplay(String(foundActivity.scenario_id));
             })()
           : Promise.resolve(null);
 
         const contentPromise = foundActivity.content_id
           ? (async () => {
-              const localContent = CONTENTS[String(foundActivity.content_id)];
               const { data: contentRows, error: contentError } = await supabase
                 .from('contents')
                 .select('*')
@@ -299,17 +378,19 @@ export default function ActivityDetails() {
                   title: contentData.title,
                   type: contentData.type,
                   category: contentData.category,
+                  genre: contentData.genre || undefined,
                   description: contentData.description,
                   duration: contentData.duration,
-                  image: resolveCatalogImage(contentData.image || localContent?.image),
-                  instructions: contentData.instructions || localContent?.instructions,
-                  ingredients: contentData.ingredients || localContent?.ingredients,
-                  videoUrl: localContent?.videoUrl || contentData.video_url,
-                  author: contentData.author || localContent?.author,
+                  image: resolveCatalogImage(contentData.image),
+                  instructions: contentData.instructions,
+                  ingredients: contentData.ingredients,
+                  videoUrl: contentData.video_url || undefined,
+                  mediaUrl: contentData.media_url || contentData.video_url || undefined,
+                  author: contentData.author || undefined,
                 } as Content;
               }
 
-              return localContent || null;
+              return null;
             })()
           : Promise.resolve(null);
 
@@ -322,7 +403,6 @@ export default function ActivityDetails() {
         const activityWithShortcut = {
           ...foundActivity,
           shortcuts: shortcutValue,
-          devices: linkedDevices,
         };
 
         setMainItem(activityWithShortcut);
@@ -330,15 +410,15 @@ export default function ActivityDetails() {
         setRelatedContent(content);
         if (scen) setFocusEnabled(scen.focusMode);
       } else {
-        const foundScenario = await fetchScenarioTemplateById(id);
-        if (foundScenario) {
-          setMainItem(foundScenario);
-          setRelatedScenario(foundScenario);
-          setFocusEnabled(foundScenario.focusMode);
+        const resolvedScenario = await resolveScenarioForDisplay(id);
+        if (resolvedScenario) {
+          setMainItem(resolvedScenario);
+          setRelatedScenario(resolvedScenario);
+          setFocusEnabled(resolvedScenario.focusMode);
         } else if (isUserScenarioRouteId(id)) {
           const { data: scenData } = await supabase
             .from('scenarios')
-            .select('id, name, description, image, playlist_id, playlist_name, focus_mode_enabled, rooms(name)')
+            .select('id, name, description, image, playlist_id, playlist_name, focus_mode_enabled, devices, rooms(name)')
             .eq('id', id.replace(/^scenario:/, ''))
             .maybeSingle<ScenarioRow>();
 
@@ -351,11 +431,18 @@ export default function ActivityDetails() {
               playlist_id: scenData.playlist_id || undefined,
               focusMode: scenData.focus_mode_enabled === true,
               shortcuts: false,
-              devices: [],
+              devices: Array.isArray(scenData.devices) ? scenData.devices : [],
               room: scenData.rooms?.name || undefined,
               image: resolveCatalogImage(scenData.image || 'Scenarios/moonlight_bay.png'),
             };
 
+            setMainItem(dbScenario);
+            setRelatedScenario(dbScenario);
+            setFocusEnabled(dbScenario.focusMode);
+          }
+        } else {
+          const dbScenario = await fetchScenarioFromDbCandidates(id);
+          if (dbScenario) {
             setMainItem(dbScenario);
             setRelatedScenario(dbScenario);
             setFocusEnabled(dbScenario.focusMode);
@@ -379,11 +466,21 @@ export default function ActivityDetails() {
     setAlertConfig((prev) => ({ ...prev, visible: false }));
 
   const handleStartPress = () => {
-    if (!mainItem) return;
+    if (!mainItem) {
+      setAlertConfig({
+        visible: true,
+        title: 'Error',
+        message: 'Could not load item details. Please try again.',
+        confirmText: 'OK',
+        cancelText: '',
+        isDestructive: false,
+        onConfirm: undefined,
+        onCancel: undefined,
+      });
+      return;
+    }
 
-    // Permitir todas as atividades e cenários avançarem para o ecrã de execução
-    if (mainItem) {
-      // 🎵 Removido daqui para tocar apenas no ecrã de exercício (como pedido)
+    const proceedToSession = () => {
       router.push({
         pathname: '/LoadingActivity',
         params: {
@@ -393,16 +490,46 @@ export default function ActivityDetails() {
           focusMode: focusEnabled.toString(),
         },
       });
+    };
+
+    const openDeviceSettingsThenProceed = async () => {
+      try {
+        await Linking.openSettings();
+      } catch (error) {
+        console.log('It was not possible to open settings', error);
+      } finally {
+        proceedToSession();
+      }
+    };
+
+    if (focusEnabled) {
+      if (Platform.OS === 'android') {
+        setAlertConfig({
+          visible: true,
+          title: 'Focus Mode',
+          message:
+            'Create a calmer session before you begin. Open your device settings and turn on Focus Mode to reduce notifications and background distractions.',
+          confirmText: 'Open Settings',
+          cancelText: 'Skip',
+          isDestructive: false,
+          onConfirm: openDeviceSettingsThenProceed,
+          onCancel: proceedToSession,
+        });
+      } else if (Platform.OS === 'ios') {
+        setAlertConfig({
+          visible: true,
+          title: 'Focus Mode',
+          message:
+            'Before starting, open Control Center and turn on Do Not Disturb or your preferred Focus mode to keep this Nidush session calm and interruption-free.',
+          confirmText: 'Understood',
+          cancelText: '',
+          isDestructive: false,
+          onConfirm: proceedToSession,
+          onCancel: undefined,
+        });
+      }
     } else {
-      setAlertConfig({
-        visible: true,
-        title: 'Error',
-        message: 'Could not load item details. Please try again.',
-        confirmText: 'OK',
-        cancelText: '',
-        isDestructive: false,
-        onConfirm: undefined,
-      });
+      proceedToSession();
     }
   };
 
@@ -420,6 +547,7 @@ export default function ActivityDetails() {
         cancelText: '',
         isDestructive: false,
         onConfirm: undefined,
+        onCancel: undefined,
       });
       return;
     }
@@ -437,13 +565,16 @@ export default function ActivityDetails() {
         cancelText: '',
         isDestructive: false,
         onConfirm: undefined,
+        onCancel: undefined,
       });
       return;
     }
 
     try {
       setIsUpdatingShortcut(true);
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
       apiLog(nextShortcutValue ? 'INSERT' : 'DELETE', 'shortcuts', {
@@ -473,7 +604,8 @@ export default function ActivityDetails() {
           if (orderError) throw orderError;
 
           const nextDisplayOrder =
-            ((orderRows?.[0] as Pick<ShortcutRow, 'displayorder'> | undefined)?.displayorder ?? 0) + 1;
+            ((orderRows?.[0] as Pick<ShortcutRow, 'displayorder'> | undefined)
+              ?.displayorder ?? 0) + 1;
 
           const { error: insertError } = await supabase
             .from('shortcuts')
@@ -510,19 +642,22 @@ export default function ActivityDetails() {
         .maybeSingle();
 
       if (mirrorError) {
-        console.warn('Shortcut saved, but activities.shortcuts mirror was not updated:', mirrorError);
+        console.warn(
+          'Shortcut saved, but activities.shortcuts mirror was not updated:',
+          mirrorError,
+        );
       }
 
       setShowToast(true);
       setToastMessage(
         nextShortcutValue
-          ? 'Atividade adicionada aos shortcuts.'
-          : 'Atividade removida dos shortcuts.',
+          ? 'Activity added to shortcuts.'
+          : 'Activity removed from shortcuts.',
       );
       AccessibilityInfo.announceForAccessibility(
         nextShortcutValue
-          ? 'Atividade adicionada aos shortcuts.'
-          : 'Atividade removida dos shortcuts.',
+          ? 'Activity added to shortcuts.'
+          : 'Activity removed from shortcuts.',
       );
 
       if (nextShortcutValue) {
@@ -535,13 +670,15 @@ export default function ActivityDetails() {
       setAlertConfig({
         visible: true,
         title: 'Shortcuts',
-        message: error instanceof Error
-          ? `Could not update shortcuts: ${error.message}`
-          : 'Could not update shortcuts. Please try again.',
+        message:
+          error instanceof Error
+            ? `Could not update shortcuts: ${error.message}`
+            : 'Could not update shortcuts. Please try again.',
         confirmText: 'OK',
         cancelText: '',
         isDestructive: false,
         onConfirm: undefined,
+        onCancel: undefined,
       });
     } finally {
       setIsUpdatingShortcut(false);
@@ -549,49 +686,103 @@ export default function ActivityDetails() {
   };
 
   const handleEditActivity = () => {
-    if (!isActivity || String(id).startsWith('template:')) {
+    if (isActivity) {
+      if (String(id).startsWith('template:')) {
+        setAlertConfig({
+          visible: true,
+          title: 'Edit',
+          message: 'Only your own created activities can be edited.',
+          confirmText: 'OK',
+          cancelText: '',
+          isDestructive: false,
+          onConfirm: undefined,
+          onCancel: undefined,
+        });
+        return;
+      }
+
+      router.push({
+        pathname: '/new-activity',
+        params: { editId: id },
+      });
+      return;
+    }
+
+    if (!isUserScenarioRouteId(id)) {
       setAlertConfig({
         visible: true,
         title: 'Edit',
-        message: 'Only your own created activities can be edited.',
+        message: 'Only your own created scenarios can be edited.',
         confirmText: 'OK',
         cancelText: '',
         isDestructive: false,
         onConfirm: undefined,
+        onCancel: undefined,
       });
       return;
     }
 
     router.push({
-      pathname: '/new-activity',
-      params: { editId: id },
+      pathname: '/new-scenario',
+      params: { editId: parseUserScenarioDbId(id) },
     });
   };
 
   const handleDeleteActivity = () => {
+    const deletingScenario = !isActivity;
     setAlertConfig({
       visible: true,
-      title: 'Delete Activity',
+      title: deletingScenario ? 'Delete Scenario' : 'Delete Activity',
       message:
-        'Are you sure you want to delete this activity? This action cannot be undone.',
+        deletingScenario
+          ? 'Are you sure you want to delete this scenario? This action cannot be undone.'
+          : 'Are you sure you want to delete this activity? This action cannot be undone.',
       confirmText: 'Delete',
       cancelText: 'Cancel',
       isDestructive: true,
       onConfirm: async () => {
         try {
-          // Deletar a atividade na nuvem do Supabase
-          apiLog('DELETE', 'activities', { id });
-          const { error } = await supabase.from('activities').delete().eq('id', id);
+          if (deletingScenario) {
+            const rawScenarioDbId = parseUserScenarioDbId(id);
+            const scenarioDbId = Number(rawScenarioDbId);
 
+            if (!Number.isFinite(scenarioDbId)) {
+              throw new Error('Invalid scenario id.');
+            }
 
+            apiLog('DELETE', 'scenarios', { id: scenarioDbId });
+            const { error } = await supabase
+              .from('scenarios')
+              .delete()
+              .eq('id', scenarioDbId);
 
-          if (error) throw error;
-          
+            if (error) throw error;
+          } else {
+            apiLog('DELETE', 'activities', { id });
+            const { error } = await supabase
+              .from('activities')
+              .delete()
+              .eq('id', id);
+
+            if (error) throw error;
+          }
+
           router.navigate('/Activities');
         } catch (e) {
           console.log('Error while trying to delete', e);
+          setAlertConfig({
+            visible: true,
+            title: deletingScenario ? 'Could not delete scenario' : 'Could not delete activity',
+            message: getSupabaseErrorText(e),
+            confirmText: 'OK',
+            cancelText: '',
+            isDestructive: false,
+            onConfirm: undefined,
+            onCancel: undefined,
+          });
         }
       },
+      onCancel: undefined,
     });
   };
 
@@ -609,7 +800,9 @@ export default function ActivityDetails() {
   if (!mainItem)
     return (
       <View className="flex-1 justify-center items-center bg-[#F0F2EB]">
-        <Text maxFontSizeMultiplier={1.2}  accessibilityRole="header">Item not found</Text>
+        <Text maxFontSizeMultiplier={1.2} accessibilityRole="header">
+          Item not found
+        </Text>
       </View>
     );
 
@@ -617,12 +810,55 @@ export default function ActivityDetails() {
   const isNumeric = typeof imgObj === 'string' && /^\d+$/.test(imgObj);
   const imageSource: ImageSourcePropType = isNumeric
     ? { uri: `https://picsum.photos/seed/${imgObj}/400/600` }
-      : typeof imgObj === 'string'
+    : typeof imgObj === 'string'
       ? { uri: imgObj }
       : imgObj || { uri: 'https://picsum.photos/400/600' };
 
-  const devicesToShow: ScenarioDeviceState[] =
-    relatedScenario?.devices?.length ? relatedScenario.devices : getItemDevices(mainItem);
+  const devicesToShow: ScenarioDeviceState[] = resolveConfiguredDevices(
+    getItemDevices(mainItem),
+    Array.isArray(relatedScenario?.devices) ? relatedScenario.devices : [],
+  );
+
+  const deviceNames = Array.from(
+    new Set(
+      devicesToShow
+        .map((config) => getReadableDeviceName(config).trim())
+        .filter(Boolean),
+    ),
+  );
+
+  const scenarioDescription =
+    relatedScenario?.description?.trim() || '';
+  const baseDescription =
+    (!isActivity && scenarioDescription) ||
+    mainItem?.description?.trim() ||
+    scenarioDescription;
+  const mergedDescription = (() => {
+    const descriptionParts = [baseDescription];
+
+    if (
+      isActivity &&
+      scenarioDescription &&
+      scenarioDescription !== baseDescription &&
+      !scenarioDescription.startsWith(baseDescription)
+    ) {
+      descriptionParts.push(scenarioDescription);
+    } else if (
+      isActivity &&
+      scenarioDescription.startsWith(baseDescription) &&
+      scenarioDescription.length > baseDescription.length
+    ) {
+      descriptionParts[0] = scenarioDescription;
+    }
+
+    if (deviceNames.length > 0) {
+      descriptionParts.push(
+        `Devices involved: ${deviceNames.join(', ')}.`,
+      );
+    }
+
+    return descriptionParts.filter(Boolean).join('\n\n');
+  })();
 
   const activeSpeakerConfig = devicesToShow.find((config) => {
     const device = SMART_HOME_DEVICES[config.deviceId];
@@ -636,15 +872,37 @@ export default function ActivityDetails() {
 
   // Helper: parse JSON safely (handles strings, arrays, objects)
   const rawInstructions = parseUnknownArray(relatedContent?.instructions);
-  const instructions: DisplayInstruction[] = rawInstructions.map(toInstructionText);
+  const instructions: DisplayInstruction[] = rawInstructions
+    .map(toInstructionText)
+    .flatMap(
+      (text) =>
+        text
+          .split('.') // Divide o bloco de texto sempre que encontra um ponto
+          .map((sentence) => sentence.trim()) // Remove espaços extra no início/fim
+          .filter((sentence) => sentence.length > 0) // Remove entradas vazias
+          .map((sentence) => sentence + '.'), // Adiciona o ponto final de volta à frase
+    );
   const ingredients =
     relatedContent?.type === 'recipe'
       ? normalizeIngredients(relatedContent.ingredients)
       : [];
+  const isAudiobookContent =
+    relatedContent?.type === 'audiobooks' ||
+    relatedContent?.category?.toLowerCase() === 'audiobook';
+  const instructionMediaUrl = parseUnknownArray(relatedContent?.instructions)
+    .map(getInstructionLink)
+    .find((value): value is string => Boolean(value));
+  const resolvedMediaUrl =
+    relatedContent?.mediaUrl || relatedContent?.videoUrl || instructionMediaUrl;
+  const audiobookGenre =
+    relatedContent?.genre ||
+    (isAudiobookContent &&
+    relatedContent?.category &&
+    relatedContent.category.toLowerCase() !== 'audiobook'
+      ? relatedContent.category
+      : undefined);
 
-  const displayTime = isActivity
-    ? relatedContent?.duration || null
-    : null;
+  const displayTime = isActivity ? relatedContent?.duration || null : null;
 
   return (
     <View
@@ -694,25 +952,46 @@ export default function ActivityDetails() {
               className="text-[#586963] text-[16px] leading-6"
               style={{ fontFamily: 'Nunito_400Regular' }}
             >
-              {mainItem.description}
+              {mergedDescription}
             </Text>
           </View>
 
           <FocusSection enabled={focusEnabled} onToggle={setFocusEnabled} />
           <MediaSection
             isVisible={
-              !!(relatedScenario?.playlist || relatedContent?.videoUrl || ['workout', 'cooking', 'meditation'].includes(getItemTypeKey(mainItem)))
+              !!(
+                relatedScenario?.playlist ||
+                relatedContent?.videoUrl ||
+                ['workout', 'cooking', 'meditation'].includes(
+                  getItemTypeKey(mainItem),
+                )
+              )
             }
-            title={relatedScenario?.playlist || relatedContent?.title || (
-              getItemTypeKey(mainItem) === 'workout' ? 'Workout Beats' :
-              getItemTypeKey(mainItem) === 'cooking' ? 'Cooking Vibes' :
-              getItemTypeKey(mainItem) === 'meditation' ? 'Nature Sounds' : 'Recommended Music'
-            )}
+            title={
+              relatedScenario?.playlist ||
+              relatedContent?.title ||
+              (getItemTypeKey(mainItem) === 'workout'
+                ? 'Workout Beats'
+                : getItemTypeKey(mainItem) === 'cooking'
+                  ? 'Cooking Vibes'
+                  : getItemTypeKey(mainItem) === 'meditation'
+                    ? 'Nature Sounds'
+                    : 'Recommended Music')
+            }
             subtitle={audioStatusText}
           />
           <ContentSection
             ingredients={ingredients}
             instructions={instructions}
+            mediaUrl={resolvedMediaUrl}
+            mediaLabel={isAudiobookContent ? 'Open audiobook' : undefined}
+            metaLabel={isAudiobookContent ? 'Genre' : undefined}
+            metaValue={isAudiobookContent ? audiobookGenre : undefined}
+            emptyMediaMessage={
+              isAudiobookContent && !resolvedMediaUrl
+                ? 'This audiobook does not have audio available yet.'
+                : undefined
+            }
           />
         </View>
       </ScrollView>
@@ -765,7 +1044,7 @@ export default function ActivityDetails() {
             <Ionicons name="checkmark" size={24} color="white" />
           </View>
           <View className="flex-1">
-            <Text 
+            <Text
               maxFontSizeMultiplier={1.2}
               className="text-[#2F4F4F] text-lg"
               style={{ fontFamily: 'Nunito_700Bold' }}
@@ -784,6 +1063,7 @@ export default function ActivityDetails() {
         cancelText={alertConfig.cancelText}
         isDestructive={alertConfig.isDestructive}
         onConfirm={alertConfig.onConfirm}
+        onCancel={alertConfig.onCancel}
         onClose={closeAlert}
       />
     </View>

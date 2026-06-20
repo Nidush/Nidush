@@ -17,18 +17,26 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 interface ExitModalProps {
   visible: boolean;
+  itemLabel?: 'activity' | 'scenario';
   onResume: () => void;
   onEnd: () => void;
 }
 
-export const ExitModal = ({ visible, onResume, onEnd }: ExitModalProps) => {
+export const ExitModal = ({
+  visible,
+  itemLabel = 'activity',
+  onResume,
+  onEnd,
+}: ExitModalProps) => {
+  const itemText = itemLabel === 'scenario' ? 'scenario' : 'activity';
+
   useEffect(() => {
     if (visible) {
       AccessibilityInfo.announceForAccessibility(
-        'Activity paused. End the activity?',
+        `Session paused. End the ${itemText}?`,
       );
     }
-  }, [visible]);
+  }, [itemText, visible]);
   return (
     <Modal
       // 2. IMPORTANTE: Mudar para "none" para não entrar em conflito com a nossa animação
@@ -81,7 +89,7 @@ export const ExitModal = ({ visible, onResume, onEnd }: ExitModalProps) => {
                   style={{ fontFamily: 'Nunito_700Bold' }}
                   accessibilityRole="header"
                 >
-                  End the activity?
+                  {`End the ${itemText}?`}
                 </Text>
                 <Text
                   maxFontSizeMultiplier={1.2}
@@ -121,14 +129,14 @@ export const ExitModal = ({ visible, onResume, onEnd }: ExitModalProps) => {
                   onPress={onEnd}
                   accessible={true}
                   accessibilityRole="button"
-                  accessibilityLabel="End activity"
+                  accessibilityLabel={`End ${itemText}`}
                   accessibilityHint="Closes the current session and returns to the activities menu"
                 >
                   <Text
                     className="text-[#5E8C5D] text-xl"
                     style={{ fontFamily: 'Nunito_700Bold' }}
                   >
-                    End activity
+                    {`End ${itemText}`}
                   </Text>
                 </TouchableOpacity>
               </View>

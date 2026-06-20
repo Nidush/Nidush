@@ -5,7 +5,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import {
   Image,
-  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -42,9 +41,9 @@ export const ScenarioCard = ({
       <View style={StyleSheet.absoluteFill}>
         <Image
           source={item.image}
-          style={StyleSheet.absoluteFill}
+          style={[StyleSheet.absoluteFill, { transform: [{ scale: 1.45 }] }]}
           resizeMode="cover"
-          blurRadius={Platform.OS === 'ios' ? 70 : 50}
+          blurRadius={85}
         />
         <View className="absolute inset-0 bg-black/20" />
       </View>

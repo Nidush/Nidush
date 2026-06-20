@@ -26,13 +26,17 @@ import HouseName from '../components/Onboarding/HouseName';
 import SpotifyConnect from '../components/Onboarding/SpotifyConnect';
 import WearableSync from '../components/Onboarding/WearableSync';
 import WelcomeUser from '../components/Onboarding/WelcomeUser';
+import ProfileAvatarStep from '../components/Onboarding/ProfileAvatarStep';
 import { CustomAlert } from '../components/CustomAlert';
 import { LEGAL_CONSENT_KEY } from '../components/legal/LegalContent';
+import { pickImage } from '../utils/imagePicker';
 import {
   ONBOARDING_CONSENTS_KEY,
   persistStoredOnboardingConsents,
   setStoredHealthConsent,
 } from '../utils/legal';
+import { DEFAULT_AVATAR_PRESET, isAvatarPreset } from '../utils/avatarSource';
+import { uploadImage } from '../utils/supabase';
 
 export default function SetupProfile() {
   const [fontsLoaded] = useFonts({
@@ -55,6 +59,7 @@ export default function SetupProfile() {
   const [houseName, setHouseName] = useState('');
   const [houseId, setHouseId] = useState('');
   const [homeMode, setHomeMode] = useState<'create' | 'join'>('create');
+  const [avatarValue, setAvatarValue] = useState<string | null>(DEFAULT_AVATAR_PRESET);
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
   const [consents, setConsents] = useState({
     health: false,
@@ -95,6 +100,7 @@ export default function SetupProfile() {
         const userFirstName = user.user_metadata?.first_name || '';
         const userLastName = user.user_metadata?.last_name || '';
         const userEmail = user.email || '';
+        const userAvatar = user.user_metadata?.avatar_url || DEFAULT_AVATAR_PRESET;
 
         // Double check if user is already registered with a home to bypass setup
         const { data: homeAssociation } = await supabase
@@ -116,6 +122,7 @@ export default function SetupProfile() {
         setFirstName(userFirstName);
         setLastName(userLastName);
         setEmail(userEmail);
+        setAvatarValue(userAvatar);
         const legalConsent = await AsyncStorage.getItem(LEGAL_CONSENT_KEY);
         setHasAcceptedLegalConsent(legalConsent === 'accepted');
         
@@ -131,6 +138,7 @@ export default function SetupProfile() {
             if (data?.houseName) setHouseName(data.houseName);
             if (data?.houseId) setHouseId(data.houseId);
             if (data?.homeMode) setHomeMode(data.homeMode || 'create');
+            if (data?.avatarValue) setAvatarValue(data.avatarValue);
             if (data?.selectedActivities) setSelectedActivities(data.selectedActivities);
             if (data?.consents) {
               setConsents((prev) => ({
@@ -166,6 +174,7 @@ export default function SetupProfile() {
           houseName,
           houseId,
           homeMode,
+          avatarValue,
           selectedActivities,
           consents,
           ...extraData
@@ -175,6 +184,12 @@ export default function SetupProfile() {
     } catch (e) {
       logger.error('Error saving progress:', e);
     }
+  };
+
+  const handleCustomAvatarPick = async () => {
+    const pickedImage = await pickImage();
+    if (!pickedImage) return;
+    setAvatarValue(pickedImage);
   };
 
   const transitionTo = (nextStep: string, extraData = {}) => {
@@ -264,7 +279,19 @@ export default function SetupProfile() {
   // --- Step Navigation ---
   if (currentStep === 'welcome') {
     return renderStep(
-      <WelcomeUser userName={firstName} onFinish={() => transitionTo('house')} />,
+      <WelcomeUser userName={firstName} onFinish={() => transitionTo('avatar')} />,
+    );
+  }
+
+  if (currentStep === 'avatar') {
+    return renderStep(
+      <ProfileAvatarStep
+        userName={firstName}
+        avatarValue={avatarValue}
+        onChoosePreset={setAvatarValue}
+        onChooseCustomPhoto={handleCustomAvatarPick}
+        onNext={() => transitionTo('house', { avatarValue })}
+      />,
     );
   }
 
@@ -406,6 +433,7 @@ export default function SetupProfile() {
           try {
             const { data: { user } } = await supabase.auth.getUser();
             let hasError = false;
+            let finalAvatarUrl = avatarValue || DEFAULT_AVATAR_PRESET;
 
             if (user) {
               // Read homeMode and selectedActivities from AsyncStorage to avoid React state race conditions
@@ -420,9 +448,24 @@ export default function SetupProfile() {
                   if (parsed?.data?.homeMode) effectiveHomeMode = parsed.data.homeMode;
                   if (parsed?.data?.houseName) effectiveHouseName = parsed.data.houseName;
                   if (parsed?.data?.houseId) effectiveHouseId = parsed.data.houseId;
+                  if (parsed?.data?.avatarValue) finalAvatarUrl = parsed.data.avatarValue;
                   if (parsed?.data?.selectedActivities) effectiveActivities = parsed.data.selectedActivities;
                 }
               } catch { /* use state fallback */ }
+
+              if (finalAvatarUrl && !isAvatarPreset(finalAvatarUrl) && !finalAvatarUrl.startsWith('http')) {
+                const uploadedAvatar = await uploadImage(
+                  finalAvatarUrl,
+                  'avatars',
+                  `${user.id}/onboarding-avatar-${Date.now()}.jpg`,
+                );
+
+                if (uploadedAvatar) {
+                  finalAvatarUrl = uploadedAvatar;
+                } else {
+                  finalAvatarUrl = DEFAULT_AVATAR_PRESET;
+                }
+              }
 
               logger.debug('[Onboarding] homeMode (effective):', effectiveHomeMode);
               let finalHomeId: number | null = null;
@@ -464,6 +507,10 @@ export default function SetupProfile() {
                     homeError && 'status' in homeError
                       ? Number((homeError as { status?: number }).status)
                       : undefined;
+                  const joinCodeNotFound = homeError && (
+                    homeError.code === 'P0002' ||
+                    String(homeError.message).toLowerCase().includes('join code not found')
+                  );
                   const rpcMissing = homeError && (
                     homeError.code === 'PGRST202' ||
                     homeErrorStatus === 404 ||
@@ -498,7 +545,9 @@ export default function SetupProfile() {
                   }
 
                   if (homeError || !joinedHomeId) {
-                    if (homeError) logger.error('Error finding existing home:', homeError);
+                    if (homeError && !joinCodeNotFound) {
+                      logger.error('Error finding existing home:', homeError);
+                    }
                     if (rpcMissing) {
                       openAlert(
                         'Home join unavailable',
@@ -526,6 +575,7 @@ export default function SetupProfile() {
                     first_name: firstName,
                     last_name: lastName,
                     email: email,
+                    avatar_url: finalAvatarUrl,
                     // password is NEVER stored here — managed by Supabase Auth
                     auth_uid: user.id,
                     hobbies: effectiveActivities.join(',')
@@ -537,6 +587,16 @@ export default function SetupProfile() {
                 }
 
                 if (!hasError) {
+                  const { error: metadataError } = await supabase.auth.updateUser({
+                    data: {
+                      avatar_url: finalAvatarUrl,
+                    },
+                  });
+
+                  if (metadataError) {
+                    logger.warn('Could not persist avatar metadata during onboarding.', metadataError);
+                  }
+
                   if (effectiveHomeMode === 'create') {
                     // 3. Associate creator with home as admin.
                     logger.debug('[Onboarding] Assigning admin role to home:', finalHomeId);

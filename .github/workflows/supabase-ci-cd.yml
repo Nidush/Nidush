@@ -85,14 +85,42 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Install Android build dependencies
+        run: |
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;27.1.12297006" \
+            "cmake;3.22.1"
+
       - name: Install dependencies
         run: npm ci
 
       - name: Validate Expo app config
         run: npx expo config --type public
 
-      - name: Generate native Android project
-        run: npx expo prebuild --platform android --non-interactive
+      - name: Verify native Android project is present
+        run: test -f android/gradlew
+
+      - name: Prepare Firebase config for Android build
+        run: |
+          test -f google-services.json
+          cp google-services.json android/app/google-services.json
+
+      - name: Generate Android debug keystore
+        run: |
+          keytool -genkeypair \
+            -v \
+            -storetype PKCS12 \
+            -keystore android/app/debug.keystore \
+            -storepass android \
+            -keypass android \
+            -alias androiddebugkey \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
 
       - name: Make Gradle executable
         run: chmod +x android/gradlew
@@ -144,7 +172,7 @@ jobs:
         run: deno lint supabase/functions
 
       - name: Type-check Edge Functions
-        run: find supabase/functions -name "index.ts" -print0 | xargs -0 deno check
+        run: find supabase/functions -name "index.ts" -print0 | xargs -0 -I{} deno check --config supabase/functions/deno.json "{}"
 
       - name: Stop local Supabase
         if: always()

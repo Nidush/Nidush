@@ -2,11 +2,11 @@ import { Content } from '@/constants/data/types';
 import { resolveCatalogImage } from '@/constants/data/catalogAssets';
 import { MaterialIcons } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
+import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import {
   Image,
-  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -69,9 +69,10 @@ export const ContentCard = ({
       >
         <Image
           source={imageSource}
-          style={StyleSheet.absoluteFill}
+          style={[StyleSheet.absoluteFill, { transform: [{ scale: 1.45 }] }]}
           resizeMode="cover"
-          blurRadius={Platform.OS === 'ios' ? 70 : 50}
+          blurRadius={85}
+          accessible={false}
         />
         <View className="absolute inset-0 bg-black/20" />
       </View>
@@ -88,10 +89,12 @@ export const ContentCard = ({
           />
         }
       >
-        <Image
+        <ExpoImage
           source={imageSource}
           style={StyleSheet.absoluteFill}
-          resizeMode="cover"
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={200}
         />
       </MaskedView>
 

@@ -86,7 +86,7 @@ describe('Login Screen', () => {
     fireEvent.press(getByTestId('login-button'));
 
     expect(
-      await findByText('Por favor preenche o email e a password.'),
+      await findByText('Please enter your email and password.'),
     ).toBeTruthy();
     expect(mockSignInWithPassword).not.toHaveBeenCalled();
   });
@@ -145,7 +145,7 @@ describe('Login Screen', () => {
 
     expect(
       await findByText(
-        'Email ou senha incorretos. Por favor, verifique os seus dados.',
+        'Incorrect email or password. Please check your details.',
       ),
     ).toBeTruthy();
     expect(mockReplace).not.toHaveBeenCalled();

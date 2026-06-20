@@ -5,6 +5,7 @@ import {
 } from '@expo/vector-icons';
 import MaskedView from '@react-native-masked-view/masked-view';
 import { BlurView } from 'expo-blur';
+import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
@@ -12,7 +13,6 @@ import {
   Image,
   ImageSourcePropType,
   Modal,
-  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -90,7 +90,7 @@ export const ActivityHeader = ({
   );
 
   return (
-    <View className="w-full h-[450px] relative">
+    <View className="w-full h-[450px] relative overflow-hidden">
       {/* Background blur + masked image */}
       <View
         style={StyleSheet.absoluteFill}
@@ -99,9 +99,10 @@ export const ActivityHeader = ({
       >
         <Image
           source={imageSource}
-          style={{ width: '100%', height: '100%' }}
+          style={StyleSheet.absoluteFill}
           resizeMode="cover"
-          blurRadius={Platform.OS === 'ios' ? 70 : 50}
+          blurRadius={70}
+          accessible={false}
         />
         <View className="absolute inset-0" />
       </View>
@@ -118,10 +119,12 @@ export const ActivityHeader = ({
           />
         }
       >
-        <Image
+        <ExpoImage
           source={imageSource}
           style={{ width: '100%', height: '100%' }}
-          resizeMode="cover"
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={200}
         />
       </MaskedView>
 
@@ -168,7 +171,7 @@ export const ActivityHeader = ({
           onRequestClose={() => setMenuVisible(false)}
         >
           <BlurView
-            intensity={Platform.OS === 'android' ? 10 : 10}
+            intensity={10}
             tint="dark"
             experimentalBlurMethod="dimezisBlurView"
             style={StyleSheet.absoluteFill}
@@ -197,10 +200,10 @@ export const ActivityHeader = ({
                     icon="bookmark-border"
                     label={
                       isUpdatingShortcut
-                        ? 'A guardar shortcut...'
+                        ? 'Saving shortcut...'
                         : isShortcut
-                          ? 'Remover dos shortcuts'
-                          : 'Adicionar aos shortcuts'
+                          ? 'Remove from shortcuts'
+                          : 'Add to shortcuts'
                     }
                     onPress={onAddToShortcuts}
                   />

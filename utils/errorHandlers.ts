@@ -4,7 +4,7 @@ type ErrorLike = {
 };
 
 export const getFriendlyErrorMessage = (error: unknown): string => {
-    if (!error) return 'Ocorreu um erro inesperado.';
+    if (!error) return 'An unexpected error occurred.';
 
     const message =
         error instanceof Error
@@ -14,10 +14,10 @@ export const getFriendlyErrorMessage = (error: unknown): string => {
                 : (error as ErrorLike).message || String(error);
 
     if (message.includes('Invalid login credentials')) {
-        return 'Email ou senha incorretos. Por favor, verifique os seus dados.';
+        return 'Incorrect email or password. Please check your details.';
     }
     if (message.includes('User already registered')) {
-        return 'Este email já está registado. Tente fazer login.';
+        return 'This email is already registered. Try logging in.';
     }
     if (
         message.toLowerCase().includes('password') &&
@@ -25,14 +25,14 @@ export const getFriendlyErrorMessage = (error: unknown): string => {
             message.toLowerCase().includes('short') ||
             message.toLowerCase().includes('characters'))
     ) {
-        return 'A password deve ter pelo menos 12 caracteres, letras maiúsculas e minúsculas, números e um símbolo.';
+        return 'Password must have at least 12 characters, uppercase and lowercase letters, a number, and one symbol.';
     }
     if (message.includes('network error') || message.includes('fetch')) {
-        return 'Parece que estás sem ligação à internet. Verifica a tua rede.';
+        return 'It looks like you are offline. Please check your connection.';
     }
     if (message.includes('JWT')) {
-        return 'A sua sessão expirou. Por favor, faça login novamente.';
+        return 'Your session expired. Please log in again.';
     }
 
-    return message || 'Não foi possível completar a operação. Tente mais tarde.';
+    return message || 'Could not complete the operation. Please try again later.';
 };

@@ -1,24 +1,58 @@
 import { Ingredient } from '@/constants/data';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Linking, Text, TouchableOpacity, View } from 'react-native';
 
 type InstructionStep = {
   text: string;
   duration?: number;
+  url?: string;
 };
 
 interface ContentSectionProps {
   ingredients?: Ingredient[];
   instructions: (string | InstructionStep)[];
+  mediaUrl?: string;
+  mediaLabel?: string;
+  metaLabel?: string;
+  metaValue?: string;
+  emptyMediaMessage?: string;
 }
 
 export const ContentSection = ({
   ingredients,
   instructions,
+  mediaUrl,
+  mediaLabel,
+  metaLabel,
+  metaValue,
+  emptyMediaMessage,
 }: ContentSectionProps) => {
   return (
     <>
+      {metaLabel && metaValue ? (
+        <View className="mb-8">
+          <Text
+            maxFontSizeMultiplier={1.2}
+            className="text-[#354F52] text-xl mb-3"
+            style={{ fontFamily: 'Nunito_700Bold' }}
+            accessible
+            accessibilityRole="header"
+          >
+            {metaLabel}
+          </Text>
+          <View className="rounded-2xl p-4 border border-[#548f537f] bg-[#F6FBF6]">
+            <Text
+              maxFontSizeMultiplier={1.2}
+              className="text-[#354F52]"
+              style={{ fontFamily: 'Nunito_600SemiBold' }}
+            >
+              {metaValue}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
       {ingredients && ingredients.length > 0 && (
         <View className="mb-8">
           <Text
@@ -79,6 +113,9 @@ export const ContentSection = ({
             const duration = isObject
               ? (step as InstructionStep).duration
               : null;
+            const stepUrl = isObject
+              ? (step as InstructionStep).url
+              : null;
 
             return (
               <View
@@ -134,12 +171,54 @@ export const ContentSection = ({
                       </Text>
                     </View>
                   )}
+
+                  {stepUrl ? (
+                    <TouchableOpacity
+                      className="mt-2 self-start"
+                      onPress={() => Linking.openURL(stepUrl).catch(() => {})}
+                    >
+                      <Text
+                        maxFontSizeMultiplier={1.2}
+                        className="text-[#548F53] text-sm underline"
+                        style={{ fontFamily: 'Nunito_700Bold' }}
+                      >
+                        Open track
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               </View>
             );
           })}
         </View>
       )}
+
+      {mediaUrl ? (
+        <View className="mb-6">
+          <TouchableOpacity
+            className="rounded-2xl border border-[#548f537f] px-4 py-3 self-start bg-[#F6FBF6]"
+            onPress={() => Linking.openURL(mediaUrl).catch(() => {})}
+          >
+            <Text
+              maxFontSizeMultiplier={1.2}
+              className="text-[#548F53]"
+              style={{ fontFamily: 'Nunito_700Bold' }}
+            >
+              {mediaLabel || 'Open audiobook'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : emptyMediaMessage ? (
+        <View className="mb-6 rounded-2xl border border-[#D7E6D2] px-4 py-3 bg-[#EEF5E8]">
+          <Text
+            maxFontSizeMultiplier={1.2}
+            className="text-[#4B6158]"
+            style={{ fontFamily: 'Nunito_600SemiBold' }}
+          >
+            {emptyMediaMessage}
+          </Text>
+        </View>
+      ) : null}
     </>
   );
 };

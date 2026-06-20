@@ -12,23 +12,25 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { UnifiedCard } from '@/components/activitiesScenarios/UnifiedCard';
 import { CarouselSection } from '../../components/activitiesScenarios/CarouselSection';
+import { CustomAlert } from '@/components/CustomAlert';
 import { HomeHeader } from '../../components/Homepage/HomeHeader';
 import { StateWidget } from '../../components/Homepage/StateWidget';
 
-import { CONTENTS, Activity } from '@/constants/data';
+import { Activity } from '@/constants/data';
 import { resolveCatalogImage } from '@/constants/data/catalogAssets';
 import { useBiometrics } from '@/context/BiometricsContext';
 import {
   AiActivityIdea,
+  fetchAiActivityIdeas,
+  getNidushAiErrorMessage,
   isAiRateLimitError,
   saveAiActivityIdea,
 } from '@/utils/aiActivities';
+import { isAiAutoInvocationEnabled } from '@/utils/aiConfig';
+import { logger } from '@/utils/logger';
 import { getDynamicRecommendations } from '@/utils/recommendationEngine';
 import { getSessionUser, supabase } from '@/utils/supabase';
-import {
-  fetchActivityTemplates,
-  mapUserActivity,
-} from '@/utils/catalogTemplates';
+import { mapUserActivity } from '@/utils/catalogTemplates';
 
 type ShortcutRow = {
   id: number;
@@ -52,8 +54,7 @@ type CarouselActivity = Activity & {
 };
 
 const getContentDuration = (contentId: string | undefined) => {
-  if (!contentId) return undefined;
-  return CONTENTS[contentId]?.duration;
+  return contentId;
 };
 
 const getActivityRoomLabel = (item: Activity) => item.room || item.room_id;
@@ -73,6 +74,9 @@ const parseHobbies = (value: unknown) => {
   );
 };
 
+const isCatalogTemplateActivity = (item: Activity) =>
+  String(item.id).startsWith('template:');
+
 export default function Index() {
   const [fontsLoaded] = useFonts({
     Nunito_700Bold,
@@ -84,16 +88,29 @@ export default function Index() {
   const [userName, setUserName] = useState('...');
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [myActivities, setMyActivities] = useState<Activity[]>([]);
-  const [activityTemplates, setActivityTemplates] = useState<Activity[]>([]);
+  const [contentDurations, setContentDurations] = useState<Record<string, string>>({});
   const [shortcutRows, setShortcutRows] = useState<ShortcutRow[]>([]);
   const [userHobbies, setUserHobbies] = useState<string[]>([]);
   const [aiHomeIdeas, setAiHomeIdeas] = useState<AiActivityIdea[]>([]);
+  const [isLoadingAiHomeIdeas, setIsLoadingAiHomeIdeas] = useState(false);
   const [isSavingAiHomeIdeaId, setIsSavingAiHomeIdeaId] = useState<string | null>(null);
+  const [aiAlert, setAiAlert] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    type: 'error' | 'info';
+  }>({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'info',
+  });
   const [isEditingShortcuts, setIsEditingShortcuts] = useState(false);
   const [isSavingShortcutOrder, setIsSavingShortcutOrder] = useState(false);
   const [draggingShortcutId, setDraggingShortcutId] = useState<number | null>(null);
   const shortcutDragOffsets = useRef(new Map<number, Animated.ValueXY>()).current;
   const shortcutLayoutsRef = useRef<Record<number, ShortcutLayout>>({});
+  const lastAiHomeIdeasRequestKeyRef = useRef<string | null>(null);
 
 
   // O userName deve ser atualizado quando ganhamos foco também
@@ -103,7 +120,7 @@ export default function Index() {
       
       if (user) {
         setAvatarUrl(user.user_metadata?.avatar_url || null);
-        setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'Utilizador');
+        setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'User');
 
         // Buscar hobbies da tabela users
         const { data: dbUser } = await supabase
@@ -134,7 +151,7 @@ export default function Index() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setAvatarUrl(session.user.user_metadata?.avatar_url || null);
-        setUserName(session.user.user_metadata?.first_name || session.user.email?.split('@')[0] || 'Utilizador');
+        setUserName(session.user.user_metadata?.first_name || session.user.email?.split('@')[0] || 'User');
       } else {
         setAvatarUrl(null);
         setUserName('Visitante');
@@ -162,7 +179,7 @@ export default function Index() {
 
         // Atualizar o nome também por precaução
         setAvatarUrl(user.user_metadata?.avatar_url || null);
-        setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'Utilizador');
+        setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'User');
         
         let [
           homeAssocResult,
@@ -177,7 +194,7 @@ export default function Index() {
             .maybeSingle(),
           supabase
             .from('activities')
-            .select('*')
+            .select('*, rooms(name)')
             .order('created_at', { ascending: false }),
           supabase
             .from('shortcuts')
@@ -194,13 +211,13 @@ export default function Index() {
         if (homeAssocResult.data?.home_id) {
           activitiesResult = await supabase
             .from('activities')
-            .select('*')
+            .select('*, rooms(name)')
             .eq('home_id', homeAssocResult.data.home_id)
             .order('created_at', { ascending: false });
         } else {
           activitiesResult = await supabase
             .from('activities')
-            .select('*')
+            .select('*, rooms(name)')
             .eq('user_id', user.id)
             .order('created_at', { ascending: false });
         }
@@ -227,18 +244,80 @@ export default function Index() {
 
         setUserHobbies(parseHobbies(userResult.data?.hobbies));
       };
-      const loadTemplates = async () => {
+      const loadContentDurations = async () => {
         try {
-          const activities = await fetchActivityTemplates();
-          setActivityTemplates(activities);
+          const { data, error } = await supabase.from('contents').select('id, duration');
+          if (error) throw error;
+
+          setContentDurations(
+            Object.fromEntries(
+              (data ?? []).map((item) => [String(item.id), String(item.duration ?? '')]),
+            ),
+          );
         } catch (error) {
-          console.error('Failed to load home catalog templates:', error);
-          setActivityTemplates([]);
+          console.error('Failed to load content durations:', error);
+          setContentDurations({});
         }
       };
-      loadTemplates();
+      loadContentDurations();
       loadActivities();
     }, [])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        lastAiHomeIdeasRequestKeyRef.current = null;
+      };
+    }, []),
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isAiAutoInvocationEnabled) {
+        setAiHomeIdeas([]);
+        setIsLoadingAiHomeIdeas(false);
+        return;
+      }
+
+      const requestKey = `home:${currentState}`;
+      if (lastAiHomeIdeasRequestKeyRef.current === requestKey) {
+        return;
+      }
+
+      let isActive = true;
+      lastAiHomeIdeasRequestKeyRef.current = requestKey;
+
+      const loadAiHomeIdeas = async () => {
+        setIsLoadingAiHomeIdeas(true);
+
+        try {
+          const ideas = await fetchAiActivityIdeas({
+            mood: currentState,
+            source: 'home-auto',
+          });
+
+          if (!isActive) return;
+          setAiHomeIdeas(ideas.slice(0, 5));
+        } catch (error) {
+          if (!isActive) return;
+          logger.warn('Failed to auto-load AI home ideas:', error);
+          const message = await getNidushAiErrorMessage(error);
+          logger.warn(message);
+          setAiHomeIdeas([]);
+        } finally {
+          if (isActive) {
+            setIsLoadingAiHomeIdeas(false);
+          }
+        }
+      };
+
+      void loadAiHomeIdeas();
+
+      return () => {
+        isActive = false;
+      };
+    }, [currentState]),
   );
 
   const saveHomeAiIdea = useCallback(async (idea: AiActivityIdea) => {
@@ -257,10 +336,15 @@ export default function Index() {
           isNew: 'true',
         },
       });
-    } catch (error) {
-      if (!(await isAiRateLimitError(error))) {
-        console.error('Failed to save AI home recommendation:', error);
-      }
+    } catch (error: unknown) {
+      logger.warn('Failed to save AI home recommendation:', error);
+      const message = await getNidushAiErrorMessage(error);
+      setAiAlert({
+        visible: true,
+        title: 'Could not save activity',
+        message,
+        type: await isAiRateLimitError(error) ? 'info' : 'error',
+      });
     } finally {
       setIsSavingAiHomeIdeaId(null);
     }
@@ -280,7 +364,8 @@ export default function Index() {
     }
 
     const formatActivityForCarousel = (item: Activity): CarouselActivity => {
-      const duration = getContentDuration(item.content_id || item.contentId);
+      const contentId = item.content_id || item.contentId;
+      const duration = contentId ? contentDurations[String(contentId)] : undefined;
 
       return {
         ...item,
@@ -289,23 +374,20 @@ export default function Index() {
       };
     };
 
-    // 1. Aplicar filtro de Hobbies se o utilizador tiver algum selecionado
-    const appActivities = activityTemplates.filter((item) => {
-      // Se o user tiver hobbies, filtramos; se não tiver, mostramos todos
+    const personalizedActivities = myActivities.filter((item) => {
+      if (isCatalogTemplateActivity(item)) return false;
       if (userHobbies.length > 0) {
-        // item.type (meditation, cooking, workout, audiobooks)
-        return userHobbies.some(h => h.toLowerCase() === item.type?.toLowerCase());
+        return userHobbies.some((h) => h.toLowerCase() === item.type?.toLowerCase());
       }
-      
       return true;
     });
 
     const sortedList = getDynamicRecommendations(
-      appActivities,
+      personalizedActivities,
       currentState,
     ) as Activity[];
 
-    const combinedList = [...myActivities, ...sortedList];
+    const combinedList = [...sortedList];
     const seenIds = new Set<string>();
 
     return combinedList
@@ -317,13 +399,13 @@ export default function Index() {
       })
       .slice(0, 8)
       .map(formatActivityForCarousel);
-  }, [activityTemplates, aiHomeIdeas, currentState, isSavingAiHomeIdeaId, myActivities, saveHomeAiIdea, userHobbies]);
+  }, [aiHomeIdeas, contentDurations, currentState, isSavingAiHomeIdeaId, myActivities, saveHomeAiIdea, userHobbies]);
 
 
-  const dynamicTitle = useMemo(
-    () => (aiHomeIdeas.length > 0 ? 'AI activities for you' : 'Activities for you'),
-    [aiHomeIdeas.length],
-  );
+  const dynamicTitle = useMemo(() => {
+    if (isLoadingAiHomeIdeas || aiHomeIdeas.length > 0) return 'AI activities for you';
+    return 'Activities for you';
+  }, [aiHomeIdeas.length, isLoadingAiHomeIdeas]);
 
   // --- NOVA LÓGICA DOS SHORTCUTS (USANDO 'shortcuts' NO PLURAL) ---
   const shortcuts = useMemo(() => {
@@ -347,8 +429,8 @@ export default function Index() {
           (activityShortcutMap.get(String(b.id))?.displayorder ?? 0),
       )
       .map((item) => {
-      // Tentar encontrar a duração no CONTENTS
-      const duration = getContentDuration(item.content_id || item.contentId);
+      const contentId = item.content_id || item.contentId;
+      const duration = contentId ? contentDurations[String(contentId)] : undefined;
 
       return {
         shortcutId: activityShortcutMap.get(String(item.id))!.shortcutId,
@@ -364,7 +446,7 @@ export default function Index() {
     });
 
     return favActivities;
-  }, [myActivities, shortcutRows]);
+  }, [contentDurations, myActivities, shortcutRows]);
 
   const saveShortcutOrder = async (orderedRows: ShortcutRow[]) => {
     setIsSavingShortcutOrder(true);
@@ -532,6 +614,7 @@ export default function Index() {
             title={dynamicTitle}
             data={dynamicActivities}
             showTime={true}
+            isLoadingMore={isLoadingAiHomeIdeas}
           />
         </View>
 
@@ -657,6 +740,19 @@ export default function Index() {
           )}
         </View>
       </ScrollView>
+      <CustomAlert
+        visible={aiAlert.visible}
+        title={aiAlert.title}
+        message={aiAlert.message}
+        type={aiAlert.type}
+        confirmText="OK"
+        onClose={() =>
+          setAiAlert((current) => ({
+            ...current,
+            visible: false,
+          }))
+        }
+      />
     </SafeAreaView>
   );
 }

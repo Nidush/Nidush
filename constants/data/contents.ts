@@ -436,10 +436,16 @@ export const CONTENTS: Record<string, Content> = {
     title: 'The Power of Habit',
     description:
       'Explore the science behind why we do what we do and how to change things.',
-    type: 'audio',
-    category: 'audiobook',
+    type: 'audiobooks',
+    category: 'Behavior change',
+    genre: 'Behavior change',
     duration: '15 min',
     image: require('@/assets/audiobooks/power_of_habit.png'),
+    instructions: [
+      'The habit loop: cue, routine, reward.',
+      'Why habits stick even when motivation fades.',
+      'How awareness helps you replace routines without losing the reward.',
+    ],
     author: 'Charles Duhigg',
   },
   c8: {
@@ -447,10 +453,16 @@ export const CONTENTS: Record<string, Content> = {
     title: 'Atomic Habits',
     description:
       'An easy and proven way to build good habits and break bad ones.',
-    type: 'audio',
-    category: 'audiobook',
+    type: 'audiobooks',
+    category: 'Self-improvement',
+    genre: 'Self-improvement',
     duration: '20 min',
     image: require('@/assets/audiobooks/atomic_habits.png'),
+    instructions: [
+      'Small improvements compound over time.',
+      'Identity shapes long-term habits more than motivation alone.',
+      'Design your environment so good habits are easier to repeat.',
+    ],
     author: 'James Clear',
   },
 };

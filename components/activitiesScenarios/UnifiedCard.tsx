@@ -6,7 +6,6 @@ import {
   DimensionValue,
   Image,
   ImageSourcePropType,
-  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -51,14 +50,15 @@ export const UnifiedCard = ({
       accessibilityLabel={`${title}. ${time ? `Duration: ${time}.` : ''} ${room ? `Room: ${room}.` : ''}`}
       accessibilityHint={`Press to go to the details of ${title}`}
     >
-      <View style={StyleSheet.absoluteFill}>
+      <View style={[StyleSheet.absoluteFill, { transform: [{ scale: 1.5 }] }]}>
         <Image
           source={imageSource}
           style={StyleSheet.absoluteFill}
           resizeMode="cover"
-          blurRadius={Platform.OS === 'ios' ? 70 : 50}
+          blurRadius={90}
+          accessible={false}
+          importantForAccessibility="no"
         />
-        <View className="absolute inset-0 " />
       </View>
 
       <MaskedView
@@ -66,7 +66,9 @@ export const UnifiedCard = ({
         maskElement={
           <LinearGradient
             colors={['black', 'black', 'transparent']}
-            locations={[0, 0.1, 0.6]}
+            locations={[0, 0.2, 0.75]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
             style={StyleSheet.absoluteFill}
           />
         }
@@ -75,12 +77,13 @@ export const UnifiedCard = ({
           source={imageSource}
           style={StyleSheet.absoluteFill}
           resizeMode="cover"
+          accessible={false}
+          importantForAccessibility="no"
         />
       </MaskedView>
 
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.5)']}
-        locations={[0.4, 0.7, 1]}
+        colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.3)', 'rgba(0,0,0,0.6)']}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
