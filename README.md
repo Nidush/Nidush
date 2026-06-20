@@ -141,7 +141,8 @@ selenium/                    E2E test specs
 - **Node.js LTS**
 - **npm**
 - **Git**
-- **Expo Go** for mobile testing, or Android Studio/iOS Simulator
+- **Android Studio** and/or **Xcode** if you build native clients
+- **Expo development build (`expo-dev-client`)** for day-to-day mobile testing
 - **Supabase CLI** for database/functions work
 
 Install Supabase CLI if needed:
@@ -178,8 +179,12 @@ EXPO_PUBLIC_SUPABASE_URL=
 EXPO_PUBLIC_SUPABASE_ANON_KEY=
 EXPO_PUBLIC_SPOTIFY_CLIENT_ID=
 EXPO_PUBLIC_SPOTIFY_SCHEME=
+EXPO_PUBLIC_AUTH_REDIRECT_URL=
 EXPO_PUBLIC_ENABLE_AI_AUTO_CALLS=true
-WORKOUTX_API_KEY=
+EXPO_PUBLIC_APP_ENV=development
+API_NINJAS_KEY=
+HOME_DEVICE_SYNC_TOKEN=
+DEVICE_SYNC_SHARED_SECRET=
 PORT=3000
 ```
 
@@ -189,16 +194,64 @@ Important:
 - Public Expo variables must start with `EXPO_PUBLIC_`.
 - Secret API keys used by Edge Functions must also be stored in Supabase secrets.
 - `EXPO_PUBLIC_ENABLE_AI_AUTO_CALLS=false` disables the automatic AI recommendation calls on screen load/focus. In development it defaults to `true`; in production builds it now defaults to `false` unless you explicitly enable it.
+- `EXPO_PUBLIC_AUTH_REDIRECT_URL` is optional; if omitted, the app falls back to `nidush://login`.
+- `DEVICE_SYNC_SHARED_SECRET` is required for non-JWT local discovery/sync calls.
 
 ### 4. Start The App
+
+Recommended flow for this repository:
+
+```bash
+npx expo start --dev-client
+```
+
+This project is currently developed primarily with a **development build**, not plain Expo Go.
+
+Useful variants:
+
+```bash
+npx expo start --dev-client --lan
+```
+
+```bash
+npx expo start --dev-client --localhost
+```
+
+```bash
+npx expo start --dev-client --tunnel
+```
+
+```bash
+npx expo start --dev-client -c
+```
+
+Flags:
+
+- `--lan`: best when your phone/emulator is on the same Wi-Fi network as your computer.
+- `--localhost`: best when everything runs on the same machine.
+- `--tunnel`: fallback when LAN access is blocked or unstable.
+- `-c`: clears the Metro cache.
+
+If you still want the standard Expo entry point, it is available too:
 
 ```bash
 npm start
 ```
 
-Then:
+Native build helpers:
 
-- Scan the QR code with **Expo Go**.
+```bash
+npm run android
+```
+
+```bash
+npm run ios
+```
+
+Then, for Expo server commands:
+
+- Open the installed **development build** on the device/emulator.
+- Scan the QR code from the dev server when needed.
 - Press `a` for Android emulator.
 - Press `i` for iOS simulator.
 - Press `w` for web.
@@ -209,25 +262,15 @@ If cache causes strange behavior:
 npx expo start -c
 ```
 
-If you are using a development build (`expo-dev-client`), these startup modes are useful:
+If the native client is missing after dependency changes, rebuild it:
 
 ```bash
-npx expo start --dev-client --localhost -c
+npm run android
 ```
-
-- `--localhost`: best for local-only development on your own machine; it is not suitable for sharing across the network.
 
 ```bash
-npx expo start --dev-client --lan -c
+npm run ios
 ```
-
-- `--lan`: use this when your phone/emulator is on the same Wi-Fi network as your computer.
-
-```bash
-npx expo start --dev-client --tunnel -c
-```
-
-- `--tunnel`: best fallback when local network restrictions break device access or when you need a more reliable remote connection path.
 
 ---
 
@@ -235,6 +278,7 @@ npx expo start --dev-client --tunnel -c
 
 ```bash
 npm start              # Start Expo
+npx expo start --dev-client  # Start Metro for the development build
 npm run android        # Run native Android build
 npm run ios            # Run native iOS build
 npm run web            # Start web version
@@ -249,6 +293,18 @@ TypeScript check:
 
 ```bash
 npx tsc --noEmit
+```
+
+If `npx expo` fails locally with `expo: not found` or similar module errors, rebuild the local install:
+
+```bash
+npm install
+```
+
+Then retry:
+
+```bash
+npx expo start --dev-client
 ```
 
 Biometric state behavior:
