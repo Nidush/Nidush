@@ -119,31 +119,6 @@ const getSupabaseErrorText = (error: unknown) => {
   return 'Please try again in a moment.';
 };
 
-const hasMissingColumnError = (error: unknown, columnName: string) => {
-  if (!error || typeof error !== 'object') return false;
-
-  const typedError = error as {
-    code?: unknown;
-    message?: unknown;
-    details?: unknown;
-    hint?: unknown;
-  };
-
-  const joinedText = [
-    typedError.message,
-    typedError.details,
-    typedError.hint,
-  ]
-    .map((part) => String(part ?? '').toLowerCase())
-    .join(' ');
-
-  return (
-    String(typedError.code ?? '') === '42703' ||
-    String(typedError.code ?? '') === 'PGRST204' ||
-    joinedText.includes(columnName.toLowerCase())
-  );
-};
-
 const isActivityItem = (item: Activity | Scenario): item is Activity =>
   'type' in item;
 
@@ -268,29 +243,6 @@ const resolveScenarioForDisplay = async (rawScenarioId: string) => {
   const dbScenario = await fetchScenarioFromDbCandidates(rawScenarioId);
   if (dbScenario) return dbScenario;
   return fetchScenarioTemplateById(rawScenarioId);
-};
-
-const countLinkedRoutinesForScenario = async (scenarioDbId: number) => {
-  const primaryQuery = await supabase
-    .from('routines')
-    .select('id', { count: 'exact', head: true })
-    .eq('scenario_id', scenarioDbId);
-
-  if (
-    primaryQuery.error &&
-    hasMissingColumnError(primaryQuery.error, 'scenario_id')
-  ) {
-    const legacyQuery = await supabase
-      .from('routines')
-      .select('id', { count: 'exact', head: true })
-      .eq('scenario_idscenario', scenarioDbId);
-
-    if (legacyQuery.error) throw legacyQuery.error;
-    return legacyQuery.count ?? 0;
-  }
-
-  if (primaryQuery.error) throw primaryQuery.error;
-  return primaryQuery.count ?? 0;
 };
 
 export default function ActivityDetails() {
@@ -796,32 +748,6 @@ export default function ActivityDetails() {
 
             if (!Number.isFinite(scenarioDbId)) {
               throw new Error('Invalid scenario id.');
-            }
-
-            const [{ count: linkedActivitiesCount, error: linkedActivitiesError }, linkedRoutinesCount] = await Promise.all([
-              supabase
-                .from('activities')
-                .select('id', { count: 'exact', head: true })
-                .eq('scenario_id', scenarioDbId),
-              countLinkedRoutinesForScenario(scenarioDbId),
-            ]);
-
-            if (linkedActivitiesError) throw linkedActivitiesError;
-
-            const blockingRefs = (linkedActivitiesCount ?? 0) + (linkedRoutinesCount ?? 0);
-            if (blockingRefs > 0) {
-              setAlertConfig({
-                visible: true,
-                title: 'Scenario in use',
-                message:
-                  'This scenario is linked to existing activities or routines. Remove those links first, then try deleting the scenario again.',
-                confirmText: 'OK',
-                cancelText: '',
-                isDestructive: false,
-                onConfirm: undefined,
-                onCancel: undefined,
-              });
-              return;
             }
 
             apiLog('DELETE', 'scenarios', { id: scenarioDbId });
