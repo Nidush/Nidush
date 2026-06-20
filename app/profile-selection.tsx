@@ -49,7 +49,7 @@ export default function ProfileSelection() {
           return;
         }
 
-        console.log("-> Utilizador atual:", user.email);
+        console.log('-> Current user:', user.email);
         
         const { data: homeAssocs, error: assocError } = await supabase
           .from('user_homes')
@@ -65,7 +65,7 @@ export default function ProfileSelection() {
           const activeHomeId = homeAssocs[0].home_id;
           if (user.user_metadata?.first_name) setHostName(user.user_metadata.first_name);
 
-          console.log("-> À procura de residentes na casa ID:", activeHomeId);
+          console.log('-> Looking for residents in home ID:', activeHomeId);
 
           const { data: residentLinks, error: residentLinksError } = await supabase
             .from('user_homes')
@@ -96,8 +96,8 @@ export default function ProfileSelection() {
               const isCurrentUser = residentId === user.id;
               const firstName = residentProfile?.first_name || (isCurrentUser ? user.user_metadata?.first_name : '');
               const lastName = residentProfile?.last_name || (isCurrentUser ? user.user_metadata?.last_name : '');
-              const fallbackName = residentProfile?.email?.split('@')[0] || (isCurrentUser ? user.email?.split('@')[0] : 'Utilizador');
-              const name = [firstName, lastName].filter(Boolean).join(' ').trim() || fallbackName || 'Utilizador';
+              const fallbackName = residentProfile?.email?.split('@')[0] || (isCurrentUser ? user.email?.split('@')[0] : 'User');
+              const name = [firstName, lastName].filter(Boolean).join(' ').trim() || fallbackName || 'User';
 
               return {
                 id: residentId,
@@ -113,7 +113,7 @@ export default function ProfileSelection() {
           }
         }
       } catch (error: unknown) {
-        console.error("Erro fatal:", error);
+        console.error('Fatal error:', error);
         if (isMounted) setProfiles([]);
       } finally {
         if (isMounted) setIsLoading(false);

@@ -109,7 +109,7 @@ export default function Index() {
       
       if (user) {
         setAvatarUrl(user.user_metadata?.avatar_url || null);
-        setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'Utilizador');
+        setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'User');
 
         // Buscar hobbies da tabela users
         const { data: dbUser } = await supabase
@@ -140,7 +140,7 @@ export default function Index() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setAvatarUrl(session.user.user_metadata?.avatar_url || null);
-        setUserName(session.user.user_metadata?.first_name || session.user.email?.split('@')[0] || 'Utilizador');
+        setUserName(session.user.user_metadata?.first_name || session.user.email?.split('@')[0] || 'User');
       } else {
         setAvatarUrl(null);
         setUserName('Visitante');
@@ -168,7 +168,7 @@ export default function Index() {
 
         // Atualizar o nome também por precaução
         setAvatarUrl(user.user_metadata?.avatar_url || null);
-        setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'Utilizador');
+        setUserName(user.user_metadata?.first_name || user.email?.split('@')[0] || 'User');
         
         let [
           homeAssocResult,

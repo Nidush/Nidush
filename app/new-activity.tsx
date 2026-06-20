@@ -704,7 +704,7 @@ export default function NewActivityFlow() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) throw new Error('Utilizador não autenticado!');
+      if (!user) throw new Error('User not authenticated.');
 
       // 1. Upload da imagem para o Storage (se for uma nova imagem local)
       let imageUrl = getImageUri(finalImage) || finalImage;
@@ -840,7 +840,7 @@ export default function NewActivityFlow() {
       });
 
       if (error) {
-        console.error('Erro no Supabase:', error);
+        console.error('Supabase error:', error);
         captureException(error, {
           area: 'activities',
           screen: 'new-activity',
@@ -885,7 +885,7 @@ export default function NewActivityFlow() {
         },
       });
     } catch (e) {
-      console.error('Erro ao salvar:', e);
+      console.error('Error saving activity:', e);
       captureException(e, {
         area: 'activities',
         screen: 'new-activity',

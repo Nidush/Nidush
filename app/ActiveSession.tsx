@@ -646,7 +646,7 @@ export default function ActiveSession() {
 
         if (pId) {
           console.log(
-            '[Spotify] A iniciar música no momento do Exercício:',
+            '[Spotify] Starting music at workout moment:',
             pId,
           );
           playPlaylist(pId, playbackOptions);
@@ -659,12 +659,12 @@ export default function ActiveSession() {
             startedPlaybackForSessionRef.current !== String(id)
           ) {
             startedPlaybackForSessionRef.current = String(id);
-            console.log('[Spotify] A usar fallback no Exercício:', activityType);
+            console.log('[Spotify] Using workout fallback:', activityType);
             playPlaylist(fallbackPlaylistId, playbackOptions);
           }
         }
       } else if (contentType !== 'video') {
-        console.log('[Spotify] Utilizador não autenticado.');
+        console.log('[Spotify] User not authenticated.');
       }
 
       setSecondsLeft(formattedInstructions[0]?.duration || 0);
@@ -1002,7 +1002,7 @@ export default function ActiveSession() {
       />
 
       <SessionHeader
-        title={sessionData.title}
+        title={isScenarioSession ? 'Active Scenario' : sessionData.title}
         onBack={() => {
           void exitSession();
         }}

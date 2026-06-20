@@ -52,7 +52,7 @@ export default function Login() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      setErrorMsg('Por favor preenche o email e a password.');
+      setErrorMsg('Please enter your email and password.');
       return;
     }
     setLoading(true);

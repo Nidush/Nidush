@@ -26,7 +26,7 @@ export const Step2_Content = ({
       setLoading(true);
       const { data, error } = await supabase.from('contents').select('*').order('title', { ascending: true });
       if (error) {
-        console.error('Erro ao carregar conteúdos do Supabase:', error);
+        console.error('Error loading content from Supabase:', error);
       } else if (data) {
         setDbContent(data as Content[]);
       }

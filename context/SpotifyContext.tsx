@@ -774,8 +774,8 @@ export const SpotifyProvider: React.FC<{ children: React.ReactNode }> = ({ child
           logger.debug('[Spotify] No active device. Attempting to open Spotify.');
           Linking.openURL('spotify:').catch(() => {
             Alert.alert(
-              'Spotify em Suspensão',
-              'O teu telemóvel desligou o Spotify. Por favor, abre o Spotify uma vez e certifica-te que a Bateria está em "Não Restrito".'
+              'Spotify Paused by System',
+              'Your phone suspended Spotify. Please open Spotify once and make sure Battery is set to "Unrestricted".'
             );
           });
         } else {

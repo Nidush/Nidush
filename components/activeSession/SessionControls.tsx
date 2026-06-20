@@ -205,7 +205,7 @@ export const SessionControls = ({
 
         if (onAudioReady) onAudioReady();
       } catch (error) {
-        console.log('Erro ao carregar áudio:', error);
+        console.log('Error loading audio:', error);
         if (onAudioReady) onAudioReady();
       }
     };

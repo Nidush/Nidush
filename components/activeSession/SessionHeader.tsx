@@ -65,20 +65,22 @@ export const SessionHeader = ({
   ]);
 
   return (
-    <View className="flex-row justify-between items-center px-6 py-2">
-      <TouchableOpacity
-        onPress={onBack}
-        accessible={true}
-        accessibilityRole="button"
-        accessibilityLabel="Go back"
-      >
-        <Ionicons
-          name="chevron-back"
-          size={30}
-          color="#354F52"
-          importantForAccessibility="no"
-        />
-      </TouchableOpacity>
+    <View className="flex-row items-center px-6 py-2">
+      <View className="w-20 items-start justify-center">
+        <TouchableOpacity
+          onPress={onBack}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
+        >
+          <Ionicons
+            name="chevron-back"
+            size={30}
+            color="#354F52"
+            importantForAccessibility="no"
+          />
+        </TouchableOpacity>
+      </View>
 
       <View className="flex-1 mx-4 overflow-hidden">
         <View
@@ -95,6 +97,7 @@ export const SessionHeader = ({
               {
                 flexDirection: 'row',
                 alignItems: 'center',
+                justifyContent: isOverflowing ? 'flex-start' : 'center',
                 width: isOverflowing ? titleTextWidth * 2 + titleGap : undefined,
               },
               titleAnimatedStyle,
@@ -108,8 +111,8 @@ export const SessionHeader = ({
                 fontFamily: 'Nunito_600SemiBold',
                 fontSize: 20,
                 color: '#354F52',
-                textAlign: 'left',
-                alignSelf: 'flex-start',
+                textAlign: isOverflowing ? 'left' : 'center',
+                alignSelf: isOverflowing ? 'flex-start' : 'center',
                 width: isOverflowing ? titleTextWidth : undefined,
               }}
             >
@@ -164,21 +167,23 @@ export const SessionHeader = ({
         </Text>
       </View>
 
-      <TouchableOpacity
-        onPress={onCancel}
-        accessible={true}
-        accessibilityRole="button"
-        accessibilityLabel="Cancel"
-        accessibilityHint="Ends the current session"
-      >
-        <Text
-          maxFontSizeMultiplier={1.2}
-          className="text-[#7DA87B] text-lg"
-          style={{ fontFamily: 'Nunito_700Bold' }}
+      <View className="w-20 items-end justify-center">
+        <TouchableOpacity
+          onPress={onCancel}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Cancel"
+          accessibilityHint="Ends the current session"
         >
-          Cancel
-        </Text>
-      </TouchableOpacity>
+          <Text
+            maxFontSizeMultiplier={1.2}
+            className="text-[#7DA87B] text-lg"
+            style={{ fontFamily: 'Nunito_700Bold' }}
+          >
+            Cancel
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };

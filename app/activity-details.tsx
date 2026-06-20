@@ -496,11 +496,11 @@ export default function ActivityDetails() {
         );
       } else if (Platform.OS === 'ios') {
         Alert.alert(
-          'Modo de Concentração',
-          "O iOS não permite bloquear outras apps automaticamente. Desliza a Central de Controlo para baixo e ativa o teu modo 'Não Incomodar' ou 'Foco'.",
+          'Focus Mode',
+          "iOS cannot block other apps automatically. Open Control Center and turn on your 'Do Not Disturb' or Focus mode.",
           [
             {
-              text: 'Entendido',
+              text: 'Understood',
               style: 'default',
               onPress: proceedToSession, // Avança depois de ler o aviso
             },
