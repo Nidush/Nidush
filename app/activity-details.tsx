@@ -691,7 +691,12 @@ export default function ActivityDetails() {
       onConfirm: async () => {
         try {
           if (deletingScenario) {
-            const scenarioDbId = parseUserScenarioDbId(id);
+            const rawScenarioDbId = parseUserScenarioDbId(id);
+            const scenarioDbId = Number(rawScenarioDbId);
+
+            if (!Number.isFinite(scenarioDbId)) {
+              throw new Error('Invalid scenario id.');
+            }
 
             const [{ count: linkedActivitiesCount, error: linkedActivitiesError }, { count: linkedRoutinesCount, error: linkedRoutinesError }] = await Promise.all([
               supabase
@@ -724,13 +729,6 @@ export default function ActivityDetails() {
             }
 
             apiLog('DELETE', 'scenarios', { id: scenarioDbId });
-            const { error: shortcutDeleteError } = await supabase
-              .from('shortcuts')
-              .delete()
-              .eq('scenario_idscenario', scenarioDbId);
-
-            if (shortcutDeleteError) throw shortcutDeleteError;
-
             const { error } = await supabase
               .from('scenarios')
               .delete()
@@ -750,6 +748,19 @@ export default function ActivityDetails() {
           router.navigate('/Activities');
         } catch (e) {
           console.log('Error while trying to delete', e);
+          setAlertConfig({
+            visible: true,
+            title: deletingScenario ? 'Could not delete scenario' : 'Could not delete activity',
+            message:
+              e instanceof Error && e.message
+                ? e.message
+                : 'Please try again in a moment.',
+            confirmText: 'OK',
+            cancelText: '',
+            isDestructive: false,
+            onConfirm: undefined,
+            onCancel: undefined,
+          });
         }
       },
       onCancel: undefined,

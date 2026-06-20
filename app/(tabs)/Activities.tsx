@@ -203,6 +203,7 @@ const UnifiedActivitiesScreen = () => {
     if (!isAiAutoInvocationEnabled || viewMode !== 'activities') {
       setAiRecommendedIdeas([]);
       setIsLoadingAiRecommendations(false);
+      lastAutoRecommendationRequestKeyRef.current = null;
       return;
     }
 
@@ -247,7 +248,7 @@ const UnifiedActivitiesScreen = () => {
       } catch (error) {
         if (!isActive) return;
         logger.warn('Failed to auto-load AI recommendations:', error);
-        setAiRecommendedIdeas([]);
+        lastAutoRecommendationRequestKeyRef.current = null;
       } finally {
         if (isActive) {
           setIsLoadingAiRecommendations(false);
