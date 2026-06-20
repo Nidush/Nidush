@@ -73,36 +73,6 @@ let scenarioTemplatesPromise: Promise<Scenario[]> | null = null;
 
 export const USER_SCENARIO_ID_PREFIX = 'scenario:';
 
-const LOCAL_SCENARIO_TEMPLATES: Scenario[] = [
-  {
-    id: 's900',
-    title: 'TV Relaxation',
-    description:
-      'A living room wind-down scene that uses the TV as the main ambient device.',
-    room: 'Living Room',
-    room_id: 'Living Room',
-    image: resolveCatalogImage('Scenarios/moonlight_bay.png'),
-    category: 'My creations',
-    devices: [
-      {
-        deviceId: 'dev_tv_living',
-        state: 'on',
-        value: 'Ocean visuals',
-      },
-      {
-        deviceId: 'dev_speaker_living',
-        state: 'on',
-        value: 'Calm music',
-      },
-    ],
-    playlist: 'Peaceful Meditation',
-    playlist_id: '37i9dQZF1DWZ0XmS6AnY9s',
-    focusMode: true,
-    shortcuts: false,
-    keywords: ['tv', 'relax', 'meditation', 'living room'],
-  },
-];
-
 const normalizeActivityType = (type: string | null | undefined): Activity['type'] => {
   const normalized = String(type ?? 'other').toLowerCase();
   if (normalized === 'audiobook') return 'audiobooks';
@@ -150,200 +120,6 @@ export const resolvePossibleUserScenarioDbIds = (value: unknown) => {
 const normalizeActivityTemplateId = (id: string) =>
   id.startsWith('template:') ? id.replace(/^template:/, '') : id;
 
-const LOCAL_ACTIVITY_TEMPLATE_ROWS: ActivityTemplateRow[] = [
-  {
-    id: '1',
-    title: 'Italian Night',
-    description: 'A cozy cooking session with italian vibes.',
-    room: 'Kitchen',
-    image: 'cooking_activities/my_creations_cooking/italian_night.png',
-    category: 'My creations',
-    type: 'cooking',
-    content_id: 'c1',
-    scenario_id: 's4',
-    shortcuts: false,
-    keywords: ['evening', 'dinner', 'italian', 'pasta', 'relaxed'],
-  },
-  {
-    id: '2',
-    title: 'Sunrise Flow',
-    description: 'Start your day with energy.',
-    room: 'Living Room',
-    image: 'activities_for_you/sunrise_flow.png',
-    category: 'My creations',
-    type: 'meditation',
-    content_id: 'c9',
-    scenario_id: 's1',
-    shortcuts: false,
-    keywords: ['morning', 'energy', 'meditation', 'stressed'],
-  },
-  {
-    id: '3',
-    title: 'Gratitude Flow',
-    description:
-      'With a gentle voice guiding you, focus for 8 minutes on things you are grateful for.',
-    room: 'Bedroom',
-    image: 'meditation_activities/my_creations/gratitude_flow.png',
-    category: 'My creations',
-    type: 'meditation',
-    content_id: 'c2',
-    scenario_id: 's5',
-    shortcuts: false,
-    keywords: ['morning', 'gratitude', 'zen', 'relaxed'],
-  },
-  {
-    id: '4',
-    title: 'Brownies',
-    description: 'Easy homemade brownies that are fudgy and delicious.',
-    room: 'Kitchen',
-    image: 'cooking_activities/recommended/brownies.png',
-    category: null,
-    type: 'cooking',
-    content_id: 'c3',
-    scenario_id: 's3',
-    shortcuts: false,
-    keywords: ['chocolate', 'dessert', 'baking', 'relaxed'],
-  },
-  {
-    id: '5',
-    title: 'Morning Zen',
-    description: 'Quick meditation session.',
-    room: 'Living Room',
-    image: 'meditation_content/video_sessions/morning_zen.png',
-    category: null,
-    type: 'meditation',
-    content_id: 'c2',
-    scenario_id: 's5',
-    shortcuts: false,
-    keywords: ['morning', 'zen', 'meditation', 'stressed'],
-  },
-  {
-    id: '6',
-    title: 'Eggs Benedict',
-    description:
-      'Master the art of the perfect brunch with crispy muffins, tender poached eggs, and rich Hollandaise sauce.',
-    room: 'Kitchen',
-    image: 'cooking_activities/recommended/eggs_benedict.png',
-    category: null,
-    type: 'cooking',
-    content_id: 'c10',
-    scenario_id: 's4',
-    shortcuts: false,
-    keywords: ['morning', 'breakfast', 'brunch', 'relaxed'],
-  },
-  {
-    id: '7',
-    title: 'Vodka Pasta',
-    description:
-      'A rich and creamy tomato sauce infused with a splash of vodka.',
-    room: 'Kitchen',
-    image: 'cooking_activities/simple_recipes/vodka_pasta.png',
-    category: 'Simple recipes',
-    type: 'cooking',
-    content_id: 'c14',
-    scenario_id: null,
-    shortcuts: false,
-    keywords: ['evening', 'dinner', 'pasta', 'cooking'],
-  },
-  {
-    id: '8',
-    title: 'Evening Read',
-    description:
-      'Unwind after a long day with an engaging audiobook summary.',
-    room: 'Bedroom',
-    image: 'activities_for_you/evening_read.png',
-    category: null,
-    type: 'audiobooks',
-    content_id: 'c8',
-    scenario_id: 's2',
-    shortcuts: false,
-    keywords: ['evening', 'reading', 'relax', 'focus'],
-  },
-  {
-    id: '9',
-    title: 'Chocolate Cake',
-    description:
-      'A rich, moist, and decadent chocolate cake for a special celebration.',
-    room: 'Kitchen',
-    image: 'cooking_activities/simple_recipes/chocolate_cake.png',
-    category: 'Simple recipes',
-    type: 'cooking',
-    content_id: 'c13',
-    scenario_id: null,
-    shortcuts: false,
-    keywords: ['dessert', 'chocolate', 'baking', 'relaxed'],
-  },
-  {
-    id: '10',
-    title: 'Pasta Primo',
-    description:
-      'A simple pasta dish for a quick lunch or hassle-free weeknight dinner.',
-    room: 'Kitchen',
-    image: 'cooking_activities/simple_recipes/pasta.png',
-    category: 'Simple recipes',
-    type: 'cooking',
-    content_id: 'c12',
-    scenario_id: null,
-    shortcuts: false,
-    keywords: ['lunch', 'dinner', 'quick', 'pasta'],
-  },
-  {
-    id: '11',
-    title: 'Stretching',
-    description:
-      'Release tension and improve flexibility with this gentle full-body routine.',
-    room: 'Bedroom',
-    image: 'activities_for_you/stretching.png',
-    category: 'My creations',
-    type: 'workout',
-    content_id: 'c11',
-    scenario_id: 's6',
-    shortcuts: false,
-    keywords: ['morning', 'stretch', 'relax', 'anxious'],
-  },
-  {
-    id: '15',
-    title: 'Visualization for Success',
-    description:
-      'Boost your confidence and clarity by mentally rehearsing your goals.',
-    room: 'Bedroom',
-    image: 'meditation_activities/recommended/visualization_for_success.png',
-    category: 'Meditation',
-    type: 'meditation',
-    content_id: 'c15',
-    scenario_id: 's2',
-    shortcuts: false,
-    keywords: ['focus', 'success', 'confidence', 'anxious'],
-  },
-  {
-    id: '16',
-    title: 'Cooking Time',
-    description:
-      'Transform your kitchen into a culinary studio and create something delicious from scratch.',
-    room: 'Kitchen',
-    image: 'shortcuts/cooking_time.png',
-    category: 'My creations',
-    type: 'cooking',
-    content_id: 'c16',
-    scenario_id: 's12',
-    shortcuts: true,
-    keywords: ['cooking', 'kitchen', 'creative', 'focus'],
-  },
-  {
-    id: '17',
-    title: 'Meditation Time',
-    description:
-      'Dedicate time to stillness and reconnect with your inner peace through guided breathwork.',
-    room: 'Bedroom',
-    image: 'shortcuts/meditation_time.png',
-    category: 'Meditation',
-    type: 'meditation',
-    content_id: 'c17',
-    scenario_id: 's13',
-    shortcuts: true,
-    keywords: ['meditation', 'calm', 'breathing', 'stressed'],
-  },
-];
 
 export const mapActivityTemplate = (row: ActivityTemplateRow): Activity => ({
   id: `template:${row.id}`,
@@ -361,8 +137,6 @@ export const mapActivityTemplate = (row: ActivityTemplateRow): Activity => ({
   shortcuts: row.shortcuts === true,
   keywords: row.keywords ?? [],
 });
-
-const LOCAL_ACTIVITY_TEMPLATES = LOCAL_ACTIVITY_TEMPLATE_ROWS.map(mapActivityTemplate);
 
 export const mapScenarioTemplate = (row: ScenarioTemplateRow): Scenario => ({
   id: row.id,
@@ -433,22 +207,9 @@ export const fetchActivityTemplates = async ({ forceRefresh = false }: FetchCata
       .select('*')
       .order('sort_order', { ascending: true });
 
-    if (error) {
-      console.warn('Falling back to local activity templates:', error);
-      activityTemplatesCache = LOCAL_ACTIVITY_TEMPLATES;
-      return LOCAL_ACTIVITY_TEMPLATES;
-    }
+    if (error) throw error;
 
-    const remoteTemplates = (data ?? []).map(mapActivityTemplate);
-    const remoteIds = new Set(
-      remoteTemplates.map((activity) => normalizeActivityTemplateId(activity.id)),
-    );
-    const templates = [
-      ...remoteTemplates,
-      ...LOCAL_ACTIVITY_TEMPLATES.filter(
-        (activity) => !remoteIds.has(normalizeActivityTemplateId(activity.id)),
-      ),
-    ];
+    const templates = (data ?? []).map(mapActivityTemplate);
     activityTemplatesCache = templates;
     return templates;
   })();
@@ -474,12 +235,7 @@ export const fetchScenarioTemplates = async ({ forceRefresh = false }: FetchCata
       .order('sort_order', { ascending: true });
 
     if (error) throw error;
-    const remoteTemplates = (data ?? []).map(mapScenarioTemplate);
-    const remoteIds = new Set(remoteTemplates.map((scenario) => scenario.id));
-    const templates = [
-      ...remoteTemplates,
-      ...LOCAL_SCENARIO_TEMPLATES.filter((scenario) => !remoteIds.has(scenario.id)),
-    ];
+    const templates = (data ?? []).map(mapScenarioTemplate);
     scenarioTemplatesCache = templates;
     return templates;
   })();
@@ -510,10 +266,6 @@ export const fetchActivityTemplateById = async (id: string) => {
   const cachedTemplate = activityTemplatesCache?.find((item) => normalizeActivityTemplateId(item.id) === templateId);
   if (cachedTemplate) return cachedTemplate;
 
-  const localTemplate = LOCAL_ACTIVITY_TEMPLATES.find(
-    (item) => normalizeActivityTemplateId(item.id) === templateId,
-  );
-
   const { data, error } = await supabase
     .from('activity_templates')
     .select('*')
@@ -521,10 +273,10 @@ export const fetchActivityTemplateById = async (id: string) => {
     .maybeSingle();
 
   if (error) {
-    console.warn('Falling back to local activity template:', error);
-    return localTemplate ?? null;
+    console.warn('Failed to load activity template by id:', error);
+    return null;
   }
-  return data ? mapActivityTemplate(data) : localTemplate ?? null;
+  return data ? mapActivityTemplate(data) : null;
 };
 
 export const fetchScenarioTemplateById = async (id: string) => {
@@ -544,15 +296,15 @@ export const fetchScenarioTemplateById = async (id: string) => {
   const cachedScenario = scenarioTemplatesCache?.find((item) => item.id === normalizedId);
   if (cachedScenario) return cachedScenario;
 
-  const localScenario = LOCAL_SCENARIO_TEMPLATES.find((item) => item.id === normalizedId);
-  if (localScenario) return localScenario;
-
   const { data, error } = await supabase
     .from('scenario_templates')
     .select('*')
     .eq('id', normalizedId)
     .maybeSingle();
 
-  if (error) throw error;
+  if (error) {
+    console.warn('Failed to load scenario template by id:', error);
+    return null;
+  }
   return data ? mapScenarioTemplate(data) : null;
 };

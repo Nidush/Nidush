@@ -30,13 +30,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   Activity,
-  CONTENTS,
   Scenario,
 } from '@/constants/data';
 import { resolveCatalogImage } from '@/constants/data/catalogAssets';
 import {
-  fetchActivityTemplates,
-  fetchScenarioTemplates,
   fetchUserScenarios,
   mapUserActivity,
 } from '@/utils/catalogTemplates';
@@ -69,6 +66,7 @@ const UnifiedActivitiesScreen = () => {
   const [myActivities, setMyActivities] = useState<Activity[]>([]);
   const [activityTemplates, setActivityTemplates] = useState<Activity[]>([]);
   const [scenarioTemplates, setScenarioTemplates] = useState<Scenario[]>([]);
+  const [contentDurations, setContentDurations] = useState<Record<string, string>>({});
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [isAiModalVisible, setIsAiModalVisible] = useState(false);
@@ -93,7 +91,6 @@ const UnifiedActivitiesScreen = () => {
   const isLoadingRef = useRef(false);
   const lastAutoRecommendationRequestKeyRef = useRef<string | null>(null);
   const PAGE_SIZE = 10;
-
   // Debounce search query
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -104,17 +101,28 @@ const UnifiedActivitiesScreen = () => {
 
   const loadTemplates = useCallback(async () => {
     try {
-      const [activities, scenarios, userScenarios] = await Promise.all([
-        fetchActivityTemplates(),
-        fetchScenarioTemplates(),
-        fetchUserScenarios().catch(() => []),
-      ]);
-      setActivityTemplates(activities);
-      setScenarioTemplates([...userScenarios, ...scenarios]);
+      const userScenarios = await fetchUserScenarios().catch(() => []);
+      setActivityTemplates([]);
+      setScenarioTemplates(userScenarios);
     } catch (error) {
       logger.error('Failed to load activity/scenario templates:', error);
       setActivityTemplates([]);
       setScenarioTemplates([]);
+    }
+  }, []);
+
+  const loadContentDurations = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.from('contents').select('id, duration');
+      if (error) throw error;
+
+      const nextDurations = Object.fromEntries(
+        (data ?? []).map((item) => [String(item.id), String(item.duration ?? '')]),
+      );
+      setContentDurations(nextDurations);
+    } catch (error) {
+      logger.warn('Failed to load content durations:', error);
+      setContentDurations({});
     }
   }, []);
 
@@ -178,8 +186,9 @@ const UnifiedActivitiesScreen = () => {
   useFocusEffect(
     useCallback(() => {
       loadTemplates();
+      loadContentDurations();
       loadActivities();
-    }, [loadActivities, loadTemplates])
+    }, [loadActivities, loadContentDurations, loadTemplates])
   );
 
   useFocusEffect(
@@ -277,8 +286,8 @@ const UnifiedActivitiesScreen = () => {
 
   const getActivityTime = (activity: Activity) => {
     const cId = activity.content_id || activity.contentId;
-    if (cId && CONTENTS[cId]) {
-      return CONTENTS[cId].duration;
+    if (cId) {
+      return contentDurations[String(cId)];
     }
     return undefined;
   };

@@ -24,7 +24,6 @@ import { CustomAlert } from '@/components/CustomAlert';
 import {
   Activity,
   Content,
-  CONTENTS,
   Scenario,
   ScenarioDeviceState,
 } from '@/constants/data';
@@ -165,6 +164,11 @@ const getItemDevices = (item: Activity | Scenario) =>
   ('devices' in item && Array.isArray(item.devices)
     ? item.devices
     : []) as ScenarioDeviceState[];
+
+const getReadableDeviceName = (config: ScenarioDeviceState) =>
+  config.deviceName ||
+  SMART_HOME_DEVICES[config.deviceId]?.name ||
+  getScenarioDeviceMeta(config).name;
 
 const resolveConfiguredDevices = (
   activityDevices: ScenarioDeviceState[],
@@ -330,7 +334,6 @@ export default function ActivityDetails() {
 
         const contentPromise = foundActivity.content_id
           ? (async () => {
-              const localContent = CONTENTS[String(foundActivity.content_id)];
               const { data: contentRows, error: contentError } = await supabase
                 .from('contents')
                 .select('*')
@@ -345,23 +348,19 @@ export default function ActivityDetails() {
                   title: contentData.title,
                   type: contentData.type,
                   category: contentData.category,
-                  genre: contentData.genre || localContent?.genre,
+                  genre: contentData.genre || undefined,
                   description: contentData.description,
                   duration: contentData.duration,
-                  image: resolveCatalogImage(
-                    contentData.image || localContent?.image,
-                  ),
-                  instructions:
-                    contentData.instructions || localContent?.instructions,
-                  ingredients:
-                    contentData.ingredients || localContent?.ingredients,
-                  videoUrl: localContent?.videoUrl || contentData.video_url,
-                  mediaUrl: localContent?.mediaUrl || contentData.media_url || contentData.video_url,
-                  author: contentData.author || localContent?.author,
+                  image: resolveCatalogImage(contentData.image),
+                  instructions: contentData.instructions,
+                  ingredients: contentData.ingredients,
+                  videoUrl: contentData.video_url || undefined,
+                  mediaUrl: contentData.media_url || contentData.video_url || undefined,
+                  author: contentData.author || undefined,
                 } as Content;
               }
 
-              return localContent || null;
+              return null;
             })()
           : Promise.resolve(null);
 
@@ -424,11 +423,6 @@ export default function ActivityDetails() {
     };
     loadData();
   }, [id]);
-
-  const displayDescription =
-    !isActivity && relatedScenario?.description
-      ? relatedScenario.description
-      : mainItem?.description;
 
   const handleCustomBack = () => {
     if (isNew === 'true') {
@@ -744,6 +738,47 @@ export default function ActivityDetails() {
     Array.isArray(relatedScenario?.devices) ? relatedScenario.devices : [],
   );
 
+  const deviceNames = Array.from(
+    new Set(
+      devicesToShow
+        .map((config) => getReadableDeviceName(config).trim())
+        .filter(Boolean),
+    ),
+  );
+
+  const scenarioDescription =
+    relatedScenario?.description?.trim() || '';
+  const baseDescription =
+    (!isActivity && scenarioDescription) ||
+    mainItem?.description?.trim() ||
+    scenarioDescription;
+  const mergedDescription = (() => {
+    const descriptionParts = [baseDescription];
+
+    if (
+      isActivity &&
+      scenarioDescription &&
+      scenarioDescription !== baseDescription &&
+      !scenarioDescription.startsWith(baseDescription)
+    ) {
+      descriptionParts.push(scenarioDescription);
+    } else if (
+      isActivity &&
+      scenarioDescription.startsWith(baseDescription) &&
+      scenarioDescription.length > baseDescription.length
+    ) {
+      descriptionParts[0] = scenarioDescription;
+    }
+
+    if (deviceNames.length > 0) {
+      descriptionParts.push(
+        `Devices involved: ${deviceNames.join(', ')}.`,
+      );
+    }
+
+    return descriptionParts.filter(Boolean).join('\n\n');
+  })();
+
   const activeSpeakerConfig = devicesToShow.find((config) => {
     const device = SMART_HOME_DEVICES[config.deviceId];
     const fallbackMeta = getScenarioDeviceMeta(config);
@@ -836,7 +871,7 @@ export default function ActivityDetails() {
               className="text-[#586963] text-[16px] leading-6"
               style={{ fontFamily: 'Nunito_400Regular' }}
             >
-              {displayDescription}
+              {mergedDescription}
             </Text>
           </View>
 

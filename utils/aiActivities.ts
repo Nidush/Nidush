@@ -193,8 +193,26 @@ export const isAiRateLimitError = async (error: unknown) => {
 };
 
 export const getNidushAiErrorMessage = async (error: unknown) => {
+  const message = await getFunctionErrorMessage(error);
+  const normalized = normalizeErrorText(message);
+
   if (await isAiRateLimitError(error)) {
     return 'Our AI guide is taking a short pause right now. Try again in about an hour.';
+  }
+
+  if (
+    normalized.includes('no home connected to this user') ||
+    normalized.includes('no home connected')
+  ) {
+    return 'Connect your profile to a home before saving AI activities.';
+  }
+
+  if (normalized.includes('invalid session') || normalized.includes('missing authorization header')) {
+    return 'Your session expired. Please sign in again and try once more.';
+  }
+
+  if (normalized.includes('row-level security') || normalized.includes('permission')) {
+    return 'This AI activity could not be saved because the database rejected the request. Check the latest Supabase policies and try again.';
   }
 
   return 'We could not create an AI suggestion right now. Please try again in a little while.';

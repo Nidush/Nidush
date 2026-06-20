@@ -1,4 +1,4 @@
-import { Content, CONTENTS } from '@/constants/data';
+import { Content } from '@/constants/data';
 import { resolveCatalogImage } from '@/constants/data/catalogAssets';
 import { Activity, Scenario } from '@/constants/data/types';
 import {
@@ -12,7 +12,6 @@ import { apiLog, supabase, uploadImage } from '../utils/supabase';
 
 import { useNotifications } from '@/context/NotificationsContext';
 import {
-  fetchScenarioTemplates,
   fetchUserScenarios,
   parseUserScenarioDbId,
 } from '@/utils/catalogTemplates';
@@ -350,24 +349,18 @@ export default function NewActivityFlow() {
       if (data && !error) {
         setDbContent(
           (data as ContentRow[]).map((c) => {
-            const localContent = CONTENTS[c.id as keyof typeof CONTENTS];
-
             return {
               id: c.id,
-              title: c.title || localContent?.title,
-              type: c.type || localContent?.type,
-              category: c.category || localContent?.category,
-              description: c.description || localContent?.description,
-              duration: c.duration || localContent?.duration,
-              image: resolveCatalogImage(c.image || localContent?.image),
-              instructions:
-                normalizeContentInstructions(c.instructions) ||
-                localContent?.instructions,
-              ingredients:
-                normalizeContentIngredients(c.ingredients) ||
-                localContent?.ingredients,
-              videoUrl: localContent?.videoUrl || c.video_url || undefined,
-              author: c.author || localContent?.author,
+              title: c.title,
+              type: c.type,
+              category: c.category,
+              description: c.description,
+              duration: c.duration,
+              image: resolveCatalogImage(c.image),
+              instructions: normalizeContentInstructions(c.instructions),
+              ingredients: normalizeContentIngredients(c.ingredients),
+              videoUrl: c.video_url || undefined,
+              author: c.author || undefined,
             };
           }),
         );
@@ -438,13 +431,8 @@ export default function NewActivityFlow() {
   useEffect(() => {
     const fetchScenarios = async () => {
       try {
-        const [templateScenarios, userScenarios] = await Promise.all([
-          fetchScenarioTemplates(),
-          fetchUserScenarios().catch(() => []),
-        ]);
-
-        const mergedScenarios = [...userScenarios, ...templateScenarios];
-        const uniqueScenarios = mergedScenarios.filter(
+        const userScenarios = await fetchUserScenarios().catch(() => []);
+        const uniqueScenarios = userScenarios.filter(
           (scenario, index, list) =>
             list.findIndex((item) => item.id === scenario.id) === index,
         );
@@ -526,13 +514,7 @@ export default function NewActivityFlow() {
   }, [room_id, homeRooms]);
 
   const allContent = useMemo(() => {
-    const combined = [...dbContent];
-    Object.values(CONTENTS).forEach((local: Content) => {
-      if (!combined.find((db: Content) => db.id === local.id)) {
-        combined.push(local);
-      }
-    });
-    return combined;
+    return dbContent;
   }, [dbContent]);
 
   useEffect(() => {
