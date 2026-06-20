@@ -5,7 +5,6 @@ import React, { useEffect, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
-  Alert,
   ImageSourcePropType,
   Linking,
   Platform,
@@ -50,6 +49,7 @@ type AlertConfigState = {
   cancelText: string;
   isDestructive: boolean;
   onConfirm?: () => void;
+  onCancel?: () => void;
 };
 
 type ShortcutRow = {
@@ -237,6 +237,7 @@ export default function ActivityDetails() {
     cancelText: 'Cancel',
     isDestructive: false,
     onConfirm: undefined,
+    onCancel: undefined,
   });
 
   useEffect(() => {
@@ -450,11 +451,11 @@ export default function ActivityDetails() {
         cancelText: '',
         isDestructive: false,
         onConfirm: undefined,
+        onCancel: undefined,
       });
       return;
     }
 
-    // Criamos uma função auxiliar que faz a navegação para a sessão
     const proceedToSession = () => {
       router.push({
         pathname: '/LoadingActivity',
@@ -467,48 +468,43 @@ export default function ActivityDetails() {
       });
     };
 
-    // Verificamos se o modo Focus está ativado antes de avançar
+    const openDeviceSettingsThenProceed = async () => {
+      try {
+        await Linking.openSettings();
+      } catch (error) {
+        console.log('It was not possible to open settings', error);
+      } finally {
+        proceedToSession();
+      }
+    };
+
     if (focusEnabled) {
       if (Platform.OS === 'android') {
-        Alert.alert(
-          'Focus Mode',
-          "Enable 'Focus Mode' on your device. This will minimize distractions by limiting notifications and background activities.",
-          [
-            {
-              text: 'Skip',
-              style: 'cancel',
-              onPress: proceedToSession,
-            },
-            {
-              text: 'Open Settings',
-              onPress: async () => {
-                try {
-                  await Linking.openSettings();
-                } catch (error) {
-                  console.log('It was not possible to open settings', error);
-                } finally {
-                  // Navega para a sessão. Assim, quando o utilizador voltar das definições para a app, já está no ecrã de carregamento/sessão!
-                  proceedToSession();
-                }
-              },
-            },
-          ],
-        );
+        setAlertConfig({
+          visible: true,
+          title: 'Focus Mode',
+          message:
+            'Create a calmer session before you begin. Open your device settings and turn on Focus Mode to reduce notifications and background distractions.',
+          confirmText: 'Open Settings',
+          cancelText: 'Skip',
+          isDestructive: false,
+          onConfirm: openDeviceSettingsThenProceed,
+          onCancel: proceedToSession,
+        });
       } else if (Platform.OS === 'ios') {
-        Alert.alert(
-          'Focus Mode',
-          "iOS cannot block other apps automatically. Open Control Center and turn on your 'Do Not Disturb' or Focus mode.",
-          [
-            {
-              text: 'Understood',
-              style: 'default',
-              onPress: proceedToSession, // Avança depois de ler o aviso
-            },
-          ],
-        );
+        setAlertConfig({
+          visible: true,
+          title: 'Focus Mode',
+          message:
+            'Before starting, open Control Center and turn on Do Not Disturb or your preferred Focus mode to keep this Nidush session calm and interruption-free.',
+          confirmText: 'Understood',
+          cancelText: '',
+          isDestructive: false,
+          onConfirm: proceedToSession,
+          onCancel: undefined,
+        });
       }
     } else {
-      // Se o botão Focus não estava ligado, entra na sessão imediatamente sem chatear o utilizador
       proceedToSession();
     }
   };
@@ -527,6 +523,7 @@ export default function ActivityDetails() {
         cancelText: '',
         isDestructive: false,
         onConfirm: undefined,
+        onCancel: undefined,
       });
       return;
     }
@@ -544,6 +541,7 @@ export default function ActivityDetails() {
         cancelText: '',
         isDestructive: false,
         onConfirm: undefined,
+        onCancel: undefined,
       });
       return;
     }
@@ -656,6 +654,7 @@ export default function ActivityDetails() {
         cancelText: '',
         isDestructive: false,
         onConfirm: undefined,
+        onCancel: undefined,
       });
     } finally {
       setIsUpdatingShortcut(false);
@@ -672,6 +671,7 @@ export default function ActivityDetails() {
         cancelText: '',
         isDestructive: false,
         onConfirm: undefined,
+        onCancel: undefined,
       });
       return;
     }
@@ -707,6 +707,7 @@ export default function ActivityDetails() {
           console.log('Error while trying to delete', e);
         }
       },
+      onCancel: undefined,
     });
   };
 
@@ -946,6 +947,7 @@ export default function ActivityDetails() {
         cancelText={alertConfig.cancelText}
         isDestructive={alertConfig.isDestructive}
         onConfirm={alertConfig.onConfirm}
+        onCancel={alertConfig.onCancel}
         onClose={closeAlert}
       />
     </View>
