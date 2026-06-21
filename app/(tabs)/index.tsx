@@ -352,17 +352,6 @@ export default function Index() {
 
   // --- LÓGICA DO CARROSSEL (Recomendações) ---
   const dynamicActivities = useMemo(() => {
-    if (aiHomeIdeas.length > 0) {
-      return aiHomeIdeas.map((idea) => ({
-        id: idea.id,
-        title: idea.title,
-        image: resolveCatalogImage(idea.image),
-        time: isSavingAiHomeIdeaId === idea.id ? 'Saving...' : `${idea.durationMinutes} min`,
-        room: idea.roomName,
-        onPress: () => saveHomeAiIdea(idea),
-      }));
-    }
-
     const formatActivityForCarousel = (item: Activity): CarouselActivity => {
       const contentId = item.content_id || item.contentId;
       const duration = contentId ? contentDurations[String(contentId)] : undefined;
@@ -374,8 +363,28 @@ export default function Index() {
       };
     };
 
+    const persistedAiActivities = myActivities
+      .filter((item) => !isCatalogTemplateActivity(item))
+      .filter((item) => item.category === 'AI For You')
+      .sort((left, right) => {
+        const leftTime = new Date(left.created_at ?? 0).getTime();
+        const rightTime = new Date(right.created_at ?? 0).getTime();
+        return rightTime - leftTime;
+      })
+      .map(formatActivityForCarousel);
+
+    const liveAiActivities = aiHomeIdeas.map((idea) => ({
+      id: idea.id,
+      title: idea.title,
+      image: resolveCatalogImage(idea.image),
+      time: isSavingAiHomeIdeaId === idea.id ? 'Saving...' : `${idea.durationMinutes} min`,
+      room: idea.roomName,
+      onPress: () => saveHomeAiIdea(idea),
+    }));
+
     const personalizedActivities = myActivities.filter((item) => {
       if (isCatalogTemplateActivity(item)) return false;
+      if (item.category === 'AI For You') return false;
       if (userHobbies.length > 0) {
         return userHobbies.some((h) => h.toLowerCase() === item.type?.toLowerCase());
       }
@@ -387,7 +396,11 @@ export default function Index() {
       currentState,
     ) as Activity[];
 
-    const combinedList = [...sortedList];
+    const combinedList = [
+      ...persistedAiActivities,
+      ...liveAiActivities,
+      ...sortedList.map(formatActivityForCarousel),
+    ];
     const seenIds = new Set<string>();
 
     return combinedList
@@ -397,8 +410,7 @@ export default function Index() {
         seenIds.add(key);
         return true;
       })
-      .slice(0, 8)
-      .map(formatActivityForCarousel);
+      .slice(0, 8);
   }, [aiHomeIdeas, contentDurations, currentState, isSavingAiHomeIdeaId, myActivities, saveHomeAiIdea, userHobbies]);
 
 
